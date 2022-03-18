@@ -21,4 +21,4 @@ DataFusion-tui provides a feature rich terminal application for using DataFusion
   - S3 (TODO)
 - Preloading DDL from `~/.datafusionrc`
 
-![Alt text](media/screenshot.jpeg?raw=true "DataFusion-tui")
+![Alt text](media/datafusion-tui-recording.mov?raw=true "DataFusion-tui")
