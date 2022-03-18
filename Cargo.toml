@@ -1,0 +1,25 @@
+[package]
+name = "datafusion-tui"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+arrow = "9"
+clap = {version = "3", features = ["derive", "cargo"]}
+crossterm = { version = "0.23", features = [ "serde" ] }
+datafusion = "7"
+datafusion-objectstore-s3 = { version = "0", optional=true }
+dirs = "4.0"
+log = "0.4"
+mimalloc = { version = "*", default-features = false }
+tui = { version = "0.17", default-features = false, features = ['crossterm', 'serde'] }
+tui-logger = "0.7"
+tokio = { version = "1", features = ["full"] }
+unicode-width = "0.1.9"
+
+[features]
+# Enable S3 as ObjectStore
+s3 = ["datafusion-objectstore-s3"]
