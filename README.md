@@ -9,6 +9,7 @@ Some of the current and planned features are listed here:
   - SQL editor
     - Text editor for writing SQL queries
     - Scrollable query results
+    - Track memory usage during query (TODO)
     - Write query results to file (TODO)
     - Multiple SQL Editor tabs (TODO)
   - Query history
@@ -20,9 +21,27 @@ Some of the current and planned features are listed here:
   - Help (TODO)
     - Documentation on functions / commands
 - Custom ObjectStore Support
-  - S3
+  - S3 with AWS default credentials
+  - S3 with custom endpoint / provider (i.e. MinIO)
   - HDFS (TODO)
 - Custom Table Providers (if supported in SQL by DataFusion)
   - Delta Table (TODO)
   - Big Table  (TODO)
 - Preloading DDL from `~/.datafusionrc` for local database available on startup
+
+## User Guide
+
+The interface is split into several tabs so that relevant information can be viewed and controlled in a clean and organized manner.  When not writing a SQL query keys can be entered to navigate and control the interface.
+
+- SQL Editor: where queries are entered and results can be viewed
+  - Normal mode
+    - `q` => quit datafusion-tui
+    - `e` => start editing SQL Editor
+    - `c` => clear contents of SQL Editor
+    - Enter the tab number in brackets after a tabs name to navigate to that tab
+    - If query results are longer or wider than screen, you can use arrow keys to scroll
+  - Edit mode
+    - Character keys to write queries
+    - Backspace / tab / enter work same as normal
+    - Add a semicolor after query and hit `enter` to execute query
+  
