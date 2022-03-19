@@ -58,7 +58,7 @@ fn draw_sql_eqitor_tab<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         )
         .split(f.size());
 
-    let help_message = draw_help(app);
+    let help_message = draw_sql_editor_help(app);
     f.render_widget(help_message, chunks[0]);
 
     let tabs = draw_tabs(app);
@@ -84,7 +84,7 @@ fn draw_query_history_tab<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         )
         .split(f.size());
 
-    let help_message = draw_help(app);
+    let help_message = draw_default_help();
     f.render_widget(help_message, chunks[0]);
 
     let tabs = draw_tabs(app);
@@ -107,7 +107,7 @@ fn draw_context_tab<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         )
         .split(f.size());
 
-    let help_message = draw_help(app);
+    let help_message = draw_default_help();
     f.render_widget(help_message, chunks[0]);
 
     let tabs = draw_tabs(app);
@@ -130,7 +130,7 @@ fn draw_logs_tab<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         )
         .split(f.size());
 
-    let help_message = draw_help(app);
+    let help_message = draw_default_help();
     f.render_widget(help_message, chunks[0]);
 
     let tabs = draw_tabs(app);
@@ -153,14 +153,14 @@ fn draw_default_tab<B: Backend>(f: &mut Frame<B>, app: &mut App) {
         )
         .split(f.size());
 
-    let help_message = draw_help(app);
+    let help_message = draw_default_help();
     f.render_widget(help_message, chunks[0]);
 
     let tabs = draw_tabs(app);
     f.render_widget(tabs, chunks[1]);
 }
 
-fn draw_help<'a>(app: &mut App) -> Paragraph<'a> {
+fn draw_sql_editor_help<'a>(app: &mut App) -> Paragraph<'a> {
     let (msg, style) = match app.input_mode {
         InputMode::Normal => (
             vec![
@@ -170,7 +170,9 @@ fn draw_help<'a>(app: &mut App) -> Paragraph<'a> {
                 Span::styled("e", Style::default().add_modifier(Modifier::BOLD)),
                 Span::raw(" to start editing, "),
                 Span::styled("c", Style::default().add_modifier(Modifier::BOLD)),
-                Span::raw(" to clear the editor."),
+                Span::raw(" to clear the editor, "),
+                Span::styled("#", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(" to change tabs."),
             ],
             Style::default().add_modifier(Modifier::RAPID_BLINK),
         ),
@@ -185,6 +187,20 @@ fn draw_help<'a>(app: &mut App) -> Paragraph<'a> {
             Style::default(),
         ),
     };
+    let mut text = Text::from(Spans::from(msg));
+    text.patch_style(style);
+    Paragraph::new(text)
+}
+
+fn draw_default_help<'a>() -> Paragraph<'a> {
+    let (msg, style) = (
+        vec![
+            Span::raw("Press "),
+            Span::styled("#", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw(" to change tabs."),
+        ],
+        Style::default().add_modifier(Modifier::RAPID_BLINK),
+    );
     let mut text = Text::from(Spans::from(msg));
     text.patch_style(style);
     Paragraph::new(text)

@@ -36,7 +36,7 @@ The interface is split into several tabs so that relevant information can be vie
 - SQL Editor: where queries are entered and results can be viewed
   - Normal mode
     - `q` => quit datafusion-tui
-    - `e` => start editing SQL Editor
+    - `e` => start editing SQL Editor in Edit mode
     - `c` => clear contents of SQL Editor
     - Enter the tab number in brackets after a tabs name to navigate to that tab
     - If query results are longer or wider than screen, you can use arrow keys to scroll
@@ -44,4 +44,5 @@ The interface is split into several tabs so that relevant information can be vie
     - Character keys to write queries
     - Backspace / tab / enter work same as normal
     - Add a semicolor after query and hit `enter` to execute query
+    - `esc` to exit Edit mode and go back to Normal mode
   
