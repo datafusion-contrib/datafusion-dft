@@ -24,6 +24,7 @@ use unicode_width::UnicodeWidthStr;
 use crate::app::datafusion::context::QueryResultsMeta;
 
 /// Single line of text in SQL Editor and cursor over it
+#[derive(Debug)]
 pub struct Line {
     // text: String,
     text: io::Cursor<String>,
@@ -38,6 +39,7 @@ impl Default for Line {
 }
 
 /// All lines in SQL Editor
+#[derive(Debug)]
 pub struct Input {
     pub lines: Vec<Line>,
     /// Current line in editor
@@ -111,11 +113,26 @@ impl Input {
 
     pub fn up_row(&mut self) {
         if self.cursor_row > 0 {
-            let previous_col = self.cursor_column;
-            self.cursor_row -= 1;
-            let new_row_width = self.lines[self.cursor_row as usize].text.get_ref().width() as u16;
-            let new_col = cmp::min(previous_col, new_row_width);
-            self.cursor_column = new_col;
+            match self.lines[self.cursor_row as usize]
+                .text
+                .get_ref()
+                .is_empty()
+            {
+                true => {
+                    self.cursor_row -= 1;
+                    let new_row_width =
+                        self.lines[self.cursor_row as usize].text.get_ref().width() as u16;
+                    self.cursor_column = new_row_width;
+                }
+                false => {
+                    let previous_col = self.cursor_column;
+                    self.cursor_row -= 1;
+                    let new_row_width =
+                        self.lines[self.cursor_row as usize].text.get_ref().width() as u16;
+                    let new_col = cmp::min(previous_col, new_row_width);
+                    self.cursor_column = new_col;
+                }
+            }
         }
     }
 
@@ -149,6 +166,7 @@ impl Input {
     }
 
     pub fn backspace(&mut self) {
+        debug!("Backspace entered. Input Before: {:?}", self);
         match self.lines[self.cursor_row as usize]
             .text
             .get_ref()
@@ -166,7 +184,8 @@ impl Input {
                     .remove((self.cursor_column - 1) as usize);
                 self.cursor_column -= 1
             }
-        }
+        };
+        debug!("Input After: {:?}", self);
     }
 
     pub fn clear(&mut self) {
