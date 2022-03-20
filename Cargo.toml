@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 
 arrow = "9"
+ballista = {version = "0.6", optional=true}
 clap = {version = "3", features = ["derive", "cargo"]}
 crossterm = { version = "0.23", features = [ "serde" ] }
 datafusion = "7"
@@ -21,5 +22,5 @@ tokio = { version = "1", features = ["full"] }
 unicode-width = "0.1.9"
 
 [features]
-# Enable S3 as ObjectStore
 s3 = ["datafusion-objectstore-s3"]
+ballista = ["ballista"]

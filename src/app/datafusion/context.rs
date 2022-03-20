@@ -122,7 +122,7 @@ impl Context {
         match self {
             Context::Local(ctx) => {
                 let physical_opts = ctx.state.lock().config.physical_optimizers.clone();
-                debug!("Extracting Physical Optimizer Rules");
+                debug!("Extracting physical optimizer rules");
                 let opts = physical_opts
                     .iter()
                     .map(|opt| opt.name().to_string())
@@ -201,6 +201,7 @@ impl BallistaContext {
     }
 }
 
+// Feature added but not tested
 #[cfg(not(feature = "ballista"))]
 pub struct BallistaContext();
 #[cfg(not(feature = "ballista"))]
