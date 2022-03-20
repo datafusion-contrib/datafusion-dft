@@ -201,7 +201,7 @@ impl BallistaContext {
     }
 }
 
-// Feature added but not tested
+// Feature added but not tested as cant install from crates
 #[cfg(not(feature = "ballista"))]
 pub struct BallistaContext();
 #[cfg(not(feature = "ballista"))]
