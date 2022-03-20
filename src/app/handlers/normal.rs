@@ -83,6 +83,7 @@ pub fn normal_mode_handler(app: &mut App, key: Key) -> io::Result<AppReturn> {
         }
     } else {
         match key {
+            Key::Char('q') => Ok(AppReturn::Exit),
             Key::Char(c) => change_tab(c, app),
             _ => Ok(AppReturn::Continue),
         }

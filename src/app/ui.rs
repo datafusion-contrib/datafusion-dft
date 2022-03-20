@@ -196,6 +196,8 @@ fn draw_default_help<'a>() -> Paragraph<'a> {
     let (msg, style) = (
         vec![
             Span::raw("Press "),
+            Span::styled("q", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw(" to exit, "),
             Span::styled("#", Style::default().add_modifier(Modifier::BOLD)),
             Span::raw(" to change tabs."),
         ],
