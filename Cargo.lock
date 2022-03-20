@@ -804,13 +804,18 @@ name = "datafusion-tui"
 version = "0.1.0"
 dependencies = [
  "arrow",
+ "aws-sdk-s3",
+ "aws-types",
  "clap",
  "crossterm 0.23.0",
  "datafusion",
  "datafusion-objectstore-s3",
  "dirs",
+ "http",
  "log",
  "mimalloc",
+ "serde",
+ "serde_json",
  "tokio",
  "tui",
  "tui-logger",

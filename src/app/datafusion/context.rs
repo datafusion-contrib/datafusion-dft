@@ -136,9 +136,59 @@ impl Context {
 
 #[cfg(feature = "s3")]
 pub async fn register_s3(ctx: ExecutionContext) -> ExecutionContext {
+    use aws_sdk_s3::Endpoint;
+    use aws_types::credentials::{Credentials, SharedCredentialsProvider};
     use datafusion_objectstore_s3::object_store::s3::S3FileSystem;
-    ctx.register_object_store("s3", Arc::new(S3FileSystem::default().await));
-    info!("Registered S3 ObjectStore");
+    use http::Uri;
+    use serde::Deserialize;
+    use std::str::FromStr;
+
+    #[derive(Deserialize, Debug)]
+    struct S3Config {
+        endpoint: String,
+        access_key_id: String,
+        secret_access_key: String,
+    }
+
+    async fn config_to_s3(cfg: S3Config) -> S3FileSystem {
+        info!("Creating S3 from: {:?}", cfg);
+        S3FileSystem::new(
+            Some(SharedCredentialsProvider::new(Credentials::new(
+                cfg.access_key_id,
+                cfg.secret_access_key,
+                None,
+                None,
+                "Static",
+            ))), // Credentials provider
+            None, // Region
+            Some(Endpoint::immutable(
+                Uri::from_str(cfg.endpoint.as_str()).unwrap(),
+            )), // Endpoint
+            None, // RetryConfig
+            None, // AsyncSleep
+            None, // TimeoutConfig
+        )
+        .await
+    }
+
+    let home = dirs::home_dir();
+    if let Some(p) = home {
+        let s3_config_path = p.join(".datafusion/object_stores/s3.json");
+        let s3 = if s3_config_path.exists() {
+            let cfg: S3Config =
+                serde_json::from_reader(File::open(s3_config_path).unwrap()).unwrap();
+            let s3 = config_to_s3(cfg).await;
+            info!("Created S3FileSystem from custom endpoint");
+            Arc::new(s3)
+        } else {
+            let s3 = S3FileSystem::default().await;
+            info!("Created S3FileSystem from default AWS credentials");
+            Arc::new(s3)
+        };
+
+        ctx.register_object_store("s3", s3);
+        info!("Registered S3 ObjectStore");
+    }
     ctx
 }
 
@@ -185,6 +235,9 @@ async fn exec_and_print(ctx: &mut Context, sql: String) -> Result<()> {
 
 // implement wrappers around the BallistaContext to support running without ballista
 
+// Feature added but not tested as cant install from crates
+#[cfg(feature = "ballista")]
+use ballista;
 #[cfg(feature = "ballista")]
 pub struct BallistaContext(ballista::context::BallistaContext);
 #[cfg(feature = "ballista")]
