@@ -45,4 +45,7 @@ The interface is split into several tabs so that relevant information can be vie
     - Backspace / tab / enter work same as normal
     - Add a semicolor after query and hit `enter` to execute query
     - `esc` to exit Edit mode and go back to Normal mode
-  
+- Register custom `ObjectStore`
+  - S3: run / install with `--features=s3`
+    - If you want to use your default AWS credentials, then no further action is required.  For example your credentials in `~/.aws/credentials` will automatically be picked up.
+    - If you want to use a custom S3 provider, such as MinIO, then you must create a `s3.json` configuration file in `~/.datafusion/object_stores/` with the fields `endpoint`, `access_key_id`, and `secret_access_key`.
