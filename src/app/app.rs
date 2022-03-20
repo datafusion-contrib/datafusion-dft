@@ -16,7 +16,7 @@
 // under the License.
 
 use datafusion::prelude::ExecutionConfig;
-use log::debug;
+use log::{debug, info};
 
 use crate::app::datafusion::context::{Context, QueryResults};
 use crate::app::editor::Editor;
@@ -83,7 +83,7 @@ impl App {
                 let mut files = Vec::new();
                 let home = dirs::home_dir();
                 if let Some(p) = home {
-                    let home_rc = p.join(".datafusionrc");
+                    let home_rc = p.join(".datafusion/.datafusionrc");
                     if home_rc.exists() {
                         files.push(home_rc.into_os_string().into_string().unwrap());
                     }
@@ -96,6 +96,7 @@ impl App {
             ctx.exec_files(files).await
         } else {
             if !rc.is_empty() {
+                info!("Executing '~/.datafusion/.datafusionrc' file");
                 ctx.exec_files(rc).await
             }
         }
