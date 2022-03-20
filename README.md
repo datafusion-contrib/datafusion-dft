@@ -27,7 +27,7 @@ Some of the current and planned features are listed here:
 - Custom Table Providers (if supported in SQL by DataFusion)
   - Delta Table (TODO)
   - Big Table  (TODO)
-- Preloading DDL from `~/.datafusionrc` for local database available on startup
+- Preloading DDL from `~/.datafusion/.datafusionrc` for local database available on startup
 
 ## User Guide
 
