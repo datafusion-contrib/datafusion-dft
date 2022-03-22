@@ -18,12 +18,11 @@
 pub mod edit;
 pub mod normal;
 
-use std::io;
-
+use crate::app::error::Result;
 use crate::app::{App, AppReturn, InputMode};
 use crate::events::Key;
 
-pub async fn key_event_handler<'a>(app: &mut App, key: Key) -> io::Result<AppReturn> {
+pub async fn key_event_handler<'a>(app: &mut App, key: Key) -> Result<AppReturn> {
     match app.input_mode {
         InputMode::Normal => normal::normal_mode_handler(app, key),
         InputMode::Editing => edit::edit_mode_handler(app, key).await,

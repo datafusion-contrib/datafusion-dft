@@ -15,8 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::io;
-
+use crate::app::error::Result;
 use crate::app::{App, AppReturn, InputMode};
 use crate::events::Key;
 
@@ -25,11 +24,11 @@ pub enum NormalModeAction {
     Exit,
 }
 
-pub fn normal_mode_handler(app: &mut App, key: Key) -> io::Result<AppReturn> {
+pub fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
     if app.tabs.index == 0 {
         match key {
             Key::Char('c') => {
-                app.editor.input.clear();
+                app.editor.input.clear()?;
                 app.input_mode = InputMode::Editing;
                 Ok(AppReturn::Continue)
             }
@@ -38,7 +37,13 @@ pub fn normal_mode_handler(app: &mut App, key: Key) -> io::Result<AppReturn> {
                 Ok(AppReturn::Continue)
             }
             Key::Char('q') => Ok(AppReturn::Exit),
-            Key::Char(c) => change_tab(c, app),
+            Key::Char(c) => {
+                if c.is_ascii_digit() {
+                    change_tab(c, app)
+                } else {
+                    Ok(AppReturn::Continue)
+                }
+            }
             Key::Down => {
                 match app.query_results {
                     Some(ref mut results) => results.scroll.x += 1,
@@ -90,15 +95,12 @@ pub fn normal_mode_handler(app: &mut App, key: Key) -> io::Result<AppReturn> {
     }
 }
 
-fn change_tab(c: char, app: &mut App) -> io::Result<AppReturn> {
-    if c.is_ascii_digit() {
-        let input_idx = c.to_digit(10).unwrap() as usize;
-        if input_idx < app.tabs.titles.len() {
-            app.tabs.index = input_idx
-        } else {
-        };
-        Ok(AppReturn::Continue)
+fn change_tab(c: char, app: &mut App) -> Result<AppReturn> {
+    // Already checked that this is a digit, safe to unwrap
+    let input_idx = c.to_digit(10).unwrap() as usize;
+    if input_idx < app.tabs.titles.len() {
+        app.tabs.index = input_idx
     } else {
-        Ok(AppReturn::Continue)
-    }
+    };
+    Ok(AppReturn::Continue)
 }

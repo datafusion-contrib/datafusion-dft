@@ -22,6 +22,8 @@ use std::io;
 use unicode_width::UnicodeWidthStr;
 
 use crate::app::datafusion::context::QueryResultsMeta;
+use crate::app::error::Result;
+use crate::app::AppReturn;
 
 /// Single line of text in SQL Editor and cursor over it
 #[derive(Debug)]
@@ -69,12 +71,11 @@ impl Input {
         text.join("")
     }
 
-    pub fn append_char(&mut self, c: char) {
+    pub fn append_char(&mut self, c: char) -> Result<AppReturn> {
         if self.lines.is_empty() {
             let line = Line::default();
             self.lines.push(line)
         }
-        // self.lines[self.cursor_row as usize].text.get_mut().push(c);
         match c {
             '\n' => {
                 self.lines[self.cursor_row as usize].text.get_mut().push(c);
@@ -105,13 +106,14 @@ impl Input {
             c,
             self.lines[self.cursor_row as usize].text.get_ref()
         );
+        Ok(AppReturn::Continue)
     }
 
     pub fn pop(&mut self) -> Option<char> {
         self.lines[self.cursor_row as usize].text.get_mut().pop()
     }
 
-    pub fn up_row(&mut self) {
+    pub fn up_row(&mut self) -> Result<AppReturn> {
         if self.cursor_row > 0 {
             match self.lines[self.cursor_row as usize]
                 .text
@@ -134,11 +136,12 @@ impl Input {
                 }
             }
         }
+        Ok(AppReturn::Continue)
     }
 
-    pub fn down_row(&mut self) {
+    pub fn down_row(&mut self) -> Result<AppReturn> {
         if self.lines.is_empty() {
-            return;
+            return Ok(AppReturn::Continue);
         } else if self.cursor_row + 1 < self.lines.len() as u16 {
             let previous_col = self.cursor_column;
             let new_row_width = self.lines[self.cursor_row as usize].text.get_ref().width() as u16;
@@ -146,26 +149,29 @@ impl Input {
             let new_col = cmp::min(previous_col, new_row_width);
             self.cursor_column = new_col;
         }
+        Ok(AppReturn::Continue)
     }
 
-    pub fn next_char(&mut self) {
+    pub fn next_char(&mut self) -> Result<AppReturn> {
         if self.lines.is_empty()
             || self.cursor_column
                 == self.lines[self.cursor_row as usize].text.get_ref().width() as u16
         {
-            return;
+            return Ok(AppReturn::Continue);
         } else {
             self.cursor_column += 1
         }
+        Ok(AppReturn::Continue)
     }
 
-    pub fn previous_char(&mut self) {
+    pub fn previous_char(&mut self) -> Result<AppReturn> {
         if self.cursor_column > 0 {
             self.cursor_column -= 1
         }
+        Ok(AppReturn::Continue)
     }
 
-    pub fn backspace(&mut self) {
+    pub fn backspace(&mut self) -> Result<AppReturn> {
         debug!("Backspace entered. Input Before: {:?}", self);
         match self.lines[self.cursor_row as usize]
             .text
@@ -173,7 +179,7 @@ impl Input {
             .is_empty()
         {
             true => {
-                self.up_row();
+                self.up_row()?;
                 // Pop newline character
                 self.pop();
             }
@@ -186,16 +192,18 @@ impl Input {
             }
         };
         debug!("Input After: {:?}", self);
+        Ok(AppReturn::Continue)
     }
 
-    pub fn clear(&mut self) {
+    pub fn clear(&mut self) -> Result<AppReturn> {
         let lines = Vec::<Line>::new();
         self.lines = lines;
         self.cursor_row = 0;
         self.cursor_column = 0;
+        Ok(AppReturn::Continue)
     }
 
-    pub fn tab(&mut self) {
+    pub fn tab(&mut self) -> Result<AppReturn> {
         self.append_char('\t')
     }
 }

@@ -15,16 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use log::debug;
-use std::io;
+use log::{debug, error};
 use std::time::Instant;
 
 use crate::app::datafusion::context::{QueryResults, QueryResultsMeta};
+use crate::app::error::{DftError, Result};
 use crate::app::ui::Scroll;
 use crate::app::{App, AppReturn, InputMode};
 use crate::events::Key;
 
-pub async fn edit_mode_handler(app: &mut App, key: Key) -> io::Result<AppReturn> {
+pub async fn edit_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
     debug!(
         "{} Entered, current row / col: {} / {}",
         key, app.editor.input.cursor_row, app.editor.input.cursor_column
@@ -33,34 +33,29 @@ pub async fn edit_mode_handler(app: &mut App, key: Key) -> io::Result<AppReturn>
         Key::Enter => enter_handler(app).await,
         Key::Char(c) => match c {
             ';' => {
-                app.editor.input.append_char(c);
+                let result = app.editor.input.append_char(c);
                 app.editor.sql_terminated = true;
+                result
             }
-            _ => {
-                app.editor.input.append_char(c);
-            }
+            _ => app.editor.input.append_char(c),
         },
         Key::Left => app.editor.input.previous_char(),
         Key::Right => app.editor.input.next_char(),
         Key::Up => app.editor.input.up_row(),
         Key::Down => app.editor.input.down_row(),
         Key::Tab => app.editor.input.tab(),
-        Key::Backspace => {
-            app.editor.input.backspace();
-        }
+        Key::Backspace => app.editor.input.backspace(),
         Key::Esc => {
             app.input_mode = InputMode::Normal;
+            Ok(AppReturn::Continue)
         }
-        _ => {}
-    };
-    Ok(AppReturn::Continue)
+        _ => Ok(AppReturn::Continue),
+    }
 }
 
-async fn enter_handler(app: &mut App) {
+async fn enter_handler(app: &mut App) -> Result<AppReturn> {
     match app.editor.sql_terminated {
-        false => {
-            app.editor.input.append_char('\n');
-        }
+        false => app.editor.input.append_char('\n'),
         true => {
             let sql: String = app.editor.input.combine_lines();
             app.editor.sql_terminated = false;
@@ -69,7 +64,10 @@ async fn enter_handler(app: &mut App) {
             let df = app.context.sql(&sql).await;
             match df {
                 Ok(df) => {
-                    let batches = df.collect().await.unwrap();
+                    let batches = df
+                        .collect()
+                        .await
+                        .map_err(|e| DftError::DataFusionError(e))?;
                     let query_duration = now.elapsed().as_secs_f64();
                     let rows: usize = batches.iter().map(|b| b.num_rows()).sum();
                     let query_meta = QueryResultsMeta {
@@ -87,6 +85,7 @@ async fn enter_handler(app: &mut App) {
                     });
                 }
                 Err(e) => {
+                    error!("{}", e);
                     let err_msg = format!("{}", e);
                     let query_meta = QueryResultsMeta {
                         query: sql,
@@ -97,7 +96,10 @@ async fn enter_handler(app: &mut App) {
                     };
                     app.editor.history.push(query_meta)
                 }
-            }
+            };
+            Ok(AppReturn::Continue)
         }
     }
 }
+
+// TODO: Create query handler function
