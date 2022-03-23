@@ -30,12 +30,13 @@ use crossterm::{
 };
 use tui::{backend::CrosstermBackend, Terminal};
 
+use crate::app::error::Result;
 use crate::app::ui;
 use crate::app::App;
 
 use crate::events::{Event, Events};
 
-pub async fn run_app(app: &mut App) -> io::Result<()> {
+pub async fn run_app(app: &mut App) -> Result<()> {
     enable_raw_mode().unwrap();
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture).unwrap();

@@ -15,7 +15,39 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use datafusion::error::DataFusionError;
+use std::error;
+use std::fmt::{Display, Formatter};
+use std::io;
+use std::result;
+
+pub type Result<T> = result::Result<T, DftError>;
+
+#[derive(Debug)]
 pub enum DftError {
-    ExternalError(Box<dyn Error + Send + Sync>),
-    IoError(String),
+    DataFusionError(DataFusionError),
+    IoError(io::Error),
 }
+
+impl From<io::Error> for DftError {
+    fn from(e: io::Error) -> Self {
+        DftError::IoError(e)
+    }
+}
+
+impl From<DataFusionError> for DftError {
+    fn from(e: DataFusionError) -> Self {
+        DftError::DataFusionError(e)
+    }
+}
+
+impl Display for DftError {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        match *self {
+            DftError::DataFusionError(ref desc) => write!(f, "DataFusion error: {}", desc),
+            DftError::IoError(ref desc) => write!(f, "IO error: {}", desc),
+        }
+    }
+}
+
+impl error::Error for DftError {}

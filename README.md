@@ -24,6 +24,7 @@ Some of the current and planned features are listed here:
   - S3 with AWS default credentials
   - S3 with custom endpoint / provider (i.e. MinIO)
   - HDFS (TODO)
+  - `ObjectStore` explorer.  I.e. able to list files in `ObjectStore`
 - Custom Table Providers (if supported in SQL by DataFusion)
   - Delta Table (TODO)
   - Big Table  (TODO)

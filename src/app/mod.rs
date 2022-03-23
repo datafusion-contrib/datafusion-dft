@@ -18,6 +18,7 @@
 mod app;
 pub mod datafusion;
 pub mod editor;
+pub mod error;
 pub mod handlers;
 pub mod ui;
 
