@@ -48,6 +48,7 @@ pub enum InputMode {
     Editing,
 }
 
+/// Status that determines whether app should continue or exit
 #[derive(PartialEq)]
 pub enum AppReturn {
     Continue,
