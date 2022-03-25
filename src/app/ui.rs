@@ -240,7 +240,7 @@ fn draw_query_results<'a>(app: &'a mut App) -> Paragraph<'a> {
         Some(query_results) => {
             let query_meta = app.editor.history.last().unwrap();
             let results = if query_meta.query.starts_with("CREATE") {
-                Paragraph::new(String::from("Table created"))
+                    Paragraph::new(String::from("Table created"))
             } else {
                 let table = pretty_format_batches(&query_results.batches)
                     .unwrap()
@@ -253,7 +253,11 @@ fn draw_query_results<'a>(app: &'a mut App) -> Paragraph<'a> {
         None => {
             let last_query = app.editor.history.last();
             let no_queries_text = match last_query {
-                Some(query_meta) => Paragraph::new(query_meta.query.as_str()),
+                Some(query_meta) => if let Some(err) = &query_meta.error {
+                    Paragraph::new(err.as_str())
+                } else {
+                    Paragraph::new(query_meta.query.as_str())
+                }
                 None => Paragraph::new("No queries yet"),
             };
             (no_queries_text, String::new())
