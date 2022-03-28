@@ -18,10 +18,10 @@
 use log::{debug, error};
 use std::time::Instant;
 
-use crate::app::datafusion::context::{QueryResults, QueryResultsMeta};
-use crate::app::error::{DftError, Result};
-use crate::app::ui::Scroll;
-use crate::app::{App, AppReturn, InputMode};
+use crate::core::datafusion::context::{QueryResults, QueryResultsMeta};
+use crate::core::error::{DftError, Result};
+use crate::core::ui::Scroll;
+use crate::core::{App, AppReturn, InputMode};
 use crate::events::Key;
 
 pub async fn edit_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
@@ -64,7 +64,10 @@ async fn enter_handler(app: &mut App) -> Result<AppReturn> {
             let df = app.context.sql(&sql).await;
             match df {
                 Ok(df) => {
-                    let batches = df.collect().await.map_err(DftError::DataFusionError)?;
+                    let batches = df
+                        .collect()
+                        .await
+                        .map_err(|e| DftError::DataFusionError(e))?;
                     let query_duration = now.elapsed().as_secs_f64();
                     let rows: usize = batches.iter().map(|b| b.num_rows()).sum();
                     let query_meta = QueryResultsMeta {

@@ -15,8 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use crate::app::error::Result;
-use crate::app::{App, AppReturn, InputMode};
+use crate::core::error::Result;
+use crate::core::{App, AppReturn, InputMode};
 use crate::events::Key;
 
 pub enum NormalModeAction {
@@ -45,35 +45,43 @@ pub fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
                 }
             }
             Key::Down => {
-                if let Some(results) = &mut app.query_results {
-                    results.scroll.x += 1
-                }
+                match app.query_results {
+                    Some(ref mut results) => results.scroll.x += 1,
+                    None => {}
+                };
                 Ok(AppReturn::Continue)
             }
             Key::Up => {
-                if let Some(results) = &mut app.query_results {
-                    let new_x = match results.scroll.x {
-                        0 => 0,
-                        n => n - 1,
-                    };
-                    results.scroll.x = new_x
-                }
+                match app.query_results {
+                    Some(ref mut results) => {
+                        let new_x = match results.scroll.x {
+                            0 => 0,
+                            n => n - 1,
+                        };
+                        results.scroll.x = new_x
+                    }
+                    None => {}
+                };
                 Ok(AppReturn::Continue)
             }
             Key::Right => {
-                if let Some(results) = &mut app.query_results {
-                    results.scroll.y += 3
-                }
+                match app.query_results {
+                    Some(ref mut results) => results.scroll.y += 3,
+                    None => {}
+                };
                 Ok(AppReturn::Continue)
             }
             Key::Left => {
-                if let Some(results) = &mut app.query_results {
-                    let new_y = match results.scroll.y {
-                        0 | 1 | 2 => 0,
-                        n => n - 3,
-                    };
-                    results.scroll.y = new_y
-                }
+                match app.query_results {
+                    Some(ref mut results) => {
+                        let new_y = match results.scroll.y {
+                            0 | 1 | 2 => 0,
+                            n => n - 3,
+                        };
+                        results.scroll.y = new_y
+                    }
+                    None => {}
+                };
                 Ok(AppReturn::Continue)
             }
             _ => Ok(AppReturn::Continue),

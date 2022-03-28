@@ -21,9 +21,9 @@ use std::io;
 
 use unicode_width::UnicodeWidthStr;
 
-use crate::app::datafusion::context::QueryResultsMeta;
-use crate::app::error::Result;
-use crate::app::AppReturn;
+use crate::core::datafusion::context::QueryResultsMeta;
+use crate::core::error::Result;
+use crate::core::AppReturn;
 
 /// Single line of text in SQL Editor and cursor over it
 #[derive(Debug)]
@@ -41,13 +41,23 @@ impl Default for Line {
 }
 
 /// All lines in SQL Editor
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Input {
     pub lines: Vec<Line>,
     /// Current line in editor
     pub cursor_row: u16,
     /// Current column in editor
     pub cursor_column: u16,
+}
+
+impl Default for Input {
+    fn default() -> Input {
+        Input {
+            lines: Vec::<Line>::new(),
+            cursor_row: 0,
+            cursor_column: 0,
+        }
+    }
 }
 
 impl Input {
@@ -209,6 +219,8 @@ pub struct Editor {
 }
 impl Default for Editor {
     fn default() -> Editor {
+        let mut line_lengths = Vec::new();
+        line_lengths.push(0);
         let input = Input::default();
         Editor {
             input,

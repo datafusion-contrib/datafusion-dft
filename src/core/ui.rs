@@ -26,7 +26,7 @@ use tui::{
 };
 use tui_logger::TuiLoggerWidget;
 
-use crate::app::{App, InputMode};
+use crate::core::{App, InputMode};
 
 pub struct Scroll {
     pub x: u16,
@@ -217,7 +217,7 @@ fn draw_editor<'a>(app: &mut App) -> Paragraph<'a> {
         .block(Block::default().borders(Borders::ALL).title("SQL Editor"))
 }
 
-fn draw_cursor<B: Backend>(app: &mut App, f: &mut Frame<B>, chunks: &[Rect]) {
+fn draw_cursor<B: Backend>(app: &mut App, f: &mut Frame<B>, chunks: &Vec<Rect>) {
     match app.input_mode {
         InputMode::Normal =>
             // Hide the cursor. `Frame` does this by default, so we don't need to do anything here
@@ -234,7 +234,7 @@ fn draw_cursor<B: Backend>(app: &mut App, f: &mut Frame<B>, chunks: &[Rect]) {
     };
 }
 
-fn draw_query_results(app: &mut App) -> Paragraph {
+fn draw_query_results<'a>(app: &'a mut App) -> Paragraph<'a> {
     // Query results not shown correctly on error. For example `show tables for x`
     let (query_results, duration) = match &app.query_results {
         Some(query_results) => {
@@ -297,7 +297,7 @@ fn draw_query_history<'a>(app: &mut App) -> List<'a> {
                     "Query {} [ {} rows took {:.3} seconds ]",
                     i, m.rows, m.query_duration
                 ))),
-                Spans::from(Span::raw(m.query.clone())),
+                Spans::from(Span::raw(format!("{}", m.query))),
                 Spans::from(Span::raw(String::new())),
             ];
             ListItem::new(content)
@@ -326,7 +326,7 @@ fn draw_logs<'a>() -> TuiLoggerWidget<'a> {
         )
 }
 
-fn draw_context<B: Backend>(f: &mut Frame<B>, app: &mut App, area: Rect) {
+fn draw_context<'a, B: Backend>(f: &mut Frame<B>, app: &mut App, area: Rect) {
     let context = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
@@ -344,7 +344,7 @@ fn draw_execution_config(app: &mut App) -> List {
     let config: Vec<ListItem> = exec_config
         .iter()
         .map(|i| {
-            let content = vec![Spans::from(Span::raw(i.to_string()))];
+            let content = vec![Spans::from(Span::raw(format!("{}", i)))];
             ListItem::new(content)
         })
         .collect();
@@ -361,7 +361,7 @@ fn draw_physical_optimizers(app: &mut App) -> List {
     let opts: Vec<ListItem> = physical_optimizers
         .iter()
         .map(|i| {
-            let content = vec![Spans::from(Span::raw(i.to_string()))];
+            let content = vec![Spans::from(Span::raw(format!("{}", i)))];
             ListItem::new(content)
         })
         .collect();

@@ -18,10 +18,10 @@
 use datafusion::prelude::ExecutionConfig;
 use log::{debug, info};
 
-use crate::app::datafusion::context::{Context, QueryResults};
-use crate::app::editor::Editor;
-use crate::app::handlers::key_event_handler;
 use crate::cli::args::Args;
+use crate::core::datafusion::context::{Context, QueryResults};
+use crate::core::editor::Editor;
+use crate::core::handlers::key_event_handler;
 use crate::events::Key;
 
 pub struct Tabs {
