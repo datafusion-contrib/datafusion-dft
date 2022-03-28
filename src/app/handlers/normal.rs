@@ -15,8 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use crate::app::core::{App, AppReturn, InputMode};
 use crate::app::error::Result;
-use crate::app::{App, AppReturn, InputMode};
 use crate::events::Key;
 
 pub enum NormalModeAction {

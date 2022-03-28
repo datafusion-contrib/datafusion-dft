@@ -19,7 +19,7 @@
 use std::error::Error;
 
 use clap::Parser;
-use datafusion_tui::app::App;
+use datafusion_tui::app::core::App;
 use datafusion_tui::cli::args::Args;
 use datafusion_tui::run_app;
 use log::LevelFilter;

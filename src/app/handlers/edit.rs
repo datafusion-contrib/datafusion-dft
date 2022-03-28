@@ -18,10 +18,10 @@
 use log::{debug, error};
 use std::time::Instant;
 
+use crate::app::core::{App, AppReturn, InputMode};
 use crate::app::datafusion::context::{QueryResults, QueryResultsMeta};
 use crate::app::error::{DftError, Result};
 use crate::app::ui::Scroll;
-use crate::app::{App, AppReturn, InputMode};
 use crate::events::Key;
 
 pub async fn edit_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {

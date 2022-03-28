@@ -26,7 +26,7 @@ use tui::{
 };
 use tui_logger::TuiLoggerWidget;
 
-use crate::app::{App, InputMode};
+use crate::app::core::{App, InputMode};
 
 pub struct Scroll {
     pub x: u16,
