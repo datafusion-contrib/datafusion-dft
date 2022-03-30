@@ -32,6 +32,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 async fn main() -> Result<(), Box<dyn Error>> {
     tui_logger::init_logger(LevelFilter::Debug).unwrap();
     tui_logger::set_default_level(LevelFilter::Debug);
+    tui_logger::set_log_file("log.txt").unwrap();
     let args = Args::parse();
     let mut app = App::new(args).await;
     let res = run_app(&mut app).await;

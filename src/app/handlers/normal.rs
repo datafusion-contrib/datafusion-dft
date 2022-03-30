@@ -15,6 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use log::error;
+
 use crate::app::error::Result;
 use crate::app::{App, AppReturn, InputMode};
 use crate::events::Key;
@@ -97,10 +99,15 @@ pub fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
 
 fn change_tab(c: char, app: &mut App) -> Result<AppReturn> {
     // Already checked that this is a digit, safe to unwrap
-    let input_idx = c.to_digit(10).unwrap() as usize;
-    if input_idx < app.tabs.titles.len() {
-        app.tabs.index = input_idx
-    } else {
-    };
+    match c.to_digit(10) {
+        Some(input_idx) => {
+            let input_idx_usize = input_idx as usize;
+            if input_idx_usize < app.tabs.titles.len() {
+                app.tabs.index = input_idx_usize;
+            }
+        },
+        None => error!("Error while processing char {}", c),
+    }
     Ok(AppReturn::Continue)
+    
 }

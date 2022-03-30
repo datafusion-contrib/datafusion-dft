@@ -27,7 +27,7 @@ use crate::events::Key;
 pub async fn edit_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
     debug!(
         "{} Entered, current row / col: {} / {}",
-        key, app.editor.input.cursor_row, app.editor.input.cursor_column
+        key, app.editor.input.cursor_line_number, app.editor.input.cursor_position_inside_line
     );
     match key {
         Key::Enter => enter_handler(app).await,
