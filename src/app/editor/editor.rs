@@ -328,22 +328,100 @@ impl Editor {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::io::Cursor;
     use crate::app::editor::editor::{Input, Line};
 
     #[test]
-    fn non_ascii_delete() {
+    fn can_delete_non_ascii_characters() {
         let mut input: Input = Input {
             lines: vec![
                 Line {
-                    text: Cursor::new(String::from("ä")),
+                    text: Cursor::new(String::from("äää")),
                 }
             ],
             cursor_line_number: 0,
-            cursor_position_inside_line: 1
+            cursor_position_inside_line: 3
         };
 
-        input.backspace();
+        input.backspace().expect("Expect that can delete character");
+        assert_eq!(input.cursor_line_number, 0);
+        assert_eq!(input.cursor_position_inside_line, 2);
+
+        input.backspace().expect("Expect that can delete character");
+        assert_eq!(input.cursor_line_number, 0);
+        assert_eq!(input.cursor_position_inside_line, 1);
+    }
+
+    #[test]
+    fn next_character_in_one_line() {
+        let mut input: Input = Input {
+            lines: vec![
+                Line {
+                    text: Cursor::new(String::from("aaa")),
+                },
+            ],
+            cursor_line_number: 0,
+            cursor_position_inside_line: 0
+        };
+
+        input.next_char().expect("Could move to next character");
+        assert_eq!(input.cursor_position_inside_line, 1);
+
+        input.next_char().expect("Could move to next character");
+        assert_eq!(input.cursor_position_inside_line, 2);
+
+        input.next_char().expect("Could move to next character");
+        assert_eq!(input.cursor_position_inside_line, 3);
+    }
+
+    #[test]
+    fn previous_character_in_one_line() {
+        let mut input: Input = Input {
+            lines: vec![
+                Line {
+                    text: Cursor::new(String::from("aaa")),
+                },
+            ],
+            cursor_line_number: 0,
+            cursor_position_inside_line: 3
+        };
+
+        input.previous_char().expect("Could move to previous character");
+        assert_eq!(input.cursor_position_inside_line, 2);
+
+        input.previous_char().expect("Could move to previous character");
+        assert_eq!(input.cursor_position_inside_line, 1);
+
+        input.previous_char().expect("Could move to previous character");
+        assert_eq!(input.cursor_position_inside_line, 0);
+
+        input.previous_char().expect("Could move to previous character");
+        assert_eq!(input.cursor_position_inside_line, 0);
+    }
+
+    #[test]
+    fn jump_to_next_line_on_next_character_at_the_end_of_line() {
+        let mut input: Input = Input {
+            lines: vec![
+                Line {
+                    text: Cursor::new(String::from("aa")),
+                },
+
+                Line {
+                    text: Cursor::new(String::from("bb")),
+                },
+            ],
+            cursor_line_number: 0,
+            cursor_position_inside_line: 0
+        };
+
+        input.next_char().expect("Could move to next character");
+        input.next_char().expect("Could move to next character");
+
+        // we expect to jump to the next line here
+        input.next_char().expect("Could move to next character");
+        assert_eq!(input.cursor_line_number, 1, "Cursor should have jumped to next line");
+        assert_eq!(input.cursor_position_inside_line, 0, "Cursor should be at beginning of the line");
     }
 }
