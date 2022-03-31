@@ -185,7 +185,7 @@ impl Input {
     }
 
     fn number_chars_in_previous_line(&self) -> usize {
-        if ((self.cursor_line_number - 1) as usize) >= 0 {
+        if self.cursor_line_number > 0 && self.lines.len() > 0 {
             self.lines[(self.cursor_line_number - 1) as usize]
                 .text
                 .get_ref()
@@ -204,30 +204,17 @@ impl Input {
     }
 
     pub fn next_char(&mut self) -> Result<AppReturn> {
-        let next_char = self.lines[self.cursor_line_number as usize]
-            .text
-            .get_ref()
-            .chars()
-            .skip(self.cursor_position_inside_line as usize)
-            .take(1)
-            .collect::<String>();
-
-        // We should not jump over a new line. If we see a new line, we COULD jump to the next
-        // line
-        if next_char == "\n" {
-            if (self.cursor_line_number as usize) < self.lines.len() {
-                self.cursor_line_number += 1;
-            }
-            self.cursor_position_inside_line = 0;
-            return Ok(AppReturn::Continue);
-        }
-
         if self.lines.is_empty() ||
-            self.cursor_position_inside_line == self.number_chars_in_current_line() as u16
-            {
+            self.cursor_position_inside_line == self.number_chars_in_current_line() as u16 {
+            if (self.cursor_line_number as usize + 1) < self.lines.len() {
+                self.cursor_line_number += 1;
+                self.cursor_position_inside_line = 0;
+            }
             return Ok(AppReturn::Continue);
         } else {
-            self.cursor_position_inside_line += 1
+            if (self.cursor_position_inside_line as usize) < self.number_chars_in_current_line() {
+                self.cursor_position_inside_line += 1;
+            }
         }
         Ok(AppReturn::Continue)
     }
@@ -384,13 +371,17 @@ mod tests {
         };
 
         input.next_char().expect("Could move to next character");
-        assert_eq!(input.cursor_position_inside_line, 1);
+        assert_eq!(input.cursor_position_inside_line, 1, "When moving once, cursor should be after first character");
 
         input.next_char().expect("Could move to next character");
         assert_eq!(input.cursor_position_inside_line, 2);
 
         input.next_char().expect("Could move to next character");
         assert_eq!(input.cursor_position_inside_line, 3);
+
+        input.next_char().expect("Could move to next character");
+        assert_eq!(input.cursor_position_inside_line, 3, "When line is over and no next line exists, cursor should stop");
+        assert_eq!(input.cursor_line_number, 0, "When line is over and no next line exists, cursor should stop");
     }
 
     #[test]
@@ -441,6 +432,14 @@ mod tests {
         input.next_char().expect("Could move to next character");
         assert_eq!(input.cursor_line_number, 1, "Cursor should have jumped to next line");
         assert_eq!(input.cursor_position_inside_line, 0, "Cursor should be at beginning of the line");
+
+        input.next_char().expect("Could move to next character");
+        assert_eq!(input.cursor_line_number, 1);
+        assert_eq!(input.cursor_position_inside_line, 1, "Cursor should be at the end of second line");
+
+        input.next_char().expect("Could move to next character");
+        assert_eq!(input.cursor_line_number, 1);
+        assert_eq!(input.cursor_position_inside_line, 1, "When there is no next line, cursor should stay unchanged");
     }
 
     #[test]
