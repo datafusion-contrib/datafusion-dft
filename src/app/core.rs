@@ -16,7 +16,7 @@
 // under the License.
 
 use datafusion::prelude::ExecutionConfig;
-use log::{debug, info};
+use log::info;
 
 use crate::app::datafusion::context::{Context, QueryResults};
 use crate::app::editor::Editor;
@@ -110,7 +110,6 @@ impl App {
     }
 
     pub async fn key_handler(&mut self, key: Key) -> AppReturn {
-        debug!("Key event: {:?}", key);
         key_event_handler(self, key).await.unwrap()
     }
 

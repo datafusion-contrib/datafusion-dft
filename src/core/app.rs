@@ -110,7 +110,6 @@ impl App {
     }
 
     pub async fn key_handler(&mut self, key: Key) -> AppReturn {
-        debug!("Key event: {:?}", key);
         key_event_handler(self, key).await.unwrap()
     }
 
