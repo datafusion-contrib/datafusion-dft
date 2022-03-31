@@ -70,8 +70,7 @@ impl Input {
             '\n' => {
                 self.lines[self.cursor_row as usize].text.get_mut().push(c);
                 debug!(
-                    "Line after appending char {:?} : {:?}",
-                    c,
+                    "Line after appending new line : {:?}",
                     self.lines[self.cursor_row as usize].text.get_ref()
                 );
                 let line = Line::default();
@@ -87,15 +86,18 @@ impl Input {
                 self.cursor_column += 4
             }
             _ => {
-                self.lines[self.cursor_row as usize].text.get_mut().push(c);
+                self.lines[self.cursor_row as usize]
+                    .text
+                    .get_mut()
+                    .insert(self.cursor_column as usize, c);
+                debug!(
+                    "Line after appending {:?} : {:?}",
+                    c,
+                    self.lines[self.cursor_row as usize].text.get_ref()
+                );
                 self.cursor_column += 1;
             }
         }
-        debug!(
-            "Line after appending char '{}': {}",
-            c,
-            self.lines[self.cursor_row as usize].text.get_ref()
-        );
         Ok(AppReturn::Continue)
     }
 
@@ -134,8 +136,8 @@ impl Input {
             return Ok(AppReturn::Continue);
         } else if self.cursor_row + 1 < self.lines.len() as u16 {
             let previous_col = self.cursor_column;
-            let new_row_width = self.lines[self.cursor_row as usize].text.get_ref().width() as u16;
             self.cursor_row += 1;
+            let new_row_width = self.lines[self.cursor_row as usize].text.get_ref().width() as u16;
             let new_col = cmp::min(previous_col, new_row_width);
             self.cursor_column = new_col;
         }
