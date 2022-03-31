@@ -18,8 +18,8 @@
 pub mod edit;
 pub mod normal;
 
+use crate::app::core::{App, AppReturn, InputMode};
 use crate::app::error::Result;
-use crate::app::{App, AppReturn, InputMode};
 use crate::events::Key;
 
 pub async fn key_event_handler<'a>(app: &mut App, key: Key) -> Result<AppReturn> {

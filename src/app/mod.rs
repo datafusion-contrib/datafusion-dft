@@ -15,11 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-mod app;
+pub mod core;
 pub mod datafusion;
 pub mod editor;
 pub mod error;
 pub mod handlers;
 pub mod ui;
 
-pub use app::{App, AppReturn, InputMode};
+// pub use app::{App, AppReturn, InputMode};

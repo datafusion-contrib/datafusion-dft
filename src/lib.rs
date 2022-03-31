@@ -22,7 +22,7 @@ pub mod events;
 use std::io;
 use std::time::Duration;
 
-use app::AppReturn;
+use app::core::{App, AppReturn};
 use crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,
@@ -32,7 +32,6 @@ use tui::{backend::CrosstermBackend, Terminal};
 
 use crate::app::error::Result;
 use crate::app::ui;
-use crate::app::App;
 
 use crate::events::{Event, Events};
 

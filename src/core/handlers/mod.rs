@@ -15,30 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-// Tabs: Context, Catalog, Logs, Sql Editors, Query History, Help for commands / functions
-use std::error::Error;
+pub mod edit;
+pub mod normal;
 
-use clap::Parser;
-use datafusion_tui::app::core::App;
-use datafusion_tui::cli::args::Args;
-use datafusion_tui::run_app;
-use log::LevelFilter;
-use mimalloc::MiMalloc;
+use crate::core::error::Result;
+use crate::core::{App, AppReturn, InputMode};
+use crate::events::Key;
 
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-    tui_logger::init_logger(LevelFilter::Debug).unwrap();
-    tui_logger::set_default_level(LevelFilter::Debug);
-    let args = Args::parse();
-    let mut app = App::new(args).await;
-    let res = run_app(&mut app).await;
-
-    if let Err(err) = res {
-        println!("{:?}", err)
+pub async fn key_event_handler<'a>(app: &mut App, key: Key) -> Result<AppReturn> {
+    match app.input_mode {
+        InputMode::Normal => normal::normal_mode_handler(app, key),
+        InputMode::Editing => edit::edit_mode_handler(app, key).await,
     }
-
-    Ok(())
 }

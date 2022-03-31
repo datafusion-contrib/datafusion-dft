@@ -48,6 +48,7 @@ pub enum InputMode {
     Editing,
 }
 
+/// Status that determines whether app should continue or exit
 #[derive(PartialEq)]
 pub enum AppReturn {
     Continue,
@@ -94,11 +95,9 @@ impl App {
 
         if !files.is_empty() {
             ctx.exec_files(files).await
-        } else {
-            if !rc.is_empty() {
-                info!("Executing '~/.datafusion/.datafusionrc' file");
-                ctx.exec_files(rc).await
-            }
+        } else if !rc.is_empty() {
+            info!("Executing '~/.datafusion/.datafusionrc' file");
+            ctx.exec_files(rc).await
         }
 
         App {

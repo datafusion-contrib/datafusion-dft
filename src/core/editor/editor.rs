@@ -21,9 +21,9 @@ use std::io;
 
 use unicode_width::UnicodeWidthStr;
 
-use crate::app::datafusion::context::QueryResultsMeta;
-use crate::app::error::Result;
-use crate::app::AppReturn;
+use crate::core::datafusion::context::QueryResultsMeta;
+use crate::core::error::Result;
+use crate::core::AppReturn;
 
 /// Single line of text in SQL Editor and cursor over it
 #[derive(Debug)]
