@@ -270,14 +270,6 @@ impl Input {
         {
             true => {
                 self.up_row()?;
-                // Pop newline character
-                self.pop();
-                // if self.cursor_position_inside_line > 0 {
-                //     self.cursor_position_inside_line -= 1;
-                // }
-                // if !self.lines.is_empty() {
-                //     self.lines.remove(self.cursor_row as usize);
-                // }
             }
             false => {
                 if self.cursor_position_inside_line >= 1 {
