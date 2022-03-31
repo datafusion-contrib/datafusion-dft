@@ -33,11 +33,11 @@ pub async fn edit_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
         Key::Enter => enter_handler(app).await,
         Key::Char(c) => match c {
             ';' => {
-                let result = app.editor.input.append_char(c);
+                let result = app.editor.input.insert_char(c);
                 app.editor.sql_terminated = true;
                 result
             }
-            _ => app.editor.input.append_char(c),
+            _ => app.editor.input.insert_char(c),
         },
         Key::Left => app.editor.input.previous_char(),
         Key::Right => app.editor.input.next_char(),
@@ -55,7 +55,7 @@ pub async fn edit_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
 
 async fn enter_handler(app: &mut App) -> Result<AppReturn> {
     match app.editor.sql_terminated {
-        false => app.editor.input.append_char('\n'),
+        false => app.editor.input.insert_char('\n'),
         true => {
             let sql: String = app.editor.input.combine_lines();
             app.editor.sql_terminated = false;

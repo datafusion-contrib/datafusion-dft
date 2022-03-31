@@ -63,32 +63,39 @@ impl Input {
         let text: Vec<&str> = self
             .lines
             .iter()
-            // Replace tabs with spaces
+            // Add new line characters
             .map(|line| line.text.get_ref().as_str())
             .collect();
-        text.join("")
+        text.join("\n")
     }
 
-    fn remove_line(&mut self, line_number: usize) {
-        if line_number >= self.lines.len() - 1 {
-            return;
-        }
+    fn insert_character_into_current_line(&self, character: char, pos: usize) -> String {
+        let mut line_as_char_vec = self.lines[self.cursor_line_number as usize]
+            .text
+            .get_ref()
+            .chars()
+            .collect::<Vec<char>>();
+        line_as_char_vec.insert(pos, character);
+        line_as_char_vec.iter().collect::<String>()
 
-        for curr_line_number in line_number..self.lines.len()-1 {
-            self.lines[curr_line_number as usize] = self.lines[(curr_line_number + 1) as usize].clone();
-        }
-
-        self.lines.pop();
+        // self.lines[self.cursor_line_number as usize]
+        //     .text
+        //     .get_ref()
+        //     .chars()
+        //     .take(pos)
+        //     .chain(String::from(character).chars() )
+        //     .chain(self.lines[self.cursor_line_number as usize].text.get_ref().chars().skip(pos).take(self.number_chars_in_current_line()))
+        //     .collect::<String>()
     }
 
-    pub fn append_char(&mut self, c: char) -> Result<AppReturn> {
+    pub fn insert_char(&mut self, c: char) -> Result<AppReturn> {
         if self.lines.is_empty() {
             let line = Line::default();
             self.lines.push(line)
         }
         match c {
             '\n' => {
-                self.lines[self.cursor_line_number as usize].text.get_mut().push(c);
+                // self.lines[self.cursor_line_number as usize].text.get_mut().push(c);
                 debug!(
                     "Line after appending char {:?} : {:?}",
                     c,
@@ -107,8 +114,17 @@ impl Input {
                     .push_str(tab_replacement);
                 self.cursor_position_inside_line += tab_replacement.chars().count() as u16;
             }
-            _ => {
-                self.lines[self.cursor_line_number as usize].text.get_mut().push(c);
+            ch => {
+                // if cursor is in the end of the line, then just append the character
+                if self.cursor_position_inside_line as usize == self.number_chars_in_current_line() {
+                    self.lines[self.cursor_line_number as usize].text.get_mut().push(c);
+                } else {
+                    // we have to construct a new string
+                    let new_line = self.insert_character_into_current_line(ch, self.cursor_position_inside_line as usize);
+                    self.lines[self.cursor_line_number as usize] = Line {
+                        text: io::Cursor::new(new_line)
+                    }
+                }
                 self.cursor_position_inside_line += 1;
             }
         }
@@ -204,15 +220,16 @@ impl Input {
     }
 
     pub fn next_char(&mut self) -> Result<AppReturn> {
+        let chars_in_current_line = self.number_chars_in_current_line() as u16;
         if self.lines.is_empty() ||
-            self.cursor_position_inside_line == self.number_chars_in_current_line() as u16 {
+            self.cursor_position_inside_line == chars_in_current_line{
             if (self.cursor_line_number as usize + 1) < self.lines.len() {
                 self.cursor_line_number += 1;
                 self.cursor_position_inside_line = 0;
             }
             return Ok(AppReturn::Continue);
         } else {
-            if (self.cursor_position_inside_line as usize) < self.number_chars_in_current_line() {
+            if self.cursor_position_inside_line < chars_in_current_line {
                 self.cursor_position_inside_line += 1;
             }
         }
@@ -295,7 +312,7 @@ impl Input {
     }
 
     pub fn tab(&mut self) -> Result<AppReturn> {
-        self.append_char('\t')
+        self.insert_char('\t')
     }
 }
 
@@ -439,7 +456,11 @@ mod tests {
 
         input.next_char().expect("Could move to next character");
         assert_eq!(input.cursor_line_number, 1);
-        assert_eq!(input.cursor_position_inside_line, 1, "When there is no next line, cursor should stay unchanged");
+        assert_eq!(input.cursor_position_inside_line, 2);
+
+        input.next_char().expect("Could move to next character");
+        assert_eq!(input.cursor_line_number, 1);
+        assert_eq!(input.cursor_position_inside_line, 2, "When there is no next line, cursor should stay unchanged");
     }
 
     #[test]
@@ -493,25 +514,55 @@ mod tests {
     fn test_append_char() {
         let mut input: Input = Input::default();
 
-        input.append_char('ä');
+        // Input: ""
+        input.insert_char('ä').expect("Could append a character");
         assert_eq!(input.cursor_line_number, 0);
         assert_eq!(input.cursor_position_inside_line, 1);
         assert_eq!(input.number_chars_in_current_line(), 1);
 
-        input.append_char('b');
+        // Input: "ä"
+        input.insert_char('b').expect("Could append a character");
         assert_eq!(input.cursor_line_number, 0);
         assert_eq!(input.cursor_position_inside_line, 2);
         assert_eq!(input.number_chars_in_current_line(), 2);
 
-        input.append_char('\t');
+        // Input: "äb"
+        input.insert_char('\t').expect("Could append a character");
         assert_eq!(input.cursor_line_number, 0);
         assert_eq!(input.cursor_position_inside_line, 6);
         assert_eq!(input.number_chars_in_current_line(), 6);
 
-        input.append_char('\n');
+        // Input: "äb    "
+        input.insert_char('\n').expect("Could append a character");
         assert_eq!(input.cursor_line_number, 1);
         assert_eq!(input.cursor_position_inside_line, 0);
         assert_eq!(input.number_chars_in_current_line(), 0);
+
+        // Input: "äb    "
+        //        ""
+        input.insert_char('a').expect("Could append a character");
+        assert_eq!(input.cursor_line_number, 1);
+        assert_eq!(input.cursor_position_inside_line, 1);
+        assert_eq!(input.number_chars_in_current_line(), 1);
+
+        // Input: "ä|b    " <- cursor |
+        //        "a"
+        input.up_row().expect("Can go up");
+        input.insert_char('a').expect("Could append a character");
+        assert_eq!(input.cursor_line_number, 0);
+        assert_eq!(input.cursor_position_inside_line, 2);
+        assert_eq!(input.number_chars_in_current_line(), 7, "{}", format!("Line is: {}", input.lines[input.cursor_line_number as usize].text.get_ref()));
+
+        // Input: "äab    "
+        //        "a|"       <- cursor |
+        input.down_row().expect("Can go down");
+        input.previous_char().expect("Can go left");
+        input.insert_char('b');
+        // Input: "äab    "
+        //        "b|a"  <- cursor |
+        assert_eq!(input.cursor_line_number, 1);
+        assert_eq!(input.cursor_position_inside_line, 1);
+        assert_eq!(input.lines[1].text.get_ref(), "ba");
     }
 
     #[test]
@@ -565,5 +616,55 @@ mod tests {
         input.up_row().expect("No exception should be thrown.");
         assert_eq!(input.cursor_line_number, 3);
         assert_eq!(input.cursor_position_inside_line, 0, "When coming from an empty line, the cursor should be at 0th position.");
+
+
+        let mut input2: Input = Input::default();
+        // this use case caused a bug
+        input2.insert_char('a').expect("Can append char");
+        input2.insert_char('\n').expect("Can append new line");
+        input2.up_row().expect("Can go up");
+        input2.down_row().expect("Can go down");
+        assert_eq!(input2.cursor_line_number, 1);
+        assert_eq!(input2.cursor_position_inside_line, 0);
+        input2.insert_char('b').expect("Can append char");
+        assert_eq!(input2.cursor_line_number, 1);
+        assert_eq!(input2.cursor_position_inside_line, 1);
+        assert_eq!(input2.lines[0].text.get_ref(), "a");
+        assert_eq!(input2.lines[1].text.get_ref(), "b");
+    }
+
+    #[test]
+    fn test_insert_character_into_current_line() {
+        let input: Input = Input {
+            lines: vec![
+                Line {
+                    text: Cursor::new(String::from("aa")),
+                }
+            ],
+            cursor_line_number: 0,
+            cursor_position_inside_line: 1
+        };
+
+        let new_string = input.insert_character_into_current_line('b', 1);
+        assert_eq!(new_string, "aba".to_string());
+
+        let new_string2 = input.insert_character_into_current_line('c', 0);
+        assert_eq!(new_string2, "caa".to_string());
+
+        let new_string3 = input.insert_character_into_current_line('d', 2);
+        assert_eq!(new_string3, "aad".to_string());
+
+        let input2: Input = Input {
+            lines: vec![
+                Line {
+                    text: Cursor::new(String::from("a")),
+                }
+            ],
+            cursor_line_number: 0,
+            cursor_position_inside_line: 1
+        };
+
+        let new_string4 = input2.insert_character_into_current_line('b', 1);
+        assert_eq!(new_string4, "ab".to_string());
     }
 }
