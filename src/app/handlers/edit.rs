@@ -45,6 +45,8 @@ pub async fn edit_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
         Key::Down => app.editor.input.down_row(),
         Key::Tab => app.editor.input.tab(),
         Key::Backspace => app.editor.input.backspace(),
+        Key::End => app.editor.input.end_row(),
+        Key::Home => app.editor.input.home_row(),
         Key::Esc => {
             app.input_mode = InputMode::Normal;
             Ok(AppReturn::Continue)

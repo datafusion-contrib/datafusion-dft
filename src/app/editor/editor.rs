@@ -167,6 +167,16 @@ impl Input {
         Ok(AppReturn::Continue)
     }
 
+    pub fn end_row(&mut self) -> Result<AppReturn> {
+        self.cursor_position_inside_line = self.number_chars_in_current_line() as u16;
+        Ok(AppReturn::Continue)
+    }
+
+    pub fn home_row(&mut self) -> Result<AppReturn> {
+        self.cursor_position_inside_line = 0;
+        Ok(AppReturn::Continue)
+    }
+
     pub fn down_row(&mut self) -> Result<AppReturn> {
         if self.lines.is_empty() || (self.cursor_line_number as usize) == self.lines.len() - 1 {
             return Ok(AppReturn::Continue);
