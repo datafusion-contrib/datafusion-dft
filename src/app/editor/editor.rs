@@ -137,18 +137,13 @@ impl Input {
         {
             true => {
                 self.cursor_line_number -= 1;
-                let new_line_length = self.lines[self.cursor_line_number as usize]
-                    .text
-                    .get_ref()
-                    .chars()
-                    .count() as u16 - 1;
-                self.cursor_position_inside_line = new_line_length;
+                self.cursor_position_inside_line = 0;
             }
             false => {
-                let previous_position_inside_line = self.cursor_position_inside_line;
+                let position_inside_current_line = self.cursor_position_inside_line;
                 self.cursor_line_number -= 1;
-                let new_line_length = (self.number_chars_in_current_line() - 1) as u16;
-                let new_position_inside_line = cmp::min(previous_position_inside_line, new_line_length);
+                let length_of_line_above = self.number_chars_in_current_line() as u16;
+                let new_position_inside_line = cmp::min(position_inside_current_line, length_of_line_above);
                 self.cursor_position_inside_line = new_position_inside_line;
             }
         }
@@ -157,18 +152,14 @@ impl Input {
     }
 
     pub fn down_row(&mut self) -> Result<AppReturn> {
-        if self.lines.is_empty() || self.cursor_line_number as usize == self.lines.len() - 1 {
+        if self.lines.is_empty() || (self.cursor_line_number as usize) == self.lines.len() - 1 {
             return Ok(AppReturn::Continue);
         } else if self.cursor_line_number + 1 < self.lines.len() as u16 {
-            let previous_col = self.cursor_position_inside_line;
-            let new_row_width = self.lines[self.cursor_line_number as usize]
-                .text
-                .get_ref()
-                .chars()
-                .count() as u16;
+            let cursor_position_in_current_line = self.cursor_position_inside_line;
+            let length_of_next_line = self.number_chars_in_next_line() as u16;
             self.cursor_line_number += 1;
-            let new_col = cmp::min(previous_col, new_row_width);
-            self.cursor_position_inside_line = new_col;
+            let cursor_position_inside_next_line = cmp::min(cursor_position_in_current_line, length_of_next_line);
+            self.cursor_position_inside_line = cursor_position_inside_next_line;
         }
         Ok(AppReturn::Continue)
     }
@@ -179,6 +170,30 @@ impl Input {
             .get_ref()
             .chars()
             .count()
+    }
+
+    fn number_chars_in_next_line(&self) -> usize {
+        if ((self.cursor_line_number + 1) as usize) < self.lines.len() {
+            self.lines[(self.cursor_line_number + 1) as usize]
+                .text
+                .get_ref()
+                .chars()
+                .count()
+        } else {
+            0
+        }
+    }
+
+    fn number_chars_in_previous_line(&self) -> usize {
+        if ((self.cursor_line_number - 1) as usize) >= 0 {
+            self.lines[(self.cursor_line_number - 1) as usize]
+                .text
+                .get_ref()
+                .chars()
+                .count()
+        } else {
+            0
+        }
     }
 
     fn current_line_is_empty(&self) -> bool {
@@ -219,12 +234,15 @@ impl Input {
 
     pub fn previous_char(&mut self) -> Result<AppReturn> {
         if self.cursor_position_inside_line > 0 {
+            // just go one position to the left
             self.cursor_position_inside_line -= 1
         } else {
+            // we are in the beginning of a line -> jump to the end of the previous line
             if self.cursor_line_number > 0 {
-                let line_of_prev_line = self.lines[(self.cursor_line_number - 1) as usize].text.get_ref().chars().count();
-                if line_of_prev_line > 0 {
-                    self.cursor_position_inside_line = line_of_prev_line as u16 - 1;
+                // we are not in the first line, so we can jump one line up
+                let length_of_previous_line = self.number_chars_in_previous_line();
+                if length_of_previous_line > 0 {
+                    self.cursor_position_inside_line = length_of_previous_line as u16 - 1;
                 }
                 self.cursor_line_number -= 1;
             }
@@ -423,5 +441,130 @@ mod tests {
         input.next_char().expect("Could move to next character");
         assert_eq!(input.cursor_line_number, 1, "Cursor should have jumped to next line");
         assert_eq!(input.cursor_position_inside_line, 0, "Cursor should be at beginning of the line");
+    }
+
+    #[test]
+    fn jump_to_previous_line_on_previous_character_at_the_beginning_of_line() {
+        let mut input: Input = Input {
+            lines: vec![
+                Line {
+                    text: Cursor::new(String::from("aa")),
+                },
+
+                Line {
+                    text: Cursor::new(String::from("bb")),
+                },
+            ],
+            cursor_line_number: 1,
+            cursor_position_inside_line: 0
+        };
+
+        input.previous_char().expect("Could move to next character");
+        assert_eq!(input.cursor_line_number, 0, "Cursor should have jumped to previous line");
+        assert_eq!(input.cursor_position_inside_line, 1, "Cursor should be at end of the previous line");
+    }
+
+    #[test]
+    fn non_ascii_character_count() {
+        let input: Input = Input {
+            lines: vec![
+                Line {
+                    text: Cursor::new(String::from("äää")),
+                }
+            ],
+            cursor_line_number: 0,
+            cursor_position_inside_line: 0
+        };
+
+        assert_eq!(input.number_chars_in_current_line(), 3);
+
+        let input2: Input = Input {
+            lines: vec![
+                Line {
+                    text: Cursor::new(String::from("äääb")),
+                }
+            ],
+            cursor_line_number: 0,
+            cursor_position_inside_line: 0
+        };
+        assert_eq!(input2.number_chars_in_current_line(), 4);
+    }
+
+    #[test]
+    fn test_append_char() {
+        let mut input: Input = Input::default();
+
+        input.append_char('ä');
+        assert_eq!(input.cursor_line_number, 0);
+        assert_eq!(input.cursor_position_inside_line, 1);
+        assert_eq!(input.number_chars_in_current_line(), 1);
+
+        input.append_char('b');
+        assert_eq!(input.cursor_line_number, 0);
+        assert_eq!(input.cursor_position_inside_line, 2);
+        assert_eq!(input.number_chars_in_current_line(), 2);
+
+        input.append_char('\t');
+        assert_eq!(input.cursor_line_number, 0);
+        assert_eq!(input.cursor_position_inside_line, 6);
+        assert_eq!(input.number_chars_in_current_line(), 6);
+
+        input.append_char('\n');
+        assert_eq!(input.cursor_line_number, 1);
+        assert_eq!(input.cursor_position_inside_line, 0);
+        assert_eq!(input.number_chars_in_current_line(), 0);
+    }
+
+    #[test]
+    fn test_up_row_and_down_row() {
+        let mut input: Input = Input {
+            lines: vec![
+                Line {
+                    text: Cursor::new(String::from("aaaa")),
+                },
+                Line {
+                    text: Cursor::new(String::from("bbbb")),
+                },
+                Line {
+                    text: Cursor::new(String::from("cccc")),
+                },
+                Line {
+                    text: Cursor::new(String::from("")),
+                },
+                Line {
+                    text: Cursor::new(String::from("dddd")),
+                },
+            ],
+            cursor_line_number: 0,
+            cursor_position_inside_line: 2
+        };
+
+        input.up_row().expect("No exception should be thrown.");
+        assert_eq!(input.cursor_line_number, 0, "At 0th line, up_row has no effect");
+        assert_eq!(input.cursor_position_inside_line, 2, "When up_row has no effect, the location inside the line should stay unchanged");
+
+        input.down_row().expect("No exception should be thrown.");
+        assert_eq!(input.cursor_line_number, 1);
+        assert_eq!(input.cursor_position_inside_line, 2);
+
+        input.down_row().expect("No exception should be thrown.");
+        assert_eq!(input.cursor_line_number, 2);
+        assert_eq!(input.cursor_position_inside_line, 2);
+
+        input.down_row().expect("No exception should be thrown.");
+        assert_eq!(input.cursor_line_number, 3);
+        assert_eq!(input.cursor_position_inside_line, 0);
+
+        input.down_row().expect("No exception should be thrown.");
+        assert_eq!(input.cursor_line_number, 4);
+        assert_eq!(input.cursor_position_inside_line, 0);
+
+        input.down_row().expect("No exception should be thrown.");
+        assert_eq!(input.cursor_line_number, 4, "At last line, down_row has no effect");
+        assert_eq!(input.cursor_position_inside_line, 0);
+
+        input.up_row().expect("No exception should be thrown.");
+        assert_eq!(input.cursor_line_number, 3);
+        assert_eq!(input.cursor_position_inside_line, 0, "When coming from an empty line, the cursor should be at 0th position.");
     }
 }
