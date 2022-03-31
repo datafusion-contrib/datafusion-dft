@@ -43,6 +43,9 @@ impl Default for Line {
 /// All lines in SQL Editor
 #[derive(Debug, Default)]
 pub struct Input {
+    /// Max number of lines of input text
+    pub max_lines: u16,
+    /// Lines of input text
     pub lines: Vec<Line>,
     /// Current line in editor
     pub cursor_row: u16,
@@ -51,6 +54,14 @@ pub struct Input {
 }
 
 impl Input {
+    pub fn set_max_lines(self, max_lines: u16) -> Self {
+        Input {
+            max_lines,
+            lines: self.lines,
+            cursor_row: self.cursor_row,
+            cursor_column: self.cursor_column,
+        }
+    }
     pub fn combine_lines(&self) -> String {
         let text: Vec<&str> = self
             .lines
@@ -70,7 +81,8 @@ impl Input {
             '\n' => {
                 self.lines[self.cursor_row as usize].text.get_mut().push(c);
                 debug!(
-                    "Line after appending new line : {:?}",
+                    "Line after appending char {:?} : {:?}",
+                    c,
                     self.lines[self.cursor_row as usize].text.get_ref()
                 );
                 let line = Line::default();
@@ -86,18 +98,15 @@ impl Input {
                 self.cursor_column += 4
             }
             _ => {
-                self.lines[self.cursor_row as usize]
-                    .text
-                    .get_mut()
-                    .insert(self.cursor_column as usize, c);
-                debug!(
-                    "Line after appending {:?} : {:?}",
-                    c,
-                    self.lines[self.cursor_row as usize].text.get_ref()
-                );
+                self.lines[self.cursor_row as usize].text.get_mut().push(c);
                 self.cursor_column += 1;
             }
         }
+        debug!(
+            "Line after appending char '{}': {}",
+            c,
+            self.lines[self.cursor_row as usize].text.get_ref()
+        );
         Ok(AppReturn::Continue)
     }
 
@@ -136,8 +145,8 @@ impl Input {
             return Ok(AppReturn::Continue);
         } else if self.cursor_row + 1 < self.lines.len() as u16 {
             let previous_col = self.cursor_column;
-            self.cursor_row += 1;
             let new_row_width = self.lines[self.cursor_row as usize].text.get_ref().width() as u16;
+            self.cursor_row += 1;
             let new_col = cmp::min(previous_col, new_row_width);
             self.cursor_column = new_col;
         }
@@ -221,6 +230,13 @@ impl Default for Editor {
 }
 
 impl Editor {
+    pub fn set_max_lines(self, max_lines: u16) -> Self {
+        Editor {
+            input: self.input.set_max_lines(max_lines),
+            sql_terminated: self.sql_terminated,
+            history: self.history,
+        }
+    }
     pub fn get_cursor_row(&self) -> u16 {
         self.input.cursor_row
     }

@@ -36,7 +36,8 @@ impl Tabs {
                 "SQL Editor [0]",
                 "Query History [1]",
                 "Context [2]",
-                "Logs [3]",
+                "Object Stores [3]",
+                "Logs [4]",
             ],
             index: 0,
         }

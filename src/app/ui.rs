@@ -116,6 +116,30 @@ fn draw_context_tab<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     draw_context(f, app, chunks[2]);
 }
 
+fn draw_object_stores_tab<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+    let chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .margin(2)
+        .constraints(
+            [
+                Constraint::Length(1),
+                Constraint::Length(3),
+                Constraint::Min(1),
+            ]
+            .as_ref(),
+        )
+        .split(f.size());
+
+    let help_message = draw_default_help();
+    f.render_widget(help_message, chunks[0]);
+
+    let tabs = draw_tabs(app);
+    f.render_widget(tabs, chunks[1]);
+
+    let user_input = draw_object_stores_user_input(app);
+    f.render_widget(user_input, chunks[2])
+}
+
 fn draw_logs_tab<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
