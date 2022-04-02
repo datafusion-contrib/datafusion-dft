@@ -16,7 +16,7 @@
 // under the License.
 
 use datafusion::execution::context::ExecutionContext;
-use log::debug;
+use log::{debug, error};
 use serde::Deserialize;
 use std::fs::File;
 use std::sync::Arc;
@@ -39,6 +39,7 @@ pub async fn register_bigtable(mut ctx: ExecutionContext) -> ExecutionContext {
         table_partition_separator: String,
         utf8_qualifiers: Vec<String>,
         i64_qualifiers: Vec<String>,
+        only_read_latest: bool,
     }
 
     impl BigtableConfig {
@@ -63,7 +64,7 @@ pub async fn register_bigtable(mut ctx: ExecutionContext) -> ExecutionContext {
                 self.table_partition_cols,
                 self.table_partition_separator,
                 qualifiers,
-                true,
+                self.only_read_latest,
             )
             .await
             .map_err(|e| DftError::DataFusionError(e))
@@ -79,8 +80,12 @@ pub async fn register_bigtable(mut ctx: ExecutionContext) -> ExecutionContext {
             debug!("BigTable Configs: {:?}", cfgs);
             for cfg in cfgs.into_iter() {
                 let name = cfg.table_name.clone();
-                let table = cfg.try_to_table().await.unwrap();
-                ctx.register_table(name.as_str(), Arc::new(table));
+                let table = cfg.clone().try_to_table().await;
+                if let Ok(t) = table {
+                    ctx.register_table(name.as_str(), Arc::new(t)).unwrap();
+                } else {
+                    error!("Error loading Bigtable with config: {:?}", cfg);
+                }
             }
         };
     }
