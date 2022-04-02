@@ -16,109 +16,73 @@
 // under the License.
 
 use datafusion::execution::context::ExecutionContext;
-use http::Uri;
 use log::debug;
 use serde::Deserialize;
-use std::str::FromStr;
 use std::fs::File;
+use std::sync::Arc;
 
-#[cfg(feature="bigtable")]
-pub fn register_bigtable(ctx: ExecutionContext) -> ExecutionContext {
-    #[derive(Deserialize, Debug)]
-    enum QualifierType {
-        Int(i64),
-        Utf(String),
-    }
-    
-    #[derive(Deserialize, Debug)]
-    struct BigTableConfig {
+use crate::app::error::{DftError, Result};
+
+#[cfg(feature = "bigtable")]
+pub async fn register_bigtable(mut ctx: ExecutionContext) -> ExecutionContext {
+    use arrow::datatypes::{DataType, Field};
+    use datafusion_bigtable::datasource::BigtableDataSource;
+
+    #[derive(Clone, Deserialize, Debug)]
+    struct BigtableConfig {
+        table_name: String,
         project: String,
         instance: String,
         table: String,
         column_family: String,
         table_partition_cols: Vec<String>,
         table_partition_separator: String,
-        qualifiers: Vec<QualifierType>,
-        secret_access_key: String,
+        utf8_qualifiers: Vec<String>,
+        i64_qualifiers: Vec<String>,
     }
 
-    #[derive(Deserialize, Debug)]
-    struct BigTableConfigs {
-        tables: Vec<BigTableConfig>
+    impl BigtableConfig {
+        async fn try_to_table(self) -> Result<BigtableDataSource> {
+            let mut qualifiers: Vec<Field> = self
+                .utf8_qualifiers
+                .iter()
+                .map(|c| Field::new(c, DataType::Utf8, false))
+                .collect();
+            let mut i64_qualifiers: Vec<Field> = self
+                .i64_qualifiers
+                .iter()
+                .map(|c| Field::new(c, DataType::Int64, false))
+                .collect();
+            qualifiers.append(&mut i64_qualifiers);
+
+            BigtableDataSource::new(
+                self.project,
+                self.instance,
+                self.table,
+                self.column_family,
+                self.table_partition_cols,
+                self.table_partition_separator,
+                qualifiers,
+                true,
+            )
+            .await
+            .map_err(|e| DftError::DataFusionError(e))
+        }
     }
-    
+
     let home = dirs::home_dir();
     if let Some(p) = home {
         let bigtable_config_path = p.join(".datafusion/table_providers/bigtable.json");
-        let bigtable = if bigtable_config_path.exists() {
-            let cfg: BigTableConfigs =
+        if bigtable_config_path.exists() {
+            let cfgs: Vec<BigtableConfig> =
                 serde_json::from_reader(File::open(bigtable_config_path).unwrap()).unwrap();
-            // let s3 = config_to_s3(cfg).await;
-            debug!("BigTable Config: {:?}", cfg);
-            // Arc::new(s3)
+            debug!("BigTable Configs: {:?}", cfgs);
+            for cfg in cfgs.into_iter() {
+                let name = cfg.table_name.clone();
+                let table = cfg.try_to_table().await.unwrap();
+                ctx.register_table(name.as_str(), Arc::new(table));
+            }
         };
-    }
-    ctx
-}
-
-
-
-
-
-#[cfg(feature = "s3")]
-pub async fn register_s3(ctx: ExecutionContext) -> ExecutionContext {
-    use aws_sdk_s3::Endpoint;
-    use aws_types::credentials::{Credentials, SharedCredentialsProvider};
-    use datafusion_objectstore_s3::object_store::s3::S3FileSystem;
-    use http::Uri;
-    use serde::Deserialize;
-    use std::str::FromStr;
-
-    #[derive(Deserialize, Debug)]
-    struct S3Config {
-        endpoint: String,
-        access_key_id: String,
-        secret_access_key: String,
-    }
-
-    async fn config_to_s3(cfg: S3Config) -> S3FileSystem {
-        info!("Creating S3 from: {:?}", cfg);
-        S3FileSystem::new(
-            Some(SharedCredentialsProvider::new(Credentials::new(
-                cfg.access_key_id,
-                cfg.secret_access_key,
-                None,
-                None,
-                "Static",
-            ))), // Credentials provider
-            None, // Region
-            Some(Endpoint::immutable(
-                Uri::from_str(cfg.endpoint.as_str()).unwrap(),
-            )), // Endpoint
-            None, // RetryConfig
-            None, // AsyncSleep
-            None, // TimeoutConfig
-        )
-        .await
-    }
-
-    let home = dirs::home_dir();
-    if let Some(p) = home {
-        let s3_config_path = p.join(".datafusion/object_stores/s3.json");
-        let s3 = if s3_config_path.exists() {
-            let cfg: S3Config =
-                serde_json::from_reader(File::open(s3_config_path).unwrap()).unwrap();
-            let s3 = config_to_s3(cfg).await;
-            info!("Created S3FileSystem from custom endpoint");
-            Arc::new(s3)
-        } else {
-            let s3 = S3FileSystem::default().await;
-            info!("Created S3FileSystem from default AWS credentials");
-            Arc::new(s3)
-        };
-
-        ctx.register_object_store("s3", s3);
-        info!("Registered S3 ObjectStore");
     }
     ctx
 }

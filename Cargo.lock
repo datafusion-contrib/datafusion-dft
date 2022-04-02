@@ -893,6 +893,7 @@ dependencies = [
  "datafusion-bigtable",
  "datafusion-objectstore-s3",
  "dirs",
+ "futures",
  "http",
  "log",
  "mimalloc",

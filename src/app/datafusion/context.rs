@@ -83,7 +83,7 @@ impl Context {
         #[cfg(feature = "bigtable")]
         use crate::app::datafusion::table_providers::register_bigtable;
         #[cfg(feature = "bigtable")]
-        let ctx = register_bigtable(ctx);
+        let ctx = register_bigtable(ctx).await;
 
         Context::Local(ctx)
     }
