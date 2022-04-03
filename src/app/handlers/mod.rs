@@ -24,7 +24,7 @@ use crate::events::Key;
 
 pub async fn key_event_handler<'a>(app: &mut App, key: Key) -> Result<AppReturn> {
     match app.input_mode {
-        InputMode::Normal => normal::normal_mode_handler(app, key),
+        InputMode::Normal => normal::normal_mode_handler(app, key).await,
         InputMode::Editing => edit::edit_mode_handler(app, key).await,
     }
 }

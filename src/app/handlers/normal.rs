@@ -24,7 +24,7 @@ pub enum NormalModeAction {
     Exit,
 }
 
-pub fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
+pub async fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
     if app.tabs.index == 0 {
         match key {
             Key::Char('c') => {
@@ -34,6 +34,10 @@ pub fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
             }
             Key::Char('e') => {
                 app.input_mode = InputMode::Editing;
+                Ok(AppReturn::Continue)
+            }
+            Key::Char('r') => {
+                app.reload_rc().await;
                 Ok(AppReturn::Continue)
             }
             Key::Char('q') => Ok(AppReturn::Exit),
