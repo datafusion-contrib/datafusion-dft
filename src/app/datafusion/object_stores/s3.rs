@@ -23,10 +23,10 @@ pub async fn register_s3(ctx: ExecutionContext) -> ExecutionContext {
     use aws_types::credentials::{Credentials, SharedCredentialsProvider};
     use datafusion_objectstore_s3::object_store::s3::S3FileSystem;
     use http::Uri;
-    use serde::Deserialize;
-    use std::str::FromStr;
     use log::info;
+    use serde::Deserialize;
     use std::fs::File;
+    use std::str::FromStr;
     use std::sync::Arc;
 
     #[derive(Deserialize, Debug)]
