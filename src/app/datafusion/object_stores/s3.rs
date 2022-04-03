@@ -15,6 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use datafusion::prelude::ExecutionContext;
+
 #[cfg(feature = "s3")]
 pub async fn register_s3(ctx: ExecutionContext) -> ExecutionContext {
     use aws_sdk_s3::Endpoint;
@@ -23,6 +25,9 @@ pub async fn register_s3(ctx: ExecutionContext) -> ExecutionContext {
     use http::Uri;
     use serde::Deserialize;
     use std::str::FromStr;
+    use log::info;
+    use std::fs::File;
+    use std::sync::Arc;
 
     #[derive(Deserialize, Debug)]
     struct S3Config {
