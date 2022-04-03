@@ -65,6 +65,7 @@ async fn enter_handler(app: &mut App) -> Result<AppReturn> {
             let df = app.context.sql(&sql).await;
             match df {
                 Ok(df) => {
+                    debug!("Successfully executed query");
                     let batches = df.collect().await.map_err(DftError::DataFusionError)?;
                     let query_duration = now.elapsed().as_secs_f64();
                     let rows: usize = batches.iter().map(|b| b.num_rows()).sum();
