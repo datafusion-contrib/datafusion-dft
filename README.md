@@ -14,7 +14,7 @@ Some of the current and planned features are listed here:
     - Multiple SQL Editor tabs (TODO)
   - Query history
     - History of executed queries
-  - ExecutionContext information (TODO)
+  - ExecutionContext information
     - Information from ExecutionContext / Catalog / ObjectStore / State / Config
   - Logs
     - Logs from `dft` and `DataFusion`
@@ -27,7 +27,7 @@ Some of the current and planned features are listed here:
   - `ObjectStore` explorer.  I.e. able to list files in `ObjectStore`
 - Custom Table Providers (if supported in SQL by DataFusion)
   - Delta Table (TODO)
-  - Big Table  (TODO)
+  - Big Table
 - Preloading DDL from `~/.datafusion/.datafusionrc` for local database available on startup
 
 ## User Guide
