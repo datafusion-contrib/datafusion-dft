@@ -605,7 +605,7 @@ mod tests {
         //        "a|"       <- cursor |
         input.down_row().expect("Can go down");
         input.previous_char().expect("Can go left");
-        input.append_char('b');
+        input.append_char('b').expect("Can type a character");
         // Input: "äab    \n"
         //        "b|a"  <- cursor |
         assert_eq!(input.cursor_row, 1);
