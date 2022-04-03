@@ -22,7 +22,7 @@ use datafusion::dataframe::DataFrame;
 use datafusion::error::{DataFusionError, Result};
 use datafusion::execution::context::{ExecutionConfig, ExecutionContext};
 
-use log::{debug, info};
+use log::{debug, error, info};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::sync::Arc;
@@ -158,7 +158,7 @@ async fn exec_from_lines(ctx: &mut Context, reader: &mut BufReader<File>) {
                 if line.ends_with(';') {
                     match exec_and_print(ctx, query).await {
                         Ok(_) => {}
-                        Err(err) => println!("{:?}", err),
+                        Err(err) => error!("{:?}", err),
                     }
                     query = "".to_owned();
                 } else {
@@ -175,7 +175,7 @@ async fn exec_from_lines(ctx: &mut Context, reader: &mut BufReader<File>) {
     if !query.is_empty() {
         match exec_and_print(ctx, query).await {
             Ok(_) => {}
-            Err(err) => println!("{:?}", err),
+            Err(err) => error!("{:?}", err),
         }
     }
 }
