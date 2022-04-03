@@ -15,7 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use arrow::util::pretty::pretty_format_batches;
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
@@ -242,10 +241,8 @@ fn draw_query_results(app: &mut App) -> Paragraph {
             let results = if query_meta.query.starts_with("CREATE") {
                 Paragraph::new(String::from("Table created"))
             } else {
-                let table = pretty_format_batches(&query_results.batches)
-                    .unwrap()
-                    .to_string();
-                Paragraph::new(table).scroll((query_results.scroll.x, query_results.scroll.y))
+                Paragraph::new(query_results.pretty_batches.as_str())
+                    .scroll((query_results.scroll.x, query_results.scroll.y))
             };
             let query_duration_info = query_results.format_timing_info();
             (results, query_duration_info)

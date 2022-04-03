@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use arrow::util::pretty::pretty_format_batches;
 use log::{debug, error};
 use std::time::Instant;
 
@@ -75,8 +76,10 @@ async fn enter_handler(app: &mut App) -> Result<AppReturn> {
                         query_duration,
                     };
                     app.editor.history.push(query_meta.clone());
+                    let pretty_batches = pretty_format_batches(&batches).unwrap().to_string();
                     app.query_results = Some(QueryResults {
                         batches,
+                        pretty_batches,
                         meta: query_meta,
                         scroll: Scroll { x: 0, y: 0 },
                     });
