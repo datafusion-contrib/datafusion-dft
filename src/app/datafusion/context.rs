@@ -40,6 +40,7 @@ pub struct QueryResultsMeta {
 
 pub struct QueryResults {
     pub batches: Vec<RecordBatch>,
+    pub pretty_batches: String,
     pub meta: QueryResultsMeta,
     pub scroll: Scroll,
 }
