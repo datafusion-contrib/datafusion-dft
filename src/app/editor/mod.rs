@@ -127,10 +127,12 @@ impl Input {
         Ok(AppReturn::Continue)
     }
 
+    /// Remove last character from the current line.
     pub fn pop(&mut self) -> Option<char> {
         self.lines[self.current_row as usize].text.get_mut().pop()
     }
 
+    /// Moves the cursor one line up.
     pub fn up_row(&mut self) -> Result<AppReturn> {
         if self.current_row > 0 {
             match self.lines[self.current_row as usize]
@@ -157,6 +159,7 @@ impl Input {
         Ok(AppReturn::Continue)
     }
 
+    /// Moves the cursor one line down.
     pub fn down_row(&mut self) -> Result<AppReturn> {
         if self.lines.is_empty() {
             return Ok(AppReturn::Continue);
@@ -170,6 +173,7 @@ impl Input {
         Ok(AppReturn::Continue)
     }
 
+    /// Moves the cursor to the next character.
     pub fn next_char(&mut self) -> Result<AppReturn> {
         if self.lines.is_empty()
             || self.cursor_column
@@ -188,6 +192,7 @@ impl Input {
         Ok(AppReturn::Continue)
     }
 
+    /// Moves the cursor to the previous character.
     pub fn previous_char(&mut self) -> Result<AppReturn> {
         if (self.cursor_column == 0) && (self.current_row > 0) {
             self.current_row -= 1;
@@ -198,6 +203,13 @@ impl Input {
         Ok(AppReturn::Continue)
     }
 
+    #[allow(dead_code)]
+    /// Returns the number of UTF8 characters in the line where the cursor is located.
+    /// This function is only required, if the editor needs to support non-ascii characters
+    /// which have more then 1 byte. <br>
+    /// Example: <br>
+    /// "abcd" has 4 characters and 4 bytes <br>
+    /// "äbcd" has 4 characters but 5 bytes (first character requires 2 bytes)
     fn number_chars_in_current_line(&self) -> usize {
         self.lines[self.cursor_row as usize]
             .text
@@ -399,19 +411,17 @@ impl Editor {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
     use crate::app::editor::{Input, Line};
+    use std::io::Cursor;
 
     #[test]
     fn can_delete_non_ascii_characters() {
         let mut input: Input = Input {
-            lines: vec![
-                Line {
-                    text: Cursor::new(String::from("äää")),
-                }
-            ],
+            lines: vec![Line {
+                text: Cursor::new(String::from("äää")),
+            }],
             cursor_row: 0,
-            cursor_column: 3
+            cursor_column: 3,
         };
 
         input.backspace().expect("Expect that can delete character");
@@ -426,17 +436,18 @@ mod tests {
     #[test]
     fn next_character_in_one_line() {
         let mut input: Input = Input {
-            lines: vec![
-                Line {
-                    text: Cursor::new(String::from("aaa")),
-                },
-            ],
+            lines: vec![Line {
+                text: Cursor::new(String::from("aaa")),
+            }],
             cursor_row: 0,
-            cursor_column: 0
+            cursor_column: 0,
         };
 
         input.next_char().expect("Could move to next character");
-        assert_eq!(input.cursor_column, 1, "When moving once, cursor should be after first character");
+        assert_eq!(
+            input.cursor_column, 1,
+            "When moving once, cursor should be after first character"
+        );
 
         input.next_char().expect("Could move to next character");
         assert_eq!(input.cursor_column, 2);
@@ -445,32 +456,44 @@ mod tests {
         assert_eq!(input.cursor_column, 3);
 
         input.next_char().expect("Could move to next character");
-        assert_eq!(input.cursor_column, 3, "When line is over and no next line exists, cursor should stop");
-        assert_eq!(input.cursor_row, 0, "When line is over and no next line exists, cursor should stop");
+        assert_eq!(
+            input.cursor_column, 3,
+            "When line is over and no next line exists, cursor should stop"
+        );
+        assert_eq!(
+            input.cursor_row, 0,
+            "When line is over and no next line exists, cursor should stop"
+        );
     }
 
     #[test]
     fn previous_character_in_one_line() {
         let mut input: Input = Input {
-            lines: vec![
-                Line {
-                    text: Cursor::new(String::from("aaa")),
-                },
-            ],
+            lines: vec![Line {
+                text: Cursor::new(String::from("aaa")),
+            }],
             cursor_row: 0,
-            cursor_column: 3
+            cursor_column: 3,
         };
 
-        input.previous_char().expect("Could move to previous character");
+        input
+            .previous_char()
+            .expect("Could move to previous character");
         assert_eq!(input.cursor_column, 2);
 
-        input.previous_char().expect("Could move to previous character");
+        input
+            .previous_char()
+            .expect("Could move to previous character");
         assert_eq!(input.cursor_column, 1);
 
-        input.previous_char().expect("Could move to previous character");
+        input
+            .previous_char()
+            .expect("Could move to previous character");
         assert_eq!(input.cursor_column, 0);
 
-        input.previous_char().expect("Could move to previous character");
+        input
+            .previous_char()
+            .expect("Could move to previous character");
         assert_eq!(input.cursor_column, 0);
     }
 
@@ -481,13 +504,12 @@ mod tests {
                 Line {
                     text: Cursor::new(String::from("aa")),
                 },
-
                 Line {
                     text: Cursor::new(String::from("bb")),
                 },
             ],
             cursor_row: 0,
-            cursor_column: 0
+            cursor_column: 0,
         };
 
         input.next_char().expect("Could move to next character");
@@ -495,12 +517,21 @@ mod tests {
 
         // we expect to jump to the next line here
         input.next_char().expect("Could move to next character");
-        assert_eq!(input.cursor_row, 1, "Cursor should have jumped to next line");
-        assert_eq!(input.cursor_column, 0, "Cursor should be at beginning of the line");
+        assert_eq!(
+            input.cursor_row, 1,
+            "Cursor should have jumped to next line"
+        );
+        assert_eq!(
+            input.cursor_column, 0,
+            "Cursor should be at beginning of the line"
+        );
 
         input.next_char().expect("Could move to next character");
         assert_eq!(input.cursor_row, 1);
-        assert_eq!(input.cursor_column, 1, "Cursor should be at the end of second line");
+        assert_eq!(
+            input.cursor_column, 1,
+            "Cursor should be at the end of second line"
+        );
 
         input.next_char().expect("Could move to next character");
         assert_eq!(input.cursor_row, 1);
@@ -508,7 +539,10 @@ mod tests {
 
         input.next_char().expect("Could move to next character");
         assert_eq!(input.cursor_row, 1);
-        assert_eq!(input.cursor_column, 2, "When there is no next line, cursor should stay unchanged");
+        assert_eq!(
+            input.cursor_column, 2,
+            "When there is no next line, cursor should stay unchanged"
+        );
     }
 
     #[test]
@@ -518,42 +552,43 @@ mod tests {
                 Line {
                     text: Cursor::new(String::from("aa")),
                 },
-
                 Line {
                     text: Cursor::new(String::from("bb")),
                 },
             ],
             cursor_row: 1,
-            cursor_column: 0
+            cursor_column: 0,
         };
 
         input.previous_char().expect("Could move to next character");
-        assert_eq!(input.cursor_row, 0, "Cursor should have jumped to previous line");
-        assert_eq!(input.cursor_column, 1, "Cursor should be at end of the previous line");
+        assert_eq!(
+            input.cursor_row, 0,
+            "Cursor should have jumped to previous line"
+        );
+        assert_eq!(
+            input.cursor_column, 1,
+            "Cursor should be at end of the previous line"
+        );
     }
 
     #[test]
     fn non_ascii_character_count() {
         let input: Input = Input {
-            lines: vec![
-                Line {
-                    text: Cursor::new(String::from("äää")),
-                }
-            ],
+            lines: vec![Line {
+                text: Cursor::new(String::from("äää")),
+            }],
             cursor_row: 0,
-            cursor_column: 0
+            cursor_column: 0,
         };
 
         assert_eq!(input.number_chars_in_current_line(), 3);
 
         let input2: Input = Input {
-            lines: vec![
-                Line {
-                    text: Cursor::new(String::from("äääb")),
-                }
-            ],
+            lines: vec![Line {
+                text: Cursor::new(String::from("äääb")),
+            }],
             cursor_row: 0,
-            cursor_column: 0
+            cursor_column: 0,
         };
         assert_eq!(input2.number_chars_in_current_line(), 4);
     }
@@ -599,7 +634,11 @@ mod tests {
         input.append_char('a').expect("Could append a character");
         assert_eq!(input.cursor_row, 0);
         assert_eq!(input.cursor_column, 2);
-        assert_eq!(input.number_chars_in_current_line(), 7, "{}", format!("Line is: {}", input.lines[input.cursor_row as usize].text.get_ref()));
+        assert_eq!(
+            input.number_chars_in_current_line(),
+            7,
+            "Line: {}", input.lines[input.cursor_row as usize].text.get_ref()
+        );
 
         // Input: "äab    \n"
         //        "a|"       <- cursor |
@@ -634,12 +673,15 @@ mod tests {
                 },
             ],
             cursor_row: 0,
-            cursor_column: 2
+            cursor_column: 2,
         };
 
         input.up_row().expect("No exception should be thrown.");
         assert_eq!(input.cursor_row, 0, "At 0th line, up_row has no effect");
-        assert_eq!(input.cursor_column, 2, "When up_row has no effect, the location inside the line should stay unchanged");
+        assert_eq!(
+            input.cursor_column, 2,
+            "When up_row has no effect, the location inside the line should stay unchanged"
+        );
 
         input.down_row().expect("No exception should be thrown.");
         assert_eq!(input.cursor_row, 1);
@@ -663,8 +705,10 @@ mod tests {
 
         input.up_row().expect("No exception should be thrown.");
         assert_eq!(input.cursor_row, 3);
-        assert_eq!(input.cursor_column, 0, "When coming from an empty line, the cursor should be at 0th position.");
-
+        assert_eq!(
+            input.cursor_column, 0,
+            "When coming from an empty line, the cursor should be at 0th position."
+        );
 
         let mut input2: Input = Input::default();
         // this use case caused a bug
@@ -680,5 +724,4 @@ mod tests {
         assert_eq!(input2.lines[0].text.get_ref(), "a\n");
         assert_eq!(input2.lines[1].text.get_ref(), "b");
     }
-
 }
