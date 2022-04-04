@@ -145,11 +145,6 @@ impl Input {
     }
 
     pub fn next_char(&mut self) -> Result<AppReturn> {
-        debug!(
-            "Col: {}, Width: {}",
-            self.cursor_column,
-            self.lines[self.cursor_row as usize].text.get_ref().width(),
-        );
         if self.lines.is_empty()
             || self.cursor_column
                 == self.lines[self.cursor_row as usize].text.get_ref().width() as u16
