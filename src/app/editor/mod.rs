@@ -30,7 +30,6 @@ const MAX_EDITOR_LINES: u16 = 17;
 /// Single line of text in SQL Editor and cursor over it
 #[derive(Debug)]
 pub struct Line {
-    // text: String,
     text: io::Cursor<String>,
 }
 
@@ -42,7 +41,15 @@ impl Default for Line {
     }
 }
 
-/// All lines in SQL Editor
+impl Line {
+    pub fn new(text: String) -> Self {
+        Line {
+            text: io::Cursor::new(text),
+        }
+    }
+}
+
+/// All lines in SQL Editor and cursor location
 #[derive(Debug, Default)]
 pub struct Input {
     pub lines: Vec<Line>,
@@ -234,6 +241,17 @@ impl Input {
 
     pub fn tab(&mut self) -> Result<AppReturn> {
         self.append_char('\t')
+    }
+}
+
+impl From<io::BufReader> for Input {
+    fn from(reader: BufReader) -> Result<Self> {
+        let lines: Vec<Line> = Vec::new();
+        let buf = String::new();
+        let bytes_read = reader.read_line(buf);
+        while bytes_read != 0 {
+            let line = Line::new(buf);
+        }
     }
 }
 

@@ -1,0 +1,71 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
+use log::{debug, error};
+use std::fs::File;
+use std::io::BufReader;
+use std::time::Instant;
+
+use crate::app::core::{App, AppReturn, InputMode};
+use crate::app::datafusion::context::{QueryResults, QueryResultsMeta};
+use crate::app::error::{DftError, Result};
+use crate::app::ui::Scroll;
+use crate::events::Key;
+
+pub async fn rc_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
+    debug!(
+        "{} Entered, current row / col: {} / {}",
+        key, app.editor.input.cursor_row, app.editor.input.cursor_column
+    );
+    match key {
+        Key::Char(c) => match c {
+            'e' => {
+                app.input_mode = InputMode::Editing;
+                Ok(AppReturn::Continue)
+            }
+            'l' => load_rc(),
+            'r' => {
+                let result = app.editor.input.append_char(c);
+                app.editor.sql_terminated = true;
+                result
+            }
+            _ => app.editor.input.append_char(c),
+        },
+        Key::Left => app.editor.input.previous_char(),
+        Key::Right => app.editor.input.next_char(),
+        Key::Up => app.editor.input.up_row(),
+        Key::Down => app.editor.input.down_row(),
+        Key::Tab => app.editor.input.tab(),
+        Key::Backspace => app.editor.input.backspace(),
+        Key::Esc => {
+            app.input_mode = InputMode::Normal;
+            Ok(AppReturn::Continue)
+        }
+        _ => Ok(AppReturn::Continue),
+    }
+}
+
+fn read_rc() -> Result<String> {
+    let home = dirs::home_dir();
+    if let Some(p) = home {
+        let home_rc = p.join(".datafusion/.datafusionrc");
+        if home_rc.exists() {
+            let file = File::open(home_rc)?;
+            let reader = BufReader::new(file);
+        }
+    }
+}

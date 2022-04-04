@@ -48,6 +48,7 @@ impl Tabs {
 pub enum InputMode {
     Normal,
     Editing,
+    Rc,
 }
 
 /// Status that determines whether app should continue or exit
