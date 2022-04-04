@@ -150,6 +150,12 @@ impl Input {
                 == self.lines[self.cursor_row as usize].text.get_ref().width() as u16
         {
             return Ok(AppReturn::Continue);
+        } else if (self.cursor_column + 1
+            == self.lines[self.cursor_row as usize].text.get_ref().width() as u16)
+            && (self.cursor_row as usize != self.lines.len() - 1)
+        {
+            self.cursor_row += 1;
+            self.cursor_column = 0
         } else {
             self.cursor_column += 1
         }
@@ -157,7 +163,10 @@ impl Input {
     }
 
     pub fn previous_char(&mut self) -> Result<AppReturn> {
-        if self.cursor_column > 0 {
+        if (self.cursor_column == 0) && (self.cursor_row > 0) {
+            self.cursor_row -= 1;
+            self.cursor_column = self.lines[self.cursor_row as usize].text.get_ref().width() as u16
+        } else if self.cursor_column > 0 {
             self.cursor_column -= 1
         }
         Ok(AppReturn::Continue)
