@@ -35,7 +35,7 @@ pub struct Scroll {
 
 pub fn draw_ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     match app.tabs.index {
-        0 => draw_sql_eqitor_tab(f, app),
+        0 => draw_sql_editor_tab(f, app),
         1 => draw_query_history_tab(f, app),
         2 => draw_context_tab(f, app),
         3 => draw_logs_tab(f, app),
@@ -43,7 +43,7 @@ pub fn draw_ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     }
 }
 
-fn draw_sql_eqitor_tab<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+fn draw_sql_editor_tab<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
