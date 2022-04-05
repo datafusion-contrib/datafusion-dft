@@ -17,7 +17,8 @@
 
 use log::debug;
 use std::cmp;
-use std::io;
+use std::fs::File;
+use std::io::{self, BufRead, BufReader};
 
 use unicode_width::UnicodeWidthStr;
 
@@ -50,13 +51,26 @@ impl Line {
 }
 
 /// All lines in SQL Editor and cursor location
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Input {
     pub lines: Vec<Line>,
     /// Current line in editor
     pub current_row: u16,
     /// Current column in editor
     pub cursor_column: u16,
+    /// Max lines in editor
+    pub max_lines: u16,
+}
+
+impl Default for Input {
+    fn default() -> Input {
+        Input {
+            lines: Vec::<Line>::new(),
+            cursor_row: 0,
+            cursor_column: 0,
+            max_lines: EDITOR_MAX_LINES,
+        }
+    }
 }
 
 impl Input {
@@ -244,17 +258,6 @@ impl Input {
     }
 }
 
-impl From<io::BufReader> for Input {
-    fn from(reader: BufReader) -> Result<Self> {
-        let lines: Vec<Line> = Vec::new();
-        let buf = String::new();
-        let bytes_read = reader.read_line(buf);
-        while bytes_read != 0 {
-            let line = Line::new(buf);
-        }
-    }
-}
-
 /// The entire editor and it's state
 pub struct Editor {
     /// Current value of the input box
@@ -286,5 +289,19 @@ impl Editor {
 
     pub fn get_cursor_column(&self) -> u16 {
         self.input.cursor_column
+    }
+
+    pub fn load_file(&mut self, file: File) -> Result<()> {
+        let buf = BufReader::new(file);
+        let mut lines = Vec::new();
+        for line in buf.lines() {
+            let mut line = line?;
+            debug!("Line: {}", line);
+            line.push('\n');
+            let line = line.replace('\t', "    ");
+            lines.push(Line::new(line));
+        }
+        self.input.lines = lines;
+        Ok(())
     }
 }

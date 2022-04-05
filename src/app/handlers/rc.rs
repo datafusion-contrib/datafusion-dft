@@ -15,15 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use log::{debug, error};
+use log::debug;
 use std::fs::File;
-use std::io::BufReader;
-use std::time::Instant;
 
 use crate::app::core::{App, AppReturn, InputMode};
-use crate::app::datafusion::context::{QueryResults, QueryResultsMeta};
-use crate::app::error::{DftError, Result};
-use crate::app::ui::Scroll;
+use crate::app::error::Result;
 use crate::events::Key;
 
 pub async fn rc_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
@@ -37,35 +33,22 @@ pub async fn rc_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
                 app.input_mode = InputMode::Editing;
                 Ok(AppReturn::Continue)
             }
-            'l' => load_rc(),
-            'r' => {
-                let result = app.editor.input.append_char(c);
-                app.editor.sql_terminated = true;
-                result
+            'l' => {
+                let home = dirs::home_dir();
+                if let Some(p) = home {
+                    let home_rc = p.join(".datafusion/.datafusionrc");
+                    let rc = File::open(home_rc)?;
+                    app.editor.load_file(rc)?;
+                };
+                Ok(AppReturn::Continue)
             }
-            _ => app.editor.input.append_char(c),
+            'r' => Ok(AppReturn::Continue),
+            _ => Ok(AppReturn::Continue),
         },
-        Key::Left => app.editor.input.previous_char(),
-        Key::Right => app.editor.input.next_char(),
-        Key::Up => app.editor.input.up_row(),
-        Key::Down => app.editor.input.down_row(),
-        Key::Tab => app.editor.input.tab(),
-        Key::Backspace => app.editor.input.backspace(),
         Key::Esc => {
             app.input_mode = InputMode::Normal;
             Ok(AppReturn::Continue)
         }
         _ => Ok(AppReturn::Continue),
-    }
-}
-
-fn read_rc() -> Result<String> {
-    let home = dirs::home_dir();
-    if let Some(p) = home {
-        let home_rc = p.join(".datafusion/.datafusionrc");
-        if home_rc.exists() {
-            let file = File::open(home_rc)?;
-            let reader = BufReader::new(file);
-        }
     }
 }

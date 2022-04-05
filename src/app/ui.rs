@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use log::debug;
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
@@ -187,6 +188,18 @@ fn draw_sql_editor_help<'a>(app: &mut App) -> Paragraph<'a> {
             ],
             Style::default(),
         ),
+        InputMode::Rc => (
+            vec![
+                Span::raw("Press "),
+                Span::styled("Esc", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(" to exit Rc mode, "),
+                Span::styled("l", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(" to load 'rc' file into editor, "),
+                Span::styled("r", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(" to reload 'rc' file."),
+            ],
+            Style::default(),
+        ),
     };
     let mut text = Text::from(Spans::from(msg));
     text.patch_style(style);
@@ -212,17 +225,15 @@ fn draw_default_help<'a>() -> Paragraph<'a> {
 fn draw_editor<'a>(app: &mut App) -> Paragraph<'a> {
     Paragraph::new(app.editor.input.combine_visible_lines())
         .style(match app.input_mode {
-            InputMode::Normal => Style::default(),
             InputMode::Editing => Style::default().fg(Color::Yellow),
+            _ => Style::default(),
         })
         .block(Block::default().borders(Borders::ALL).title("SQL Editor"))
+        .scroll((x_scroll as u16, 0))
 }
 
 fn draw_cursor<B: Backend>(app: &mut App, f: &mut Frame<B>, chunks: &[Rect]) {
     match app.input_mode {
-        InputMode::Normal =>
-            // Hide the cursor. `Frame` does this by default, so we don't need to do anything here
-            {}
         InputMode::Editing => {
             // Make the cursor visible and ask tui-rs to put it at the specified coordinates after rendering
             f.set_cursor(
@@ -232,6 +243,9 @@ fn draw_cursor<B: Backend>(app: &mut App, f: &mut Frame<B>, chunks: &[Rect]) {
                 chunks[2].y + app.editor.get_cursor_row() + 1,
             )
         }
+        _ =>
+            // Hide the cursor. `Frame` does this by default, so we don't need to do anything here
+            {}
     };
 }
 

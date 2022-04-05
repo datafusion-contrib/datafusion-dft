@@ -42,6 +42,10 @@ pub async fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
                 Ok(AppReturn::Continue)
             }
             Key::Char('q') => Ok(AppReturn::Exit),
+            Key::Char('r') => {
+                app.input_mode = InputMode::Rc;
+                Ok(AppReturn::Continue)
+            }
             Key::Char(c) => {
                 if c.is_ascii_digit() {
                     change_tab(c, app)
