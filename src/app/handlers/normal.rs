@@ -82,7 +82,7 @@ pub fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
     } else {
         match key {
             Key::Char('q') => Ok(AppReturn::Exit),
-            Key::Char(c) => change_tab(c, app),
+            Key::Char(c @ ('0'..='9')) => change_tab(c, app),
             _ => Ok(AppReturn::Continue),
         }
     }
@@ -94,7 +94,11 @@ fn change_tab(c: char, app: &mut App) -> Result<AppReturn> {
     if 0 < input_idx && input_idx <= app.tabs.titles.len() {
         app.tabs.index = input_idx - 1
     } else {
-        debug!("Invalid tab index: {}", input_idx);
+        debug!(
+            "Invalid tab index: {}, valid range is [1..={}]",
+            input_idx,
+            app.tabs.titles.len()
+        );
     };
     Ok(AppReturn::Continue)
 }
