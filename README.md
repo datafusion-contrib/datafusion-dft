@@ -1,10 +1,11 @@
 # datafusion-tui (dft)
 
-DataFusion-tui provides a feature rich terminal application, built with [tui-rs](https://github.com/fdehau/tui-rs), for using DataFusion (and eventually Ballista).  It has drawn inspiration and several features from `datafusion-cli`.  In contrast to `datafusion-cli` the objective of this tool is to provide a light SQL IDE experience for querying data with DataFusion. It is currently in early stages of development and as such there are likely to be bugs.
+DataFusion-tui provides a feature rich terminal application, built with [tui-rs](https://github.com/fdehau/tui-rs), for using DataFusion (and eventually Ballista). It has drawn inspiration and several features from `datafusion-cli`. In contrast to `datafusion-cli` the objective of this tool is to provide a light SQL IDE experience for querying data with DataFusion. It is currently in early stages of development and as such there are likely to be bugs.
 
-https://user-images.githubusercontent.com/22136083/158945369-77708c59-c2bc-4580-b449-0b593e6ed18f.mov
+![recording](./media/datafusion-tui-recording.mp4)
 
 Some of the current and planned features are listed here:
+
 - Tab management to provide clean and structured organization of DataFusion queries, results, and context
   - SQL editor
     - Text editor for writing SQL queries
@@ -24,7 +25,7 @@ Some of the current and planned features are listed here:
   - S3 with AWS default credentials
   - S3 with custom endpoint / provider (i.e. MinIO)
   - HDFS (TODO)
-  - `ObjectStore` explorer.  I.e. able to list files in `ObjectStore`
+  - `ObjectStore` explorer. I.e. able to list files in `ObjectStore`
 - Custom Table Providers (if supported in SQL by DataFusion)
   - Delta Table (TODO)
   - Big Table
@@ -32,7 +33,7 @@ Some of the current and planned features are listed here:
 
 ## User Guide
 
-The interface is split into several tabs so that relevant information can be viewed and controlled in a clean and organized manner.  When not writing a SQL query keys can be entered to navigate and control the interface.
+The interface is split into several tabs so that relevant information can be viewed and controlled in a clean and organized manner. When not writing a SQL query keys can be entered to navigate and control the interface.
 
 - SQL Editor: where queries are entered and results can be viewed
   - Normal mode
@@ -48,5 +49,5 @@ The interface is split into several tabs so that relevant information can be vie
     - `esc` to exit Edit mode and go back to Normal mode
 - Register custom `ObjectStore`
   - S3: run / install with `--features=s3`
-    - If you want to use your default AWS credentials, then no further action is required.  For example your credentials in `~/.aws/credentials` will automatically be picked up.
+    - If you want to use your default AWS credentials, then no further action is required. For example your credentials in `~/.aws/credentials` will automatically be picked up.
     - If you want to use a custom S3 provider, such as MinIO, then you must create a `s3.json` configuration file in `~/.datafusion/object_stores/` with the fields `endpoint`, `access_key_id`, and `secret_access_key`.
