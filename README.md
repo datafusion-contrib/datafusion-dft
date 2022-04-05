@@ -2,7 +2,7 @@
 
 DataFusion-tui provides a feature rich terminal application, built with [tui-rs](https://github.com/fdehau/tui-rs), for using DataFusion (and eventually Ballista). It has drawn inspiration and several features from `datafusion-cli`. In contrast to `datafusion-cli` the objective of this tool is to provide a light SQL IDE experience for querying data with DataFusion. It is currently in early stages of development and as such there are likely to be bugs.
 
-![recording](./media/datafusion-tui-recording.mp4)
+https://user-images.githubusercontent.com/622789/161690194-c7c1e1b0-e432-43ab-9e44-f7673868b9cb.mp4
 
 Some of the current and planned features are listed here:
 
