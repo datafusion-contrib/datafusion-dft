@@ -217,6 +217,7 @@ mod test {
 
     #[test]
     fn test_tab_item_from_char() {
+        assert!(TabItem::try_from('0').is_err());
         assert_eq!(TabItem::Editor, TabItem::try_from('1').unwrap());
         assert_eq!(TabItem::QueryHistory, TabItem::try_from('2').unwrap());
         assert_eq!(TabItem::Context, TabItem::try_from('3').unwrap());
@@ -225,13 +226,13 @@ mod test {
     }
 
     #[test]
-    fn test_tab_item_index_mapping() {
-        TabItem::all_values()
-            .iter()
-            .enumerate()
-            .for_each(|(idx, item)| {
-                let index = item.list_index();
-                assert_eq!(idx, index);
-            });
+    fn test_tab_item_to_usize() {
+        (0_usize..TabItem::all_values().len()).for_each(|i| {
+            assert_eq!(
+                TabItem::all_values()[i],
+                TabItem::try_from(format!("{}", i + 1).chars().next().unwrap()).unwrap()
+            );
+            assert_eq!(TabItem::all_values()[i].list_index(), i);
+        });
     }
 }
