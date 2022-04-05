@@ -33,10 +33,10 @@ impl Tabs {
     fn new() -> Self {
         Tabs {
             titles: vec![
-                "SQL Editor [0]",
-                "Query History [1]",
-                "Context [2]",
-                "Logs [3]",
+                "SQL Editor [1]",
+                "Query History [2]",
+                "Context [3]",
+                "Logs [4]",
             ],
             index: 0,
         }
