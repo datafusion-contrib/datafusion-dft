@@ -46,9 +46,9 @@ jobs:
           rustup default ${{ matrix.rust }}
           rustup component add rustfmt
       # No tests yet
-      # - name: Run tests
-      #   run: |
-      #     cargo test
+      - name: Run tests
+        run: |
+          cargo test
   fmt:
     name: Rust formatting
     runs-on: ubuntu-latest
