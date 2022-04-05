@@ -210,3 +210,28 @@ impl App {
         AppReturn::Continue
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_tab_item_from_char() {
+        assert_eq!(TabItem::Editor, TabItem::try_from('1').unwrap());
+        assert_eq!(TabItem::QueryHistory, TabItem::try_from('2').unwrap());
+        assert_eq!(TabItem::Context, TabItem::try_from('3').unwrap());
+        assert_eq!(TabItem::Logs, TabItem::try_from('4').unwrap());
+        assert!(TabItem::try_from('5').is_err());
+    }
+
+    #[test]
+    fn test_tab_item_index_mapping() {
+        TabItem::all_values()
+            .iter()
+            .enumerate()
+            .for_each(|(idx, item)| {
+                let index = item.list_index();
+                assert_eq!(idx, index);
+            });
+    }
+}
