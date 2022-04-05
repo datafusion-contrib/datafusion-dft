@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use crate::app::core::{App, AppReturn, InputMode};
+use crate::app::core::{App, AppReturn, InputMode, TabItem};
 use crate::app::datafusion::context::{QueryResults, QueryResultsMeta};
 use crate::app::error::{DftError, Result};
 use crate::app::ui::Scroll;
@@ -33,7 +33,7 @@ pub enum NormalModeAction {
 }
 
 pub async fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
-    if app.tabs.index == 0 {
+    if app.tab_item == TabItem::Editor {
         match key {
             Key::Enter => execute(app).await,
             Key::Char('c') => {
@@ -111,23 +111,20 @@ pub async fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
     } else {
         match key {
             Key::Char('q') => Ok(AppReturn::Exit),
-            Key::Char(c @ ('0'..='9')) => change_tab(c, app),
+            Key::Char(c) if c.is_ascii_digit() => change_tab(c, app),
             _ => Ok(AppReturn::Continue),
         }
     }
 }
 
 fn change_tab(c: char, app: &mut App) -> Result<AppReturn> {
-    // Already checked that this is a digit, safe to unwrap
-    let input_idx = c.to_digit(10).unwrap() as usize;
-    if 0 < input_idx && input_idx <= app.tabs.titles.len() {
-        app.tabs.index = input_idx - 1
-    } else {
-        debug!(
-            "Invalid tab index: {}, valid range is [1..={}]",
-            input_idx,
-            app.tabs.titles.len()
-        );
+    match TabItem::try_from(c) {
+        Ok(tab_item) => {
+            app.tab_item = tab_item;
+        }
+        Err(e) => {
+            debug!("{}", e);
+        }
     };
     Ok(AppReturn::Continue)
 }

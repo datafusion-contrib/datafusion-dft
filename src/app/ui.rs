@@ -24,7 +24,7 @@ use tui::{
 };
 use tui_logger::TuiLoggerWidget;
 
-use crate::app::core::{App, InputMode};
+use crate::app::core::{App, InputMode, TabItem};
 
 pub struct Scroll {
     pub x: u16,
@@ -32,12 +32,11 @@ pub struct Scroll {
 }
 
 pub fn draw_ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
-    match app.tabs.index {
-        0 => draw_sql_editor_tab(f, app),
-        1 => draw_query_history_tab(f, app),
-        2 => draw_context_tab(f, app),
-        3 => draw_logs_tab(f, app),
-        _ => draw_default_tab(f, app),
+    match app.tab_item {
+        TabItem::Editor => draw_sql_editor_tab(f, app),
+        TabItem::QueryHistory => draw_query_history_tab(f, app),
+        TabItem::Context => draw_context_tab(f, app),
+        TabItem::Logs => draw_logs_tab(f, app),
     }
 }
 
@@ -135,27 +134,6 @@ fn draw_logs_tab<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     f.render_widget(tabs, chunks[1]);
     let logs = draw_logs();
     f.render_widget(logs, chunks[2])
-}
-
-fn draw_default_tab<B: Backend>(f: &mut Frame<B>, app: &mut App) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .margin(2)
-        .constraints(
-            [
-                Constraint::Length(1),
-                Constraint::Length(3),
-                Constraint::Min(1),
-            ]
-            .as_ref(),
-        )
-        .split(f.size());
-
-    let help_message = draw_default_help();
-    f.render_widget(help_message, chunks[0]);
-
-    let tabs = draw_tabs(app);
-    f.render_widget(tabs, chunks[1]);
 }
 
 fn draw_sql_editor_help<'a>(app: &mut App) -> Paragraph<'a> {
@@ -280,16 +258,15 @@ fn draw_query_results(app: &mut App) -> Paragraph {
 }
 
 fn draw_tabs<'a>(app: &mut App) -> Tabs<'a> {
-    let titles = app
-        .tabs
-        .titles
+    let titles = TabItem::all_values()
         .iter()
-        .map(|t| Spans::from(vec![Span::styled(*t, Style::default())]))
+        .map(|tab| tab.title_with_key())
+        .map(|t| Spans::from(vec![Span::styled(t, Style::default())]))
         .collect();
 
     Tabs::new(titles)
         .block(Block::default().borders(Borders::ALL).title("Tabs"))
-        .select(app.tabs.index)
+        .select(app.tab_item.list_index())
         .style(Style::default())
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
 }
