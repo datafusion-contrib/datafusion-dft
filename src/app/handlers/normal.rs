@@ -18,6 +18,7 @@
 use crate::app::core::{App, AppReturn, InputMode};
 use crate::app::error::Result;
 use crate::events::Key;
+use log::debug;
 
 pub enum NormalModeAction {
     Continue,
@@ -81,7 +82,7 @@ pub fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
     } else {
         match key {
             Key::Char('q') => Ok(AppReturn::Exit),
-            Key::Char(c) => change_tab(c, app),
+            Key::Char(c @ ('0'..='9')) => change_tab(c, app),
             _ => Ok(AppReturn::Continue),
         }
     }
@@ -90,9 +91,14 @@ pub fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
 fn change_tab(c: char, app: &mut App) -> Result<AppReturn> {
     // Already checked that this is a digit, safe to unwrap
     let input_idx = c.to_digit(10).unwrap() as usize;
-    if input_idx < app.tabs.titles.len() {
-        app.tabs.index = input_idx
+    if 0 < input_idx && input_idx <= app.tabs.titles.len() {
+        app.tabs.index = input_idx - 1
     } else {
+        debug!(
+            "Invalid tab index: {}, valid range is [1..={}]",
+            input_idx,
+            app.tabs.titles.len()
+        );
     };
     Ok(AppReturn::Continue)
 }
