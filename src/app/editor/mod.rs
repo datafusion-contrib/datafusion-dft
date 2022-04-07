@@ -51,23 +51,13 @@ impl Line {
 }
 
 /// All lines in SQL Editor and cursor location
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Input {
     pub lines: Vec<Line>,
     /// Current line in editor
     pub current_row: u16,
     /// Current column in editor
     pub cursor_column: u16,
-}
-
-impl Default for Input {
-    fn default() -> Input {
-        Input {
-            lines: Vec::<Line>::new(),
-            current_row: 0,
-            cursor_column: 0,
-        }
-    }
 }
 
 impl Input {

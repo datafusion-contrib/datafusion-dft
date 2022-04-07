@@ -15,7 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use log::debug;
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
@@ -232,20 +231,15 @@ fn draw_editor<'a>(app: &mut App) -> Paragraph<'a> {
 }
 
 fn draw_cursor<B: Backend>(app: &mut App, f: &mut Frame<B>, chunks: &[Rect]) {
-    match app.input_mode {
-        InputMode::Editing => {
-            // Make the cursor visible and ask tui-rs to put it at the specified coordinates after rendering
-            f.set_cursor(
-                // Put cursor past the end of the input text
-                chunks[2].x + app.editor.get_cursor_column() + 1,
-                // Move one line down, from the border to the input line
-                chunks[2].y + app.editor.get_cursor_row() + 1,
-            )
-        }
-        _ =>
-            // Hide the cursor. `Frame` does this by default, so we don't need to do anything here
-            {}
-    };
+    if let InputMode::Editing = app.input_mode {
+        // Make the cursor visible and ask tui-rs to put it at the specified coordinates after rendering
+        f.set_cursor(
+            // Put cursor past the end of the input text
+            chunks[2].x + app.editor.get_cursor_column() + 1,
+            // Move one line down, from the border to the input line
+            chunks[2].y + app.editor.get_cursor_row() + 1,
+        )
+    }
 }
 
 fn draw_query_results(app: &mut App) -> Paragraph {
