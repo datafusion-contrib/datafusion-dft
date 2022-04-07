@@ -170,6 +170,8 @@ fn draw_sql_editor_help<'a>(app: &mut App) -> Paragraph<'a> {
                 Span::raw(" to start editing, "),
                 Span::styled("c", Style::default().add_modifier(Modifier::BOLD)),
                 Span::raw(" to clear the editor, "),
+                Span::styled("r", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(" to reload '.datafusionrc', "),
                 Span::styled("#", Style::default().add_modifier(Modifier::BOLD)),
                 Span::raw(" to change tabs."),
             ],
@@ -208,7 +210,7 @@ fn draw_default_help<'a>() -> Paragraph<'a> {
 }
 
 fn draw_editor<'a>(app: &mut App) -> Paragraph<'a> {
-    Paragraph::new(app.editor.input.combine_lines())
+    Paragraph::new(app.editor.input.combine_visible_lines())
         .style(match app.input_mode {
             InputMode::Normal => Style::default(),
             InputMode::Editing => Style::default().fg(Color::Yellow),

@@ -24,6 +24,8 @@ use crate::app::handlers::key_event_handler;
 use crate::cli::args::Args;
 use crate::events::Key;
 
+const DATAFUSION_RC: &str = ".datafusion/.datafusionrc";
+
 pub struct Tabs {
     pub titles: Vec<&'static str>,
     pub index: usize,
@@ -78,20 +80,8 @@ impl App {
         };
 
         let files = args.file;
-        let rc = match args.rc {
-            Some(file) => file,
-            None => {
-                let mut files = Vec::new();
-                let home = dirs::home_dir();
-                if let Some(p) = home {
-                    let home_rc = p.join(".datafusion/.datafusionrc");
-                    if home_rc.exists() {
-                        files.push(home_rc.into_os_string().into_string().unwrap());
-                    }
-                }
-                files
-            }
-        };
+
+        let rc = App::get_rc_files(args.rc);
 
         if !files.is_empty() {
             ctx.exec_files(files).await
@@ -107,6 +97,29 @@ impl App {
             context: ctx,
             query_results: None,
         }
+    }
+
+    fn get_rc_files(rc: Option<Vec<String>>) -> Vec<String> {
+        match rc {
+            Some(file) => file,
+            None => {
+                let mut files = Vec::new();
+                let home = dirs::home_dir();
+                if let Some(p) = home {
+                    let home_rc = p.join(DATAFUSION_RC);
+                    if home_rc.exists() {
+                        files.push(home_rc.into_os_string().into_string().unwrap());
+                    }
+                }
+                files
+            }
+        }
+    }
+
+    pub async fn reload_rc(&mut self) {
+        let rc = App::get_rc_files(None);
+        self.context.exec_files(rc).await;
+        info!("Reloaded .datafusionrc");
     }
 
     pub async fn key_handler(&mut self, key: Key) -> AppReturn {
