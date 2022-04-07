@@ -25,7 +25,7 @@ use crate::events::Key;
 pub async fn rc_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
     debug!(
         "{} Entered, current row / col: {} / {}",
-        key, app.editor.input.cursor_row, app.editor.input.cursor_column
+        key, app.editor.input.current_row, app.editor.input.cursor_column
     );
     match key {
         Key::Char(c) => match c {
@@ -42,7 +42,10 @@ pub async fn rc_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
                 };
                 Ok(AppReturn::Continue)
             }
-            'r' => Ok(AppReturn::Continue),
+            'r' => {
+                app.reload_rc().await;
+                Ok(AppReturn::Continue)
+            }
             _ => Ok(AppReturn::Continue),
         },
         Key::Esc => {

@@ -58,17 +58,14 @@ pub struct Input {
     pub current_row: u16,
     /// Current column in editor
     pub cursor_column: u16,
-    /// Max lines in editor
-    pub max_lines: u16,
 }
 
 impl Default for Input {
     fn default() -> Input {
         Input {
             lines: Vec::<Line>::new(),
-            cursor_row: 0,
+            current_row: 0,
             cursor_column: 0,
-            max_lines: EDITOR_MAX_LINES,
         }
     }
 }
@@ -200,10 +197,10 @@ impl Input {
         {
             return Ok(AppReturn::Continue);
         } else if (self.cursor_column + 1
-            == self.lines[self.cursor_row as usize].text.get_ref().width() as u16)
-            && (self.cursor_row as usize != self.lines.len() - 1)
+            == self.lines[self.current_row as usize].text.get_ref().width() as u16)
+            && (self.current_row as usize != self.lines.len() - 1)
         {
-            self.cursor_row += 1;
+            self.current_row += 1;
             self.cursor_column = 0
         } else {
             self.cursor_column += 1
@@ -212,9 +209,9 @@ impl Input {
     }
 
     pub fn previous_char(&mut self) -> Result<AppReturn> {
-        if (self.cursor_column == 0) && (self.cursor_row > 0) {
-            self.cursor_row -= 1;
-            self.cursor_column = self.lines[self.cursor_row as usize].text.get_ref().width() as u16
+        if (self.cursor_column == 0) && (self.current_row > 0) {
+            self.current_row -= 1;
+            self.cursor_column = self.lines[self.current_row as usize].text.get_ref().width() as u16
         } else if self.cursor_column > 0 {
             self.cursor_column -= 1
         }

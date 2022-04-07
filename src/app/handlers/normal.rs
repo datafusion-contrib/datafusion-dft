@@ -37,10 +37,6 @@ pub async fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
                 app.input_mode = InputMode::Editing;
                 Ok(AppReturn::Continue)
             }
-            Key::Char('r') => {
-                app.reload_rc().await;
-                Ok(AppReturn::Continue)
-            }
             Key::Char('q') => Ok(AppReturn::Exit),
             Key::Char('r') => {
                 app.input_mode = InputMode::Rc;

@@ -172,7 +172,7 @@ fn draw_sql_editor_help<'a>(app: &mut App) -> Paragraph<'a> {
                 Span::styled("c", Style::default().add_modifier(Modifier::BOLD)),
                 Span::raw(" to clear the editor, "),
                 Span::styled("r", Style::default().add_modifier(Modifier::BOLD)),
-                Span::raw(" to reload '.datafusionrc', "),
+                Span::raw(" start 'rc' mode, "),
                 Span::styled("#", Style::default().add_modifier(Modifier::BOLD)),
                 Span::raw(" to change tabs."),
             ],
@@ -229,7 +229,6 @@ fn draw_editor<'a>(app: &mut App) -> Paragraph<'a> {
             _ => Style::default(),
         })
         .block(Block::default().borders(Borders::ALL).title("SQL Editor"))
-        .scroll((x_scroll as u16, 0))
 }
 
 fn draw_cursor<B: Backend>(app: &mut App, f: &mut Frame<B>, chunks: &[Rect]) {
