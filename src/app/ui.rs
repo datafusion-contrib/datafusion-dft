@@ -210,7 +210,7 @@ fn draw_default_help<'a>() -> Paragraph<'a> {
 }
 
 fn draw_editor<'a>(app: &mut App) -> Paragraph<'a> {
-    Paragraph::new(app.editor.input.combine_lines())
+    Paragraph::new(app.editor.input.combine_visible_lines())
         .style(match app.input_mode {
             InputMode::Normal => Style::default(),
             InputMode::Editing => Style::default().fg(Color::Yellow),
