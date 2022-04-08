@@ -171,7 +171,7 @@ fn draw_sql_editor_help<'a>(app: &mut App) -> Paragraph<'a> {
                 Span::styled("c", Style::default().add_modifier(Modifier::BOLD)),
                 Span::raw(" to clear the editor, "),
                 Span::styled("r", Style::default().add_modifier(Modifier::BOLD)),
-                Span::raw(" to reload '.datafusionrc', "),
+                Span::raw(" start 'rc' mode, "),
                 Span::styled("#", Style::default().add_modifier(Modifier::BOLD)),
                 Span::raw(" to change tabs."),
             ],
@@ -184,6 +184,20 @@ fn draw_sql_editor_help<'a>(app: &mut App) -> Paragraph<'a> {
                 Span::raw(" to stop editing, "),
                 Span::styled("Enter", Style::default().add_modifier(Modifier::BOLD)),
                 Span::raw(" to execute query after closing ';'"),
+            ],
+            Style::default(),
+        ),
+        InputMode::Rc => (
+            vec![
+                Span::raw("Press "),
+                Span::styled("Esc", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(" to exit Rc mode, "),
+                Span::styled("l", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(" to load 'rc' file into editor, "),
+                Span::styled("r", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(" to reload 'rc' file, "),
+                Span::styled("w", Style::default().add_modifier(Modifier::BOLD)),
+                Span::raw(" to write 'rc' editor contents to file."),
             ],
             Style::default(),
         ),
@@ -212,27 +226,22 @@ fn draw_default_help<'a>() -> Paragraph<'a> {
 fn draw_editor<'a>(app: &mut App) -> Paragraph<'a> {
     Paragraph::new(app.editor.input.combine_visible_lines())
         .style(match app.input_mode {
-            InputMode::Normal => Style::default(),
             InputMode::Editing => Style::default().fg(Color::Yellow),
+            _ => Style::default(),
         })
         .block(Block::default().borders(Borders::ALL).title("SQL Editor"))
 }
 
 fn draw_cursor<B: Backend>(app: &mut App, f: &mut Frame<B>, chunks: &[Rect]) {
-    match app.input_mode {
-        InputMode::Normal =>
-            // Hide the cursor. `Frame` does this by default, so we don't need to do anything here
-            {}
-        InputMode::Editing => {
-            // Make the cursor visible and ask tui-rs to put it at the specified coordinates after rendering
-            f.set_cursor(
-                // Put cursor past the end of the input text
-                chunks[2].x + app.editor.get_cursor_column() + 1,
-                // Move one line down, from the border to the input line
-                chunks[2].y + app.editor.get_cursor_row() + 1,
-            )
-        }
-    };
+    if let InputMode::Editing = app.input_mode {
+        // Make the cursor visible and ask tui-rs to put it at the specified coordinates after rendering
+        f.set_cursor(
+            // Put cursor past the end of the input text
+            chunks[2].x + app.editor.get_cursor_column() + 1,
+            // Move one line down, from the border to the input line
+            chunks[2].y + app.editor.get_cursor_row() + 1,
+        )
+    }
 }
 
 fn draw_query_results(app: &mut App) -> Paragraph {

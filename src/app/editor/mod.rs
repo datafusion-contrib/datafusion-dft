@@ -17,7 +17,8 @@
 
 use log::debug;
 use std::cmp;
-use std::io;
+use std::fs::File;
+use std::io::{self, BufRead, BufReader};
 
 use unicode_width::UnicodeWidthStr;
 
@@ -30,7 +31,6 @@ const MAX_EDITOR_LINES: u16 = 17;
 /// Single line of text in SQL Editor and cursor over it
 #[derive(Debug)]
 pub struct Line {
-    // text: String,
     text: io::Cursor<String>,
 }
 
@@ -42,7 +42,15 @@ impl Default for Line {
     }
 }
 
-/// All lines in SQL Editor
+impl Line {
+    pub fn new(text: String) -> Self {
+        Line {
+            text: io::Cursor::new(text),
+        }
+    }
+}
+
+/// All lines in SQL Editor and cursor location
 #[derive(Debug, Default)]
 pub struct Input {
     pub lines: Vec<Line>,
@@ -73,7 +81,7 @@ impl Input {
         let end = (start + (MAX_EDITOR_LINES as usize) + 1) as usize;
 
         let text: Vec<&str> = if start == 0 {
-            debug!("Combining all lines");
+            // debug!("Combining all lines");
             self.lines
                 .iter()
                 .map(|line| line.text.get_ref().as_str())
@@ -95,17 +103,7 @@ impl Input {
             self.lines.push(line)
         }
         match c {
-            '\n' => {
-                self.lines[self.current_row as usize].text.get_mut().push(c);
-                debug!(
-                    "Line after appending new line : {:?}",
-                    self.lines[self.current_row as usize].text.get_ref()
-                );
-                let line = Line::default();
-                self.lines.push(line);
-                self.current_row += 1;
-                self.cursor_column = 0;
-            }
+            '\n' => self.new_line(),
             '\t' => {
                 self.lines[self.current_row as usize]
                     .text
@@ -179,10 +177,10 @@ impl Input {
         {
             return Ok(AppReturn::Continue);
         } else if (self.cursor_column + 1
-            == self.lines[self.cursor_row as usize].text.get_ref().width() as u16)
-            && (self.cursor_row as usize != self.lines.len() - 1)
+            == self.lines[self.current_row as usize].text.get_ref().width() as u16)
+            && (self.current_row as usize != self.lines.len() - 1)
         {
-            self.cursor_row += 1;
+            self.current_row += 1;
             self.cursor_column = 0
         } else {
             self.cursor_column += 1
@@ -191,9 +189,9 @@ impl Input {
     }
 
     pub fn previous_char(&mut self) -> Result<AppReturn> {
-        if (self.cursor_column == 0) && (self.cursor_row > 0) {
-            self.cursor_row -= 1;
-            self.cursor_column = self.lines[self.cursor_row as usize].text.get_ref().width() as u16
+        if (self.cursor_column == 0) && (self.current_row > 0) {
+            self.current_row -= 1;
+            self.cursor_column = self.lines[self.current_row as usize].text.get_ref().width() as u16
         } else if self.cursor_column > 0 {
             self.cursor_column -= 1
         }
@@ -213,11 +211,27 @@ impl Input {
                 self.pop();
             }
             false => {
-                self.lines[self.current_row as usize]
-                    .text
-                    .get_mut()
-                    .remove((self.cursor_column - 1) as usize);
-                self.cursor_column -= 1
+                if self.cursor_is_at_line_beginning() {
+                    if self.on_first_line() {
+                        debug!("On first column of first line.  Unable to backspace")
+                    } else {
+                        let prior_row_text =
+                            self.lines[self.current_row as usize].text.get_ref().clone();
+                        self.up_row()?;
+                        self.pop();
+                        self.lines[self.current_row as usize]
+                            .text
+                            .get_mut()
+                            .push_str(&prior_row_text);
+                        self.lines.remove((self.current_row + 1) as usize);
+                    }
+                } else if self.cursor_is_at_line_end() || self.cursor_is_in_line_middle() {
+                    self.lines[self.current_row as usize]
+                        .text
+                        .get_mut()
+                        .remove((self.cursor_column - 1) as usize);
+                    self.cursor_column -= 1
+                }
             }
         };
         debug!("Input After: {:?}", self);
@@ -234,6 +248,96 @@ impl Input {
 
     pub fn tab(&mut self) -> Result<AppReturn> {
         self.append_char('\t')
+    }
+
+    fn new_line(&mut self) {
+        if self.cursor_is_at_line_beginning() {
+            debug!("Cursor at line beginning");
+            let line_empty = self.lines[self.current_row as usize]
+                .text
+                .get_ref()
+                .is_empty();
+
+            let line = if line_empty {
+                Line::default()
+            } else {
+                let text = self.lines[self.current_row as usize].text.get_ref().clone();
+                Line::new(text)
+            };
+
+            self.lines[self.current_row as usize] = Line::new(String::from('\n'));
+            if self.on_last_line() {
+                self.lines.push(line);
+            } else {
+                self.lines.insert((self.current_row + 1) as usize, line)
+            }
+            self.current_row += 1;
+            self.cursor_column = 0;
+            debug!("Lines: {:?}", self.lines);
+        } else if self.cursor_is_at_line_end() {
+            debug!("Cursor at line end");
+            self.lines[self.current_row as usize]
+                .text
+                .get_mut()
+                .push('\n');
+            let line = Line::default();
+            if self.on_last_line() {
+                self.lines.push(line);
+            } else {
+                self.lines.insert((self.current_row + 1) as usize, line)
+            }
+            self.current_row += 1;
+            self.cursor_column = 0;
+        } else if self.cursor_is_in_line_middle() {
+            debug!("Cursor in middle of line");
+            let new_line: String = self.lines[self.current_row as usize]
+                .text
+                .get_mut()
+                .drain((self.cursor_column as usize)..)
+                .collect();
+            self.lines[self.current_row as usize]
+                .text
+                .get_mut()
+                .push('\n');
+
+            debug!("New line: {}", new_line);
+            let line = Line::new(new_line);
+            if self.on_last_line() {
+                self.lines.push(line);
+            } else {
+                self.lines.insert((self.current_row + 1) as usize, line)
+            }
+            self.current_row += 1;
+            self.cursor_column = 0;
+        } else {
+            debug!("Unhandled")
+        }
+    }
+
+    fn cursor_is_at_line_end(&self) -> bool {
+        let len = self.lines[self.current_row as usize].text.get_ref().len();
+        self.cursor_column as usize == len
+    }
+
+    fn cursor_is_at_line_beginning(&self) -> bool {
+        self.cursor_column == 0
+    }
+
+    fn cursor_is_in_line_middle(&self) -> bool {
+        let len = self.lines[self.current_row as usize].text.get_ref().len();
+        (self.cursor_column > 0) && ((self.cursor_column as usize) < len)
+    }
+
+    fn on_first_line(&self) -> bool {
+        let res = self.current_row as usize == 0;
+        debug!("On first line: {}", res);
+        res
+    }
+
+    fn on_last_line(&self) -> bool {
+        let res = self.current_row as usize == self.lines.len() - 1;
+        debug!("On last line: {}", res);
+        res
     }
 }
 
@@ -268,5 +372,19 @@ impl Editor {
 
     pub fn get_cursor_column(&self) -> u16 {
         self.input.cursor_column
+    }
+
+    pub fn load_file(&mut self, file: File) -> Result<()> {
+        let buf = BufReader::new(file);
+        let mut lines = Vec::new();
+        for line in buf.lines() {
+            let mut line = line?;
+            debug!("Line: {}", line);
+            line.push('\n');
+            let line = line.replace('\t', "    ");
+            lines.push(Line::new(line));
+        }
+        self.input.lines = lines;
+        Ok(())
     }
 }

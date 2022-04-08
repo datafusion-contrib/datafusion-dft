@@ -15,11 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use std::fs::File;
+use std::io::{BufWriter, Write};
+
 use datafusion::prelude::ExecutionConfig;
 use log::info;
 
 use crate::app::datafusion::context::{Context, QueryResults};
 use crate::app::editor::Editor;
+use crate::app::error::Result;
 use crate::app::handlers::key_event_handler;
 use crate::cli::args::Args;
 use crate::events::Key;
@@ -48,6 +52,7 @@ impl Tabs {
 pub enum InputMode {
     Normal,
     Editing,
+    Rc,
 }
 
 /// Status that determines whether app should continue or exit
@@ -120,6 +125,15 @@ impl App {
         let rc = App::get_rc_files(None);
         self.context.exec_files(rc).await;
         info!("Reloaded .datafusionrc");
+    }
+
+    pub fn write_rc(&self) -> Result<()> {
+        let text = self.editor.input.combine_lines();
+        let rc = App::get_rc_files(None);
+        let file = File::create(rc[0].clone())?;
+        let mut writer = BufWriter::new(file);
+        writer.write_all(text.as_bytes())?;
+        Ok(())
     }
 
     pub async fn key_handler(&mut self, key: Key) -> AppReturn {

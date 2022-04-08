@@ -15,6 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
+// Enumeration of the possibilities for each key stroke
+// Key type => Letter or special character
+// Cursor location => Beginning of line, middle of line, end of line
+// Text around cursor => Before cursor, on cursor, after cursor
+// Lines around cursor => First line, middle line, last line
+
 use arrow::util::pretty::pretty_format_batches;
 use log::{debug, error};
 use std::time::Instant;

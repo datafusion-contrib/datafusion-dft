@@ -17,6 +17,7 @@
 
 pub mod edit;
 pub mod normal;
+pub mod rc;
 
 use crate::app::core::{App, AppReturn, InputMode};
 use crate::app::error::Result;
@@ -26,5 +27,6 @@ pub async fn key_event_handler<'a>(app: &mut App, key: Key) -> Result<AppReturn>
     match app.input_mode {
         InputMode::Normal => normal::normal_mode_handler(app, key).await,
         InputMode::Editing => edit::edit_mode_handler(app, key).await,
+        InputMode::Rc => rc::rc_mode_handler(app, key).await,
     }
 }
