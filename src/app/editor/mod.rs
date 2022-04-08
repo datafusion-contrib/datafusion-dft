@@ -81,7 +81,7 @@ impl Input {
         let end = (start + (MAX_EDITOR_LINES as usize) + 1) as usize;
 
         let text: Vec<&str> = if start == 0 {
-            debug!("Combining all lines");
+            // debug!("Combining all lines");
             self.lines
                 .iter()
                 .map(|line| line.text.get_ref().as_str())
@@ -103,17 +103,7 @@ impl Input {
             self.lines.push(line)
         }
         match c {
-            '\n' => {
-                self.lines[self.current_row as usize].text.get_mut().push(c);
-                debug!(
-                    "Line after appending new line : {:?}",
-                    self.lines[self.current_row as usize].text.get_ref()
-                );
-                let line = Line::default();
-                self.lines.push(line);
-                self.current_row += 1;
-                self.cursor_column = 0;
-            }
+            '\n' => self.new_line(),
             '\t' => {
                 self.lines[self.current_row as usize]
                     .text
@@ -242,6 +232,90 @@ impl Input {
 
     pub fn tab(&mut self) -> Result<AppReturn> {
         self.append_char('\t')
+    }
+
+    fn new_line(&mut self) {
+        if self.cursor_is_at_line_beginning() {
+            debug!("Cursor at line beginning");
+            let line_empty = self.lines[self.current_row as usize]
+                .text
+                .get_ref()
+                .is_empty();
+
+            let line = if line_empty {
+                Line::default()
+            } else {
+                let text = self.lines[self.current_row as usize].text.get_ref().clone();
+                Line::new(text)
+            };
+
+            self.lines[self.current_row as usize] = Line::new(String::from('\n'));
+            if self.on_last_line() {
+                self.lines.push(line);
+            } else {
+                self.lines.insert((self.current_row + 1) as usize, line)
+            }
+            self.current_row += 1;
+            self.cursor_column = 0;
+            debug!("Lines: {:?}", self.lines);
+        } else if self.cursor_is_at_line_end() {
+            debug!("Cursor at line end");
+            self.lines[self.current_row as usize]
+                .text
+                .get_mut()
+                .push('\n');
+            let line = Line::default();
+            if self.on_last_line() {
+                self.lines.push(line);
+            } else {
+                self.lines.insert((self.current_row + 1) as usize, line)
+            }
+            self.current_row += 1;
+            self.cursor_column = 0;
+        } else if self.cursor_is_in_line_middle() {
+            debug!("Cursor in middle of line");
+            let new_line: String = self.lines[self.current_row as usize]
+                .text
+                .get_mut()
+                .drain((self.cursor_column as usize)..)
+                .collect();
+            self.lines[self.current_row as usize]
+                .text
+                .get_mut()
+                .push('\n');
+
+            debug!("New line: {}", new_line);
+            let line = Line::new(new_line);
+            if self.on_last_line() {
+                self.lines.push(line);
+            } else {
+                self.lines.insert((self.current_row + 1) as usize, line)
+            }
+            self.current_row += 1;
+            self.cursor_column = 0;
+        } else {
+            debug!("Unhandled")
+        }
+    }
+
+    fn cursor_is_at_line_end(&self) -> bool {
+        let len = self.lines[self.current_row as usize].text.get_ref().len();
+        self.cursor_column as usize == len
+    }
+
+    fn cursor_is_at_line_beginning(&self) -> bool {
+        self.cursor_column == 0
+    }
+
+    fn cursor_is_in_line_middle(&self) -> bool {
+        let len = self.lines[self.current_row as usize].text.get_ref().len();
+        (self.cursor_column > 0) && ((self.cursor_column as usize) < len)
+    }
+
+    fn on_last_line(&self) -> bool {
+        let res = self.current_row as usize == self.lines.len() - 1;
+        debug!("On last line: {}", res);
+        res
     }
 }
 
