@@ -222,7 +222,7 @@ impl Input {
                         self.lines[self.current_row as usize]
                             .text
                             .get_mut()
-                            .extend(prior_row_text.chars());
+                            .push_str(&prior_row_text);
                         self.lines.remove((self.current_row + 1) as usize);
                     }
                 } else if self.cursor_is_at_line_end() || self.cursor_is_in_line_middle() {

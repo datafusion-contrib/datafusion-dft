@@ -132,7 +132,7 @@ impl App {
         let rc = App::get_rc_files(None);
         let file = File::create(rc[0].clone())?;
         let mut writer = BufWriter::new(file);
-        writer.write(text.as_bytes());
+        writer.write_all(text.as_bytes())?;
         Ok(())
     }
 
