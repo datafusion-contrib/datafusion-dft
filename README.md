@@ -47,6 +47,10 @@ The interface is split into several tabs so that relevant information can be vie
     - Backspace / tab / enter work same as normal
     - Add a semicolor after query and hit `enter` to execute query
     - `esc` to exit Edit mode and go back to Normal mode
+  - Rc mode
+    - `l` load `~/.datafusion/.datafusionrc` into editor
+    - `r` rerun `~/.datafusion/.datafusionrc`
+    - `w` write editor contents to `~/.datafusion/.datafusionrc`
 - Register custom `ObjectStore`
   - S3: run / install with `--features=s3`
     - If you want to use your default AWS credentials, then no further action is required. For example your credentials in `~/.aws/credentials` will automatically be picked up.
