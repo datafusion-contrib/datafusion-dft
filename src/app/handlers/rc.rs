@@ -46,6 +46,10 @@ pub async fn rc_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
                 app.reload_rc().await;
                 Ok(AppReturn::Continue)
             }
+            'w' => {
+                app.write_rc()?;
+                Ok(AppReturn::Continue)
+            }
             _ => Ok(AppReturn::Continue),
         },
         Key::Esc => {
