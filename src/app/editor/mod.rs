@@ -211,11 +211,27 @@ impl Input {
                 self.pop();
             }
             false => {
-                self.lines[self.current_row as usize]
-                    .text
-                    .get_mut()
-                    .remove((self.cursor_column - 1) as usize);
-                self.cursor_column -= 1
+                if self.cursor_is_at_line_beginning() {
+                    if self.on_first_line() {
+                        debug!("On first column of first line.  Unable to backspace")
+                    } else {
+                        let prior_row_text =
+                            self.lines[self.current_row as usize].text.get_ref().clone();
+                        self.up_row()?;
+                        self.pop();
+                        self.lines[self.current_row as usize]
+                            .text
+                            .get_mut()
+                            .extend(prior_row_text.chars());
+                        self.lines.remove((self.current_row + 1) as usize);
+                    }
+                } else if self.cursor_is_at_line_end() || self.cursor_is_in_line_middle() {
+                    self.lines[self.current_row as usize]
+                        .text
+                        .get_mut()
+                        .remove((self.cursor_column - 1) as usize);
+                    self.cursor_column -= 1
+                }
             }
         };
         debug!("Input After: {:?}", self);
@@ -310,6 +326,12 @@ impl Input {
     fn cursor_is_in_line_middle(&self) -> bool {
         let len = self.lines[self.current_row as usize].text.get_ref().len();
         (self.cursor_column > 0) && ((self.cursor_column as usize) < len)
+    }
+
+    fn on_first_line(&self) -> bool {
+        let res = self.current_row as usize == 0;
+        debug!("On first line: {}", res);
+        res
     }
 
     fn on_last_line(&self) -> bool {
