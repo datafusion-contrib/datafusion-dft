@@ -105,6 +105,7 @@ pub enum Key {
     Char(char),
     Ctrl(char),
     Alt(char),
+    ShiftEnter,
     Unknown,
 }
 
@@ -145,6 +146,7 @@ impl fmt::Display for Key {
             Key::Alt(c) => write!(f, "<Alt+{}>", c),
             Key::Ctrl(c) => write!(f, "<Ctrl+{}>", c),
             Key::Char(c) => write!(f, "{}", c),
+            Key::ShiftEnter => write!(f, "<Shift+Enter>"),
             Key::Left | Key::Right | Key::Up | Key::Down => write!(f, "<{:?} Arrow Key>", self),
             Key::Enter
             | Key::Tab
@@ -217,10 +219,6 @@ impl From<event::KeyEvent> for Key {
                 ..
             } => Key::from_f(n),
             event::KeyEvent {
-                code: event::KeyCode::Enter,
-                ..
-            } => Key::Enter,
-            event::KeyEvent {
                 code: event::KeyCode::Tab,
                 ..
             } => Key::Tab,
@@ -234,11 +232,19 @@ impl From<event::KeyEvent> for Key {
                 code: event::KeyCode::Char(c),
                 modifiers: event::KeyModifiers::CONTROL,
             } => Key::Ctrl(c),
+            event::KeyEvent {
+                code: event::KeyCode::Enter,
+                modifiers: event::KeyModifiers::SHIFT,
+            } => Key::ShiftEnter,
 
             event::KeyEvent {
                 code: event::KeyCode::Char(c),
                 ..
             } => Key::Char(c),
+            event::KeyEvent {
+                code: event::KeyCode::Enter,
+                ..
+            } => Key::Enter,
 
             _ => Key::Unknown,
         }

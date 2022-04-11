@@ -14,7 +14,7 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-
+use log::debug;
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
@@ -248,6 +248,7 @@ fn draw_query_results(app: &mut App) -> Paragraph {
     // Query results not shown correctly on error. For example `show tables for x`
     let (query_results, duration) = match &app.query_results {
         Some(query_results) => {
+            // debug!("Query results available");
             let query_meta = app.editor.history.last().unwrap();
             let results = if query_meta.query.starts_with("CREATE") {
                 Paragraph::new(String::from("Table created"))
@@ -259,6 +260,7 @@ fn draw_query_results(app: &mut App) -> Paragraph {
             (results, query_duration_info)
         }
         None => {
+            // debug!("Query results not available");
             let last_query = app.editor.history.last();
             let no_queries_text = match last_query {
                 Some(query_meta) => {

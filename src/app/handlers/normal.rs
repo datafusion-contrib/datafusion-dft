@@ -55,6 +55,12 @@ pub async fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
                 }
                 Ok(AppReturn::Continue)
             }
+            Key::PageDown => {
+                if let Some(results) = &mut app.query_results {
+                    results.scroll.x += 5
+                }
+                Ok(AppReturn::Continue)
+            }
             Key::Up => {
                 if let Some(results) = &mut app.query_results {
                     let new_x = match results.scroll.x {
@@ -65,6 +71,17 @@ pub async fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
                 }
                 Ok(AppReturn::Continue)
             }
+            Key::PageUp => {
+                if let Some(results) = &mut app.query_results {
+                    let new_x = match results.scroll.x {
+                        0 => 0,
+                        n => n - 5,
+                    };
+                    results.scroll.x = new_x
+                }
+                Ok(AppReturn::Continue)
+            }
+
             Key::Right => {
                 if let Some(results) = &mut app.query_results {
                     results.scroll.y += 3
