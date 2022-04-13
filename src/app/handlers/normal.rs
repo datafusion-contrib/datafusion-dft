@@ -65,7 +65,7 @@ pub async fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
             }
             Key::PageDown => {
                 if let Some(results) = &mut app.query_results {
-                    results.scroll.x += 5
+                    results.scroll.x += 10
                 }
                 Ok(AppReturn::Continue)
             }
@@ -83,7 +83,7 @@ pub async fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
                 if let Some(results) = &mut app.query_results {
                     let new_x = match results.scroll.x {
                         0 => 0,
-                        n => n - 5,
+                        n => n - 10,
                     };
                     results.scroll.x = new_x
                 }
