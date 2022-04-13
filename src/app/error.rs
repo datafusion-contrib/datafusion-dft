@@ -27,6 +27,7 @@ pub type Result<T> = result::Result<T, DftError>;
 pub enum DftError {
     DataFusionError(DataFusionError),
     IoError(io::Error),
+    UiError(String),
 }
 
 impl From<io::Error> for DftError {
@@ -46,6 +47,7 @@ impl Display for DftError {
         match *self {
             DftError::DataFusionError(ref desc) => write!(f, "DataFusion error: {}", desc),
             DftError::IoError(ref desc) => write!(f, "IO error: {}", desc),
+            DftError::UiError(ref text) => write!(f, "UI Error: {}", text),
         }
     }
 }

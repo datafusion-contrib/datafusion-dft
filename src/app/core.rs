@@ -35,24 +35,90 @@ pub struct Tabs {
     pub index: usize,
 }
 
-impl Tabs {
-    fn new() -> Self {
-        Tabs {
-            titles: vec![
-                "SQL Editor [1]",
-                "Query History [2]",
-                "Context [3]",
-                "Logs [4]",
-            ],
-            index: 0,
+#[derive(Debug, Copy, Eq, PartialEq, Clone)]
+pub enum TabItem {
+    Editor,
+    QueryHistory,
+    Context,
+    Logs,
+}
+
+impl Default for TabItem {
+    fn default() -> TabItem {
+        TabItem::Editor
+    }
+}
+
+impl TabItem {
+    pub(crate) fn all_values() -> Vec<TabItem> {
+        vec![
+            TabItem::Editor,
+            TabItem::QueryHistory,
+            TabItem::Context,
+            TabItem::Logs,
+        ]
+    }
+
+    pub(crate) fn list_index(&self) -> usize {
+        return TabItem::all_values()
+            .iter()
+            .position(|x| x == self)
+            .unwrap();
+    }
+
+    pub(crate) fn title_with_key(&self) -> String {
+        return format!("{} [{}]", self.title(), self.list_index() + 1);
+    }
+
+    pub(crate) fn title(&self) -> &'static str {
+        match self {
+            TabItem::Editor => "SQL Editor",
+            TabItem::QueryHistory => "Query History",
+            TabItem::Context => "Context",
+            TabItem::Logs => "Logs",
         }
     }
 }
 
+impl TryFrom<char> for TabItem {
+    type Error = String;
+
+    fn try_from(value: char) -> std::result::Result<Self, Self::Error> {
+        match value {
+            '1' => Ok(TabItem::Editor),
+            '2' => Ok(TabItem::QueryHistory),
+            '3' => Ok(TabItem::Context),
+            '4' => Ok(TabItem::Logs),
+            i => Err(format!(
+                "Invalid tab index: {}, valid range is [1..={}]",
+                i, 4
+            )),
+        }
+    }
+}
+
+impl From<TabItem> for usize {
+    fn from(item: TabItem) -> Self {
+        match item {
+            TabItem::Editor => 1,
+            TabItem::QueryHistory => 2,
+            TabItem::Context => 3,
+            TabItem::Logs => 4,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
 pub enum InputMode {
     Normal,
     Editing,
     Rc,
+}
+
+impl Default for InputMode {
+    fn default() -> InputMode {
+        InputMode::Normal
+    }
 }
 
 /// Status that determines whether app should continue or exit
@@ -65,7 +131,7 @@ pub enum AppReturn {
 /// App holds the state of the application
 pub struct App {
     /// Application tabs
-    pub tabs: Tabs,
+    pub tab_item: TabItem,
     /// Current input mode
     pub input_mode: InputMode,
     /// SQL Editor and it's state
@@ -96,8 +162,8 @@ impl App {
         }
 
         App {
-            tabs: Tabs::new(),
-            input_mode: InputMode::Normal,
+            tab_item: Default::default(),
+            input_mode: Default::default(),
             editor: Editor::default(),
             context: ctx,
             query_results: None,
@@ -142,5 +208,31 @@ impl App {
 
     pub fn update_on_tick(&mut self) -> AppReturn {
         AppReturn::Continue
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_tab_item_from_char() {
+        assert!(TabItem::try_from('0').is_err());
+        assert_eq!(TabItem::Editor, TabItem::try_from('1').unwrap());
+        assert_eq!(TabItem::QueryHistory, TabItem::try_from('2').unwrap());
+        assert_eq!(TabItem::Context, TabItem::try_from('3').unwrap());
+        assert_eq!(TabItem::Logs, TabItem::try_from('4').unwrap());
+        assert!(TabItem::try_from('5').is_err());
+    }
+
+    #[test]
+    fn test_tab_item_to_usize() {
+        (0_usize..TabItem::all_values().len()).for_each(|i| {
+            assert_eq!(
+                TabItem::all_values()[i],
+                TabItem::try_from(format!("{}", i + 1).chars().next().unwrap()).unwrap()
+            );
+            assert_eq!(TabItem::all_values()[i].list_index(), i);
+        });
     }
 }
