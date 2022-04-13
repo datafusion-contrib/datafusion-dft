@@ -21,14 +21,10 @@
 // Text around cursor => Before cursor, on cursor, after cursor
 // Lines around cursor => First line, middle line, last line
 
-use arrow::util::pretty::pretty_format_batches;
-use log::{debug, error};
-use std::time::Instant;
+use log::debug;
 
 use crate::app::core::{App, AppReturn, InputMode};
-use crate::app::datafusion::context::{QueryResults, QueryResultsMeta};
-use crate::app::error::{DftError, Result};
-use crate::app::ui::Scroll;
+use crate::app::error::Result;
 use crate::events::Key;
 
 pub async fn edit_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
@@ -37,7 +33,7 @@ pub async fn edit_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
         key, app.editor.input.current_row, app.editor.input.cursor_column
     );
     match key {
-        Key::Enter => enter_handler(app).await,
+        Key::Enter => app.editor.input.append_char('\n'),
         Key::Char(c) => match c {
             ';' => {
                 let result = app.editor.input.append_char(c);
@@ -59,54 +55,3 @@ pub async fn edit_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
         _ => Ok(AppReturn::Continue),
     }
 }
-
-async fn enter_handler(app: &mut App) -> Result<AppReturn> {
-    match app.editor.sql_terminated {
-        false => app.editor.input.append_char('\n'),
-        true => {
-            let sql: String = app.editor.input.combine_lines();
-            app.editor.sql_terminated = false;
-
-            let now = Instant::now();
-            let df = app.context.sql(&sql).await;
-            match df {
-                Ok(df) => {
-                    debug!("Successfully executed query");
-                    let batches = df.collect().await.map_err(DftError::DataFusionError)?;
-                    let query_duration = now.elapsed().as_secs_f64();
-                    let rows: usize = batches.iter().map(|b| b.num_rows()).sum();
-                    let query_meta = QueryResultsMeta {
-                        query: sql,
-                        succeeded: true,
-                        error: None,
-                        rows,
-                        query_duration,
-                    };
-                    app.editor.history.push(query_meta.clone());
-                    let pretty_batches = pretty_format_batches(&batches).unwrap().to_string();
-                    app.query_results = Some(QueryResults {
-                        batches,
-                        pretty_batches,
-                        meta: query_meta,
-                        scroll: Scroll { x: 0, y: 0 },
-                    });
-                }
-                Err(e) => {
-                    error!("{}", e);
-                    let err_msg = format!("{}", e);
-                    let query_meta = QueryResultsMeta {
-                        query: sql,
-                        succeeded: false,
-                        error: Some(err_msg),
-                        rows: 0,
-                        query_duration: 0.0,
-                    };
-                    app.editor.history.push(query_meta)
-                }
-            };
-            Ok(AppReturn::Continue)
-        }
-    }
-}
-
-// TODO: Create query handler function

@@ -217,10 +217,6 @@ impl From<event::KeyEvent> for Key {
                 ..
             } => Key::from_f(n),
             event::KeyEvent {
-                code: event::KeyCode::Enter,
-                ..
-            } => Key::Enter,
-            event::KeyEvent {
                 code: event::KeyCode::Tab,
                 ..
             } => Key::Tab,
@@ -239,7 +235,10 @@ impl From<event::KeyEvent> for Key {
                 code: event::KeyCode::Char(c),
                 ..
             } => Key::Char(c),
-
+            event::KeyEvent {
+                code: event::KeyCode::Enter,
+                ..
+            } => Key::Enter,
             _ => Key::Unknown,
         }
     }

@@ -18,6 +18,7 @@
 mod key;
 
 use crossterm::event::KeyEvent;
+use log::debug;
 
 pub use self::key::Key;
 
@@ -53,6 +54,7 @@ impl Events {
                 // poll for tick rate duration, if no event, sent tick event.
                 if crossterm::event::poll(tick_rate).unwrap() {
                     if let event::Event::Key(key) = event::read().unwrap() {
+                        debug!("Key Event: {:?}", key);
                         let key = Key::from(key);
                         event_tx.send(Event::KeyInput(key)).unwrap();
                     }

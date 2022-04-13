@@ -40,12 +40,12 @@ The interface is split into several tabs so that relevant information can be vie
     - `q` => quit datafusion-tui
     - `e` => start editing SQL Editor in Edit mode
     - `c` => clear contents of SQL Editor
+    - `Enter` => execute query
     - Enter the tab number in brackets after a tabs name to navigate to that tab
     - If query results are longer or wider than screen, you can use arrow keys to scroll
   - Edit mode
     - Character keys to write queries
     - Backspace / tab / enter work same as normal
-    - Add a semicolor after query and hit `enter` to execute query
     - `esc` to exit Edit mode and go back to Normal mode
   - Rc mode
     - `l` load `~/.datafusion/.datafusionrc` into editor
