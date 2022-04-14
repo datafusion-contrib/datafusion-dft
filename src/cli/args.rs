@@ -97,3 +97,16 @@ fn is_valid_batch_size(size: &str) -> std::result::Result<(), String> {
         _ => Err(format!("Invalid batch size '{}'", size)),
     }
 }
+
+pub fn mock_standard_args() -> Args {
+    Args {
+        data_path: None,
+        batch_size: None,
+        file: Vec::new(),
+        rc: None,
+        format: PrintFormat::Table,
+        host: None,
+        port: None,
+        quiet: false,
+    }
+}
