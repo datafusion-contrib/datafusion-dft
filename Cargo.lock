@@ -817,6 +817,7 @@ dependencies = [
  "mimalloc",
  "serde",
  "serde_json",
+ "sqlparser",
  "tokio",
  "tui",
  "tui-logger",

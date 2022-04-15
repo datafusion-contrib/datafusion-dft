@@ -29,7 +29,7 @@ use std::sync::Arc;
 
 use crate::app::ui::Scroll;
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct QueryResultsMeta {
     pub query: String,
     pub succeeded: bool,
@@ -223,11 +223,15 @@ impl BallistaContext {
 
 #[cfg(test)]
 mod test {
+    use datafusion::error::DataFusionError;
+    use sqlparser::parser::ParserError;
+
     use crate::app::core::{App, TabItem};
     use crate::app::datafusion::context::{QueryResults, QueryResultsMeta};
+    use crate::app::handlers::execute_query;
     use crate::app::ui::Scroll;
-    use crate::assert_results_eq;
     use crate::cli::args::mock_standard_args;
+    use crate::utils::test_util::assert_results_eq;
 
     #[test]
     fn test_tab_item_from_char() {
@@ -251,12 +255,76 @@ mod test {
     }
 
     #[tokio::test]
+    async fn test_select() {
+        let args = mock_standard_args();
+        let mut app = App::new(args).await;
+
+        let query = "SELECT 1";
+        for char in query.chars() {
+            app.editor.input.append_char(char).unwrap();
+        }
+
+        execute_query(&mut app).await.unwrap();
+
+        let results = app.query_results.unwrap();
+
+        let expected_meta = QueryResultsMeta {
+            query: query.to_string(),
+            succeeded: true,
+            error: None,
+            rows: 1,
+            query_duration: 0f64,
+        };
+
+        let expected_results = QueryResults {
+            batches: Vec::new(),
+            pretty_batches: String::new(),
+            meta: expected_meta,
+            scroll: Scroll { x: 0, y: 0 },
+        };
+
+        assert_results_eq(Some(results), Some(expected_results));
+    }
+
+    #[tokio::test]
+    async fn test_select_with_typo() {
+        let args = mock_standard_args();
+        let mut app = App::new(args).await;
+
+        let query = "SELE 1";
+        for char in query.chars() {
+            app.editor.input.append_char(char).unwrap();
+        }
+
+        execute_query(&mut app).await.unwrap();
+
+        let actual = app.editor.history.pop();
+
+        let expected_meta = QueryResultsMeta {
+            query: query.to_string(),
+            succeeded: false,
+            error: Some(
+                "SQL error: ParserError(\"Expected an SQL statement, found: SELE\")".to_string(),
+            ),
+            rows: 0,
+            query_duration: 0f64,
+        };
+
+        assert_eq!(actual, Some(expected_meta));
+    }
+
+    #[tokio::test]
     async fn test_create_table() {
         let args = mock_standard_args();
         let mut app = App::new(args).await;
 
         let query = "CREATE TABLE abc AS VALUES (1,2,3)";
-        let df = app.context.sql(query).await.unwrap();
+
+        for char in query.chars() {
+            app.editor.input.append_char(char).unwrap();
+        }
+
+        execute_query(&mut app).await.unwrap();
 
         let results = app.query_results;
 
@@ -275,6 +343,6 @@ mod test {
             scroll: Scroll { x: 0, y: 0 },
         };
 
-        assert_results_eq!(results, expected_results);
+        assert_results_eq(results, Some(expected_results));
     }
 }
