@@ -223,9 +223,6 @@ impl BallistaContext {
 
 #[cfg(test)]
 mod test {
-    use datafusion::error::DataFusionError;
-    use sqlparser::parser::ParserError;
-
     use crate::app::core::{App, TabItem};
     use crate::app::datafusion::context::{QueryResults, QueryResultsMeta};
     use crate::app::handlers::execute_query;
@@ -344,5 +341,37 @@ mod test {
         };
 
         assert_results_eq(results, Some(expected_results));
+    }
+
+    #[tokio::test]
+    async fn test_multiple_queries() {
+        let args = mock_standard_args();
+        let mut app = App::new(args).await;
+
+        let query = "SELECT 1;SELECT 2;";
+        for char in query.chars() {
+            app.editor.input.append_char(char).unwrap();
+        }
+
+        execute_query(&mut app).await.unwrap();
+
+        let results = app.query_results.unwrap();
+
+        let expected_meta = QueryResultsMeta {
+            query: "SELECT 2".to_string(),
+            succeeded: true,
+            error: None,
+            rows: 1,
+            query_duration: 0f64,
+        };
+
+        let expected_results = QueryResults {
+            batches: Vec::new(),
+            pretty_batches: String::new(),
+            meta: expected_meta,
+            scroll: Scroll { x: 0, y: 0 },
+        };
+
+        assert_results_eq(Some(results), Some(expected_results));
     }
 }
