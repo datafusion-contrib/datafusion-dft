@@ -18,6 +18,7 @@
 pub mod app;
 pub mod cli;
 pub mod events;
+pub mod utils;
 
 use std::io;
 use std::time::Duration;

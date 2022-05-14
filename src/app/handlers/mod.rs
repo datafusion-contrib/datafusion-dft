@@ -19,8 +19,17 @@ pub mod edit;
 pub mod normal;
 pub mod rc;
 
+use arrow::util::pretty::pretty_format_batches;
+use datafusion::error::DataFusionError;
+use datafusion::prelude::DataFrame;
+use log::{debug, error};
+use std::sync::Arc;
+use std::time::Instant;
+
 use crate::app::core::{App, AppReturn, InputMode};
-use crate::app::error::Result;
+use crate::app::datafusion::context::{QueryResults, QueryResultsMeta};
+use crate::app::error::{DftError, Result};
+use crate::app::ui::Scroll;
 use crate::events::Key;
 
 pub async fn key_event_handler<'a>(app: &mut App, key: Key) -> Result<AppReturn> {
@@ -29,4 +38,71 @@ pub async fn key_event_handler<'a>(app: &mut App, key: Key) -> Result<AppReturn>
         InputMode::Editing => edit::edit_mode_handler(app, key).await,
         InputMode::Rc => rc::rc_mode_handler(app, key).await,
     }
+}
+
+pub async fn execute_query(app: &mut App) -> Result<AppReturn> {
+    let sql: String = app.editor.input.combine_lines();
+    handle_queries(app, sql).await?;
+    Ok(AppReturn::Continue)
+}
+
+async fn handle_queries(app: &mut App, sql: String) -> Result<()> {
+    let start = Instant::now();
+    let queries = sql.split(';');
+    for query in queries {
+        if !query.is_empty() {
+            let df = app.context.sql(query).await;
+            match df {
+                Ok(df) => handle_successful_query(app, start, query.to_string(), df).await?,
+                Err(err) => {
+                    handle_failed_query(app, query.to_string(), err)?;
+                    break;
+                }
+            };
+        }
+    }
+    Ok(())
+}
+
+async fn handle_successful_query(
+    app: &mut App,
+    start: Instant,
+    sql: String,
+    df: Arc<dyn DataFrame>,
+) -> Result<()> {
+    debug!("Successfully executed query");
+    let batches = df.collect().await.map_err(DftError::DataFusionError)?;
+    let query_duration = start.elapsed().as_secs_f64();
+    let rows: usize = batches.iter().map(|b| b.num_rows()).sum();
+    let query_meta = QueryResultsMeta {
+        query: sql,
+        succeeded: true,
+        error: None,
+        rows,
+        query_duration,
+    };
+    app.editor.history.push(query_meta.clone());
+    let pretty_batches = pretty_format_batches(&batches).unwrap().to_string();
+    app.query_results = Some(QueryResults {
+        batches,
+        pretty_batches,
+        meta: query_meta,
+        scroll: Scroll { x: 0, y: 0 },
+    });
+    Ok(())
+}
+
+fn handle_failed_query(app: &mut App, sql: String, error: DataFusionError) -> Result<()> {
+    error!("{}", error);
+    let err_msg = format!("{}", error);
+    app.query_results = None;
+    let query_meta = QueryResultsMeta {
+        query: sql,
+        succeeded: false,
+        error: Some(err_msg),
+        rows: 0,
+        query_duration: 0.0,
+    };
+    app.editor.history.push(query_meta);
+    Ok(())
 }

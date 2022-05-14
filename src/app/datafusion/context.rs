@@ -29,7 +29,7 @@ use std::sync::Arc;
 
 use crate::app::ui::Scroll;
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct QueryResultsMeta {
     pub query: String,
     pub succeeded: bool,
@@ -218,5 +218,160 @@ impl BallistaContext {
     }
     pub async fn sql(&mut self, _sql: &str) -> Result<Arc<dyn DataFrame>> {
         unreachable!()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::app::core::{App, TabItem};
+    use crate::app::datafusion::context::{QueryResults, QueryResultsMeta};
+    use crate::app::handlers::execute_query;
+    use crate::app::ui::Scroll;
+    use crate::cli::args::mock_standard_args;
+    use crate::utils::test_util::assert_results_eq;
+
+    #[test]
+    fn test_tab_item_from_char() {
+        assert!(TabItem::try_from('0').is_err());
+        assert_eq!(TabItem::Editor, TabItem::try_from('1').unwrap());
+        assert_eq!(TabItem::QueryHistory, TabItem::try_from('2').unwrap());
+        assert_eq!(TabItem::Context, TabItem::try_from('3').unwrap());
+        assert_eq!(TabItem::Logs, TabItem::try_from('4').unwrap());
+        assert!(TabItem::try_from('5').is_err());
+    }
+
+    #[test]
+    fn test_tab_item_to_usize() {
+        (0_usize..TabItem::all_values().len()).for_each(|i| {
+            assert_eq!(
+                TabItem::all_values()[i],
+                TabItem::try_from(format!("{}", i + 1).chars().next().unwrap()).unwrap()
+            );
+            assert_eq!(TabItem::all_values()[i].list_index(), i);
+        });
+    }
+
+    #[tokio::test]
+    async fn test_select() {
+        let args = mock_standard_args();
+        let mut app = App::new(args).await;
+
+        let query = "SELECT 1";
+        for char in query.chars() {
+            app.editor.input.append_char(char).unwrap();
+        }
+
+        execute_query(&mut app).await.unwrap();
+
+        let results = app.query_results.unwrap();
+
+        let expected_meta = QueryResultsMeta {
+            query: query.to_string(),
+            succeeded: true,
+            error: None,
+            rows: 1,
+            query_duration: 0f64,
+        };
+
+        let expected_results = QueryResults {
+            batches: Vec::new(),
+            pretty_batches: String::new(),
+            meta: expected_meta,
+            scroll: Scroll { x: 0, y: 0 },
+        };
+
+        assert_results_eq(Some(results), Some(expected_results));
+    }
+
+    #[tokio::test]
+    async fn test_select_with_typo() {
+        let args = mock_standard_args();
+        let mut app = App::new(args).await;
+
+        let query = "SELE 1";
+        for char in query.chars() {
+            app.editor.input.append_char(char).unwrap();
+        }
+
+        execute_query(&mut app).await.unwrap();
+
+        let actual = app.editor.history.pop();
+
+        let expected_meta = QueryResultsMeta {
+            query: query.to_string(),
+            succeeded: false,
+            error: Some(
+                "SQL error: ParserError(\"Expected an SQL statement, found: SELE\")".to_string(),
+            ),
+            rows: 0,
+            query_duration: 0f64,
+        };
+
+        assert_eq!(actual, Some(expected_meta));
+    }
+
+    #[tokio::test]
+    async fn test_create_table() {
+        let args = mock_standard_args();
+        let mut app = App::new(args).await;
+
+        let query = "CREATE TABLE abc AS VALUES (1,2,3)";
+
+        for char in query.chars() {
+            app.editor.input.append_char(char).unwrap();
+        }
+
+        execute_query(&mut app).await.unwrap();
+
+        let results = app.query_results;
+
+        let expected_meta = QueryResultsMeta {
+            query: query.to_string(),
+            succeeded: true,
+            error: None,
+            rows: 0,
+            query_duration: 0f64,
+        };
+
+        let expected_results = QueryResults {
+            batches: Vec::new(),
+            pretty_batches: String::new(),
+            meta: expected_meta,
+            scroll: Scroll { x: 0, y: 0 },
+        };
+
+        assert_results_eq(results, Some(expected_results));
+    }
+
+    #[tokio::test]
+    async fn test_multiple_queries() {
+        let args = mock_standard_args();
+        let mut app = App::new(args).await;
+
+        let query = "SELECT 1;SELECT 2;";
+        for char in query.chars() {
+            app.editor.input.append_char(char).unwrap();
+        }
+
+        execute_query(&mut app).await.unwrap();
+
+        let results = app.query_results.unwrap();
+
+        let expected_meta = QueryResultsMeta {
+            query: "SELECT 2".to_string(),
+            succeeded: true,
+            error: None,
+            rows: 1,
+            query_duration: 0f64,
+        };
+
+        let expected_results = QueryResults {
+            batches: Vec::new(),
+            pretty_batches: String::new(),
+            meta: expected_meta,
+            scroll: Scroll { x: 0, y: 0 },
+        };
+
+        assert_results_eq(Some(results), Some(expected_results));
     }
 }
