@@ -26,6 +26,7 @@ datafusion-objectstore-s3 = { version = "0.2.1", optional=true }
 dirs = "4.0"
 futures = "0.3"
 http = "0.2.6"
+hyper = "0.14"
 log = "0.4"
 mimalloc = { version = "0.1", default-features = false }
 serde = "1.0.136"
