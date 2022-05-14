@@ -18,6 +18,7 @@ arrow = "13"
 aws-sdk-s3 = "0.9.0"
 aws-types = "0.9.0"
 ballista = { version = "0.7", optional=true }
+async-trait = "0.1.53"
 clap = {version = "3", features = ["derive", "cargo"]}
 crossterm = { version = "0.23", features = [ "serde" ] }
 datafusion = "8"
@@ -26,7 +27,8 @@ datafusion-objectstore-s3 = { version = "0.2.1", optional=true }
 dirs = "4.0"
 futures = "0.3"
 http = "0.2.6"
-hyper = "0.14"
+hyper = { version = "0.14", features=["full"]}
+hyper-tls = "0.5.0"
 log = "0.4"
 mimalloc = { version = "0.1", default-features = false }
 serde = "1.0.136"
@@ -43,3 +45,4 @@ glue = ["datafusion-catalogprovider-glue"]
 [[bin]]
 name = "dft"
 path = "src/main.rs"
+

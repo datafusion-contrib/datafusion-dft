@@ -16,6 +16,7 @@
 // under the License.
 
 use datafusion::error::DataFusionError;
+use hyper;
 use std::error;
 use std::fmt::{Display, Formatter};
 use std::io;
@@ -26,19 +27,25 @@ pub type Result<T> = result::Result<T, DftError>;
 #[derive(Debug)]
 pub enum DftError {
     DataFusionError(DataFusionError),
-    IoError(io::Error),
+    IoError(String),
     UiError(String),
 }
 
 impl From<io::Error> for DftError {
     fn from(e: io::Error) -> Self {
-        DftError::IoError(e)
+        DftError::IoError(e.to_string())
     }
 }
 
 impl From<DataFusionError> for DftError {
     fn from(e: DataFusionError) -> Self {
         DftError::DataFusionError(e)
+    }
+}
+
+impl From<hyper::Error> for DftError {
+    fn from(e: hyper::Error) -> Self {
+        DftError::IoError(e.to_string())
     }
 }
 
