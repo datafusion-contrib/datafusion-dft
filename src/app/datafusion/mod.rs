@@ -17,4 +17,3 @@
 
 pub mod context;
 pub mod object_stores;
-pub mod table_providers;

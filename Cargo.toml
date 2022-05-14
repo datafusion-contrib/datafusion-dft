@@ -15,7 +15,6 @@ clap = {version = "3", features = ["derive", "cargo"]}
 crossterm = { version = "0.23", features = [ "serde" ] }
 datafusion = "7"
 datafusion-objectstore-s3 = { version = "0", optional=true }
-datafusion-bigtable = { version = "0", optional=true }
 dirs = "4.0"
 futures = "0.3"
 http = "0.2.6"
@@ -30,5 +29,4 @@ unicode-width = "0.1.9"
 
 [features]
 s3 = ["datafusion-objectstore-s3"]
-bigtable = ["datafusion-bigtable"]
 # ballista = ["ballista"]
