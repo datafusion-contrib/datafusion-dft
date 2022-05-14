@@ -23,27 +23,164 @@ use datafusion::datasource::{TableProvider, TableType};
 use datafusion::error::Result as DFResult;
 use datafusion::logical_plan::Expr;
 use datafusion::physical_plan::{
-    expressions::PhysicalSortExpr, DisplayFormatType, ExecutionPlan, Partitioning, Statistics,
+    expressions::PhysicalSortExpr, ColumnStatistics, DisplayFormatType, ExecutionPlan,
+    Partitioning, Statistics,
 };
-use futures::{future, stream, Future, Stream};
+use futures::{future, stream, AsyncRead, Future, Stream};
 use http::Uri;
 use hyper::body::{Buf, HttpBody};
 use hyper::{Client, StatusCode};
 use hyper_tls::HttpsConnector;
 use serde_json;
-use std::{any::Any, sync::Arc};
+use std::{any::Any, fmt, io::Read, pin::Pin, sync::Arc};
 
 use crate::app::error::Result;
 
-#[derive(Debug)]
-pub enum ApiFormat {
-    Json,
+/// Stream readers opened on a given object store
+pub type PageReaderStream = Pin<Box<dyn Stream<Item = Result<Arc<dyn PageReader>>> + Send + Sync>>;
+
+/// Object Reader for one file in an object store.
+///
+/// Note that the dynamic dispatch on the reader might
+/// have some performance impacts.
+#[async_trait]
+pub trait PageReader: Send + Sync {
+    /// Get reader for a part [start, start + length] in the file asynchronously
+    async fn chunk_reader(&self, start: u64, length: usize) -> Result<Box<dyn AsyncRead>>;
+
+    /// Get reader for a part [start, start + length] in the file
+    fn sync_chunk_reader(&self, start: u64, length: usize) -> Result<Box<dyn Read + Send + Sync>>;
+
+    /// Get reader for the entire file
+    fn sync_reader(&self) -> Result<Box<dyn Read + Send + Sync>> {
+        self.sync_chunk_reader(0, self.length() as usize)
+    }
+
+    /// Get the size of the file
+    fn length(&self) -> u64;
+}
+
+#[derive(Debug, Clone)]
+/// A single page from an API
+pub struct ApiPage {
+    /// URI for the API
+    pub uri: Uri,
+}
+
+/// The base configurations to provide when creating a physical plan for
+/// any given API.
+#[derive(Debug, Clone)]
+pub struct ApiScanConfig {
+    /// Schema before projection. It contains the columns that are expected
+    /// to be in the API results without the table partition columns.
+    pub api_schema: SchemaRef,
+    /// List of files to be processed, grouped into partitions
+    pub api_pages: Vec<Vec<ApiPage>>,
+    /// Estimated overall statistics of the files, taking `filters` into account.
+    pub statistics: Statistics,
+    /// Columns on which to project the data. Indexes that are higher than the
+    /// number of columns of `api_schema` refer to `table_partition_cols`.
+    pub projection: Option<Vec<usize>>,
+    /// The minimum number of records required from this source plan
+    pub limit: Option<usize>,
+}
+
+impl ApiScanConfig {
+    /// Project the schema and the statistics on the given column indices
+    fn project(&self) -> (SchemaRef, Statistics) {
+        if self.projection.is_none() {
+            return (Arc::clone(&self.api_schema), self.statistics.clone());
+        }
+
+        let proj_iter: Box<dyn Iterator<Item = usize>> = match &self.projection {
+            Some(proj) => Box::new(proj.iter().copied()),
+            None => Box::new(0..(self.api_schema.fields().len())),
+        };
+
+        let mut table_fields = vec![];
+        let mut table_cols_stats = vec![];
+        for idx in proj_iter {
+            if idx < self.api_schema.fields().len() {
+                table_fields.push(self.api_schema.field(idx).clone());
+                if let Some(file_cols_stats) = &self.statistics.column_statistics {
+                    table_cols_stats.push(file_cols_stats[idx].clone())
+                } else {
+                    table_cols_stats.push(ColumnStatistics::default())
+                }
+            } else {
+                // There shouldnt be an partitioning columns for APIs
+                panic!("Found partitioning columns when there should be none")
+            }
+        }
+
+        let table_stats = Statistics {
+            num_rows: self.statistics.num_rows,
+            is_exact: self.statistics.is_exact,
+            // TODO correct byte size?
+            total_byte_size: None,
+            column_statistics: Some(table_cols_stats),
+        };
+
+        let table_schema = Arc::new(Schema::new(table_fields));
+
+        (table_schema, table_stats)
+    }
+
+    fn projected_file_column_names(&self) -> Option<Vec<String>> {
+        self.projection.as_ref().map(|p| {
+            p.iter()
+                .filter(|col_idx| **col_idx < self.api_schema.fields().len())
+                .map(|col_idx| self.api_schema.field(*col_idx).name())
+                .cloned()
+                .collect()
+        })
+    }
+
+    fn file_column_projection_indices(&self) -> Option<Vec<usize>> {
+        self.projection.as_ref().map(|p| {
+            p.iter()
+                .filter(|col_idx| **col_idx < self.api_schema.fields().len())
+                .copied()
+                .collect()
+        })
+    }
+}
+
+#[async_trait]
+pub trait ApiFormat: Send + Sync + fmt::Debug {
+    /// Returns the table provider as [`Any`](std::any::Any) so that it can be
+    /// downcast to a specific implementation.
+    fn as_any(&self) -> &dyn Any;
+
+    /// Infer the common schema of the return API responses. The objects will usually
+    /// be analysed up to a given number of records or pages (as specified in the
+    /// format config) then give the estimated common schema. This might fail if
+    /// the files have schemas that cannot be merged.
+    // async fn infer_schema(&self, readers: PageReaderStream) -> Result<SchemaRef>;
+    async fn infer_schema(&self, readers: Arc<dyn PageReader>) -> Result<SchemaRef>;
+
+    /// Infer the statistics for the provided object. The cost and accuracy of the
+    /// estimated statistics might vary greatly between file formats.
+    ///
+    /// `table_schema` is the (combined) schema of the overall table
+    /// and may be a superset of the schema contained in this file.
+    ///
+    /// TODO: should the file source return statistics for only columns referred to in the table schema?
+    async fn infer_stats(
+        &self,
+        reader: Arc<dyn PageReader>,
+        table_schema: SchemaRef,
+    ) -> Result<Statistics>;
+
+    /// Take a list of files and convert it to the appropriate executor
+    /// according to this file format.
+    async fn create_physical_plan(&self, conf: ApiScanConfig) -> Result<Arc<dyn ExecutionPlan>>;
 }
 
 #[derive(Debug)]
 pub struct ApiConfig {
     uri: Uri,
-    format: ApiFormat,
+    format: Arc<dyn ApiFormat>,
 }
 
 /// An implementation of `TableProvider` that calls an API.
@@ -100,10 +237,21 @@ impl TableProvider for ApiTable {
 
 #[derive(Debug)]
 struct JsonApiExec {
-    config: ApiConfig,
-    schema_infer_max_rec: Option<usize>,
+    config: ApiScanConfig,
     projected_statistics: Statistics,
     projected_schema: SchemaRef,
+}
+
+impl JsonApiExec {
+    pub fn new(base_config: ApiScanConfig) -> Self {
+        let (projected_schema, projected_statistics) = base_config.project();
+
+        Self {
+            config: base_config,
+            projected_statistics,
+            projected_schema,
+        }
+    }
 }
 
 impl ExecutionPlan for JsonApiExec {
