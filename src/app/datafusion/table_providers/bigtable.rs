@@ -23,6 +23,7 @@ use std::sync::Arc;
 
 use crate::app::error::{DftError, Result};
 
+// Not enabled on master yet until certain that bigtable is kept up to date
 #[cfg(feature = "bigtable")]
 pub async fn register_bigtable(mut ctx: ExecutionContext) -> ExecutionContext {
     use arrow::datatypes::{DataType, Field};
