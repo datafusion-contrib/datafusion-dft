@@ -15,36 +15,32 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use arrow::json;
+pub mod json;
 
-use arrow::datatypes::{Field, Schema, SchemaRef};
+use arrow::datatypes::{Schema, SchemaRef};
 use async_trait::async_trait;
 use datafusion::datasource::{TableProvider, TableType};
-use datafusion::error::Result as DFResult;
 use datafusion::logical_plan::Expr;
-use datafusion::physical_plan::{
-    expressions::PhysicalSortExpr, ColumnStatistics, DisplayFormatType, ExecutionPlan,
-    Partitioning, Statistics,
-};
+use datafusion::physical_plan::{ColumnStatistics, ExecutionPlan, Statistics};
 use futures::{future, stream, AsyncRead, Future, Stream};
 use http::Uri;
 use hyper::body::{Buf, HttpBody};
 use hyper::{Client, StatusCode};
 use hyper_tls::HttpsConnector;
-use serde_json;
 use std::{any::Any, fmt, io::Read, pin::Pin, sync::Arc};
 
 use crate::app::error::Result;
 
-/// Stream readers opened on a given object store
-pub type PageReaderStream = Pin<Box<dyn Stream<Item = Result<Arc<dyn PageReader>>> + Send + Sync>>;
+/// Stream readers opened on a given API
+pub type ApiPageReaderStream =
+    Pin<Box<dyn Stream<Item = Result<Arc<dyn ApiPageReader>>> + Send + Sync>>;
 
-/// Object Reader for one file in an object store.
+/// API Reader for one page from an object store.
 ///
 /// Note that the dynamic dispatch on the reader might
 /// have some performance impacts.
 #[async_trait]
-pub trait PageReader: Send + Sync {
+pub trait ApiPageReader: Send + Sync {
     /// Get reader for a part [start, start + length] in the file asynchronously
     async fn chunk_reader(&self, start: u64, length: usize) -> Result<Box<dyn AsyncRead>>;
 
@@ -157,7 +153,7 @@ pub trait ApiFormat: Send + Sync + fmt::Debug {
     /// format config) then give the estimated common schema. This might fail if
     /// the files have schemas that cannot be merged.
     // async fn infer_schema(&self, readers: PageReaderStream) -> Result<SchemaRef>;
-    async fn infer_schema(&self, readers: Arc<dyn PageReader>) -> Result<SchemaRef>;
+    async fn infer_schema(&self, readers: Arc<dyn ApiPageReader>) -> Result<SchemaRef>;
 
     /// Infer the statistics for the provided object. The cost and accuracy of the
     /// estimated statistics might vary greatly between file formats.
@@ -168,7 +164,7 @@ pub trait ApiFormat: Send + Sync + fmt::Debug {
     /// TODO: should the file source return statistics for only columns referred to in the table schema?
     async fn infer_stats(
         &self,
-        reader: Arc<dyn PageReader>,
+        reader: Arc<dyn ApiPageReader>,
         table_schema: SchemaRef,
     ) -> Result<Statistics>;
 
@@ -185,11 +181,20 @@ pub struct ApiConfig {
 
 /// An implementation of `TableProvider` that calls an API.
 pub struct ApiTable {
-    config: ApiConfig,
+    uri: ApiConfig,
+    format: Arc<dyn ApiFormat>,
     table_schema: SchemaRef,
 }
 
 impl ApiTable {
+    pub fn new(config: ApiConfig) -> Self {
+        let api_schema = format.infer_schema(uri);
+        Self {
+            uri: config.uri,
+            format: config.format,
+        }
+    }
+
     async fn get_page(self, uri: Uri) -> Result<()> {
         let https = HttpsConnector::new();
         let client = Client::builder().build::<_, hyper::Body>(https);
@@ -232,112 +237,6 @@ impl TableProvider for ApiTable {
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let uri = self.config.uri;
-    }
-}
-
-#[derive(Debug)]
-struct JsonApiExec {
-    config: ApiScanConfig,
-    projected_statistics: Statistics,
-    projected_schema: SchemaRef,
-}
-
-impl JsonApiExec {
-    pub fn new(base_config: ApiScanConfig) -> Self {
-        let (projected_schema, projected_statistics) = base_config.project();
-
-        Self {
-            config: base_config,
-            projected_statistics,
-            projected_schema,
-        }
-    }
-}
-
-impl ExecutionPlan for JsonApiExec {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn schema(&self) -> SchemaRef {
-        self.projected_schema.clone()
-    }
-
-    fn output_partitioning(&self) -> Partitioning {
-        // TODO: Come back to this when implementing paginated APIs
-        Partitioning::UnknownPartitioning(1)
-    }
-
-    fn output_ordering(&self) -> Option<&[PhysicalSortExpr]> {
-        None
-    }
-
-    fn relies_on_input_order(&self) -> bool {
-        false
-    }
-
-    fn children(&self) -> Vec<Arc<dyn ExecutionPlan>> {
-        Vec::new()
-    }
-
-    fn with_new_children(
-        self: Arc<Self>,
-        _: Vec<Arc<dyn ExecutionPlan>>,
-    ) -> DFResult<Arc<dyn ExecutionPlan>> {
-        Ok(self)
-    }
-
-    fn execute(
-        &self,
-        partition: usize,
-        context: Arc<TaskContext>,
-    ) -> Result<SendableRecordBatchStream> {
-        let proj = self.base_config.projected_file_column_names();
-
-        let batch_size = context.session_config().batch_size;
-        let file_schema = Arc::clone(&self.base_config.file_schema);
-
-        // The json reader cannot limit the number of records, so `remaining` is ignored.
-        let fun = move |file, _remaining: &Option<usize>| {
-            // TODO: make DecoderOptions implement Clone so we can
-            // clone here rather than recreating the options each time
-            // https://github.com/apache/arrow-rs/issues/1580
-            let options = DecoderOptions::new().with_batch_size(batch_size);
-
-            let options = if let Some(proj) = proj.clone() {
-                options.with_projection(proj)
-            } else {
-                options
-            };
-
-            Box::new(json::Reader::new(file, Arc::clone(&file_schema), options)) as BatchIter
-        };
-
-        Ok(Box::pin(FileStream::new(
-            Arc::clone(&self.base_config.object_store),
-            self.base_config.file_groups[partition].clone(),
-            fun,
-            Arc::clone(&self.projected_schema),
-            self.base_config.limit,
-            self.base_config.table_partition_cols.clone(),
-        )))
-    }
-
-    fn fmt_as(&self, t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match t {
-            DisplayFormatType::Default => {
-                write!(
-                    f,
-                    "JsonApiExec: limit={:?}, endpoint={}",
-                    self.config.limit,
-                    super::FileGroupsDisplay(&self.base_config.file_groups),
-                )
-            }
-        }
-    }
-
-    fn statistics(&self) -> Statistics {
-        self.projected_statistics.clone()
     }
 }
 
