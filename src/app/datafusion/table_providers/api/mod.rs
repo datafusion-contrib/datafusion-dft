@@ -52,6 +52,26 @@ pub trait ApiPageReader: Send + Sync {
         self.sync_chunk_reader(0, self.length() as usize)
     }
 
+    async fn sync_get_page(uri: Uri) -> Result<Box<dyn Read + Send + Sync>> {
+        // let https = HttpsConnector::new();
+        // let client = Client::builder().build::<_, hyper::Body>(https);
+        // let mut response = client.get(uri).await?;
+
+        // while let Some(chunk) = response.body_mut().data().await {
+        //     let chunk_reader = chunk?.reader();
+        //     // let builder = json::ReaderBuilder::new().infer_schema(Some(100));
+        //     // let reader = builder.build(chunk_reader)?;
+
+        //     println!("Chunk: {:?}", chunk);
+        // }
+
+        // match response.status() {
+        //     StatusCode::OK => println!("Successful API call"),
+        //     _ => println!("Unsuccesful API call"),
+        // };
+        // Ok(())
+    }
+
     /// Get the size of the file
     fn length(&self) -> u64;
 }
@@ -181,38 +201,20 @@ pub struct ApiConfig {
 
 /// An implementation of `TableProvider` that calls an API.
 pub struct ApiTable {
-    uri: ApiConfig,
+    uri: Uri,
     format: Arc<dyn ApiFormat>,
     table_schema: SchemaRef,
 }
 
 impl ApiTable {
-    pub fn new(config: ApiConfig) -> Self {
-        let api_schema = format.infer_schema(uri);
-        Self {
+    pub async fn try_new(config: ApiConfig) -> Result<Self> {
+        let page = ApiTable::get_page(config.uri).await?;
+        let api_schema = config.format.infer_schema(page)?;
+        Ok(Self {
             uri: config.uri,
             format: config.format,
-        }
-    }
-
-    async fn get_page(self, uri: Uri) -> Result<()> {
-        let https = HttpsConnector::new();
-        let client = Client::builder().build::<_, hyper::Body>(https);
-        let mut response = client.get(uri).await?;
-
-        while let Some(chunk) = response.body_mut().data().await {
-            let chunk_reader = chunk?.reader();
-            let builder = json::ReaderBuilder::new().infer_schema(Some(100));
-            let reader = builder.build(chunk_reader)?;
-
-            println!("Chunk: {:?}", chunk);
-        }
-
-        match response.status() {
-            StatusCode::OK => println!("Successful API call"),
-            _ => println!("Unsuccesful API call"),
-        };
-        Ok(())
+            table_schema: api_schema,
+        })
     }
 }
 
