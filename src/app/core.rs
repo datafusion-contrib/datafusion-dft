@@ -18,7 +18,7 @@
 use std::fs::File;
 use std::io::{BufWriter, Write};
 
-use datafusion::prelude::ExecutionConfig;
+use datafusion::prelude::SessionConfig;
 use log::info;
 
 use crate::app::datafusion::context::{Context, QueryResults};
@@ -144,7 +144,7 @@ pub struct App {
 
 impl App {
     pub async fn new(args: Args) -> App {
-        let execution_config = ExecutionConfig::new().with_information_schema(true);
+        let execution_config = SessionConfig::new().with_information_schema(true);
         let mut ctx: Context = match (args.host, args.port) {
             (Some(ref h), Some(p)) => Context::new_remote(h, p).unwrap(),
             _ => Context::new_local(&execution_config).await,

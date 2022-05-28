@@ -7,13 +7,13 @@ edition = "2021"
 
 [dependencies]
 
-arrow = "9"
-aws-sdk-s3 = "0.6.0"
-aws-types = "0.6.0"
+arrow = "13"
+aws-sdk-s3 = "0.9.0"
+aws-types = "0.9.0"
 # ballista = {version = "0.6", optional=true}
 clap = {version = "3", features = ["derive", "cargo"]}
 crossterm = { version = "0.23", features = [ "serde" ] }
-datafusion = "7"
+datafusion = "8"
 datafusion-objectstore-s3 = { version = "0", optional=true }
 dirs = "4.0"
 futures = "0.3"
