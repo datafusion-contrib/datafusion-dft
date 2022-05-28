@@ -146,7 +146,7 @@ impl App {
     pub async fn new(args: Args) -> App {
         let execution_config = SessionConfig::new().with_information_schema(true);
         let mut ctx: Context = match (args.host, args.port) {
-            (Some(ref h), Some(p)) => Context::new_remote(h, p).unwrap(),
+            (Some(ref h), Some(p)) => Context::new_remote(h, p).await.unwrap(),
             _ => Context::new_local(&execution_config).await,
         };
 

@@ -66,9 +66,9 @@ pub enum Context {
 
 impl Context {
     /// create a new remote context with given host and port
-    pub fn new_remote(host: &str, port: u16) -> Result<Context> {
+    pub async fn new_remote(host: &str, port: u16) -> Result<Context> {
         debug!("Created BallistaContext @ {:?}:{:?}", host, port);
-        Ok(Context::Remote(BallistaContext::try_new(host, port)?))
+        Ok(Context::Remote(BallistaContext::try_new(host, port).await?))
     }
 
     /// create a local context using the given config
@@ -194,24 +194,28 @@ use ballista;
 pub struct BallistaContext(ballista::context::BallistaContext);
 #[cfg(feature = "ballista")]
 impl BallistaContext {
-    pub fn try_new(host: &str, port: u16) -> Result<Self> {
+    pub async fn try_new(host: &str, port: u16) -> Result<Self> {
         use ballista::context::BallistaContext;
         use ballista::prelude::BallistaConfig;
-        let config: BallistaConfig =
-            BallistaConfig::new().map_err(|e| DataFusionError::Execution(format!("{:?}", e)))?;
-        Ok(Self(BallistaContext::remote(host, port, &config)))
+        let builder = BallistaConfig::builder().set("ballista.with_information_schema", "true");
+        let config = builder
+            .build()
+            .map_err(|e| DataFusionError::Execution(format!("{:?}", e)))?;
+        let remote_ctx = BallistaContext::remote(host, port, &config)
+            .await
+            .map_err(|e| DataFusionError::Execution(format!("{:?}", e)))?;
+        Ok(Self(remote_ctx))
     }
-    pub async fn sql(&mut self, sql: &str) -> Result<Arc<dyn DataFrame>> {
+    pub async fn sql(&mut self, sql: &str) -> Result<Arc<DataFrame>> {
         self.0.sql(sql).await
     }
 }
 
-// Feature added but not tested as cant install from crates
 #[cfg(not(feature = "ballista"))]
 pub struct BallistaContext();
 #[cfg(not(feature = "ballista"))]
 impl BallistaContext {
-    pub fn try_new(_host: &str, _port: u16) -> Result<Self> {
+    pub async fn try_new(_host: &str, _port: u16) -> Result<Self> {
         Err(DataFusionError::NotImplemented(
             "Remote execution not supported. Compile with feature 'ballista' to enable".to_string(),
         ))
