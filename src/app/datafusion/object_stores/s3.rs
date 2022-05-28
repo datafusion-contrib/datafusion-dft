@@ -15,11 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use datafusion::prelude::ExecutionContext;
+use datafusion::prelude::SessionContext;
 
 #[cfg(feature = "s3")]
-pub async fn register_s3(ctx: ExecutionContext) -> ExecutionContext {
+pub async fn register_s3(ctx: SessionContext) -> SessionContext {
     use aws_sdk_s3::Endpoint;
+    // use aws_smithy_http::endpoint::Endpoint;
     use aws_types::credentials::{Credentials, SharedCredentialsProvider};
     use datafusion_objectstore_s3::object_store::s3::S3FileSystem;
     use http::Uri;
@@ -72,7 +73,7 @@ pub async fn register_s3(ctx: ExecutionContext) -> ExecutionContext {
             Arc::new(s3)
         };
 
-        ctx.register_object_store("s3", s3);
+        ctx.runtime_env().register_object_store("s3", s3);
         info!("Registered S3 ObjectStore");
     }
     ctx

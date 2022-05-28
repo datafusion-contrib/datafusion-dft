@@ -68,7 +68,7 @@ async fn handle_successful_query(
     app: &mut App,
     start: Instant,
     sql: String,
-    df: Arc<dyn DataFrame>,
+    df: Arc<DataFrame>,
 ) -> Result<()> {
     debug!("Successfully executed query");
     let batches = df.collect().await.map_err(DftError::DataFusionError)?;

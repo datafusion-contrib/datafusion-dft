@@ -20,7 +20,7 @@
 use arrow::record_batch::RecordBatch;
 use datafusion::dataframe::DataFrame;
 use datafusion::error::{DataFusionError, Result};
-use datafusion::execution::context::{ExecutionConfig, ExecutionContext};
+use datafusion::execution::context::{SessionConfig, SessionContext};
 
 use log::{debug, error, info};
 use std::fs::File;
@@ -59,7 +59,7 @@ impl QueryResults {
 /// The CLI supports using a local DataFusion context or a distributed BallistaContext
 pub enum Context {
     /// In-process execution with DataFusion
-    Local(ExecutionContext),
+    Local(SessionContext),
     /// Distributed execution with Ballista (if available)
     Remote(BallistaContext),
 }
@@ -72,9 +72,9 @@ impl Context {
     }
 
     /// create a local context using the given config
-    pub async fn new_local(config: &ExecutionConfig) -> Context {
+    pub async fn new_local(config: &SessionConfig) -> Context {
         debug!("Created ExecutionContext");
-        let ctx = ExecutionContext::with_config(config.clone());
+        let ctx = SessionContext::with_config(config.clone());
 
         #[cfg(feature = "s3")]
         use crate::app::datafusion::object_stores::register_s3;
@@ -90,7 +90,7 @@ impl Context {
     }
 
     /// execute an SQL statement against the context
-    pub async fn sql(&mut self, sql: &str) -> Result<Arc<dyn DataFrame>> {
+    pub async fn sql(&mut self, sql: &str) -> Result<Arc<DataFrame>> {
         info!("Executing SQL: {:?}", sql);
         match self {
             Context::Local(datafusion) => datafusion.sql(sql).await,
@@ -113,7 +113,7 @@ impl Context {
         match self {
             Context::Local(ctx) => {
                 let mut config = Vec::new();
-                let cfg = ctx.state.lock().config.clone();
+                let cfg = ctx.copied_config();
                 debug!("Extracting ExecutionConfig attributes");
                 config.push(format!("Target Partitions: {}", cfg.target_partitions));
                 config.push(format!("Repartition Joins: {}", cfg.repartition_joins));
@@ -131,7 +131,7 @@ impl Context {
     pub fn format_physical_optimizers(&self) -> Option<Vec<String>> {
         match self {
             Context::Local(ctx) => {
-                let physical_opts = ctx.state.lock().config.physical_optimizers.clone();
+                let physical_opts = ctx.state.read().physical_optimizers.clone();
                 debug!("Extracting physical optimizer rules");
                 let opts = physical_opts
                     .iter()
@@ -216,7 +216,7 @@ impl BallistaContext {
             "Remote execution not supported. Compile with feature 'ballista' to enable".to_string(),
         ))
     }
-    pub async fn sql(&mut self, _sql: &str) -> Result<Arc<dyn DataFrame>> {
+    pub async fn sql(&mut self, _sql: &str) -> Result<Arc<DataFrame>> {
         unreachable!()
     }
 }
@@ -325,11 +325,14 @@ mod test {
 
         let results = app.query_results;
 
+        // Need to look into rows here.  Originally I believe creating a table
+        // returned no rows but now it appears to return the created table.
+        // It seems this is from datafusion side but not certain.
         let expected_meta = QueryResultsMeta {
             query: query.to_string(),
             succeeded: true,
             error: None,
-            rows: 0,
+            rows: 1,
             query_duration: 0f64,
         };
 
