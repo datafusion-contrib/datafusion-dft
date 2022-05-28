@@ -794,9 +794,9 @@ dependencies = [
 
 [[package]]
 name = "datafusion-objectstore-s3"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9169473eed6d4445bd426023517eb516307daf623938f75f49663f46c8bf361e"
+checksum = "d61a8c89f8099405b3740cac89cef16a74586903b93f4b7f78788840e8429ff1"
 dependencies = [
  "async-trait",
  "aws-config",
