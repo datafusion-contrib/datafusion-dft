@@ -10,7 +10,7 @@ edition = "2021"
 arrow = "13"
 aws-sdk-s3 = "0.9.0"
 aws-types = "0.9.0"
-# ballista = {version = "0.6", optional=true}
+ballista = { version = "0.7", optional=true }
 clap = {version = "3", features = ["derive", "cargo"]}
 crossterm = { version = "0.23", features = [ "serde" ] }
 datafusion = "8"
@@ -29,4 +29,3 @@ unicode-width = "0.1.9"
 
 [features]
 s3 = ["datafusion-objectstore-s3"]
-# ballista = ["ballista"]
