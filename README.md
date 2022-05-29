@@ -26,6 +26,7 @@ Some of the current and planned features are:
   - S3 with custom endpoint / provider (i.e. MinIO)
   - HDFS (TODO)
   - `ObjectStore` explorer. I.e. able to list files in `ObjectStore`
+  - There are ongoing conversations in DataFusion about adopting a new `ObjectStore` interface that would come with bindings to S3, ADLS, and GCP.  I am  monitoring this and plan on updating to use that interface when it is available. 
 - `TableProvider` data sources
   - Delta Table => TODO
   - Google Big Table => (currently in the bigtable branch which isnt up to date with latest DataFusion )
@@ -33,6 +34,8 @@ Some of the current and planned features are:
 - Preloading DDL from `~/.datafusion/.datafusionrc` for local database available on startup
 
 ## User Guide
+
+To have the best experience with `dft` it is highly recommended to define all of your DDL in `~/.datafusion/.datafusionrc` so that any tables you wish to query are available at startup.  Additionally, now that DataFusion supports `CREATE VIEW` via sql you can also make a `VIEW` based on these tables.
 
 The interface is split into several tabs so that relevant information can be viewed and controlled in a clean and organized manner. When not writing a SQL query keys can be entered to navigate and control the interface.
 
