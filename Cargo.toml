@@ -29,3 +29,7 @@ unicode-width = "0.1.9"
 
 [features]
 s3 = ["datafusion-objectstore-s3"]
+
+[[bin]]
+name = "dft"
+path = "src/main.rs"
