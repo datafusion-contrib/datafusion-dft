@@ -1,10 +1,12 @@
 # datafusion-tui (dft)
 
-DataFusion-tui provides a feature rich terminal application, built with [tui-rs](https://github.com/fdehau/tui-rs), for using DataFusion (and eventually Ballista). It has drawn inspiration and several features from `datafusion-cli`. In contrast to `datafusion-cli` the objective of this tool is to provide a light SQL IDE experience for querying data with DataFusion. It is currently in early stages of development and as such there are likely to be bugs.
+DataFusion-tui provides an extensible terminal based data analysis tool that uses [DataFusion](https://github.com/apache/arrow-datafusion) (single node) and [Ballista](https://github.com/apache/arrow-ballista) (distributed) as query execution engines. It has drawn inspiration and several features from `datafusion-cli`. In contrast to `datafusion-cli` a focus of `dft` is to provide an interface for leveraging DataFusions extensibility (for example connecting to `ObjectStore`s or querying custom `TableProvider`s).  
+
+The objective of `dft` is to provide users with the experience of having their own local database that allows them to query and join data from disparate data sources all from the terminal.  
 
 https://user-images.githubusercontent.com/622789/161690194-c7c1e1b0-e432-43ab-9e44-f7673868b9cb.mp4
 
-Some of the current and planned features are listed here:
+Some of the current and planned features are:
 
 - Tab management to provide clean and structured organization of DataFusion queries, results, and context
   - SQL editor
@@ -19,23 +21,22 @@ Some of the current and planned features are listed here:
     - Information from ExecutionContext / Catalog / ObjectStore / State / Config
   - Logs
     - Logs from `dft` and `DataFusion`
-  - Help (TODO)
-    - Documentation on functions / commands
-- Custom ObjectStore Support
+- `ObjectStore` Support
   - S3 with AWS default credentials
   - S3 with custom endpoint / provider (i.e. MinIO)
   - HDFS (TODO)
   - `ObjectStore` explorer. I.e. able to list files in `ObjectStore`
-- Custom Table Providers (if supported in SQL by DataFusion)
-  - Delta Table (TODO)
-  - Big Table
+- `TableProvider` data sources
+  - Delta Table => TODO
+  - Google Big Table => (currently in the bigtable branch which isnt up to date with latest DataFusion )
+  - ApiTable => Will allow treating API endpoints as tables by handling pagination and authentication.  Currently being prototyped in [#85](https://github.com/datafusion-contrib/datafusion-tui/pull/85)
 - Preloading DDL from `~/.datafusion/.datafusionrc` for local database available on startup
 
 ## User Guide
 
 The interface is split into several tabs so that relevant information can be viewed and controlled in a clean and organized manner. When not writing a SQL query keys can be entered to navigate and control the interface.
 
-- SQL Editor: where queries are entered and results can be viewed
+- SQL Editor: where queries are entered and results can be viewed.  Drawing inspiration from vim there are multiple modes.
   - Normal mode
     - `q` => quit datafusion-tui
     - `e` => start editing SQL Editor in Edit mode
