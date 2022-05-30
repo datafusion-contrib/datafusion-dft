@@ -35,7 +35,32 @@ Some of the current and planned features are:
 
 ## User Guide
 
+### Installation
+
+Currently, the only supported packaging is on [crates.io](https://crates.io/search?q=datafusion-tui).  If you already have Rust installed it can be installed by running `cargo install datafusion-tui`.  If rust is not installed you can download following the directions [here](https://www.rust-lang.org/tools/install).
+
+To install with support for s3 run `cargo install datafusion-tui --features=s3` and to enable using ballista as a execution backend run `cargo install datafusion-tui --features=ballista`.
+
+Once installed you can run `dft` to start the application with DataFusion as the exection engine or `dft --host $HOST --port $PORT` to start the application with Ballista as the execution engine.
+
+### Getting Started
+
 To have the best experience with `dft` it is highly recommended to define all of your DDL in `~/.datafusion/.datafusionrc` so that any tables you wish to query are available at startup.  Additionally, now that DataFusion supports `CREATE VIEW` via sql you can also make a `VIEW` based on these tables.
+
+For example, your `~/.datafusion/.datafusionrc` file could look like the following:
+
+```
+CREATE EXTERNAL TABLE users STORED AS NDJSON LOCATION 's3://bucket/users';
+
+CREATE EXTERNAL TABLE taxis STORED AS PARQUET LOCATION 's3://bucket/transactions';
+
+CREATE EXTERNAL TABLE listings STORED AS PARQUET LOCATION 'file://folder/listings';
+
+CREATE VIEW OR REPLACE users_listings AS SELECT * FROM users LEFT JOIN listings USING (user_id);
+```
+
+### Key Mappings
+
 
 The interface is split into several tabs so that relevant information can be viewed and controlled in a clean and organized manner. When not writing a SQL query keys can be entered to navigate and control the interface.
 
