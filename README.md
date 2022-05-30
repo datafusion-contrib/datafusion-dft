@@ -59,6 +59,8 @@ CREATE EXTERNAL TABLE listings STORED AS PARQUET LOCATION 'file://folder/listing
 CREATE VIEW OR REPLACE users_listings AS SELECT * FROM users LEFT JOIN listings USING (user_id);
 ```
 
+This would make the tables `users`, `taxis`, `listings`, and the view  `users_listings` available at startup.  Any of these DDL statements could also be run interactively from the SQL editor as well to create the tables.
+
 ### Key Mappings
 
 
