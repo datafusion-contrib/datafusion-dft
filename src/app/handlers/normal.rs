@@ -26,9 +26,9 @@ pub enum NormalModeAction {
     Exit,
 }
 
-pub async fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
-    if app.tab_item == TabItem::Editor {
-        match key {
+pub async fn normal_mode_handler<'a>(app: &'a mut App<'a>, key: Key) -> Result<AppReturn> {
+    match app.tab_item {
+        TabItem::Editor => match key {
             Key::Enter => execute_query(app).await,
             Key::Char('c') => {
                 app.editor.input.clear()?;
@@ -101,13 +101,17 @@ pub async fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
                 Ok(AppReturn::Continue)
             }
             _ => Ok(AppReturn::Continue),
-        }
-    } else {
-        match key {
+        },
+        TabItem::Logs => match key {
+            Key::PageUp => Ok(app.scroll_logs_up()),
+            Key::PageDown => Ok(app.scroll_logs_down()),
+            _ => Ok(AppReturn::Continue),
+        },
+        _ => match key {
             Key::Char('q') => Ok(AppReturn::Exit),
             Key::Char(c) if c.is_ascii_digit() => change_tab(c, app),
             _ => Ok(AppReturn::Continue),
-        }
+        },
     }
 }
 

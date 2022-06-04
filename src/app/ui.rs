@@ -31,7 +31,7 @@ pub struct Scroll {
     pub y: u16,
 }
 
-pub fn draw_ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+pub fn draw_ui<'a, B: Backend>(f: &mut Frame<B>, app: &'a mut App<'a>) {
     match app.tab_item {
         TabItem::Editor => draw_sql_editor_tab(f, app),
         TabItem::QueryHistory => draw_query_history_tab(f, app),
@@ -40,7 +40,7 @@ pub fn draw_ui<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     }
 }
 
-fn draw_sql_editor_tab<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+fn draw_sql_editor_tab<'a, B: Backend>(f: &mut Frame<B>, app: &'a mut App<'a>) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -132,7 +132,7 @@ fn draw_logs_tab<B: Backend>(f: &mut Frame<B>, app: &mut App) {
 
     let tabs = draw_tabs(app);
     f.render_widget(tabs, chunks[1]);
-    let logs = draw_logs();
+    let logs = draw_logs(app);
     f.render_widget(logs, chunks[2])
 }
 
@@ -221,7 +221,7 @@ fn draw_cursor<B: Backend>(app: &mut App, f: &mut Frame<B>, chunks: &[Rect]) {
     }
 }
 
-fn draw_query_results(app: &mut App) -> Paragraph {
+fn draw_query_results<'a>(app: &'a mut App<'a>) -> Paragraph<'a> {
     // Query results not shown correctly on error. For example `show tables for x`
     let (query_results, duration) = match &app.query_results {
         Some(query_results) => {
@@ -297,19 +297,8 @@ fn draw_query_history<'a>(app: &mut App) -> List<'a> {
     )
 }
 
-fn draw_logs<'a>() -> TuiLoggerWidget<'a> {
-    TuiLoggerWidget::default()
-        .style_error(Style::default().fg(Color::Red))
-        .style_debug(Style::default().fg(Color::Green))
-        .style_warn(Style::default().fg(Color::Yellow))
-        .style_trace(Style::default().fg(Color::Gray))
-        .style_info(Style::default().fg(Color::Blue))
-        .block(
-            Block::default()
-                .title("Logs")
-                .border_style(Style::default())
-                .borders(Borders::ALL),
-        )
+fn draw_logs<'a>(app: &mut App<'a>) -> TuiLoggerWidget<'a> {
+    app.logs.widget
 }
 
 fn draw_context<B: Backend>(f: &mut Frame<B>, app: &mut App, area: Rect) {
@@ -325,7 +314,7 @@ fn draw_context<B: Backend>(f: &mut Frame<B>, app: &mut App, area: Rect) {
     f.render_widget(physical_opts, context[1]);
 }
 
-fn draw_execution_config(app: &mut App) -> List {
+fn draw_execution_config<'a>(app: &mut App<'a>) -> List<'a> {
     let exec_config = app.context.format_execution_config().unwrap();
     let config: Vec<ListItem> = exec_config
         .iter()
@@ -342,7 +331,7 @@ fn draw_execution_config(app: &mut App) -> List {
     )
 }
 
-fn draw_physical_optimizers(app: &mut App) -> List {
+fn draw_physical_optimizers<'a>(app: &mut App<'a>) -> List<'a> {
     let physical_optimizers = app.context.format_physical_optimizers().unwrap();
     let opts: Vec<ListItem> = physical_optimizers
         .iter()

@@ -20,6 +20,9 @@ use std::io::{BufWriter, Write};
 
 use datafusion::prelude::SessionConfig;
 use log::info;
+use tui::style::{Color, Style};
+use tui::widgets::{Block, Borders};
+use tui_logger::{TuiLoggerWidget, TuiWidgetEvent, TuiWidgetState};
 
 use crate::app::datafusion::context::{Context, QueryResults};
 use crate::app::editor::Editor;
@@ -128,8 +131,13 @@ pub enum AppReturn {
     Exit,
 }
 
+pub struct Logs<'a> {
+    pub widget: TuiLoggerWidget<'a>,
+    pub state: TuiWidgetState,
+}
+
 /// App holds the state of the application
-pub struct App {
+pub struct App<'a> {
     /// Application tabs
     pub tab_item: TabItem,
     /// Current input mode
@@ -140,10 +148,12 @@ pub struct App {
     pub context: Context,
     /// Results from DataFusion query
     pub query_results: Option<QueryResults>,
+    /// Application logs
+    pub logs: Logs<'a>,
 }
 
-impl App {
-    pub async fn new(args: Args) -> App {
+impl<'a> App<'a> {
+    pub async fn new(args: Args) -> App<'a> {
         let execution_config = SessionConfig::new().with_information_schema(true);
         let mut ctx: Context = match (args.host, args.port) {
             (Some(ref h), Some(p)) => Context::new_remote(h, p).await.unwrap(),
@@ -161,12 +171,32 @@ impl App {
             ctx.exec_files(rc).await
         }
 
+        let log_state = TuiWidgetState::default();
+        let logs = TuiLoggerWidget::default()
+            .style_error(Style::default().fg(Color::Red))
+            .style_debug(Style::default().fg(Color::Green))
+            .style_warn(Style::default().fg(Color::Yellow))
+            .style_trace(Style::default().fg(Color::Gray))
+            .style_info(Style::default().fg(Color::Blue))
+            .block(
+                Block::default()
+                    .title("Logs")
+                    .border_style(Style::default())
+                    .borders(Borders::ALL),
+            );
+
+        let logs = Logs {
+            widget: logs,
+            state: log_state,
+        };
+
         App {
             tab_item: Default::default(),
             input_mode: Default::default(),
             editor: Editor::default(),
             context: ctx,
             query_results: None,
+            logs,
         }
     }
 
@@ -202,11 +232,21 @@ impl App {
         Ok(())
     }
 
-    pub async fn key_handler(&mut self, key: Key) -> AppReturn {
+    pub async fn key_handler(&'a mut self, key: Key) -> AppReturn {
         key_event_handler(self, key).await.unwrap()
     }
 
     pub fn update_on_tick(&mut self) -> AppReturn {
+        AppReturn::Continue
+    }
+
+    pub fn scroll_logs_up(&mut self) -> AppReturn {
+        self.logs.state.transition(&TuiWidgetEvent::PrevPageKey);
+        AppReturn::Continue
+    }
+
+    pub fn scroll_logs_down(&mut self) -> AppReturn {
+        self.logs.state.transition(&TuiWidgetEvent::NextPageKey);
         AppReturn::Continue
     }
 }

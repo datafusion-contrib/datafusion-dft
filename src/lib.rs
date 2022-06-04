@@ -36,7 +36,7 @@ use crate::app::ui;
 
 use crate::events::{Event, Events};
 
-pub async fn run_app(app: &mut App) -> Result<()> {
+pub async fn run_app<'a>(app: &'a mut App<'a>) -> Result<()> {
     enable_raw_mode().unwrap();
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture).unwrap();

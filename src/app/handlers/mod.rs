@@ -32,7 +32,7 @@ use crate::app::error::{DftError, Result};
 use crate::app::ui::Scroll;
 use crate::events::Key;
 
-pub async fn key_event_handler<'a>(app: &mut App, key: Key) -> Result<AppReturn> {
+pub async fn key_event_handler<'a>(app: &'a mut App<'a>, key: Key) -> Result<AppReturn> {
     match app.input_mode {
         InputMode::Normal => normal::normal_mode_handler(app, key).await,
         InputMode::Editing => edit::edit_mode_handler(app, key).await,
@@ -40,13 +40,13 @@ pub async fn key_event_handler<'a>(app: &mut App, key: Key) -> Result<AppReturn>
     }
 }
 
-pub async fn execute_query(app: &mut App) -> Result<AppReturn> {
+pub async fn execute_query<'a>(app: &'a mut App<'a>) -> Result<AppReturn> {
     let sql: String = app.editor.input.combine_lines();
     handle_queries(app, sql).await?;
     Ok(AppReturn::Continue)
 }
 
-async fn handle_queries(app: &mut App, sql: String) -> Result<()> {
+async fn handle_queries<'a>(app: &'a mut App<'a>, sql: String) -> Result<()> {
     let start = Instant::now();
     let queries = sql.split(';');
     for query in queries {
@@ -64,8 +64,8 @@ async fn handle_queries(app: &mut App, sql: String) -> Result<()> {
     Ok(())
 }
 
-async fn handle_successful_query(
-    app: &mut App,
+async fn handle_successful_query<'a>(
+    app: &'a mut App<'a>,
     start: Instant,
     sql: String,
     df: Arc<DataFrame>,
