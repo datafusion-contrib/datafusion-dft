@@ -352,12 +352,6 @@ impl Input {
         (self.cursor_column > 0) && ((self.cursor_column as usize) < len)
     }
 
-    fn on_first_line(&self) -> bool {
-        let res = self.current_row as usize == 0;
-        debug!("On first line: {}", res);
-        res
-    }
-
     fn on_last_line(&self) -> bool {
         let res = self.current_row as usize == self.lines.len() - 1;
         debug!("On last line: {}", res);
