@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-pub mod catalog_providers;
-pub mod context;
-pub mod object_stores;
+#[cfg(feature = "glue")]
+mod glue;
+#[cfg(feature = "glue")]
+pub use glue::register_glue;
