@@ -220,21 +220,21 @@ impl Input {
 
     pub fn backspace(&mut self) -> Result<AppReturn> {
         debug!("Backspace entered. Input Before: {:?}", self);
-        match self.lines[self.current_row as usize]
-            .text
-            .get_ref()
-            .is_empty()
-        {
-            true => {
-                self.up_row()?;
-                // Pop newline character
-                self.pop();
-            }
-            false => {
-                if self.cursor_is_at_line_beginning() {
-                    if self.on_first_line() {
-                        debug!("On first column of first line.  Unable to backspace")
-                    } else {
+        if self.cursor_is_at_editor_beginning() {
+            debug!("On first column of first line.  Unable to backspace")
+        } else {
+            match self.lines[self.current_row as usize]
+                .text
+                .get_ref()
+                .is_empty()
+            {
+                true => {
+                    self.up_row()?;
+                    // Pop newline character
+                    self.pop();
+                }
+                false => {
+                    if self.cursor_is_at_line_beginning() {
                         let prior_row_text =
                             self.lines[self.current_row as usize].text.get_ref().clone();
                         self.up_row()?;
@@ -244,16 +244,16 @@ impl Input {
                             .get_mut()
                             .push_str(&prior_row_text);
                         self.lines.remove((self.current_row + 1) as usize);
+                    } else if self.cursor_is_at_line_end() || self.cursor_is_in_line_middle() {
+                        self.lines[self.current_row as usize]
+                            .text
+                            .get_mut()
+                            .remove((self.cursor_column - 1) as usize);
+                        self.cursor_column -= 1
                     }
-                } else if self.cursor_is_at_line_end() || self.cursor_is_in_line_middle() {
-                    self.lines[self.current_row as usize]
-                        .text
-                        .get_mut()
-                        .remove((self.cursor_column - 1) as usize);
-                    self.cursor_column -= 1
                 }
-            }
-        };
+            };
+        }
         debug!("Input After: {:?}", self);
         Ok(AppReturn::Continue)
     }
@@ -334,6 +334,10 @@ impl Input {
         }
     }
 
+    fn cursor_is_at_editor_beginning(&self) -> bool {
+        (self.current_row == 0) && (self.cursor_column == 0)
+    }
+
     fn cursor_is_at_line_end(&self) -> bool {
         let len = self.lines[self.current_row as usize].text.get_ref().len();
         self.cursor_column as usize == len
@@ -346,12 +350,6 @@ impl Input {
     fn cursor_is_in_line_middle(&self) -> bool {
         let len = self.lines[self.current_row as usize].text.get_ref().len();
         (self.cursor_column > 0) && ((self.cursor_column as usize) < len)
-    }
-
-    fn on_first_line(&self) -> bool {
-        let res = self.current_row as usize == 0;
-        debug!("On first line: {}", res);
-        res
     }
 
     fn on_last_line(&self) -> bool {
@@ -738,5 +736,14 @@ mod tests {
         assert_eq!(input2.cursor_column, 1);
         assert_eq!(input2.lines[0].text.get_ref(), "a\n");
         assert_eq!(input2.lines[1].text.get_ref(), "b");
+    }
+
+    #[test]
+    fn empty_editor_backspace() {
+        let mut input: Input = Input::default();
+
+        input.backspace().expect("Backspace doesnt move cursor");
+        assert_eq!(input.current_row, 0);
+        assert_eq!(input.cursor_column, 0);
     }
 }
