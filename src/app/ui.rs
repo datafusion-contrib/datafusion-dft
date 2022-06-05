@@ -23,10 +23,10 @@ use tui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Span, Spans, Text},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Tabs},
+    widgets::{Block, Borders, List, ListItem, Paragraph, Tabs, Widget},
     Frame,
 };
-use tui_logger::TuiLoggerWidget;
+use tui_logger::TuiLoggerSmartWidget;
 
 use crate::app::core::{App, InputMode, TabItem};
 
@@ -35,7 +35,7 @@ pub struct Scroll {
     pub y: u16,
 }
 
-pub fn draw_ui<'logs, B: Backend>(f: &mut Frame<B>, app: &App<'logs>) {
+pub fn draw_ui<B: Backend>(f: &mut Frame<B>, app: &App) {
     match app.tab_item {
         TabItem::Editor => draw_sql_editor_tab(f, app),
         TabItem::QueryHistory => draw_query_history_tab(f, app),
@@ -44,7 +44,7 @@ pub fn draw_ui<'logs, B: Backend>(f: &mut Frame<B>, app: &App<'logs>) {
     }
 }
 
-fn draw_sql_editor_tab<'logs, B: Backend>(f: &mut Frame<B>, app: &App<'logs>) {
+fn draw_sql_editor_tab<B: Backend>(f: &mut Frame<B>, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -140,7 +140,7 @@ fn draw_logs_tab<B: Backend>(f: &mut Frame<B>, app: &App) {
     f.render_widget(logs, chunks[2])
 }
 
-fn draw_sql_editor_help<'screen, 'logs: 'screen>(app: &App<'logs>) -> Paragraph<'screen> {
+fn draw_sql_editor_help<'screen>(app: &App) -> Paragraph<'screen> {
     let (msg, style) = match app.input_mode {
         InputMode::Normal => (
             vec![
@@ -225,7 +225,7 @@ fn draw_cursor<B: Backend>(app: &App, f: &mut Frame<B>, chunks: &[Rect]) {
     }
 }
 
-fn draw_query_results<'screen, 'logs: 'screen>(app: &'logs App<'logs>) -> Paragraph<'screen> {
+fn draw_query_results<'screen>(app: &'screen App) -> Paragraph<'screen> {
     // Query results not shown correctly on error. For example `show tables for x`
     let (query_results, duration) = match &app.query_results {
         Some(query_results) => {
@@ -261,7 +261,7 @@ fn draw_query_results<'screen, 'logs: 'screen>(app: &'logs App<'logs>) -> Paragr
     query_results.block(Block::default().borders(Borders::TOP).title(title))
 }
 
-fn draw_tabs<'screen, 'logs: 'screen>(app: &App<'logs>) -> Tabs<'screen> {
+fn draw_tabs<'screen>(app: &App) -> Tabs<'screen> {
     let titles = TabItem::all_values()
         .iter()
         .map(|tab| tab.title_with_key())
@@ -301,20 +301,20 @@ fn draw_query_history<'screen>(app: &App) -> List<'screen> {
     )
 }
 
-fn draw_logs<'logs>(app: &App<'logs>) -> TuiLoggerWidget<'logs> {
-    TuiLoggerWidget::default()
+fn draw_logs(app: &App) -> TuiLoggerSmartWidget {
+    TuiLoggerSmartWidget::default()
         .style_error(Style::default().fg(Color::Red))
         .style_debug(Style::default().fg(Color::Green))
         .style_warn(Style::default().fg(Color::Yellow))
         .style_trace(Style::default().fg(Color::Gray))
         .style_info(Style::default().fg(Color::Blue))
-        .block(
-            Block::default()
-                .title("Logs")
-                .border_style(Style::default())
-                .borders(Borders::ALL),
-        )
-        .state(&app.logs.state);
+        // .block(
+        //     Block::default()
+        //         .title("Logs")
+        //         .border_style(Style::default())
+        //         .borders(Borders::ALL),
+        // )
+        .state(&app.logs.state)
 }
 
 fn draw_context<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
@@ -330,7 +330,7 @@ fn draw_context<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
     f.render_widget(physical_opts, context[1]);
 }
 
-fn draw_execution_config<'screen, 'logs: 'screen>(app: &App<'logs>) -> List<'screen> {
+fn draw_execution_config<'screen>(app: &App) -> List<'screen> {
     let exec_config = app.context.format_execution_config().unwrap();
     let config: Vec<ListItem> = exec_config
         .iter()
@@ -347,7 +347,7 @@ fn draw_execution_config<'screen, 'logs: 'screen>(app: &App<'logs>) -> List<'scr
     )
 }
 
-fn draw_physical_optimizers<'screen, 'logs: 'screen>(app: &App<'logs>) -> List<'screen> {
+fn draw_physical_optimizers<'screen>(app: &App) -> List<'screen> {
     let physical_optimizers = app.context.format_physical_optimizers().unwrap();
     let opts: Vec<ListItem> = physical_optimizers
         .iter()

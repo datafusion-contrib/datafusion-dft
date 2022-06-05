@@ -131,13 +131,13 @@ pub enum AppReturn {
     Exit,
 }
 
-pub struct Logs<'logs> {
+pub struct Logs {
     // pub widget: TuiLoggerWidget<'logs>,
     pub state: TuiWidgetState,
 }
 
 /// App holds the state of the application
-pub struct App<'logs> {
+pub struct App {
     /// Application tabs
     pub tab_item: TabItem,
     /// Current input mode
@@ -149,11 +149,11 @@ pub struct App<'logs> {
     /// Results from DataFusion query
     pub query_results: Option<QueryResults>,
     /// Application logs
-    pub logs: Logs<'logs>,
+    pub logs: Logs,
 }
 
-impl<'logs> App<'logs> {
-    pub async fn new(args: Args) -> App<'logs> {
+impl App {
+    pub async fn new(args: Args) -> App {
         let execution_config = SessionConfig::new().with_information_schema(true);
         let mut ctx: Context = match (args.host, args.port) {
             (Some(ref h), Some(p)) => Context::new_remote(h, p).await.unwrap(),

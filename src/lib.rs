@@ -40,7 +40,7 @@ use crate::app::ui;
 
 use crate::events::{Event, Events};
 
-pub async fn run_app<'a>(app: Arc<Mutex<App<'a>>>) -> Result<()> {
+pub async fn run_app(app: Arc<Mutex<App>>) -> Result<()> {
     enable_raw_mode().unwrap();
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture).unwrap();

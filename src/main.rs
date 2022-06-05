@@ -16,9 +16,7 @@
 // under the License.
 
 // Tabs: Context, Catalog, Logs, Sql Editors, Query History, Help for commands / functions
-use std::cell::RefCell;
 use std::error::Error;
-use std::rc::Rc;
 use std::sync::Arc;
 
 use clap::Parser;
@@ -39,8 +37,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
     // let mut app = App::new(args).await;
     // let mut app = Rc::new(RefCell::new(App::new(args).await));
-    let mut app = Arc::new(Mutex::new(App::new(args).await));
-    let res = run_app(&mut app).await;
+    let app = Arc::new(Mutex::new(App::new(args).await));
+    let res = run_app(app).await;
 
     if let Err(err) = res {
         println!("{:?}", err)
