@@ -26,7 +26,7 @@ Some of the current and planned features are:
   - S3 with custom endpoint / provider (i.e. MinIO)
   - HDFS (TODO)
   - `ObjectStore` explorer. I.e. able to list files in `ObjectStore`
-  - There are ongoing conversations in DataFusion about adopting a new `ObjectStore` interface that would come with bindings to S3, ADLS, and GCP.  I am  monitoring this and plan on updating to use that interface when it is available. 
+  - There are ongoing conversations in DataFusion about adopting a new `ObjectStore` interface that would come with bindings to S3, ADLS, and GCP.  I am  monitoring this and plan on updating to use that interface when it is available.
 - `TableProvider` data sources
   - Delta Table => TODO
   - Google Big Table => (currently in the bigtable branch which isnt up to date with latest DataFusion )
@@ -79,9 +79,22 @@ The interface is split into several tabs so that relevant information can be vie
     - Backspace / tab / enter work same as normal
     - `esc` to exit Edit mode and go back to Normal mode
   - Rc mode
-    - `l` load `~/.datafusion/.datafusionrc` into editor
-    - `r` rerun `~/.datafusion/.datafusionrc`
-    - `w` write editor contents to `~/.datafusion/.datafusionrc`
+    - `l` => load `~/.datafusion/.datafusionrc` into editor
+    - `r` => rerun `~/.datafusion/.datafusionrc`
+    - `w` => write editor contents to `~/.datafusion/.datafusionrc`
+  - Logging mode (coming from [tui_logger](https://docs.rs/tui-logger/latest/tui_logger/index.html))
+    - `h` => Toggles target selector widget hidden/visible
+    - `f` => Toggle focus on the selected target only
+    - `UP` => Select previous target in target selector widget
+    - `DOWN` => Select next target in target selector widget
+    - `LEFT` => Reduce SHOWN (!) log messages by one level
+    - `RIGHT` => Increase SHOWN (!) log messages by one level
+    - `-` => Reduce CAPTURED (!) log messages by one level
+    - `+` => Increase CAPTURED (!) log messages by one level
+    - `PAGEUP` => Enter Page Mode and scroll approx. half page up in log history.
+    - `PAGEDOWN` => Only in page mode: scroll 10 events down in log history.
+    - `ESCAPE` => Exit page mode and go back to scrolling mode
+    - `SPACE` => Toggles hiding of targets, which have logfilter set to off
 - Register custom `ObjectStore`
   - S3: run / install with `--features=s3`
     - If you want to use your default AWS credentials, then no further action is required. For example your credentials in `~/.aws/credentials` will automatically be picked up.

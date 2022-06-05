@@ -20,6 +20,7 @@ use std::io::{BufWriter, Write};
 
 use datafusion::prelude::SessionConfig;
 use log::info;
+use tui_logger::TuiWidgetState;
 
 use crate::app::datafusion::context::{Context, QueryResults};
 use crate::app::editor::Editor;
@@ -128,6 +129,10 @@ pub enum AppReturn {
     Exit,
 }
 
+pub struct Logs {
+    pub state: TuiWidgetState,
+}
+
 /// App holds the state of the application
 pub struct App {
     /// Application tabs
@@ -140,6 +145,8 @@ pub struct App {
     pub context: Context,
     /// Results from DataFusion query
     pub query_results: Option<QueryResults>,
+    /// Application logs
+    pub logs: Logs,
 }
 
 impl App {
@@ -161,12 +168,17 @@ impl App {
             ctx.exec_files(rc).await
         }
 
+        let log_state = TuiWidgetState::default();
+
+        let logs = Logs { state: log_state };
+
         App {
             tab_item: Default::default(),
             input_mode: Default::default(),
             editor: Editor::default(),
             context: ctx,
             query_results: None,
+            logs,
         }
     }
 
@@ -206,7 +218,7 @@ impl App {
         key_event_handler(self, key).await.unwrap()
     }
 
-    pub fn update_on_tick(&mut self) -> AppReturn {
+    pub fn update_on_tick(&self) -> AppReturn {
         AppReturn::Continue
     }
 }

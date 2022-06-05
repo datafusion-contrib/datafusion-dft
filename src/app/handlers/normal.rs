@@ -18,17 +18,13 @@
 use crate::app::core::{App, AppReturn, InputMode, TabItem};
 use crate::app::error::Result;
 use crate::app::handlers::execute_query;
+use crate::app::handlers::logging;
 use crate::events::Key;
 use log::debug;
 
-pub enum NormalModeAction {
-    Continue,
-    Exit,
-}
-
 pub async fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
-    if app.tab_item == TabItem::Editor {
-        match key {
+    match app.tab_item {
+        TabItem::Editor => match key {
             Key::Enter => execute_query(app).await,
             Key::Char('c') => {
                 app.editor.input.clear()?;
@@ -101,13 +97,13 @@ pub async fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
                 Ok(AppReturn::Continue)
             }
             _ => Ok(AppReturn::Continue),
-        }
-    } else {
-        match key {
+        },
+        TabItem::Logs => logging::logging_handler(app, key).await,
+        _ => match key {
             Key::Char('q') => Ok(AppReturn::Exit),
             Key::Char(c) if c.is_ascii_digit() => change_tab(c, app),
             _ => Ok(AppReturn::Continue),
-        }
+        },
     }
 }
 

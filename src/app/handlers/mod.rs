@@ -16,6 +16,7 @@
 // under the License.
 
 pub mod edit;
+pub mod logging;
 pub mod normal;
 pub mod rc;
 
@@ -32,7 +33,7 @@ use crate::app::error::{DftError, Result};
 use crate::app::ui::Scroll;
 use crate::events::Key;
 
-pub async fn key_event_handler<'a>(app: &mut App, key: Key) -> Result<AppReturn> {
+pub async fn key_event_handler(app: &mut App, key: Key) -> Result<AppReturn> {
     match app.input_mode {
         InputMode::Normal => normal::normal_mode_handler(app, key).await,
         InputMode::Editing => edit::edit_mode_handler(app, key).await,

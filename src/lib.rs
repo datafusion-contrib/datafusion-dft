@@ -21,6 +21,7 @@ pub mod events;
 pub mod utils;
 
 use std::io;
+use std::sync::Arc;
 use std::time::Duration;
 
 use app::core::{App, AppReturn};
@@ -29,6 +30,7 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
+use tokio::sync::Mutex;
 use tui::{backend::CrosstermBackend, Terminal};
 
 use crate::app::error::Result;
@@ -36,7 +38,7 @@ use crate::app::ui;
 
 use crate::events::{Event, Events};
 
-pub async fn run_app(app: &mut App) -> Result<()> {
+pub async fn run_app(app: Arc<Mutex<App>>) -> Result<()> {
     enable_raw_mode().unwrap();
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture).unwrap();
@@ -47,7 +49,9 @@ pub async fn run_app(app: &mut App) -> Result<()> {
     let events = Events::new(tick_rate);
 
     loop {
-        terminal.draw(|f| ui::draw_ui(f, app))?;
+        let mut app = app.lock().await;
+        terminal.draw(|f| ui::draw_ui(f, &app))?;
+        // terminal.draw(|f| ui::draw_ui(f, app.borrow()))?;
 
         let event = events.next().unwrap();
 

@@ -17,6 +17,7 @@
 
 // Tabs: Context, Catalog, Logs, Sql Editors, Query History, Help for commands / functions
 use std::error::Error;
+use std::sync::Arc;
 
 use clap::Parser;
 use datafusion_tui::app::core::App;
@@ -24,17 +25,20 @@ use datafusion_tui::cli::args::Args;
 use datafusion_tui::run_app;
 use log::LevelFilter;
 use mimalloc::MiMalloc;
+use tokio::sync::Mutex;
 
 #[global_allocator]
 static GLOBAL: MiMalloc = MiMalloc;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    tui_logger::init_logger(LevelFilter::Debug).unwrap();
+    tui_logger::init_logger(LevelFilter::Info).unwrap();
     tui_logger::set_default_level(LevelFilter::Debug);
     let args = Args::parse();
-    let mut app = App::new(args).await;
-    let res = run_app(&mut app).await;
+    // let mut app = App::new(args).await;
+    // let mut app = Rc::new(RefCell::new(App::new(args).await));
+    let app = Arc::new(Mutex::new(App::new(args).await));
+    let res = run_app(app).await;
 
     if let Err(err) = res {
         println!("{:?}", err)
