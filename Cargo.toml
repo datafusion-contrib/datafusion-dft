@@ -8,7 +8,7 @@ repository = "https://github.com/datafusion-contrib/datafusion-tui"
 readme = "README.md"
 authors = ["Matthew Turner <matthew.m.turner@outlook.com>"]
 license = "Apache-2.0"
-keywords = [ "arrow", "query", "sql", "datafusion" ]
+keywords = ["arrow", "query", "sql", "datafusion"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -17,23 +17,27 @@ keywords = [ "arrow", "query", "sql", "datafusion" ]
 arrow = "13"
 aws-sdk-s3 = "0.9.0"
 aws-types = "0.9.0"
-ballista = { version = "0.7", optional=true }
+ballista = { version = "0.7", optional = true }
+bytes = "1.1"
 async-trait = "0.1.53"
-clap = {version = "3", features = ["derive", "cargo"]}
-crossterm = { version = "0.23", features = [ "serde" ] }
+clap = { version = "3", features = ["derive", "cargo"] }
+crossterm = { version = "0.23", features = ["serde"] }
 datafusion = "8"
-datafusion-catalogprovider-glue = { version = "0.1.0", optional=true }
-datafusion-objectstore-s3 = { version = "0.2.1", optional=true }
+datafusion-catalogprovider-glue = { version = "0.1.0", optional = true }
+datafusion-objectstore-s3 = { version = "0.2.1", optional = true }
 dirs = "4.0"
 futures = "0.3"
 http = "0.2.6"
-hyper = { version = "0.14", features=["full"]}
+hyper = { version = "0.14", features = ["full"] }
 hyper-tls = "0.5.0"
 log = "0.4"
 mimalloc = { version = "0.1", default-features = false }
 serde = "1.0.136"
 serde_json = "1.0.79"
-tui = { version = "0.17", default-features = false, features = ['crossterm', 'serde'] }
+tui = { version = "0.17", default-features = false, features = [
+    'crossterm',
+    'serde',
+] }
 tui-logger = "0.7"
 tokio = { version = "1", features = ["full"] }
 unicode-width = "0.1.9"
@@ -45,4 +49,3 @@ glue = ["datafusion-catalogprovider-glue"]
 [[bin]]
 name = "dft"
 path = "src/main.rs"
-

@@ -19,17 +19,20 @@ pub mod json;
 
 use arrow::datatypes::{Schema, SchemaRef};
 use async_trait::async_trait;
+use bytes::buf::Reader;
+use bytes::Bytes;
+use datafusion::datasource::file_format::FileFormat;
 use datafusion::datasource::{TableProvider, TableType};
 use datafusion::logical_plan::Expr;
 use datafusion::physical_plan::{ColumnStatistics, ExecutionPlan, Statistics};
 use futures::{future, stream, AsyncRead, Future, Stream};
 use http::Uri;
-use hyper::body::{Buf, HttpBody};
+use hyper::body::{self, Buf, HttpBody};
 use hyper::{Client, StatusCode};
 use hyper_tls::HttpsConnector;
 use std::{any::Any, fmt, io::Read, pin::Pin, sync::Arc};
 
-use crate::app::error::Result;
+use crate::app::error::{DftError, Result};
 
 /// Stream readers opened on a given API
 pub type ApiPageReaderStream =
@@ -74,13 +77,6 @@ pub trait ApiPageReader: Send + Sync {
 
     /// Get the size of the file
     fn length(&self) -> u64;
-}
-
-#[derive(Debug, Clone)]
-/// A single page from an API
-pub struct ApiPage {
-    /// URI for the API
-    pub uri: Uri,
 }
 
 /// The base configurations to provide when creating a physical plan for
@@ -182,11 +178,11 @@ pub trait ApiFormat: Send + Sync + fmt::Debug {
     /// and may be a superset of the schema contained in this file.
     ///
     /// TODO: should the file source return statistics for only columns referred to in the table schema?
-    async fn infer_stats(
-        &self,
-        reader: Arc<dyn ApiPageReader>,
-        table_schema: SchemaRef,
-    ) -> Result<Statistics>;
+    // async fn infer_stats(
+    //     &self,
+    //     reader: Arc<dyn ApiPageReader>,
+    //     table_schema: SchemaRef,
+    // ) -> Result<Statistics>;
 
     /// Take a list of files and convert it to the appropriate executor
     /// according to this file format.
@@ -194,9 +190,36 @@ pub trait ApiFormat: Send + Sync + fmt::Debug {
 }
 
 #[derive(Debug)]
-pub struct ApiConfig {
-    uri: Uri,
-    format: Arc<dyn ApiFormat>,
+pub struct ApiTableConfig {
+    pub uri: Uri,
+    pub schema: Option<SchemaRef>,
+    pub format: Option<Arc<dyn FileFormat>>,
+}
+
+impl ApiTableConfig {
+    pub fn new(uri: Uri, format: Option<Arc<dyn FileFormat>>) -> Self {
+        Self {
+            uri,
+            format,
+            schema: None,
+        }
+    }
+
+    /// Add `schema` to `ApiTableConfig`
+    pub fn with_schema(self, schema: SchemaRef) -> Self {
+        Self {
+            uri: self.uri,
+            schema: Some(schema),
+            format: self.api_format,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+/// A single page from an API
+pub struct ApiPage {
+    /// URI for the API
+    pub bytes: Bytes,
 }
 
 /// An implementation of `TableProvider` that calls an API.
@@ -207,14 +230,51 @@ pub struct ApiTable {
 }
 
 impl ApiTable {
-    pub async fn try_new(config: ApiConfig) -> Result<Self> {
-        let page = ApiTable::get_page(config.uri).await?;
-        let api_schema = config.format.infer_schema(page)?;
+    pub async fn try_new(config: ApiTableConfig) -> Result<Self> {
+        let api_schema = config
+            .api_schema
+            .ok_or_else(|| DftError::IoError("No schema provided.".into()))?;
+
+        // let page = ApiTable::get_page(config.uri).await?;
+        // let api_schema = config.format.infer_schema(page)?;
+        // Ok(Self {
+        //     uri: config.uri,
+        //     format: config.format,
+        //     table_schema: api_schema,
+        // })
+
         Ok(Self {
             uri: config.uri,
             format: config.format,
-            table_schema: api_schema,
+            table_schema: config.schema,
         })
+    }
+
+    pub async fn try_get_page(uri: Uri) -> Result<ApiPage> {
+        let https = HttpsConnector::new();
+        let client = Client::builder().build::<_, hyper::Body>(https);
+        let response = client.get(uri).await?;
+
+        // match response.status() {
+        //     StatusCode::OK => println!("Successful API call"),
+        //     _ => println!("Unsuccesful API call"),
+        // };
+
+        let bytes = body::to_bytes(response.into_body()).await?;
+
+        let page = ApiPage { bytes };
+
+        // let bytes = body::to_bytes(response.body());
+
+        // let chunks = Vec::new();
+        // while let Some(chunk) = response.body_mut().data().await {
+        //     chunks.push(chunk?);
+        //     // let chunk_reader = chunk?.reader();
+
+        //     println!("Chunk: {:?}", chunk);
+        // }
+
+        Ok(page)
     }
 }
 
@@ -238,7 +298,7 @@ impl TableProvider for ApiTable {
         filters: &[Expr],
         limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        let uri = self.config.uri;
+        self.api_format.create_physical_plan()
     }
 }
 
@@ -248,11 +308,27 @@ mod test {
     use crate::app::error::Result;
 
     #[tokio::test]
-    async fn test_get_api_results() -> Result<()> {
+    async fn test_get_good_api_page() {
         let uri = "https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/latest/currencies.json"
             .parse()
             .unwrap();
 
-        ApiTable::get_page(uri).await
+        ApiTable::get_page(uri).await.unwrap();
     }
+
+    #[tokio::test]
+    async fn test_get_bad_api_page() {
+        let uri = "https://www.abc.com".parse().unwrap();
+
+        ApiTable::try_get_page(uri).await.unwrap();
+    }
+
+    // #[tokio::test]
+    // async fn test_api_table() -> Result<()> {
+    //     let uri = "https://cdn.jsdelivr.net/gh/fawazahmed0/currency-api@1/latest/currencies.json"
+    //         .parse()
+    //         .unwrap();
+
+    //     ApiTable::try_new(uri).await
+    // }
 }

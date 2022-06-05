@@ -1368,6 +1368,7 @@ dependencies = [
  "aws-sdk-s3",
  "aws-types 0.9.0",
  "ballista",
+ "bytes",
  "clap",
  "crossterm 0.23.2",
  "datafusion",
