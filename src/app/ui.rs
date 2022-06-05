@@ -222,7 +222,7 @@ fn draw_cursor<B: Backend>(app: &App, f: &mut Frame<B>, chunks: &[Rect]) {
     }
 }
 
-fn draw_query_results<'screen>(app: &'screen App) -> Paragraph<'screen> {
+fn draw_query_results(app: &App) -> Paragraph {
     // Query results not shown correctly on error. For example `show tables for x`
     let (query_results, duration) = match &app.query_results {
         Some(query_results) => {
@@ -242,10 +242,10 @@ fn draw_query_results<'screen>(app: &'screen App) -> Paragraph<'screen> {
             let last_query = &app.editor.history.last();
             let no_queries_text = match last_query {
                 Some(query_meta) => {
-                    if let Some(err) = &query_meta.clone().error {
-                        Paragraph::new(err.as_str())
+                    if let Some(err) = query_meta.error.clone() {
+                        Paragraph::new(err)
                     } else {
-                        Paragraph::new(query_meta.clone().query.as_str())
+                        Paragraph::new(query_meta.query.clone())
                     }
                 }
                 None => Paragraph::new("No queries yet"),
