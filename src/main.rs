@@ -32,11 +32,9 @@ static GLOBAL: MiMalloc = MiMalloc;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    tui_logger::init_logger(LevelFilter::Info).unwrap();
+    tui_logger::init_logger(LevelFilter::Debug).unwrap();
     tui_logger::set_default_level(LevelFilter::Debug);
     let args = Args::parse();
-    // let mut app = App::new(args).await;
-    // let mut app = Rc::new(RefCell::new(App::new(args).await));
     let app = Arc::new(Mutex::new(App::new(args).await));
     let res = run_app(app).await;
 
