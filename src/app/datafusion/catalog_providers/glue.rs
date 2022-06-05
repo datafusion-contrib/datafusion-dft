@@ -42,7 +42,7 @@ pub async fn register_glue(ctx: SessionContext) -> SessionContext {
                     error!("{}", result.err().unwrap());
                 }
             }
-        };
+        }
         glue
     }
 
