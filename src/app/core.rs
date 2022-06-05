@@ -20,7 +20,7 @@ use std::io::{BufWriter, Write};
 
 use datafusion::prelude::SessionConfig;
 use log::info;
-use tui_logger::{TuiWidgetEvent, TuiWidgetState};
+use tui_logger::TuiWidgetState;
 
 use crate::app::datafusion::context::{Context, QueryResults};
 use crate::app::editor::Editor;
@@ -130,7 +130,6 @@ pub enum AppReturn {
 }
 
 pub struct Logs {
-    // pub widget: TuiLoggerWidget<'logs>,
     pub state: TuiWidgetState,
 }
 
@@ -220,16 +219,6 @@ impl App {
     }
 
     pub fn update_on_tick(&self) -> AppReturn {
-        AppReturn::Continue
-    }
-
-    pub fn scroll_logs_up(&mut self) -> AppReturn {
-        self.logs.state.transition(&TuiWidgetEvent::PrevPageKey);
-        AppReturn::Continue
-    }
-
-    pub fn scroll_logs_down(&mut self) -> AppReturn {
-        self.logs.state.transition(&TuiWidgetEvent::NextPageKey);
         AppReturn::Continue
     }
 }
