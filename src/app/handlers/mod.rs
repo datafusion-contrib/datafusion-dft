@@ -16,6 +16,7 @@
 // under the License.
 
 pub mod edit;
+pub mod logging;
 pub mod normal;
 pub mod rc;
 

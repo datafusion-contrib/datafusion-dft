@@ -20,9 +20,7 @@ use std::io::{BufWriter, Write};
 
 use datafusion::prelude::SessionConfig;
 use log::info;
-use tui::style::{Color, Style};
-use tui::widgets::{Block, Borders};
-use tui_logger::{TuiLoggerWidget, TuiWidgetEvent, TuiWidgetState};
+use tui_logger::{TuiWidgetEvent, TuiWidgetState};
 
 use crate::app::datafusion::context::{Context, QueryResults};
 use crate::app::editor::Editor;
@@ -172,23 +170,8 @@ impl App {
         }
 
         let log_state = TuiWidgetState::default();
-        // let logs = TuiLoggerWidget::default()
-        //     .style_error(Style::default().fg(Color::Red))
-        //     .style_debug(Style::default().fg(Color::Green))
-        //     .style_warn(Style::default().fg(Color::Yellow))
-        //     .style_trace(Style::default().fg(Color::Gray))
-        //     .style_info(Style::default().fg(Color::Blue))
-        //     .block(
-        //         Block::default()
-        //             .title("Logs")
-        //             .border_style(Style::default())
-        //             .borders(Borders::ALL),
-        //     );
 
-        let logs = Logs {
-            // widget: logs,
-            state: log_state,
-        };
+        let logs = Logs { state: log_state };
 
         App {
             tab_item: Default::default(),

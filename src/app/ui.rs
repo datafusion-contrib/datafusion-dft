@@ -15,15 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::cell::{Ref, RefCell};
-use std::rc::Rc;
-
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Span, Spans, Text},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Tabs, Widget},
+    widgets::{Block, Borders, List, ListItem, Paragraph, Tabs},
     Frame,
 };
 use tui_logger::TuiLoggerSmartWidget;

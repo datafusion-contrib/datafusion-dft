@@ -18,13 +18,9 @@
 use crate::app::core::{App, AppReturn, InputMode, TabItem};
 use crate::app::error::Result;
 use crate::app::handlers::execute_query;
+use crate::app::handlers::logging;
 use crate::events::Key;
 use log::debug;
-
-pub enum NormalModeAction {
-    Continue,
-    Exit,
-}
 
 pub async fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
     match app.tab_item {
@@ -102,11 +98,7 @@ pub async fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
             }
             _ => Ok(AppReturn::Continue),
         },
-        TabItem::Logs => match key {
-            Key::PageUp => Ok(app.scroll_logs_up()),
-            Key::PageDown => Ok(app.scroll_logs_down()),
-            _ => Ok(AppReturn::Continue),
-        },
+        TabItem::Logs => logging::logging_handler(app, key).await,
         _ => match key {
             Key::Char('q') => Ok(AppReturn::Exit),
             Key::Char(c) if c.is_ascii_digit() => change_tab(c, app),
