@@ -22,7 +22,7 @@ use crate::app::core::{App, AppReturn, InputMode};
 use crate::app::error::Result;
 use crate::events::Key;
 
-pub async fn rc_mode_handler<'a>(app: &'a mut App<'a>, key: Key) -> Result<AppReturn> {
+pub async fn rc_mode_handler<'logs>(app: &mut App<'logs>, key: Key) -> Result<AppReturn> {
     debug!(
         "{} Entered, current row / col: {} / {}",
         key, app.editor.input.current_row, app.editor.input.cursor_column

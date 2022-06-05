@@ -26,7 +26,7 @@ pub enum NormalModeAction {
     Exit,
 }
 
-pub async fn normal_mode_handler<'a>(app: &'a mut App<'a>, key: Key) -> Result<AppReturn> {
+pub async fn normal_mode_handler<'logs>(app: &mut App<'logs>, key: Key) -> Result<AppReturn> {
     match app.tab_item {
         TabItem::Editor => match key {
             Key::Enter => execute_query(app).await,

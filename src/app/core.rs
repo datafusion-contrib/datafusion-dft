@@ -131,13 +131,13 @@ pub enum AppReturn {
     Exit,
 }
 
-pub struct Logs<'a> {
-    pub widget: TuiLoggerWidget<'a>,
+pub struct Logs<'logs> {
+    // pub widget: TuiLoggerWidget<'logs>,
     pub state: TuiWidgetState,
 }
 
 /// App holds the state of the application
-pub struct App<'a> {
+pub struct App<'logs> {
     /// Application tabs
     pub tab_item: TabItem,
     /// Current input mode
@@ -149,11 +149,11 @@ pub struct App<'a> {
     /// Results from DataFusion query
     pub query_results: Option<QueryResults>,
     /// Application logs
-    pub logs: Logs<'a>,
+    pub logs: Logs<'logs>,
 }
 
-impl<'a> App<'a> {
-    pub async fn new(args: Args) -> App<'a> {
+impl<'logs> App<'logs> {
+    pub async fn new(args: Args) -> App<'logs> {
         let execution_config = SessionConfig::new().with_information_schema(true);
         let mut ctx: Context = match (args.host, args.port) {
             (Some(ref h), Some(p)) => Context::new_remote(h, p).await.unwrap(),
@@ -172,21 +172,21 @@ impl<'a> App<'a> {
         }
 
         let log_state = TuiWidgetState::default();
-        let logs = TuiLoggerWidget::default()
-            .style_error(Style::default().fg(Color::Red))
-            .style_debug(Style::default().fg(Color::Green))
-            .style_warn(Style::default().fg(Color::Yellow))
-            .style_trace(Style::default().fg(Color::Gray))
-            .style_info(Style::default().fg(Color::Blue))
-            .block(
-                Block::default()
-                    .title("Logs")
-                    .border_style(Style::default())
-                    .borders(Borders::ALL),
-            );
+        // let logs = TuiLoggerWidget::default()
+        //     .style_error(Style::default().fg(Color::Red))
+        //     .style_debug(Style::default().fg(Color::Green))
+        //     .style_warn(Style::default().fg(Color::Yellow))
+        //     .style_trace(Style::default().fg(Color::Gray))
+        //     .style_info(Style::default().fg(Color::Blue))
+        //     .block(
+        //         Block::default()
+        //             .title("Logs")
+        //             .border_style(Style::default())
+        //             .borders(Borders::ALL),
+        //     );
 
         let logs = Logs {
-            widget: logs,
+            // widget: logs,
             state: log_state,
         };
 
@@ -232,11 +232,11 @@ impl<'a> App<'a> {
         Ok(())
     }
 
-    pub async fn key_handler(&'a mut self, key: Key) -> AppReturn {
+    pub async fn key_handler(&mut self, key: Key) -> AppReturn {
         key_event_handler(self, key).await.unwrap()
     }
 
-    pub fn update_on_tick(&mut self) -> AppReturn {
+    pub fn update_on_tick(&self) -> AppReturn {
         AppReturn::Continue
     }
 

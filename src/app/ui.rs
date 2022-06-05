@@ -14,6 +14,10 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
+
+use std::cell::{Ref, RefCell};
+use std::rc::Rc;
+
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
@@ -31,7 +35,7 @@ pub struct Scroll {
     pub y: u16,
 }
 
-pub fn draw_ui<'a, B: Backend>(f: &mut Frame<B>, app: &'a mut App<'a>) {
+pub fn draw_ui<'logs, B: Backend>(f: &mut Frame<B>, app: &App<'logs>) {
     match app.tab_item {
         TabItem::Editor => draw_sql_editor_tab(f, app),
         TabItem::QueryHistory => draw_query_history_tab(f, app),
@@ -40,7 +44,7 @@ pub fn draw_ui<'a, B: Backend>(f: &mut Frame<B>, app: &'a mut App<'a>) {
     }
 }
 
-fn draw_sql_editor_tab<'a, B: Backend>(f: &mut Frame<B>, app: &'a mut App<'a>) {
+fn draw_sql_editor_tab<'logs, B: Backend>(f: &mut Frame<B>, app: &App<'logs>) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -67,7 +71,7 @@ fn draw_sql_editor_tab<'a, B: Backend>(f: &mut Frame<B>, app: &'a mut App<'a>) {
     f.render_widget(query_results, chunks[3]);
 }
 
-fn draw_query_history_tab<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+fn draw_query_history_tab<B: Backend>(f: &mut Frame<B>, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -90,7 +94,7 @@ fn draw_query_history_tab<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     f.render_widget(query_history, chunks[2])
 }
 
-fn draw_context_tab<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+fn draw_context_tab<B: Backend>(f: &mut Frame<B>, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -113,7 +117,7 @@ fn draw_context_tab<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     draw_context(f, app, chunks[2]);
 }
 
-fn draw_logs_tab<B: Backend>(f: &mut Frame<B>, app: &mut App) {
+fn draw_logs_tab<B: Backend>(f: &mut Frame<B>, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -136,7 +140,7 @@ fn draw_logs_tab<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     f.render_widget(logs, chunks[2])
 }
 
-fn draw_sql_editor_help<'a>(app: &mut App) -> Paragraph<'a> {
+fn draw_sql_editor_help<'screen, 'logs: 'screen>(app: &App<'logs>) -> Paragraph<'screen> {
     let (msg, style) = match app.input_mode {
         InputMode::Normal => (
             vec![
@@ -184,7 +188,7 @@ fn draw_sql_editor_help<'a>(app: &mut App) -> Paragraph<'a> {
     Paragraph::new(text)
 }
 
-fn draw_default_help<'a>() -> Paragraph<'a> {
+fn draw_default_help<'screen>() -> Paragraph<'screen> {
     let (msg, style) = (
         vec![
             Span::raw("Press "),
@@ -200,7 +204,7 @@ fn draw_default_help<'a>() -> Paragraph<'a> {
     Paragraph::new(text)
 }
 
-fn draw_editor<'a>(app: &mut App) -> Paragraph<'a> {
+fn draw_editor<'screen>(app: &App) -> Paragraph<'screen> {
     Paragraph::new(app.editor.input.combine_visible_lines())
         .style(match app.input_mode {
             InputMode::Editing => Style::default().fg(Color::Yellow),
@@ -209,7 +213,7 @@ fn draw_editor<'a>(app: &mut App) -> Paragraph<'a> {
         .block(Block::default().borders(Borders::ALL).title("SQL Editor"))
 }
 
-fn draw_cursor<B: Backend>(app: &mut App, f: &mut Frame<B>, chunks: &[Rect]) {
+fn draw_cursor<B: Backend>(app: &App, f: &mut Frame<B>, chunks: &[Rect]) {
     if let InputMode::Editing = app.input_mode {
         // Make the cursor visible and ask tui-rs to put it at the specified coordinates after rendering
         f.set_cursor(
@@ -221,7 +225,7 @@ fn draw_cursor<B: Backend>(app: &mut App, f: &mut Frame<B>, chunks: &[Rect]) {
     }
 }
 
-fn draw_query_results<'a>(app: &'a mut App<'a>) -> Paragraph<'a> {
+fn draw_query_results<'screen, 'logs: 'screen>(app: &'logs App<'logs>) -> Paragraph<'screen> {
     // Query results not shown correctly on error. For example `show tables for x`
     let (query_results, duration) = match &app.query_results {
         Some(query_results) => {
@@ -238,13 +242,13 @@ fn draw_query_results<'a>(app: &'a mut App<'a>) -> Paragraph<'a> {
         }
         None => {
             // debug!("Query results not available");
-            let last_query = app.editor.history.last();
+            let last_query = &app.editor.history.last();
             let no_queries_text = match last_query {
                 Some(query_meta) => {
-                    if let Some(err) = &query_meta.error {
+                    if let Some(err) = &query_meta.clone().error {
                         Paragraph::new(err.as_str())
                     } else {
-                        Paragraph::new(query_meta.query.as_str())
+                        Paragraph::new(query_meta.clone().query.as_str())
                     }
                 }
                 None => Paragraph::new("No queries yet"),
@@ -257,7 +261,7 @@ fn draw_query_results<'a>(app: &'a mut App<'a>) -> Paragraph<'a> {
     query_results.block(Block::default().borders(Borders::TOP).title(title))
 }
 
-fn draw_tabs<'a>(app: &mut App) -> Tabs<'a> {
+fn draw_tabs<'screen, 'logs: 'screen>(app: &App<'logs>) -> Tabs<'screen> {
     let titles = TabItem::all_values()
         .iter()
         .map(|tab| tab.title_with_key())
@@ -271,7 +275,7 @@ fn draw_tabs<'a>(app: &mut App) -> Tabs<'a> {
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
 }
 
-fn draw_query_history<'a>(app: &mut App) -> List<'a> {
+fn draw_query_history<'screen>(app: &App) -> List<'screen> {
     let messages: Vec<ListItem> = app
         .editor
         .history
@@ -297,11 +301,23 @@ fn draw_query_history<'a>(app: &mut App) -> List<'a> {
     )
 }
 
-fn draw_logs<'a>(app: &mut App<'a>) -> TuiLoggerWidget<'a> {
-    app.logs.widget
+fn draw_logs<'logs>(app: &App<'logs>) -> TuiLoggerWidget<'logs> {
+    TuiLoggerWidget::default()
+        .style_error(Style::default().fg(Color::Red))
+        .style_debug(Style::default().fg(Color::Green))
+        .style_warn(Style::default().fg(Color::Yellow))
+        .style_trace(Style::default().fg(Color::Gray))
+        .style_info(Style::default().fg(Color::Blue))
+        .block(
+            Block::default()
+                .title("Logs")
+                .border_style(Style::default())
+                .borders(Borders::ALL),
+        )
+        .state(&app.logs.state);
 }
 
-fn draw_context<B: Backend>(f: &mut Frame<B>, app: &mut App, area: Rect) {
+fn draw_context<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
     let context = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
@@ -314,7 +330,7 @@ fn draw_context<B: Backend>(f: &mut Frame<B>, app: &mut App, area: Rect) {
     f.render_widget(physical_opts, context[1]);
 }
 
-fn draw_execution_config<'a>(app: &mut App<'a>) -> List<'a> {
+fn draw_execution_config<'screen, 'logs: 'screen>(app: &App<'logs>) -> List<'screen> {
     let exec_config = app.context.format_execution_config().unwrap();
     let config: Vec<ListItem> = exec_config
         .iter()
@@ -331,7 +347,7 @@ fn draw_execution_config<'a>(app: &mut App<'a>) -> List<'a> {
     )
 }
 
-fn draw_physical_optimizers<'a>(app: &mut App<'a>) -> List<'a> {
+fn draw_physical_optimizers<'screen, 'logs: 'screen>(app: &App<'logs>) -> List<'screen> {
     let physical_optimizers = app.context.format_physical_optimizers().unwrap();
     let opts: Vec<ListItem> = physical_optimizers
         .iter()
