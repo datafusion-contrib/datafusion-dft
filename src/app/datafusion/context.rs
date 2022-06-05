@@ -80,11 +80,15 @@ impl Context {
         use crate::app::datafusion::object_stores::register_s3;
         #[cfg(feature = "s3")]
         let ctx = register_s3(ctx).await;
+        #[cfg(feature = "s3")]
+        info!("Finished registering s3");
 
-        #[cfg(feature = "bigtable")]
-        use crate::app::datafusion::table_providers::register_bigtable;
-        #[cfg(feature = "bigtable")]
-        let ctx = register_bigtable(ctx).await;
+        #[cfg(feature = "glue")]
+        use crate::app::datafusion::catalog_providers::register_glue;
+        #[cfg(feature = "glue")]
+        let ctx = register_glue(ctx).await;
+        #[cfg(feature = "glue")]
+        info!("Finished registering Glue");
 
         Context::Local(ctx)
     }
