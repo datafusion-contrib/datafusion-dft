@@ -18,6 +18,8 @@
 pub mod json;
 
 use arrow::datatypes::{Schema, SchemaRef};
+use arrow::error::Result as ArrowResult;
+use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use bytes::buf::Reader;
 use bytes::Bytes;
@@ -33,6 +35,8 @@ use hyper_tls::HttpsConnector;
 use std::{any::Any, fmt, io::Read, pin::Pin, sync::Arc};
 
 use crate::app::error::{DftError, Result};
+
+pub type BatchIter = Box<dyn Iterator<Item = ArrowResult<RecordBatch>> + Send + Sync>;
 
 /// Stream readers opened on a given API
 pub type ApiPageReaderStream =
@@ -83,6 +87,7 @@ pub trait ApiPageReader: Send + Sync {
 /// any given API.
 #[derive(Debug, Clone)]
 pub struct ApiScanConfig {
+    pub table_config: ApiTableConfig,
     /// Schema before projection. It contains the columns that are expected
     /// to be in the API results without the table partition columns.
     pub api_schema: SchemaRef,
@@ -138,7 +143,7 @@ impl ApiScanConfig {
         (table_schema, table_stats)
     }
 
-    fn projected_file_column_names(&self) -> Option<Vec<String>> {
+    fn projected_api_column_names(&self) -> Option<Vec<String>> {
         self.projection.as_ref().map(|p| {
             p.iter()
                 .filter(|col_idx| **col_idx < self.api_schema.fields().len())
@@ -148,7 +153,7 @@ impl ApiScanConfig {
         })
     }
 
-    fn file_column_projection_indices(&self) -> Option<Vec<usize>> {
+    fn api_column_projection_indices(&self) -> Option<Vec<usize>> {
         self.projection.as_ref().map(|p| {
             p.iter()
                 .filter(|col_idx| **col_idx < self.api_schema.fields().len())

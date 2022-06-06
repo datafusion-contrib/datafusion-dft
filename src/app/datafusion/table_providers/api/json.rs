@@ -18,21 +18,24 @@
 use arrow::datatypes::SchemaRef;
 use arrow::json;
 use arrow::json::reader::infer_json_schema_from_iterator;
-use arrow::json::reader::ValueIter;
+use arrow::json::reader::{DecoderOptions, ValueIter};
 use async_trait::async_trait;
 use bytes::Buf;
 use datafusion::error::Result as DFResult;
-use datafusion::execution::context::TaskContext;
+use datafusion::execution::context::{SessionState, TaskContext};
 use datafusion::logical_plan::Expr;
 use datafusion::physical_plan::{
     expressions::PhysicalSortExpr, DisplayFormatType, ExecutionPlan, Partitioning,
     SendableRecordBatchStream, Statistics,
 };
+use http::Uri;
+use tokio::task::{self, JoinHandle};
+
 use std::io::BufReader;
 use std::{any::Any, sync::Arc};
 
-use crate::app::datafusion::table_providers::api::{ApiFormat, ApiScanConfig, ApiTable};
-use crate::app::error::Result;
+use crate::app::datafusion::table_providers::api::{ApiFormat, ApiScanConfig, ApiTable, BatchIter};
+use crate::app::error::{DftError, Result};
 
 /// New line delimited JSON `FileFormat` implementation.
 #[derive(Debug)]
@@ -173,7 +176,7 @@ impl ExecutionPlan for JsonApiExec {
         partition: usize,
         context: Arc<TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
-        let proj = self.base_config.projected_file_column_names();
+        let proj = self.base_config.projected_api_column_names();
 
         let batch_size = context.session_config().batch_size;
         let file_schema = Arc::clone(&self.base_config.file_schema);
@@ -213,9 +216,8 @@ impl ExecutionPlan for JsonApiExec {
             DisplayFormatType::Default => {
                 write!(
                     f,
-                    "JsonExec: limit={:?}, files={}",
-                    self.base_config.limit,
-                    super::FileGroupsDisplay(&self.base_config.file_groups),
+                    "JsonExec: limit={:?}, uris={}",
+                    self.base_config.limit, self.base_config.table_config.uri,
                 )
             }
         }
@@ -250,14 +252,14 @@ pub async fn plan_to_json(
                         .map(|batch| writer.write(batch?))
                         .try_collect()
                         .await
-                        .map_err(DataFusionError::from)
+                        .map_err(DftError::from)
                 });
                 tasks.push(handle);
             }
             futures::future::join_all(tasks).await;
             Ok(())
         }
-        Err(e) => Err(DataFusionError::Execution(format!(
+        Err(e) => Err(DftError::Execution(format!(
             "Could not create directory {}: {:?}",
             path, e
         ))),
