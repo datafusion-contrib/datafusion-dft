@@ -21,7 +21,7 @@ ballista = { version = "0.7", optional = true }
 clap = { version = "3", features = ["derive", "cargo"] }
 crossterm = { version = "0.23", features = ["serde"] }
 datafusion = "8"
-datafusion-catalogprovider-glue = { version = "0.1.4", optional = true }
+datafusion-catalogprovider-glue = { version = "0.1.7", optional = true }
 datafusion-objectstore-s3 = { version = "0.2.1", optional = true }
 dirs = "4.0"
 futures = "0.3"
