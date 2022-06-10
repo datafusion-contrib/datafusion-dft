@@ -90,3 +90,5 @@ venv/*
 
 # apache release artifacts
 dev/dist
+
+Cargo.lock

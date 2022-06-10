@@ -61,6 +61,16 @@ CREATE VIEW OR REPLACE users_listings AS SELECT * FROM users LEFT JOIN listings 
 
 This would make the tables `users`, `taxis`, `listings`, and the view  `users_listings` available at startup.  Any of these DDL statements could also be run interactively from the SQL editor as well to create the tables.
 
+### Catalog Providers
+
+You can run `dft` with `--features=glue,s3` to registered databases and tables from your AWS Glue Catalogs.  You can optionally use a configuration file to specify which databases you want to register.  To use a configuration create `~/.datafusion/catalog_providers/glue.json`.  In that file you can specify the databases that you want to register:
+
+```json
+{
+  "databases": ["my_database", "my_other_database"]
+}
+```
+
 ### Key Mappings
 
 

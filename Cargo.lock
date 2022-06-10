@@ -1254,9 +1254,9 @@ dependencies = [
 
 [[package]]
 name = "datafusion-catalogprovider-glue"
-version = "0.1.4"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5529ae03c5c0f8bfaa21319ba2badd3fe1a54e4741d6ccf4d2cde747d167b8bf"
+checksum = "3d99e7aaab07e644f6aaf38ccf8107e7b02fac1673fbfaf1c1b7e420530b58e3"
 dependencies = [
  "aws-config 0.12.0",
  "aws-sdk-glue",
