@@ -78,7 +78,7 @@ impl Input {
             self.current_row - MAX_EDITOR_LINES
         } as usize;
 
-        let end = (start + (MAX_EDITOR_LINES as usize) + 1) as usize;
+        let end = start + (MAX_EDITOR_LINES as usize) + 1;
 
         let text: Vec<&str> = if start == 0 {
             // debug!("Combining all lines");

@@ -36,18 +36,13 @@ pub struct Tabs {
     pub index: usize,
 }
 
-#[derive(Debug, Copy, Eq, PartialEq, Clone)]
+#[derive(Default, Debug, Copy, Eq, PartialEq, Clone)]
 pub enum TabItem {
+    #[default]
     Editor,
     QueryHistory,
     Context,
     Logs,
-}
-
-impl Default for TabItem {
-    fn default() -> TabItem {
-        TabItem::Editor
-    }
 }
 
 impl TabItem {
@@ -68,7 +63,7 @@ impl TabItem {
     }
 
     pub(crate) fn title_with_key(&self) -> String {
-        return format!("{} [{}]", self.title(), self.list_index() + 1);
+        format!("{} [{}]", self.title(), self.list_index() + 1)
     }
 
     pub(crate) fn title(&self) -> &'static str {
@@ -109,17 +104,12 @@ impl From<TabItem> for usize {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Default, Debug, Copy, Clone)]
 pub enum InputMode {
+    #[default]
     Normal,
     Editing,
     Rc,
-}
-
-impl Default for InputMode {
-    fn default() -> InputMode {
-        InputMode::Normal
-    }
 }
 
 /// Status that determines whether app should continue or exit
