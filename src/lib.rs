@@ -30,8 +30,8 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use tokio::sync::Mutex;
 use ratatui::{backend::CrosstermBackend, Terminal};
+use tokio::sync::Mutex;
 
 use crate::app::error::Result;
 use crate::app::ui;

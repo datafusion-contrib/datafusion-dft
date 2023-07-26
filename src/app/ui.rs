@@ -19,7 +19,7 @@ use ratatui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::{Span, Text, Line},
+    text::{Line, Span, Text},
     widgets::{Block, Borders, List, ListItem, Paragraph, Tabs},
     Frame,
 };
