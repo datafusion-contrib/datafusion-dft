@@ -30,11 +30,11 @@ log = "0.4"
 mimalloc = { version = "0.1", default-features = false }
 serde = "1.0.136"
 serde_json = "1.0.79"
-tui = { version = "0.17", default-features = false, features = [
+ratatui = { version = "0.21", default-features = false, features = [
     'crossterm',
     'serde',
 ] }
-tui-logger = "0.7"
+tui-logger = {version="0.9", default-features = false, features = ["ratatui-support"]}
 tokio = { version = "1", features = ["full"] }
 unicode-width = "0.1.9"
 
