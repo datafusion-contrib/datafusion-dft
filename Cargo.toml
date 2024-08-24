@@ -9,7 +9,7 @@ edition = "2021"
 async-trait = "0.1.80"
 clap = { version = "4.5.1", features = ["derive"] }
 color-eyre = "0.6.3"
-crossterm = { version = "0.27.0", features = ["event-stream"] }
+crossterm = { version = "0.28.1", features = ["event-stream"] }
 # datafusion = { path = "/Users/matth/OpenSource/arrow-datafusion/datafusion/core"}
 datafusion = "40.0.0"
 directories = "5.0.1"
@@ -17,8 +17,9 @@ futures = "0.3.30"
 futures-util = "0.3.30"
 itertools = "0.13.0"
 lazy_static = "1.4.0"
+log = "0.4.22"
 open = "5.1.4"
-ratatui = "0.27.0"
+ratatui = "0.28.0"
 serde = { version = "1.0.197", features = ["derive"] }
 strum = "0.26.2"
 tokio = { version = "1.36.0", features = ["rt-multi-thread", "macros"] }
@@ -28,8 +29,8 @@ toml = "0.8.12"
 tracing = { version = "0.1.40", features = ["log"] }
 tracing-error = "0.2.0"
 tracing-subscriber = {version = "0.3.18", features = ["env-filter"] }
-tui-logger = "0.12"
-tui-textarea = "0.5.3"
+tui-logger = {version = "0.12", features = ["tracing-support"]}
+tui-textarea = "0.6.1"
 
 [lints.clippy]
 clone_on_ref_ptr = "deny"

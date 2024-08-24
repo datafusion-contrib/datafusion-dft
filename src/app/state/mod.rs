@@ -19,7 +19,7 @@ pub struct Tabs {
 impl Default for Tabs {
     fn default() -> Self {
         Self {
-            selected: SelectedTab::Explore,
+            selected: SelectedTab::Queries,
         }
     }
 }

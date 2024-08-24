@@ -1,5 +1,5 @@
-use crossterm::event::KeyEvent;
 use datafusion::arrow::array::RecordBatch;
+use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::{palette::tailwind, Style};
 use tui_textarea::TextArea;
 
@@ -7,7 +7,7 @@ use tui_textarea::TextArea;
 pub struct ExploreTabState<'app> {
     editor: TextArea<'app>,
     editor_editable: bool,
-    query_results: Option<Vec<RecordBatch>>, // query_handle: Option<JoinHandle<Result<Vec<RecordBatch>>>>,
+    query_results: Option<Vec<RecordBatch>>,
 }
 
 impl<'app> ExploreTabState<'app> {
@@ -28,6 +28,17 @@ impl<'app> ExploreTabState<'app> {
         // TODO: Figure out how to do this without clone. Probably need logic in handler to make
         // updates to the Widget and then pass a ref
         self.editor.clone()
+    }
+
+    pub fn clear_placeholder(&mut self) {
+        let default = "Enter a query here.";
+        let lines = self.editor.lines();
+        let content = lines.join("");
+        if content == default {
+            self.editor
+                .move_cursor(tui_textarea::CursorMove::Jump(0, 0));
+            self.editor.delete_str(default.len());
+        }
     }
 
     pub fn update_editor_content(&mut self, key: KeyEvent) {

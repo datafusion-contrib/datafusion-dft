@@ -10,7 +10,7 @@ use color_eyre::Result;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    telemetry::initialize_tracing()?;
+    telemetry::initialize_logs()?;
     let cli = cli::DftCli::parse();
     let state = state::initialize(&cli);
     run_app(cli.clone(), state).await?;

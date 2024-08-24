@@ -7,19 +7,19 @@ use crate::cli::DftCli;
 use crate::{cli, ui};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
-use crossterm::{
-    cursor, event,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen},
-};
+use crossterm::event as ct;
 use datafusion::arrow::array::RecordBatch;
 use futures::FutureExt;
 use futures_util::StreamExt;
 use ratatui::backend::CrosstermBackend;
+use ratatui::crossterm::{
+    self, cursor, event,
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen},
+};
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
 use strum::IntoEnumIterator;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
-use tokio::{sync::broadcast, task::JoinHandle};
-use tokio_stream::StreamMap;
+use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 
@@ -40,6 +40,7 @@ pub enum AppEvent {
     Paste(String),
     Mouse(event::MouseEvent),
     Resize(u16, u16),
+    ExecuteDDL(String),
     ExploreQueryResult(Vec<RecordBatch>),
 }
 
@@ -80,13 +81,13 @@ impl<'app> App<'app> {
     /// mouse capture, then start event loop.
     pub fn enter(&mut self, ui: bool) -> Result<()> {
         if ui {
-            crossterm::terminal::enable_raw_mode()?;
-            crossterm::execute!(std::io::stdout(), EnterAlternateScreen, cursor::Hide)?;
+            ratatui::crossterm::terminal::enable_raw_mode()?;
+            ratatui::crossterm::execute!(std::io::stdout(), EnterAlternateScreen, cursor::Hide)?;
             if self.state.config.interaction.mouse {
-                crossterm::execute!(std::io::stdout(), event::EnableMouseCapture)?;
+                ratatui::crossterm::execute!(std::io::stdout(), event::EnableMouseCapture)?;
             }
             if self.state.config.interaction.paste {
-                crossterm::execute!(std::io::stdout(), event::EnableBracketedPaste)?;
+                ratatui::crossterm::execute!(std::io::stdout(), event::EnableBracketedPaste)?;
             }
         }
         self.start_event_loop();
@@ -156,7 +157,6 @@ impl<'app> App<'app> {
         let tick_delay =
             std::time::Duration::from_secs_f64(1.0 / self.state.config.display.tick_rate);
         // TODO-V1: Add this to config
-        let realtime_graph_refresh_delay = std::time::Duration::from_millis(250);
         debug!("Tick delay: {:?}", tick_delay);
         self.cancel();
         self.app_cancellation_token = CancellationToken::new();
@@ -164,22 +164,15 @@ impl<'app> App<'app> {
         let _event_tx = self.app_event_tx.clone();
 
         self.task = tokio::spawn(async move {
-            let mut reader = event::EventStream::new();
+            let mut reader = ct::EventStream::new();
             let mut tick_interval = tokio::time::interval(tick_delay);
             debug!("Tick interval: {:?}", tick_interval);
             let mut render_interval = tokio::time::interval(render_delay);
             debug!("Render interval: {:?}", render_interval);
-            let mut realtime_graph_refresh_interval =
-                tokio::time::interval(realtime_graph_refresh_delay);
-            debug!(
-                "Realtime graph refresh interval: {:?}",
-                realtime_graph_refresh_interval
-            );
             _event_tx.send(AppEvent::Init).unwrap();
             loop {
                 let tick_delay = tick_interval.tick();
                 let render_delay = render_interval.tick();
-                let realtime_graph_refresh_delay = realtime_graph_refresh_interval.tick();
                 let crossterm_event = reader.next().fuse();
                 tokio::select! {
                   _ = _cancellation_token.cancelled() => {
@@ -204,36 +197,9 @@ impl<'app> App<'app> {
         });
     }
 
-    fn start_stream_event_loop(&mut self) {
-        self.cancel();
-        self.app_cancellation_token = CancellationToken::new();
-        let _cancellation_token = self.app_cancellation_token.clone();
-        let _event_tx = self.app_event_tx.clone();
-
-        self.task = tokio::spawn(async move {
-            let mut reader = event::EventStream::new();
-            _event_tx.send(AppEvent::Init).unwrap();
-            loop {
-                let crossterm_event = reader.next().fuse();
-                tokio::select! {
-                  _ = _cancellation_token.cancelled() => {
-                      break;
-                  }
-                  maybe_event = crossterm_event => {
-                      let maybe_app_event = match maybe_event {
-                            Some(Ok(event)) => {
-                                Self::handle_crossterm_event(event)
-                            }
-                            Some(Err(_)) => Some(AppEvent::Error),
-                            None => unimplemented!()
-                      };
-                      if let Some(app_event) = maybe_app_event {
-                          Self::send_app_event(app_event, &_event_tx);
-                      };
-                  },
-                }
-            }
-        });
+    pub fn execute_ddl(&mut self) {
+        let ddl = std::fs::read_to_string("~/.datafusionrc").unwrap();
+        let _ = self.app_event_tx.send(AppEvent::ExecuteDDL(ddl));
     }
 
     /// Dispatch to the appropriate event loop based on the command
