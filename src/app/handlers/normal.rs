@@ -89,7 +89,7 @@ pub async fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
             Key::Left => {
                 if let Some(results) = &mut app.query_results {
                     let new_y = match results.scroll.y {
-                        0 | 1 | 2 => 0,
+                        0..=2 => 0,
                         n => n - 3,
                     };
                     results.scroll.y = new_y

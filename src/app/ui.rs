@@ -16,7 +16,6 @@
 // under the License.
 
 use ratatui::{
-    backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
@@ -54,7 +53,7 @@ fn draw_sql_editor_tab(f: &mut Frame, app: &App) {
             ]
             .as_ref(),
         )
-        .split(f.size());
+        .split(f.area());
 
     let help_message = draw_sql_editor_help(app);
     f.render_widget(help_message, chunks[0]);
@@ -80,7 +79,7 @@ fn draw_query_history_tab(f: &mut Frame, app: &App) {
             ]
             .as_ref(),
         )
-        .split(f.size());
+        .split(f.area());
 
     let help_message = draw_default_help();
     f.render_widget(help_message, chunks[0]);
@@ -103,7 +102,7 @@ fn draw_context_tab(f: &mut Frame, app: &App) {
             ]
             .as_ref(),
         )
-        .split(f.size());
+        .split(f.area());
 
     let help_message = draw_default_help();
     f.render_widget(help_message, chunks[0]);
@@ -126,7 +125,7 @@ fn draw_logs_tab(f: &mut Frame, app: &App) {
             ]
             .as_ref(),
         )
-        .split(f.size());
+        .split(f.area());
 
     let help_message = draw_default_help();
     f.render_widget(help_message, chunks[0]);
