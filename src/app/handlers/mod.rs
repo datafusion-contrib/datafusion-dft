@@ -24,6 +24,7 @@ use arrow::util::pretty::pretty_format_batches;
 use datafusion::error::DataFusionError;
 use datafusion::prelude::DataFrame;
 use log::{debug, error};
+use ratatui::crossterm::event::KeyEvent;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -33,7 +34,7 @@ use crate::app::error::{DftError, Result};
 use crate::app::ui::Scroll;
 use crate::events::Key;
 
-pub async fn key_event_handler(app: &mut App, key: Key) -> Result<AppReturn> {
+pub async fn key_event_handler<'app>(app: &'app mut App<'app>, key: KeyEvent) -> Result<AppReturn> {
     match app.input_mode {
         InputMode::Normal => normal::normal_mode_handler(app, key).await,
         InputMode::Editing => edit::edit_mode_handler(app, key).await,
@@ -41,13 +42,13 @@ pub async fn key_event_handler(app: &mut App, key: Key) -> Result<AppReturn> {
     }
 }
 
-pub async fn execute_query(app: &mut App) -> Result<AppReturn> {
-    let sql: String = app.editor.input.combine_lines();
+pub async fn execute_query(app: &mut App<'_>) -> Result<AppReturn> {
+    let sql: String = app.editor.input.lines().join("\n");
     handle_queries(app, sql).await?;
     Ok(AppReturn::Continue)
 }
 
-async fn handle_queries(app: &mut App, sql: String) -> Result<()> {
+async fn handle_queries(app: &mut App<'_>, sql: String) -> Result<()> {
     let start = Instant::now();
     let queries = sql.split(';');
     for query in queries {
@@ -66,7 +67,7 @@ async fn handle_queries(app: &mut App, sql: String) -> Result<()> {
 }
 
 async fn handle_successful_query(
-    app: &mut App,
+    app: &mut App<'_>,
     start: Instant,
     sql: String,
     df: Arc<DataFrame>,

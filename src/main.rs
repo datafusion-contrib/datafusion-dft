@@ -21,6 +21,7 @@ use std::sync::Arc;
 
 use clap::Parser;
 use datafusion_tui::app::core::App;
+use datafusion_tui::app::editor::Editor;
 use datafusion_tui::cli::args::Args;
 use datafusion_tui::run_app;
 use log::LevelFilter;
@@ -35,8 +36,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
     tui_logger::init_logger(LevelFilter::Debug).unwrap();
     tui_logger::set_default_level(LevelFilter::Debug);
     let args = Args::parse();
-    let app = Arc::new(Mutex::new(App::new(args).await));
-    let res = run_app(app).await;
+    // let app = Arc::new(Mutex::new(App::new(args).await));
+    // let res = run_app(app).await;
+    let ed = Editor::default();
+    run_app(args, ed).await;
 
     if let Err(err) = res {
         println!("{:?}", err)

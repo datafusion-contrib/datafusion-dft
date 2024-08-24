@@ -20,6 +20,10 @@ use std::io::{BufWriter, Write};
 
 use datafusion::prelude::SessionConfig;
 use log::info;
+use ratatui::buffer::Buffer;
+use ratatui::crossterm::event::KeyEvent;
+use ratatui::layout::Rect;
+use ratatui::widgets::Widget;
 use tui_logger::TuiWidgetState;
 
 use crate::app::datafusion::context::{Context, QueryResults};
@@ -27,7 +31,9 @@ use crate::app::editor::Editor;
 use crate::app::error::Result;
 use crate::app::handlers::key_event_handler;
 use crate::cli::args::Args;
-use crate::events::Key;
+use crate::events::{Event, Key};
+
+use super::ui::{draw_context_tab, draw_logs_tab, draw_query_history_tab, draw_sql_editor_tab};
 
 const DATAFUSION_RC: &str = ".datafusion/.datafusionrc";
 
@@ -124,13 +130,13 @@ pub struct Logs {
 }
 
 /// App holds the state of the application
-pub struct App {
+pub struct App<'app> {
     /// Application tabs
     pub tab_item: TabItem,
     /// Current input mode
     pub input_mode: InputMode,
     /// SQL Editor and it's state
-    pub editor: Editor,
+    pub editor: Editor<'app>,
     /// DataFusion `ExecutionContext`
     pub context: Context,
     /// Results from DataFusion query
@@ -139,24 +145,25 @@ pub struct App {
     pub logs: Logs,
 }
 
-impl App {
-    pub async fn new(args: Args) -> App {
+impl<'app> App<'app> {
+    pub fn new(args: Args, editor: Editor<'app>) -> Self {
         let execution_config = SessionConfig::new().with_information_schema(true);
-        let mut ctx: Context = match (args.host, args.port) {
-            (Some(ref h), Some(p)) => Context::new_remote(h, p).await.unwrap(),
-            _ => Context::new_local(&execution_config).await,
-        };
+        let ctx = Context::new_local(&execution_config);
+        // let mut ctx: Context = match (args.host, args.port) {
+        //     (Some(ref h), Some(p)) => Context::new_remote(h, p).await.unwrap(),
+        //     _ => Context::new_local(&execution_config).await,
+        // };
 
         let files = args.file;
 
         let rc = App::get_rc_files(args.rc);
 
-        if !files.is_empty() {
-            ctx.exec_files(files).await
-        } else if !rc.is_empty() {
-            info!("Executing '~/.datafusion/.datafusionrc' file");
-            ctx.exec_files(rc).await
-        }
+        // if !files.is_empty() {
+        //     ctx.exec_files(files).await
+        // } else if !rc.is_empty() {
+        //     info!("Executing '~/.datafusion/.datafusionrc' file");
+        //     ctx.exec_files(rc).await
+        // }
 
         let log_state = TuiWidgetState::default();
 
@@ -165,7 +172,8 @@ impl App {
         App {
             tab_item: Default::default(),
             input_mode: Default::default(),
-            editor: Editor::default(),
+            editor,
+            // editor: Editor::default(),
             context: ctx,
             query_results: None,
             logs,
@@ -189,27 +197,60 @@ impl App {
         }
     }
 
+    pub async fn event_handler(&'app mut self, event: Event) -> Result<AppReturn> {
+        match event {
+            Event::KeyInput(k) => key_event_handler(self, k).await,
+            _ => Ok(AppReturn::Continue),
+        }
+    }
+
     pub async fn reload_rc(&mut self) {
         let rc = App::get_rc_files(None);
         self.context.exec_files(rc).await;
         info!("Reloaded .datafusionrc");
     }
 
-    pub fn write_rc(&self) -> Result<()> {
-        let text = self.editor.input.combine_lines();
-        let rc = App::get_rc_files(None);
-        let file = File::create(rc[0].clone())?;
-        let mut writer = BufWriter::new(file);
-        writer.write_all(text.as_bytes())?;
-        Ok(())
-    }
+    // pub fn write_rc(&self) -> Result<()> {
+    //     let text = self.editor.input.combine_lines();
+    //     let rc = App::get_rc_files(None);
+    //     let file = File::create(rc[0].clone())?;
+    //     let mut writer = BufWriter::new(file);
+    //     writer.write_all(text.as_bytes())?;
+    //     Ok(())
+    // }
 
-    pub async fn key_handler(&mut self, key: Key) -> AppReturn {
+    pub async fn key_handler(&'app mut self, key: KeyEvent) -> AppReturn {
         key_event_handler(self, key).await.unwrap()
     }
 
     pub fn update_on_tick(&self) -> AppReturn {
         AppReturn::Continue
+    }
+}
+
+impl Widget for &App<'_> {
+    /// Note: Ratatui uses Immediate Mode rendering (i.e. the entire UI is redrawn)
+    /// on every frame based on application state. There is no permanent widget object
+    /// in memory.
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        match self.tab_item {
+            TabItem::Editor => draw_sql_editor_tab(self, area, buf),
+            TabItem::QueryHistory => draw_query_history_tab(self, area, buf),
+            TabItem::Context => draw_context_tab(self, area, buf),
+            TabItem::Logs => draw_logs_tab(self, area, buf),
+        }
+        // let vertical = Layout::vertical([
+        //     Constraint::Length(1),
+        //     Constraint::Min(0),
+        //     Constraint::Length(1),
+        // ]);
+        // let [header_area, inner_area, footer_area] = vertical.areas(area);
+        //
+        // let horizontal = Layout::horizontal([Constraint::Min(0)]);
+        // let [tabs_area] = horizontal.areas(header_area);
+        // self.render_tabs(tabs_area, buf);
+        // self.state.tabs.selected.render(inner_area, buf, self);
+        // self.render_footer(footer_area, buf);
     }
 }
 

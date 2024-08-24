@@ -16,19 +16,20 @@
 // under the License.
 
 use log::debug;
+use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use std::fs::File;
 
 use crate::app::core::{App, AppReturn, InputMode};
 use crate::app::error::Result;
 use crate::events::Key;
 
-pub async fn rc_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
-    debug!(
-        "{} Entered, current row / col: {} / {}",
-        key, app.editor.input.current_row, app.editor.input.cursor_column
-    );
-    match key {
-        Key::Char(c) => match c {
+pub async fn rc_mode_handler(app: &mut App<'_>, key: KeyEvent) -> Result<AppReturn> {
+    // debug!(
+    //     "{} Entered, current row / col: {} / {}",
+    //     key, app.editor.input.current_row, app.editor.input.cursor_column
+    // );
+    match key.code {
+        KeyCode::Char(c) => match c {
             'e' => {
                 app.input_mode = InputMode::Editing;
                 Ok(AppReturn::Continue)
@@ -47,12 +48,12 @@ pub async fn rc_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
                 Ok(AppReturn::Continue)
             }
             'w' => {
-                app.write_rc()?;
+                // app.write_rc()?;
                 Ok(AppReturn::Continue)
             }
             _ => Ok(AppReturn::Continue),
         },
-        Key::Esc => {
+        KeyCode::Esc => {
             app.input_mode = InputMode::Normal;
             Ok(AppReturn::Continue)
         }

@@ -16,10 +16,11 @@
 // under the License.
 
 use ratatui::{
+    buffer::Buffer,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Tabs},
+    widgets::{Block, Borders, List, ListItem, Paragraph, Tabs, Widget},
     Frame,
 };
 use tui_logger::TuiLoggerSmartWidget;
@@ -31,16 +32,16 @@ pub struct Scroll {
     pub y: u16,
 }
 
-pub fn draw_ui(f: &mut Frame, app: &App) {
-    match app.tab_item {
-        TabItem::Editor => draw_sql_editor_tab(f, app),
-        TabItem::QueryHistory => draw_query_history_tab(f, app),
-        TabItem::Context => draw_context_tab(f, app),
-        TabItem::Logs => draw_logs_tab(f, app),
-    }
-}
+// pub fn draw_ui(f: &mut Frame, app: &App) {
+//     match app.tab_item {
+//         TabItem::Editor => draw_sql_editor_tab(f, app),
+//         TabItem::QueryHistory => draw_query_history_tab(f, app),
+//         TabItem::Context => draw_context_tab(f, app),
+//         TabItem::Logs => draw_logs_tab(f, app),
+//     }
+// }
 
-fn draw_sql_editor_tab(f: &mut Frame, app: &App) {
+pub fn draw_sql_editor_tab(app: &App, area: Rect, buf: &mut Buffer) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -53,21 +54,25 @@ fn draw_sql_editor_tab(f: &mut Frame, app: &App) {
             ]
             .as_ref(),
         )
-        .split(f.area());
+        .split(area);
 
     let help_message = draw_sql_editor_help(app);
-    f.render_widget(help_message, chunks[0]);
+    help_message.render(chunks[0], buf);
+    // f.render_widget(help_message, chunks[0]);
 
     let tabs = draw_tabs(app);
-    f.render_widget(tabs, chunks[1]);
-    let editor = draw_editor(app);
-    f.render_widget(editor, chunks[2]);
-    draw_cursor(app, f, &chunks);
+    tabs.render(chunks[1], buf);
+    // f.render_widget(tabs, chunks[1]);
+    // let editor = draw_editor(app);
+    // f.render_widget(editor, chunks[2]);
+    app.editor.input.render(chunks[2], buf);
+    // draw_cursor(app, f, &chunks);
     let query_results = draw_query_results(app);
-    f.render_widget(query_results, chunks[3]);
+    query_results.render(chunks[3], buf);
+    // f.render_widget(query_results, chunks[3]);
 }
 
-fn draw_query_history_tab(f: &mut Frame, app: &App) {
+pub fn draw_query_history_tab(app: &App, area: Rect, buf: &mut Buffer) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -79,18 +84,21 @@ fn draw_query_history_tab(f: &mut Frame, app: &App) {
             ]
             .as_ref(),
         )
-        .split(f.area());
+        .split(area);
 
     let help_message = draw_default_help();
-    f.render_widget(help_message, chunks[0]);
+    help_message.render(chunks[0], buf);
+    // f.render_widget(help_message, chunks[0]);
 
     let tabs = draw_tabs(app);
-    f.render_widget(tabs, chunks[1]);
+    tabs.render(chunks[1], buf);
+    // f.render_widget(tabs, chunks[1]);
     let query_history = draw_query_history(app);
-    f.render_widget(query_history, chunks[2])
+    // f.render_widget(query_history, chunks[2])
+    query_history.render(chunks[2], buf);
 }
 
-fn draw_context_tab(f: &mut Frame, app: &App) {
+pub fn draw_context_tab(app: &App, area: Rect, buf: &mut Buffer) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -102,18 +110,22 @@ fn draw_context_tab(f: &mut Frame, app: &App) {
             ]
             .as_ref(),
         )
-        .split(f.area());
+        .split(area);
 
     let help_message = draw_default_help();
-    f.render_widget(help_message, chunks[0]);
+    help_message.render(chunks[0], buf);
+    // f.render_widget(help_message, chunks[0]);
 
     let tabs = draw_tabs(app);
-    f.render_widget(tabs, chunks[1]);
+    // f.render_widget(tabs, chunks[1]);
+    tabs.render(chunks[1], buf);
 
-    draw_context(f, app, chunks[2]);
+    draw_context(app, chunks[2], buf);
+
+    // draw_context(f, app, chunks[2]);
 }
 
-fn draw_logs_tab(f: &mut Frame, app: &App) {
+pub fn draw_logs_tab(app: &App, area: Rect, buf: &mut Buffer) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -125,15 +137,18 @@ fn draw_logs_tab(f: &mut Frame, app: &App) {
             ]
             .as_ref(),
         )
-        .split(f.area());
+        .split(area);
 
     let help_message = draw_default_help();
-    f.render_widget(help_message, chunks[0]);
+    // f.render_widget(help_message, chunks[0]);
+    help_message.render(chunks[0], buf);
 
     let tabs = draw_tabs(app);
-    f.render_widget(tabs, chunks[1]);
+    // f.render_widget(tabs, chunks[1]);
+    tabs.render(chunks[1], buf);
     let logs = draw_logs(app);
-    f.render_widget(logs, chunks[2])
+    // f.render_widget(logs, chunks[2])
+    logs.render(chunks[2], buf);
 }
 
 fn draw_sql_editor_help<'screen>(app: &App) -> Paragraph<'screen> {
@@ -198,32 +213,32 @@ fn draw_default_help<'screen>() -> Paragraph<'screen> {
     Paragraph::new(text)
 }
 
-fn draw_editor<'screen>(app: &App) -> Paragraph<'screen> {
-    Paragraph::new(app.editor.input.combine_visible_lines())
-        .style(match app.input_mode {
-            InputMode::Editing => Style::default().fg(Color::Yellow),
-            _ => Style::default(),
-        })
-        .block(Block::default().borders(Borders::ALL).title("SQL Editor"))
-}
+// fn draw_editor<'screen>(app: &App, area: R) -> Paragraph<'screen> {
+//     app.editor.input.render(area, buf)
+//     Paragraph::new(app.editor.input.combine_visible_lines())
+//         .style(match app.input_mode {
+//             InputMode::Editing => Style::default().fg(Color::Yellow),
+//             _ => Style::default(),
+//         })
+//         .block(Block::default().borders(Borders::ALL).title("SQL Editor"))
+// }
 
-fn draw_cursor(app: &App, f: &mut Frame, chunks: &[Rect]) {
-    if let InputMode::Editing = app.input_mode {
-        // Make the cursor visible and ask tui-rs to put it at the specified coordinates after rendering
-        f.set_cursor(
-            // Put cursor past the end of the input text
-            chunks[2].x + app.editor.get_cursor_column() + 1,
-            // Move one line down, from the border to the input line
-            chunks[2].y + app.editor.get_cursor_row() + 1,
-        )
-    }
-}
+// fn draw_cursor(app: &App, f: &mut Frame, chunks: &[Rect]) {
+//     if let InputMode::Editing = app.input_mode {
+//         // Make the cursor visible and ask tui-rs to put it at the specified coordinates after rendering
+//         f.set_cursor(
+//             // Put cursor past the end of the input text
+//             chunks[2].x + app.editor.get_cursor_column() + 1,
+//             // Move one line down, from the border to the input line
+//             chunks[2].y + app.editor.get_cursor_row() + 1,
+//         )
+//     }
+// }
 
-fn draw_query_results(app: &App) -> Paragraph {
+fn draw_query_results<'app>(app: &'app App) -> Paragraph<'app> {
     // Query results not shown correctly on error. For example `show tables for x`
     let (query_results, duration) = match &app.query_results {
         Some(query_results) => {
-            // debug!("Query results available");
             let query_meta = app.editor.history.last().unwrap();
             let results = if query_meta.query.starts_with("CREATE") {
                 Paragraph::new(String::from("Table created"))
@@ -235,7 +250,6 @@ fn draw_query_results(app: &App) -> Paragraph {
             (results, query_duration_info)
         }
         None => {
-            // debug!("Query results not available");
             let last_query = &app.editor.history.last();
             let no_queries_text = match last_query {
                 Some(query_meta) => {
@@ -295,33 +309,29 @@ fn draw_query_history<'screen>(app: &App) -> List<'screen> {
     )
 }
 
-fn draw_logs(app: &App) -> TuiLoggerSmartWidget {
+fn draw_logs<'app>(app: &'app App) -> TuiLoggerSmartWidget<'app> {
     TuiLoggerSmartWidget::default()
         .style_error(Style::default().fg(Color::Red))
         .style_debug(Style::default().fg(Color::Green))
         .style_warn(Style::default().fg(Color::Yellow))
         .style_trace(Style::default().fg(Color::Gray))
         .style_info(Style::default().fg(Color::Blue))
-        // .block(
-        //     Block::default()
-        //         .title("Logs")
-        //         .border_style(Style::default())
-        //         .borders(Borders::ALL),
-        // )
         .state(&app.logs.state)
 }
 
-fn draw_context(f: &mut Frame, app: &App, area: Rect) {
-    let context = Layout::default()
+fn draw_context(app: &App, area: Rect, buf: &mut Buffer) {
+    let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(area);
 
     let exec_config = draw_execution_config(app);
-    f.render_widget(exec_config, context[0]);
+    // f.render_widget(exec_config, context[0]);
+    exec_config.render(chunks[0], buf);
 
     let physical_opts = draw_physical_optimizers(app);
-    f.render_widget(physical_opts, context[1]);
+    // f.render_widget(physical_opts, context[1]);
+    physical_opts.render(chunks[1], buf);
 }
 
 fn draw_execution_config<'screen>(app: &App) -> List<'screen> {

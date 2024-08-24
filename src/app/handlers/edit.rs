@@ -22,36 +22,33 @@
 // Lines around cursor => First line, middle line, last line
 
 use log::debug;
+use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
 use crate::app::core::{App, AppReturn, InputMode};
 use crate::app::error::Result;
 use crate::events::Key;
 
-pub async fn edit_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
-    debug!(
-        "{} Entered, current row / col: {} / {}",
-        key, app.editor.input.current_row, app.editor.input.cursor_column
-    );
-    match key {
-        Key::Enter => app.editor.input.append_char('\n'),
-        Key::Char(c) => match c {
-            ';' => {
-                let result = app.editor.input.append_char(c);
-                app.editor.sql_terminated = true;
-                result
-            }
-            _ => app.editor.input.append_char(c),
-        },
-        Key::Left => app.editor.input.previous_char(),
-        Key::Right => app.editor.input.next_char(),
-        Key::Up => app.editor.input.up_row(),
-        Key::Down => app.editor.input.down_row(),
-        Key::Tab => app.editor.input.tab(),
-        Key::Backspace => app.editor.input.backspace(),
-        Key::Esc => {
+pub async fn edit_mode_handler(app: &mut App<'_>, key: KeyEvent) -> Result<AppReturn> {
+    // debug!(
+    //     "{} Entered, current row / col: {} / {}",
+    //     key, app.editor.input.current_row, app.editor.input.cursor_column
+    // );
+    match key.code {
+        // KeyCode::Char(c) => match c {
+        //     ';' => {
+        //         let result = app.editor.input.append_char(c);
+        //         app.editor.sql_terminated = true;
+        //         result
+        //     }
+        //     _ => app.editor.input.append_char(c),
+        // },
+        KeyCode::Esc => {
             app.input_mode = InputMode::Normal;
             Ok(AppReturn::Continue)
         }
-        _ => Ok(AppReturn::Continue),
+        _ => {
+            app.editor.input.input(key);
+            Ok(AppReturn::Continue)
+        }
     }
 }

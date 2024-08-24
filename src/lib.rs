@@ -20,25 +20,42 @@ pub mod cli;
 pub mod events;
 pub mod utils;
 
-use std::io;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
+use std::{borrow::Borrow, io};
 
-use app::core::{App, AppReturn};
-use crossterm::{
+use app::editor::Editor;
+use app::{
+    core::{App, AppReturn},
+    error::DftError,
+};
+use cli::args::Args;
+use ratatui::crossterm::{
     event::{DisableMouseCapture, EnableMouseCapture},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
-use tokio::sync::Mutex;
+// use tokio::sync::Mutex;
 
 use crate::app::error::Result;
 use crate::app::ui;
 
 use crate::events::{Event, Events};
 
-pub async fn run_app(app: Arc<Mutex<App>>) -> Result<()> {
+fn draw_app(
+    terminal: &mut Terminal<CrosstermBackend<std::io::Stdout>>,
+    app: &App<'_>,
+) -> Result<()> {
+    terminal.draw(|f| {
+        f.render_widget(app, f.area());
+    })?;
+    Ok(())
+}
+
+pub async fn run_app(args: Args, ed: Editor<'_>) -> Result<()> {
+    // let ed = Editor::default();
+    let mut app = App::new(args, ed);
     enable_raw_mode().unwrap();
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture).unwrap();
@@ -49,21 +66,37 @@ pub async fn run_app(app: Arc<Mutex<App>>) -> Result<()> {
     let events = Events::new(tick_rate);
 
     loop {
-        let mut app = app.lock().await;
-        terminal.draw(|f| ui::draw_ui(f, &app))?;
-        // terminal.draw(|f| ui::draw_ui(f, app.borrow()))?;
-
         let event = events.next().unwrap();
 
-        let result = match event {
-            Event::KeyInput(key) => app.key_handler(key).await,
-            Event::Tick => app.update_on_tick(),
-        };
+        terminal.draw(|f| {
+            let area = f.area();
+            f.render_widget(&app, area);
+        })?;
 
-        if result == AppReturn::Exit {
+        // Ensure the immutable borrow is dropped before we proceed.
+        // Then handle the event (mutable borrow)
+        let result = { app.event_handler(event).await };
+
+        if result? == AppReturn::Exit {
             break;
         }
     }
+
+    // loop {
+    //     let event = events.next().unwrap();
+    //     if let Event::Tick = event {
+    //         terminal.draw(|f| f.render_widget(&app, f.area()))?;
+    //     }
+    //     // draw_app(&mut terminal, &app)?;
+    //     // terminal.draw(|f| ui::draw_ui(f, &app))?;
+    //     // terminal.draw(|f| ui::draw_ui(f, app.borrow()))?;
+    //
+    //     // Handle events
+    //     let result = app.event_handler(event).await?;
+    //     if result == AppReturn::Exit {
+    //         break;
+    //     }
+    // }
 
     disable_raw_mode()?;
     execute!(

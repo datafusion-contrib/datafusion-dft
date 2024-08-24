@@ -17,12 +17,11 @@
 
 mod key;
 
-use crossterm::event::KeyEvent;
 use log::debug;
 
 pub use self::key::Key;
 
-use crossterm::event;
+use ratatui::crossterm::event::{self, KeyEvent};
 use std::time::Duration;
 use std::{sync::mpsc, thread};
 
@@ -34,7 +33,7 @@ pub enum InputEvent {
 }
 
 pub enum Event {
-    KeyInput(Key),
+    KeyInput(KeyEvent),
     Tick,
 }
 
@@ -52,11 +51,12 @@ impl Events {
         thread::spawn(move || {
             loop {
                 // poll for tick rate duration, if no event, sent tick event.
-                if crossterm::event::poll(tick_rate).unwrap() {
+                if ratatui::crossterm::event::poll(tick_rate).unwrap() {
                     if let event::Event::Key(key) = event::read().unwrap() {
                         debug!("Key Event: {:?}", key);
-                        let key = Key::from(key);
-                        event_tx.send(Event::KeyInput(key)).unwrap();
+                        // let key = Key::from(key);
+                        event_tx.send(Event::KeyInput(key));
+                        // event_tx.send(Event::KeyInput(key)).unwrap();
                     }
                 }
                 event_tx.send(Event::Tick).unwrap();

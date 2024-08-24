@@ -72,7 +72,7 @@ impl Context {
     }
 
     /// create a local context using the given config
-    pub async fn new_local(config: &SessionConfig) -> Context {
+    pub fn new_local(config: &SessionConfig) -> Context {
         debug!("Created ExecutionContext");
         let ctx = SessionContext::with_config(config.clone());
 
@@ -233,6 +233,7 @@ impl BallistaContext {
 mod test {
     use crate::app::core::{App, TabItem};
     use crate::app::datafusion::context::{QueryResults, QueryResultsMeta};
+    use crate::app::editor::Editor;
     use crate::app::handlers::execute_query;
     use crate::app::ui::Scroll;
     use crate::cli::args::mock_standard_args;
@@ -262,12 +263,14 @@ mod test {
     #[tokio::test]
     async fn test_select() {
         let args = mock_standard_args();
-        let mut app = App::new(args).await;
+        let ed = Editor::default();
+        let mut app = App::new(args, ed);
 
         let query = "SELECT 1";
-        for char in query.chars() {
-            app.editor.input.append_char(char).unwrap();
-        }
+        app.editor.input.insert_str(query);
+        // for char in query.chars() {
+        //     app.editor.input.append_char(char).unwrap();
+        // }
 
         execute_query(&mut app).await.unwrap();
 
@@ -297,9 +300,10 @@ mod test {
         let mut app = App::new(args).await;
 
         let query = "SELE 1";
-        for char in query.chars() {
-            app.editor.input.append_char(char).unwrap();
-        }
+        app.editor.input.insert_str(query);
+        // for char in query.chars() {
+        //     app.editor.input.append_char(char).unwrap();
+        // }
 
         execute_query(&mut app).await.unwrap();
 
@@ -325,9 +329,10 @@ mod test {
 
         let query = "CREATE TABLE abc AS VALUES (1,2,3)";
 
-        for char in query.chars() {
-            app.editor.input.append_char(char).unwrap();
-        }
+        app.editor.input.insert_str(query);
+        // for char in query.chars() {
+        //     app.editor.input.append_char(char).unwrap();
+        // }
 
         execute_query(&mut app).await.unwrap();
 
@@ -360,9 +365,10 @@ mod test {
         let mut app = App::new(args).await;
 
         let query = "SELECT 1;SELECT 2;";
-        for char in query.chars() {
-            app.editor.input.append_char(char).unwrap();
-        }
+        app.editor.input.insert_str(query);
+        // for char in query.chars() {
+        //     app.editor.input.append_char(char).unwrap();
+        // }
 
         execute_query(&mut app).await.unwrap();
 

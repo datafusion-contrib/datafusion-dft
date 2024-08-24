@@ -19,47 +19,50 @@ use crate::app::core::{App, AppReturn, InputMode, TabItem};
 use crate::app::error::Result;
 use crate::app::handlers::execute_query;
 use crate::app::handlers::logging;
-use crate::events::Key;
 use log::debug;
+use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
-pub async fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
+pub async fn normal_mode_handler<'app>(
+    app: &'app mut App<'app>,
+    key: KeyEvent,
+) -> Result<AppReturn> {
     match app.tab_item {
-        TabItem::Editor => match key {
-            Key::Enter => execute_query(app).await,
-            Key::Char('c') => {
-                app.editor.input.clear()?;
+        TabItem::Editor => match key.code {
+            KeyCode::Enter => execute_query(app).await,
+            KeyCode::Char('c') => {
+                // app.editor.input.clear()?;
                 app.input_mode = InputMode::Editing;
                 Ok(AppReturn::Continue)
             }
-            Key::Char('e') => {
+            KeyCode::Char('e') => {
                 app.input_mode = InputMode::Editing;
                 Ok(AppReturn::Continue)
             }
-            Key::Char('q') => Ok(AppReturn::Exit),
-            Key::Char('r') => {
+            KeyCode::Char('q') => Ok(AppReturn::Exit),
+            KeyCode::Char('r') => {
                 app.input_mode = InputMode::Rc;
                 Ok(AppReturn::Continue)
             }
-            Key::Char(c) => {
+            KeyCode::Char(c) => {
                 if c.is_ascii_digit() {
                     change_tab(c, app)
                 } else {
                     Ok(AppReturn::Continue)
                 }
             }
-            Key::Down => {
+            KeyCode::Down => {
                 if let Some(results) = &mut app.query_results {
                     results.scroll.x += 1
                 }
                 Ok(AppReturn::Continue)
             }
-            Key::PageDown => {
+            KeyCode::PageDown => {
                 if let Some(results) = &mut app.query_results {
                     results.scroll.x += 10
                 }
                 Ok(AppReturn::Continue)
             }
-            Key::Up => {
+            KeyCode::Up => {
                 if let Some(results) = &mut app.query_results {
                     let new_x = match results.scroll.x {
                         0 => 0,
@@ -69,7 +72,7 @@ pub async fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
                 }
                 Ok(AppReturn::Continue)
             }
-            Key::PageUp => {
+            KeyCode::PageUp => {
                 if let Some(results) = &mut app.query_results {
                     let new_x = match results.scroll.x {
                         0 => 0,
@@ -80,13 +83,13 @@ pub async fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
                 Ok(AppReturn::Continue)
             }
 
-            Key::Right => {
+            KeyCode::Right => {
                 if let Some(results) = &mut app.query_results {
                     results.scroll.y += 3
                 }
                 Ok(AppReturn::Continue)
             }
-            Key::Left => {
+            KeyCode::Left => {
                 if let Some(results) = &mut app.query_results {
                     let new_y = match results.scroll.y {
                         0..=2 => 0,
@@ -99,9 +102,9 @@ pub async fn normal_mode_handler(app: &mut App, key: Key) -> Result<AppReturn> {
             _ => Ok(AppReturn::Continue),
         },
         TabItem::Logs => logging::logging_handler(app, key).await,
-        _ => match key {
-            Key::Char('q') => Ok(AppReturn::Exit),
-            Key::Char(c) if c.is_ascii_digit() => change_tab(c, app),
+        _ => match key.code {
+            KeyCode::Char('q') => Ok(AppReturn::Exit),
+            KeyCode::Char(c) if c.is_ascii_digit() => change_tab(c, app),
             _ => Ok(AppReturn::Continue),
         },
     }

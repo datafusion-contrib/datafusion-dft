@@ -17,64 +17,64 @@
 
 use crate::app::core::{App, AppReturn, TabItem};
 use crate::app::error::Result;
-use crate::events::Key;
 use log::debug;
+use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use tui_logger::TuiWidgetEvent;
 
-pub async fn logging_handler(app: &mut App, key: Key) -> Result<AppReturn> {
+pub async fn logging_handler<'app>(app: &'app mut App<'app>, key: KeyEvent) -> Result<AppReturn> {
     match app.tab_item {
-        TabItem::Logs => match key {
-            Key::Char('h') => {
+        TabItem::Logs => match key.code {
+            KeyCode::Char('h') => {
                 app.logs.state.transition(TuiWidgetEvent::HideKey);
                 Ok(AppReturn::Continue)
             }
-            Key::Char('f') => {
+            KeyCode::Char('f') => {
                 app.logs.state.transition(TuiWidgetEvent::FocusKey);
                 Ok(AppReturn::Continue)
             }
-            Key::Char('+') => {
+            KeyCode::Char('+') => {
                 app.logs.state.transition(TuiWidgetEvent::PlusKey);
                 Ok(AppReturn::Continue)
             }
-            Key::Char('-') => {
+            KeyCode::Char('-') => {
                 app.logs.state.transition(TuiWidgetEvent::MinusKey);
                 Ok(AppReturn::Continue)
             }
-            Key::Char('q') => Ok(AppReturn::Exit),
-            Key::Char(' ') => {
+            KeyCode::Char('q') => Ok(AppReturn::Exit),
+            KeyCode::Char(' ') => {
                 app.logs.state.transition(TuiWidgetEvent::SpaceKey);
                 Ok(AppReturn::Continue)
             }
-            Key::Esc => {
+            KeyCode::Esc => {
                 app.logs.state.transition(TuiWidgetEvent::EscapeKey);
                 Ok(AppReturn::Continue)
             }
-            Key::Down => {
+            KeyCode::Down => {
                 app.logs.state.transition(TuiWidgetEvent::DownKey);
                 Ok(AppReturn::Continue)
             }
-            Key::Up => {
+            KeyCode::Up => {
                 app.logs.state.transition(TuiWidgetEvent::UpKey);
                 Ok(AppReturn::Continue)
             }
-            Key::Right => {
+            KeyCode::Right => {
                 app.logs.state.transition(TuiWidgetEvent::RightKey);
                 Ok(AppReturn::Continue)
             }
-            Key::Left => {
+            KeyCode::Left => {
                 app.logs.state.transition(TuiWidgetEvent::LeftKey);
                 Ok(AppReturn::Continue)
             }
-            Key::PageDown => {
+            KeyCode::PageDown => {
                 app.logs.state.transition(TuiWidgetEvent::NextPageKey);
                 Ok(AppReturn::Continue)
             }
 
-            Key::PageUp => {
+            KeyCode::PageUp => {
                 app.logs.state.transition(TuiWidgetEvent::PrevPageKey);
                 Ok(AppReturn::Continue)
             }
-            Key::Char(c) if c.is_ascii_digit() => {
+            KeyCode::Char(c) if c.is_ascii_digit() => {
                 change_tab(c, app)?;
                 Ok(AppReturn::Continue)
             }
