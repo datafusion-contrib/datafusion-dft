@@ -25,53 +25,53 @@ pub async fn logging_handler(app: &mut App, key: Key) -> Result<AppReturn> {
     match app.tab_item {
         TabItem::Logs => match key {
             Key::Char('h') => {
-                app.logs.state.transition(&TuiWidgetEvent::HideKey);
+                app.logs.state.transition(TuiWidgetEvent::HideKey);
                 Ok(AppReturn::Continue)
             }
             Key::Char('f') => {
-                app.logs.state.transition(&TuiWidgetEvent::FocusKey);
+                app.logs.state.transition(TuiWidgetEvent::FocusKey);
                 Ok(AppReturn::Continue)
             }
             Key::Char('+') => {
-                app.logs.state.transition(&TuiWidgetEvent::PlusKey);
+                app.logs.state.transition(TuiWidgetEvent::PlusKey);
                 Ok(AppReturn::Continue)
             }
             Key::Char('-') => {
-                app.logs.state.transition(&TuiWidgetEvent::MinusKey);
+                app.logs.state.transition(TuiWidgetEvent::MinusKey);
                 Ok(AppReturn::Continue)
             }
             Key::Char('q') => Ok(AppReturn::Exit),
             Key::Char(' ') => {
-                app.logs.state.transition(&TuiWidgetEvent::SpaceKey);
+                app.logs.state.transition(TuiWidgetEvent::SpaceKey);
                 Ok(AppReturn::Continue)
             }
             Key::Esc => {
-                app.logs.state.transition(&TuiWidgetEvent::EscapeKey);
+                app.logs.state.transition(TuiWidgetEvent::EscapeKey);
                 Ok(AppReturn::Continue)
             }
             Key::Down => {
-                app.logs.state.transition(&TuiWidgetEvent::DownKey);
+                app.logs.state.transition(TuiWidgetEvent::DownKey);
                 Ok(AppReturn::Continue)
             }
             Key::Up => {
-                app.logs.state.transition(&TuiWidgetEvent::UpKey);
+                app.logs.state.transition(TuiWidgetEvent::UpKey);
                 Ok(AppReturn::Continue)
             }
             Key::Right => {
-                app.logs.state.transition(&TuiWidgetEvent::RightKey);
+                app.logs.state.transition(TuiWidgetEvent::RightKey);
                 Ok(AppReturn::Continue)
             }
             Key::Left => {
-                app.logs.state.transition(&TuiWidgetEvent::LeftKey);
+                app.logs.state.transition(TuiWidgetEvent::LeftKey);
                 Ok(AppReturn::Continue)
             }
             Key::PageDown => {
-                app.logs.state.transition(&TuiWidgetEvent::NextPageKey);
+                app.logs.state.transition(TuiWidgetEvent::NextPageKey);
                 Ok(AppReturn::Continue)
             }
 
             Key::PageUp => {
-                app.logs.state.transition(&TuiWidgetEvent::PrevPageKey);
+                app.logs.state.transition(TuiWidgetEvent::PrevPageKey);
                 Ok(AppReturn::Continue)
             }
             Key::Char(c) if c.is_ascii_digit() => {

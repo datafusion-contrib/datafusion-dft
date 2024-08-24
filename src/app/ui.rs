@@ -16,7 +16,6 @@
 // under the License.
 
 use ratatui::{
-    backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span, Text},
@@ -32,7 +31,7 @@ pub struct Scroll {
     pub y: u16,
 }
 
-pub fn draw_ui<B: Backend>(f: &mut Frame<B>, app: &App) {
+pub fn draw_ui(f: &mut Frame, app: &App) {
     match app.tab_item {
         TabItem::Editor => draw_sql_editor_tab(f, app),
         TabItem::QueryHistory => draw_query_history_tab(f, app),
@@ -41,7 +40,7 @@ pub fn draw_ui<B: Backend>(f: &mut Frame<B>, app: &App) {
     }
 }
 
-fn draw_sql_editor_tab<B: Backend>(f: &mut Frame<B>, app: &App) {
+fn draw_sql_editor_tab(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -54,7 +53,7 @@ fn draw_sql_editor_tab<B: Backend>(f: &mut Frame<B>, app: &App) {
             ]
             .as_ref(),
         )
-        .split(f.size());
+        .split(f.area());
 
     let help_message = draw_sql_editor_help(app);
     f.render_widget(help_message, chunks[0]);
@@ -68,7 +67,7 @@ fn draw_sql_editor_tab<B: Backend>(f: &mut Frame<B>, app: &App) {
     f.render_widget(query_results, chunks[3]);
 }
 
-fn draw_query_history_tab<B: Backend>(f: &mut Frame<B>, app: &App) {
+fn draw_query_history_tab(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -80,7 +79,7 @@ fn draw_query_history_tab<B: Backend>(f: &mut Frame<B>, app: &App) {
             ]
             .as_ref(),
         )
-        .split(f.size());
+        .split(f.area());
 
     let help_message = draw_default_help();
     f.render_widget(help_message, chunks[0]);
@@ -91,7 +90,7 @@ fn draw_query_history_tab<B: Backend>(f: &mut Frame<B>, app: &App) {
     f.render_widget(query_history, chunks[2])
 }
 
-fn draw_context_tab<B: Backend>(f: &mut Frame<B>, app: &App) {
+fn draw_context_tab(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -103,7 +102,7 @@ fn draw_context_tab<B: Backend>(f: &mut Frame<B>, app: &App) {
             ]
             .as_ref(),
         )
-        .split(f.size());
+        .split(f.area());
 
     let help_message = draw_default_help();
     f.render_widget(help_message, chunks[0]);
@@ -114,7 +113,7 @@ fn draw_context_tab<B: Backend>(f: &mut Frame<B>, app: &App) {
     draw_context(f, app, chunks[2]);
 }
 
-fn draw_logs_tab<B: Backend>(f: &mut Frame<B>, app: &App) {
+fn draw_logs_tab(f: &mut Frame, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .margin(2)
@@ -126,7 +125,7 @@ fn draw_logs_tab<B: Backend>(f: &mut Frame<B>, app: &App) {
             ]
             .as_ref(),
         )
-        .split(f.size());
+        .split(f.area());
 
     let help_message = draw_default_help();
     f.render_widget(help_message, chunks[0]);
@@ -180,8 +179,7 @@ fn draw_sql_editor_help<'screen>(app: &App) -> Paragraph<'screen> {
             Style::default(),
         ),
     };
-    let mut text = Text::from(Line::from(msg));
-    text.patch_style(style);
+    let text = Text::from(Line::from(msg)).patch_style(style);
     Paragraph::new(text)
 }
 
@@ -196,8 +194,7 @@ fn draw_default_help<'screen>() -> Paragraph<'screen> {
         ],
         Style::default().add_modifier(Modifier::RAPID_BLINK),
     );
-    let mut text = Text::from(Line::from(msg));
-    text.patch_style(style);
+    let text = Text::from(Line::from(msg)).patch_style(style);
     Paragraph::new(text)
 }
 
@@ -210,7 +207,7 @@ fn draw_editor<'screen>(app: &App) -> Paragraph<'screen> {
         .block(Block::default().borders(Borders::ALL).title("SQL Editor"))
 }
 
-fn draw_cursor<B: Backend>(app: &App, f: &mut Frame<B>, chunks: &[Rect]) {
+fn draw_cursor(app: &App, f: &mut Frame, chunks: &[Rect]) {
     if let InputMode::Editing = app.input_mode {
         // Make the cursor visible and ask tui-rs to put it at the specified coordinates after rendering
         f.set_cursor(
@@ -259,7 +256,7 @@ fn draw_query_results(app: &App) -> Paragraph {
 }
 
 fn draw_tabs<'screen>(app: &App) -> Tabs<'screen> {
-    let titles = TabItem::all_values()
+    let titles: Vec<_> = TabItem::all_values()
         .iter()
         .map(|tab| tab.title_with_key())
         .map(|t| Line::from(vec![Span::styled(t, Style::default())]))
@@ -314,7 +311,7 @@ fn draw_logs(app: &App) -> TuiLoggerSmartWidget {
         .state(&app.logs.state)
 }
 
-fn draw_context<B: Backend>(f: &mut Frame<B>, app: &App, area: Rect) {
+fn draw_context(f: &mut Frame, app: &App, area: Rect) {
     let context = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
