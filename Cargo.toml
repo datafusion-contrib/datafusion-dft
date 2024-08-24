@@ -1,48 +1,35 @@
 [package]
-edition = "2021"
-name = "datafusion-tui"
-description = "Terminal based, extensible, interactive data analysis tool using SQL "
+name = "dft"
 version = "0.1.0"
-homepage = "https://github.com/datafusion-contrib/datafusion-tui"
-repository = "https://github.com/datafusion-contrib/datafusion-tui"
-readme = "README.md"
-authors = ["Matthew Turner <matthew.m.turner@outlook.com>"]
-license = "Apache-2.0"
-keywords = ["arrow", "query", "sql", "datafusion"]
+edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+async-trait = "0.1.80"
+clap = { version = "4.5.1", features = ["derive"] }
+color-eyre = "0.6.3"
+crossterm = { version = "0.27.0", features = ["event-stream"] }
+# datafusion = { path = "/Users/matth/OpenSource/arrow-datafusion/datafusion/core"}
+datafusion = "40.0.0"
+directories = "5.0.1"
+futures = "0.3.30"
+futures-util = "0.3.30"
+itertools = "0.13.0"
+lazy_static = "1.4.0"
+open = "5.1.4"
+ratatui = "0.27.0"
+serde = { version = "1.0.197", features = ["derive"] }
+strum = "0.26.2"
+tokio = { version = "1.36.0", features = ["rt-multi-thread", "macros"] }
+tokio-stream = "0.1.15"
+tokio-util = "0.7.10"
+toml = "0.8.12"
+tracing = { version = "0.1.40", features = ["log"] }
+tracing-error = "0.2.0"
+tracing-subscriber = {version = "0.3.18", features = ["env-filter"] }
+tui-logger = "0.12"
+tui-textarea = "0.5.3"
 
-arrow = "13"
-aws-sdk-s3 = "0.9.0"
-aws-types = "0.9.0"
-ballista = { version = "0.7", optional = true }
-clap = { version = "3", features = ["derive", "cargo"] }
-crossterm = { version = "0.23", features = ["serde"] }
-datafusion = "8"
-datafusion-catalogprovider-glue = { version = "0.1.7", optional = true }
-datafusion-objectstore-s3 = { version = "0.2.1", optional = true }
-dirs = "4.0"
-futures = "0.3"
-http = "0.2.6"
-log = "0.4"
-mimalloc = { version = "0.1", default-features = false }
-serde = "1.0.136"
-serde_json = "1.0.79"
-ratatui = { version = "0.28", default-features = false, features = [
-    'crossterm',
-    'serde',
-] }
-tui-logger = {version="0.12", features=["crossterm"]}
-tokio = { version = "1", features = ["full"] }
-unicode-width = "0.1.9"
-tui-textarea = "0.6.1"
-
-[features]
-s3 = ["datafusion-objectstore-s3"]
-glue = ["datafusion-catalogprovider-glue"]
-
-[[bin]]
-name = "dft"
-path = "src/main.rs"
+[lints.clippy]
+clone_on_ref_ptr = "deny"

@@ -1,110 +1,109 @@
-// Licensed to the Apache Software Foundation (ASF) under one
-// or more contributor license agreements.  See the NOTICE file
-// distributed with this work for additional information
-// regarding copyright ownership.  The ASF licenses this file
-// to you under the Apache License, Version 2.0 (the
-// "License"); you may not use this file except in compliance
-// with the License.  You may obtain a copy of the License at
-//
-//   http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing,
-// software distributed under the License is distributed on an
-// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-// KIND, either express or implied.  See the License for the
-// specific language governing permissions and limitations
-// under the License.
+use color_eyre::{eyre::eyre, Result};
+use crossterm::event::{self, KeyCode, KeyEvent, KeyModifiers};
+use datafusion::physical_plan::execute_stream;
+use tracing::{debug, error, info};
 
-pub mod edit;
-pub mod logging;
-pub mod normal;
-pub mod rc;
+use crate::{app::AppEvent, ui::SelectedTab};
 
-use arrow::util::pretty::pretty_format_batches;
-use datafusion::error::DataFusionError;
-use datafusion::prelude::DataFrame;
-use log::{debug, error};
-use ratatui::crossterm::event::KeyEvent;
-use std::sync::Arc;
-use std::time::Instant;
+use super::App;
 
-use crate::app::core::{App, AppReturn, InputMode};
-use crate::app::datafusion::context::{QueryResults, QueryResultsMeta};
-use crate::app::error::{DftError, Result};
-use crate::app::ui::Scroll;
-use crate::events::Key;
-
-pub async fn key_event_handler<'app>(app: &'app mut App<'app>, key: KeyEvent) -> Result<AppReturn> {
-    match app.input_mode {
-        InputMode::Normal => normal::normal_mode_handler(app, key).await,
-        InputMode::Editing => edit::edit_mode_handler(app, key).await,
-        InputMode::Rc => rc::rc_mode_handler(app, key).await,
-    }
-}
-
-pub async fn execute_query(app: &mut App<'_>) -> Result<AppReturn> {
-    let sql: String = app.editor.input.lines().join("\n");
-    handle_queries(app, sql).await?;
-    Ok(AppReturn::Continue)
-}
-
-async fn handle_queries(app: &mut App<'_>, sql: String) -> Result<()> {
-    let start = Instant::now();
-    let queries = sql.split(';');
-    for query in queries {
-        if !query.is_empty() {
-            let df = app.context.sql(query).await;
-            match df {
-                Ok(df) => handle_successful_query(app, start, query.to_string(), df).await?,
-                Err(err) => {
-                    handle_failed_query(app, query.to_string(), err)?;
-                    break;
-                }
-            };
+pub fn crossterm_event_handler(event: event::Event) -> Option<AppEvent> {
+    debug!("crossterm::event: {:?}", event);
+    match event {
+        event::Event::Key(key) => {
+            if key.kind == event::KeyEventKind::Press {
+                Some(AppEvent::Key(key))
+            } else {
+                None
+            }
         }
+        _ => None,
     }
-    Ok(())
 }
 
-async fn handle_successful_query(
-    app: &mut App<'_>,
-    start: Instant,
-    sql: String,
-    df: Arc<DataFrame>,
-) -> Result<()> {
-    debug!("Successfully executed query");
-    let batches = df.collect().await.map_err(DftError::DataFusionError)?;
-    let query_duration = start.elapsed().as_secs_f64();
-    let rows: usize = batches.iter().map(|b| b.num_rows()).sum();
-    let query_meta = QueryResultsMeta {
-        query: sql,
-        succeeded: true,
-        error: None,
-        rows,
-        query_duration,
+fn tab_navigation_handler(app: &mut App, key: KeyCode) {
+    match key {
+        KeyCode::Char('e') => app.state.tabs.selected = SelectedTab::Explore,
+        _ => {}
     };
-    app.editor.history.push(query_meta.clone());
-    let pretty_batches = pretty_format_batches(&batches).unwrap().to_string();
-    app.query_results = Some(QueryResults {
-        batches,
-        pretty_batches,
-        meta: query_meta,
-        scroll: Scroll { x: 0, y: 0 },
-    });
-    Ok(())
 }
 
-fn handle_failed_query(app: &mut App, sql: String, error: DataFusionError) -> Result<()> {
-    error!("{}", error);
-    let err_msg = format!("{}", error);
-    app.query_results = None;
-    let query_meta = QueryResultsMeta {
-        query: sql,
-        succeeded: false,
-        error: Some(err_msg),
-        rows: 0,
-        query_duration: 0.0,
+fn explore_tab_normal_mode_handler(app: &mut App, key: KeyEvent) {
+    match key.code {
+        KeyCode::Char('q') => app.state.should_quit = true,
+        KeyCode::Char('i') => app.state.explore_tab.edit(),
+        tab @ (KeyCode::Char('p') | KeyCode::Char('t') | KeyCode::Char('e')) => {
+            tab_navigation_handler(app, tab)
+        }
+        KeyCode::Enter => {
+            info!("Run query");
+            let query = app.state.explore_tab.editor().lines().join("");
+            info!("Query: {}", query);
+            let ctx = app.execution.session_ctx.clone();
+            let _event_tx = app.app_event_tx.clone();
+            // TODO: Maybe this should be on a separate runtime to prevent blocking main thread /
+            // runtime
+            tokio::spawn(async move {
+                if let Ok(df) = ctx.sql(&query).await {
+                    if let Ok(res) = df.collect().await.map_err(|e| eyre!(e)) {
+                        info!("Results: {:?}", res);
+                        let _ = _event_tx.send(AppEvent::ExploreQueryResult(res));
+                    }
+                } else {
+                    error!("Error creating dataframe")
+                }
+            });
+        }
+        _ => {}
+    }
+}
+
+fn explore_tab_editable_handler(app: &mut App, key: KeyEvent) {
+    info!("KeyEvent: {:?}", key);
+    match (key.code, key.modifiers) {
+        (KeyCode::Esc, _) => app.state.explore_tab.exit_edit(),
+        (KeyCode::Enter, KeyModifiers::CONTROL) => {
+            let query = app.state.explore_tab.editor().lines().join("");
+            let ctx = app.execution.session_ctx.clone();
+            let _event_tx = app.app_event_tx.clone();
+            // TODO: Maybe this should be on a separate runtime to prevent blocking main thread /
+            // runtime
+            tokio::spawn(async move {
+                // TODO: Turn this into a match and return the error somehow
+                if let Ok(df) = ctx.sql(&query).await {
+                    if let Ok(res) = df.collect().await.map_err(|e| eyre!(e)) {
+                        info!("Results: {:?}", res);
+                        let _ = _event_tx.send(AppEvent::ExploreQueryResult(res));
+                    }
+                } else {
+                    error!("Error creating dataframe")
+                }
+            });
+        }
+        _ => app.state.explore_tab.update_editor_content(key),
+    }
+}
+
+fn explore_tab_app_event_handler(app: &mut App, event: AppEvent) {
+    match event {
+        AppEvent::Key(key) => match app.state.explore_tab.is_editable() {
+            true => explore_tab_editable_handler(app, key),
+            false => explore_tab_normal_mode_handler(app, key),
+        },
+        AppEvent::ExploreQueryResult(r) => app.state.explore_tab.set_query_results(r),
+        AppEvent::Tick => {}
+        AppEvent::Error => {}
+        _ => {}
     };
-    app.editor.history.push(query_meta);
+}
+
+pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
+    let now = std::time::Instant::now();
+    //TODO: Create event to action
+    debug!("Tui::Event: {:?}", event);
+    match app.state.tabs.selected {
+        SelectedTab::Explore => explore_tab_app_event_handler(app, event),
+    };
+    debug!("Event handling took: {:?}", now.elapsed());
     Ok(())
 }
