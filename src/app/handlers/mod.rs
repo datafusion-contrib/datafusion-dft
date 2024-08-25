@@ -246,7 +246,7 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
     let now = std::time::Instant::now();
     trace!("Tui::Event: {:?}", event);
     if let AppEvent::ExecuteDDL(ddl) = event {
-        let queries: Vec<String> = ddl.split(";").map(|s| s.to_string()).collect();
+        let queries: Vec<String> = ddl.split(';').map(|s| s.to_string()).collect();
         queries.into_iter().for_each(|q| {
             let ctx = app.execution.session_ctx.clone();
             tokio::spawn(async move {
