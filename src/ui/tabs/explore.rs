@@ -15,6 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use std::borrow::BorrowMut;
+
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -43,7 +45,7 @@ pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
 pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
     let block = Block::default().title(" Results ").borders(Borders::ALL);
     if let Some(q) = app.state.explore_tab.query() {
-        if let Some(mut s) = app.state.explore_tab.query_results_state_clone() {
+        if let Some(s) = app.state.explore_tab.query_results_state() {
             if let Some(r) = q.results() {
                 let block = block
                     .title_bottom(format!(
@@ -55,6 +57,7 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
                 let table = record_batches_to_table(r)
                     .highlight_style(Style::default().bg(tailwind::WHITE).fg(tailwind::BLACK))
                     .block(block);
+                let mut s = s.borrow_mut();
                 StatefulWidget::render(table, area, buf, &mut s);
             }
         }

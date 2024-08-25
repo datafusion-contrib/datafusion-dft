@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use core::cell::RefCell;
 use std::time::Duration;
 
 use datafusion::arrow::array::RecordBatch;
@@ -92,7 +93,7 @@ pub struct ExploreTabState<'app> {
     editor_editable: bool,
     query: Option<Query>,
     query_results: Option<Vec<RecordBatch>>,
-    query_results_state: Option<TableState>,
+    query_results_state: Option<RefCell<TableState>>,
     query_error: Option<String>,
 }
 
@@ -112,16 +113,12 @@ impl<'app> ExploreTabState<'app> {
         }
     }
 
-    pub fn query_results_state_clone(&self) -> Option<TableState> {
-        self.query_results_state.clone()
-    }
-
-    pub fn query_results_state_mut(&mut self) -> &mut Option<TableState> {
-        &mut self.query_results_state
+    pub fn query_results_state(&self) -> &Option<RefCell<TableState>> {
+        &self.query_results_state
     }
 
     pub fn refresh_query_results_state(&mut self) {
-        self.query_results_state = Some(TableState::default());
+        self.query_results_state = Some(RefCell::new(TableState::default()));
     }
 
     pub fn query_error(&self) -> &Option<String> {

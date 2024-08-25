@@ -28,9 +28,6 @@ use super::config::DataFusionConfig;
 pub struct ExecutionContext {
     pub session_ctx: SessionContext,
     pub config: DataFusionConfig,
-    /// Sends WSMessages to DataFusion.  We have a separate sender for this, rather than piggy
-    /// backing on `app_event_tx` because we are only concerned about `WSMessage` and not other
-    /// `AppEvent`'s.
     pub cancellation_token: CancellationToken,
 }
 

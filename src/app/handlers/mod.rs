@@ -68,14 +68,16 @@ fn explore_tab_normal_mode_handler(app: &mut App, key: KeyEvent) {
             app.state.explore_tab.edit();
         }
         KeyCode::Down => {
-            if let Some(s) = app.state.explore_tab.query_results_state_mut() {
+            if let Some(s) = app.state.explore_tab.query_results_state() {
                 info!("Select next");
+                let mut s = s.borrow_mut();
                 s.select_next();
             }
         }
         KeyCode::Up => {
-            if let Some(s) = app.state.explore_tab.query_results_state_mut() {
+            if let Some(s) = app.state.explore_tab.query_results_state() {
                 info!("Select previous");
+                let mut s = s.borrow_mut();
                 s.select_previous();
             }
         }
