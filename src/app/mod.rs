@@ -3,8 +3,6 @@ pub mod execution;
 pub mod handlers;
 pub mod state;
 
-use std::path::PathBuf;
-
 use crate::cli::DftCli;
 use crate::{cli, ui};
 use color_eyre::eyre::eyre;

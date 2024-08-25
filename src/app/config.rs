@@ -66,11 +66,11 @@ pub struct DisplayConfig {
 }
 
 fn default_tick_rate() -> f64 {
-    5.0
+    60.0
 }
 
 fn default_frame_rate() -> f64 {
-    5.0
+    60.0
 }
 
 impl Default for DisplayConfig {
