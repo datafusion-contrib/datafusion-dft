@@ -4,10 +4,10 @@ use crate::app::config::get_data_dir;
 use crate::app::state::tabs::explore::ExploreTabState;
 use crate::cli;
 use crate::ui::SelectedTab;
-use std::fs::File;
-use std::io::Read;
+use log::{debug, error, info};
 use std::path::PathBuf;
-use tracing::{debug, error, info, instrument};
+
+use self::tabs::logs::LogsTabState;
 
 use super::config::AppConfig;
 
@@ -30,10 +30,10 @@ pub struct AppState<'app> {
     pub should_quit: bool,
     pub data_dir: PathBuf,
     pub explore_tab: ExploreTabState<'app>,
+    pub logs_tab: LogsTabState,
     pub tabs: Tabs,
 }
 
-#[instrument]
 pub fn initialize(args: &cli::DftCli) -> AppState {
     debug!("Initializing state");
     let data_dir = get_data_dir();
@@ -65,12 +65,14 @@ pub fn initialize(args: &cli::DftCli) -> AppState {
     let tabs = Tabs::default();
 
     let explore_tab_state = ExploreTabState::new();
+    let logs_tab_state = LogsTabState::default();
 
     AppState {
         config,
         data_dir,
         tabs,
         explore_tab: explore_tab_state,
+        logs_tab: logs_tab_state,
         should_quit: false,
     }
 }

@@ -1,14 +1,8 @@
-use std::sync::Arc;
-
 use color_eyre::eyre::Result;
-use datafusion::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use datafusion::arrow::util::pretty::pretty_format_batches;
-use datafusion::common::Constraints;
-use datafusion::datasource::stream::{StreamConfig, StreamTable};
 use datafusion::execution::TaskContext;
 use datafusion::physical_plan::execute_stream;
 use datafusion::prelude::*;
-use tokio::sync::broadcast::{self, Sender};
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 

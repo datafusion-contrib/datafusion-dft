@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
 use directories::{ProjectDirs, UserDirs};
 use lazy_static::lazy_static;
@@ -114,8 +114,4 @@ fn default_mouse() -> bool {
 
 fn default_paste() -> bool {
     false
-}
-
-fn default_fetch_limit() -> usize {
-    100_usize
 }

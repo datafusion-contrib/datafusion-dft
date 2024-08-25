@@ -11,6 +11,7 @@ use crossterm::event as ct;
 use datafusion::arrow::array::RecordBatch;
 use futures::FutureExt;
 use futures_util::StreamExt;
+use log::{debug, error, info, trace};
 use ratatui::backend::CrosstermBackend;
 use ratatui::crossterm::{
     self, cursor, event,
@@ -21,7 +22,6 @@ use strum::IntoEnumIterator;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info};
 
 use self::execution::ExecutionContext;
 use self::handlers::{app_event_handler, crossterm_event_handler};
@@ -42,6 +42,7 @@ pub enum AppEvent {
     Resize(u16, u16),
     ExecuteDDL(String),
     ExploreQueryResult(Vec<RecordBatch>),
+    ExploreQueryError(String),
 }
 
 pub struct App<'app> {
@@ -105,7 +106,7 @@ impl<'app> App<'app> {
                 self.task.abort();
             }
             if counter > 100 {
-                tracing::error!("Failed to abort task in 100 milliseconds for unknown reason");
+                error!("Failed to abort task in 100 milliseconds for unknown reason");
                 break;
             }
         }
@@ -142,7 +143,7 @@ impl<'app> App<'app> {
         // TODO: Can maybe make tx optional, add a self param, and get tx from self
         let res = tx.send(app_event);
         match res {
-            Ok(_) => debug!("App event sent"),
+            Ok(_) => trace!("App event sent"),
             Err(err) => error!("Error sending app event: {}", err),
         };
     }
@@ -277,7 +278,7 @@ pub async fn run_app(cli: cli::DftCli, state: state::AppState<'_>) -> Result<()>
                 let event = app.next().await?;
 
                 if let AppEvent::Render = event.clone() {
-                    terminal.draw(|f| f.render_widget(&app, f.size()))?;
+                    terminal.draw(|f| f.render_widget(&app, f.area()))?;
                 };
 
                 app.handle_app_event(event)?;

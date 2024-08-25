@@ -1,7 +1,7 @@
 use color_eyre::{eyre::eyre, Result};
-use datafusion::physical_plan::execute_stream;
+use log::{debug, error, info, trace};
 use ratatui::crossterm::event::{self, KeyCode, KeyEvent, KeyModifiers};
-use tracing::{debug, error, info};
+use tui_logger::TuiWidgetEvent;
 
 use crate::{app::AppEvent, ui::SelectedTab};
 
@@ -41,8 +41,6 @@ fn explore_tab_normal_mode_handler(app: &mut App, key: KeyEvent) {
             if content == default {
                 info!("Clearing default content");
                 app.state.explore_tab.clear_placeholder();
-                // editor.move_cursor(tui_textarea::CursorMove::Jump(0, 0));
-                // editor.delete_str(default.len());
             }
             app.state.explore_tab.edit();
         }
@@ -56,14 +54,30 @@ fn explore_tab_normal_mode_handler(app: &mut App, key: KeyEvent) {
             // TODO: Maybe this should be on a separate runtime to prevent blocking main thread /
             // runtime
             tokio::spawn(async move {
-                if let Ok(df) = ctx.sql(&query).await {
-                    if let Ok(res) = df.collect().await.map_err(|e| eyre!(e)) {
-                        info!("Results: {:?}", res);
-                        let _ = _event_tx.send(AppEvent::ExploreQueryResult(res));
+                match ctx.sql(&query).await {
+                    Ok(df) => match df.collect().await {
+                        Ok(res) => {
+                            info!("Results: {:?}", res);
+                            let _ = _event_tx.send(AppEvent::ExploreQueryResult(res));
+                        }
+                        Err(e) => {
+                            error!("Error collecting results: {:?}", e);
+                            let _ = _event_tx.send(AppEvent::ExploreQueryError(e.to_string()));
+                        }
+                    },
+                    Err(e) => {
+                        error!("Error creating dataframe: {:?}", e);
+                        let _ = _event_tx.send(AppEvent::ExploreQueryError(e.to_string()));
                     }
-                } else {
-                    error!("Error creating dataframe")
                 }
+                // if let Ok(df) = ctx.sql(&query).await {
+                //     if let Ok(res) = df.collect().await.map_err(|e| eyre!(e)) {
+                //         info!("Results: {:?}", res);
+                //         let _ = _event_tx.send(AppEvent::ExploreQueryResult(res));
+                //     }
+                // } else {
+                //     error!("Error creating dataframe")
+                // }
             });
         }
         _ => {}
@@ -109,12 +123,56 @@ fn explore_tab_app_event_handler(app: &mut App, event: AppEvent) {
     };
 }
 
+fn logs_tab_key_event_handler(app: &mut App, key: KeyEvent) {
+    match key.code {
+        KeyCode::Char('h') => {
+            app.state.logs_tab.transition(TuiWidgetEvent::HideKey);
+        }
+        KeyCode::Char('f') => {
+            app.state.logs_tab.transition(TuiWidgetEvent::FocusKey);
+        }
+        KeyCode::Char('+') => {
+            app.state.logs_tab.transition(TuiWidgetEvent::PlusKey);
+        }
+        KeyCode::Char('-') => {
+            app.state.logs_tab.transition(TuiWidgetEvent::MinusKey);
+        }
+        KeyCode::Char('q') => app.state.should_quit = true,
+        KeyCode::Char(' ') => {
+            app.state.logs_tab.transition(TuiWidgetEvent::SpaceKey);
+        }
+        KeyCode::Esc => {
+            app.state.logs_tab.transition(TuiWidgetEvent::EscapeKey);
+        }
+        KeyCode::Down => {
+            app.state.logs_tab.transition(TuiWidgetEvent::DownKey);
+        }
+        KeyCode::Up => {
+            app.state.logs_tab.transition(TuiWidgetEvent::UpKey);
+        }
+        KeyCode::Right => {
+            app.state.logs_tab.transition(TuiWidgetEvent::RightKey);
+        }
+        KeyCode::Left => {
+            app.state.logs_tab.transition(TuiWidgetEvent::LeftKey);
+        }
+        KeyCode::PageDown => {
+            app.state.logs_tab.transition(TuiWidgetEvent::NextPageKey);
+        }
+
+        KeyCode::PageUp => {
+            app.state.logs_tab.transition(TuiWidgetEvent::PrevPageKey);
+        }
+        KeyCode::Char('e') => {
+            app.state.tabs.selected = SelectedTab::Queries;
+        }
+        _ => {}
+    }
+}
+
 fn logs_tab_app_event_handler(app: &mut App, event: AppEvent) {
     match event {
-        AppEvent::Key(key) => match app.state.explore_tab.is_editable() {
-            true => explore_tab_editable_handler(app, key),
-            false => explore_tab_normal_mode_handler(app, key),
-        },
+        AppEvent::Key(key) => logs_tab_key_event_handler(app, key),
         AppEvent::ExploreQueryResult(r) => app.state.explore_tab.set_query_results(r),
         AppEvent::Tick => {}
         AppEvent::Error => {}
@@ -125,7 +183,7 @@ fn logs_tab_app_event_handler(app: &mut App, event: AppEvent) {
 pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
     let now = std::time::Instant::now();
     //TODO: Create event to action
-    debug!("Tui::Event: {:?}", event);
+    trace!("Tui::Event: {:?}", event);
     if let AppEvent::ExecuteDDL(ddl) = event {
         let queries: Vec<String> = ddl.split(";").map(|s| s.to_string()).collect();
         queries.into_iter().for_each(|q| {
@@ -144,6 +202,6 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
             SelectedTab::Logs => logs_tab_app_event_handler(app, event),
         };
     }
-    debug!("Event handling took: {:?}", now.elapsed());
+    trace!("Event handling took: {:?}", now.elapsed());
     Ok(())
 }
