@@ -15,12 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use std::time::{Duration, Instant};
+
 use color_eyre::{eyre::eyre, Result};
 use log::{debug, error, info, trace};
 use ratatui::crossterm::event::{self, KeyCode, KeyEvent, KeyModifiers};
 use tui_logger::TuiWidgetEvent;
 
-use crate::{app::AppEvent, ui::SelectedTab};
+use crate::{
+    app::{state::tabs::explore::Query, AppEvent},
+    ui::SelectedTab,
+};
 
 use super::App;
 
@@ -78,29 +83,43 @@ fn explore_tab_normal_mode_handler(app: &mut App, key: KeyEvent) {
         tab @ (KeyCode::Char('s') | KeyCode::Char('l')) => tab_navigation_handler(app, tab),
         KeyCode::Enter => {
             info!("Run query");
-            let query = app.state.explore_tab.editor().lines().join("");
-            info!("Query: {}", query);
+            let sql = app.state.explore_tab.editor().lines().join("");
+            info!("SQL: {}", sql);
+            let mut query = Query::new(sql.clone(), None, None, None, Duration::default());
             let ctx = app.execution.session_ctx.clone();
             let _event_tx = app.app_event_tx.clone();
             // TODO: Maybe this should be on a separate runtime to prevent blocking main thread /
             // runtime
             tokio::spawn(async move {
-                match ctx.sql(&query).await {
+                let start = std::time::Instant::now();
+                match ctx.sql(&sql).await {
                     Ok(df) => match df.collect().await {
                         Ok(res) => {
-                            info!("Results: {:?}", res);
-                            let _ = _event_tx.send(AppEvent::ExploreQueryResult(res));
+                            let elapsed = start.elapsed();
+                            let rows: usize = res.iter().map(|r| r.num_rows()).sum();
+                            query.set_results(Some(res));
+                            query.set_num_rows(Some(rows));
+                            query.set_elapsed_time(elapsed);
+                            // let query = Query::new(sql, Some(res), Some(rows), None, elapsed);
+                            // let _ = _event_tx.send(AppEvent::ExploreQueryResult(res));
                         }
                         Err(e) => {
                             error!("Error collecting results: {:?}", e);
+                            let elapsed = start.elapsed();
+                            query.set_error(Some(e.to_string()));
+                            query.set_elapsed_time(elapsed);
                             let _ = _event_tx.send(AppEvent::ExploreQueryError(e.to_string()));
                         }
                     },
                     Err(e) => {
                         error!("Error creating dataframe: {:?}", e);
+                        let elapsed = start.elapsed();
+                        query.set_error(Some(e.to_string()));
+                        query.set_elapsed_time(elapsed);
                         let _ = _event_tx.send(AppEvent::ExploreQueryError(e.to_string()));
                     }
                 }
+                let _ = _event_tx.send(AppEvent::ExploreQueryResult(query));
                 // if let Ok(df) = ctx.sql(&query).await {
                 //     if let Ok(res) = df.collect().await.map_err(|e| eyre!(e)) {
                 //         info!("Results: {:?}", res);
@@ -127,10 +146,13 @@ fn explore_tab_editable_handler(app: &mut App, key: KeyEvent) {
             // runtime
             tokio::spawn(async move {
                 // TODO: Turn this into a match and return the error somehow
+                let start = Instant::now();
                 if let Ok(df) = ctx.sql(&query).await {
                     if let Ok(res) = df.collect().await.map_err(|e| eyre!(e)) {
                         info!("Results: {:?}", res);
-                        let _ = _event_tx.send(AppEvent::ExploreQueryResult(res));
+                        let elapsed = start.elapsed();
+                        let query = Query::new(query, Some(res), None, None, elapsed);
+                        let _ = _event_tx.send(AppEvent::ExploreQueryResult(query));
                     }
                 } else {
                     error!("Error creating dataframe")
@@ -148,7 +170,7 @@ fn explore_tab_app_event_handler(app: &mut App, event: AppEvent) {
             false => explore_tab_normal_mode_handler(app, key),
         },
         AppEvent::ExploreQueryResult(r) => {
-            app.state.explore_tab.set_query_results(r);
+            app.state.explore_tab.set_query(r);
             app.state.explore_tab.refresh_query_results_state();
         }
         AppEvent::Tick => {}
@@ -208,7 +230,7 @@ fn logs_tab_app_event_handler(app: &mut App, event: AppEvent) {
     match event {
         AppEvent::Key(key) => logs_tab_key_event_handler(app, key),
         AppEvent::ExploreQueryResult(r) => {
-            app.state.explore_tab.set_query_results(r);
+            app.state.explore_tab.set_query(r);
             app.state.explore_tab.refresh_query_results_state();
         }
         AppEvent::Tick => {}

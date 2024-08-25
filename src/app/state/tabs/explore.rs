@@ -15,16 +15,82 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use std::time::Duration;
+
 use datafusion::arrow::array::RecordBatch;
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::{palette::tailwind, Style};
 use ratatui::widgets::TableState;
 use tui_textarea::TextArea;
 
+#[derive(Clone, Debug)]
+pub struct Query {
+    sql: String,
+    results: Option<Vec<RecordBatch>>,
+    num_rows: Option<usize>,
+    error: Option<String>,
+    elapsed_time: Duration,
+}
+
+impl Query {
+    pub fn new(
+        sql: String,
+        results: Option<Vec<RecordBatch>>,
+        num_rows: Option<usize>,
+        error: Option<String>,
+        elapsed_time: Duration,
+    ) -> Self {
+        Self {
+            sql,
+            results,
+            num_rows,
+            error,
+            elapsed_time,
+        }
+    }
+
+    pub fn sql(&self) -> &String {
+        &self.sql
+    }
+
+    pub fn set_results(&mut self, results: Option<Vec<RecordBatch>>) {
+        self.results = results;
+    }
+
+    pub fn results(&self) -> &Option<Vec<RecordBatch>> {
+        &self.results
+    }
+
+    pub fn set_num_rows(&mut self, num_rows: Option<usize>) {
+        self.num_rows = num_rows;
+    }
+
+    pub fn num_rows(&self) -> &Option<usize> {
+        &self.num_rows
+    }
+
+    pub fn set_error(&mut self, error: Option<String>) {
+        self.error = error;
+    }
+
+    pub fn error(&self) -> &Option<String> {
+        &self.error
+    }
+
+    pub fn set_elapsed_time(&mut self, elapsed_time: Duration) {
+        self.elapsed_time = elapsed_time;
+    }
+
+    pub fn elapsed_time(&self) -> Duration {
+        self.elapsed_time
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct ExploreTabState<'app> {
     editor: TextArea<'app>,
     editor_editable: bool,
+    query: Option<Query>,
     query_results: Option<Vec<RecordBatch>>,
     query_results_state: Option<TableState>,
     query_error: Option<String>,
@@ -39,6 +105,7 @@ impl<'app> ExploreTabState<'app> {
         Self {
             editor: textarea,
             editor_editable: false,
+            query: None,
             query_results: None,
             query_results_state: None,
             query_error: None,
@@ -100,6 +167,14 @@ impl<'app> ExploreTabState<'app> {
 
     pub fn editor_editable(&self) -> bool {
         self.editor_editable
+    }
+
+    pub fn set_query(&mut self, query: Query) {
+        self.query = Some(query);
+    }
+
+    pub fn query(&self) -> &Option<Query> {
+        &self.query
     }
 
     pub fn set_query_results(&mut self, query_results: Vec<RecordBatch>) {

@@ -42,11 +42,21 @@ pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
 
 pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
     let block = Block::default().title(" Results ").borders(Borders::ALL);
-    if let Some(r) = app.state.explore_tab.query_results() {
+    if let Some(q) = app.state.explore_tab.query() {
         if let Some(mut s) = app.state.explore_tab.query_results_state_clone() {
-            let table = record_batches_to_table(r)
-                .highlight_style(Style::default().bg(tailwind::WHITE).fg(tailwind::BLACK));
-            StatefulWidget::render(table, area, buf, &mut s);
+            if let Some(r) = q.results() {
+                let block = block
+                    .title_bottom(format!(
+                        " {} rows in {}ms",
+                        q.num_rows().unwrap_or(0),
+                        q.elapsed_time().as_millis()
+                    ))
+                    .fg(tailwind::GREEN.c300);
+                let table = record_batches_to_table(r)
+                    .highlight_style(Style::default().bg(tailwind::WHITE).fg(tailwind::BLACK))
+                    .block(block);
+                StatefulWidget::render(table, area, buf, &mut s);
+            }
         }
     } else if let Some(e) = app.state.explore_tab.query_error() {
         let row = Row::new(vec![e.to_string()]);

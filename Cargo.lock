@@ -1134,7 +1134,6 @@ dependencies = [
  "datafusion",
  "directories",
  "futures",
- "futures-util",
  "itertools 0.13.0",
  "lazy_static",
  "log",

@@ -25,7 +25,6 @@ use crate::{cli, ui};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use crossterm::event as ct;
-use datafusion::arrow::array::RecordBatch;
 use futures::FutureExt;
 use log::{debug, error, info, trace};
 use ratatui::backend::CrosstermBackend;
@@ -42,6 +41,7 @@ use tokio_util::sync::CancellationToken;
 
 use self::execution::ExecutionContext;
 use self::handlers::{app_event_handler, crossterm_event_handler};
+use self::state::tabs::explore::Query;
 
 #[derive(Clone, Debug)]
 pub enum AppEvent {
@@ -58,7 +58,7 @@ pub enum AppEvent {
     Mouse(event::MouseEvent),
     Resize(u16, u16),
     ExecuteDDL(String),
-    ExploreQueryResult(Vec<RecordBatch>),
+    ExploreQueryResult(Query),
     ExploreQueryError(String),
 }
 

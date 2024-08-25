@@ -40,14 +40,21 @@ macro_rules! convert_array_values_to_cells {
 
 pub fn record_batch_to_table_header_cells(record_batch: &RecordBatch) -> Vec<Cell> {
     let fields = record_batch.schema().fields().clone();
-    fields
-        .into_iter()
-        .map(|f| {
-            Cell::new(f.name().to_string())
-                .bg(tailwind::LIME.c300)
-                .fg(tailwind::BLACK)
-        })
-        .collect()
+    let mut cells = vec![Cell::new("#").bg(tailwind::LIME.c300).fg(tailwind::BLACK)];
+    fields.iter().for_each(|f| {
+        let cell = Cell::new(f.name().to_string())
+            .bg(tailwind::LIME.c300)
+            .fg(tailwind::BLACK);
+        cells.push(cell);
+    });
+    cells
+}
+
+pub fn create_row_number_cells(record_batch: &RecordBatch) -> Vec<Cell> {
+    let cells: Vec<Cell> = (0..record_batch.num_rows())
+        .map(|i| Cell::new(i.to_string()))
+        .collect();
+    cells
 }
 
 pub fn record_batch_to_table_row_cells(record_batch: &RecordBatch) -> Vec<Vec<Cell>> {
@@ -57,6 +64,12 @@ pub fn record_batch_to_table_row_cells(record_batch: &RecordBatch) -> Vec<Vec<Ce
     let mut rows: Vec<Vec<Cell>> = Vec::with_capacity(row_count);
     for _ in 0..row_count {
         rows.push(Vec::with_capacity(column_count))
+    }
+
+    let row_number_cells = create_row_number_cells(record_batch);
+
+    for (i, cell) in row_number_cells.into_iter().enumerate() {
+        rows[i].push(cell);
     }
 
     for arr in record_batch.columns() {
@@ -105,7 +118,7 @@ where
                 rows
             })
             .collect();
-        let column_count = first_batch.num_columns();
+        let column_count = first_batch.num_columns() + 1;
         let widths = (0..column_count).map(|_| Constraint::Fill(1));
         let block = Block::default().borders(Borders::all());
         Table::new(rows, widths).header(header_row).block(block)
@@ -137,6 +150,7 @@ mod tests {
         assert_eq!(
             header_cells,
             vec![
+                Cell::new("#").bg(tailwind::LIME.c300).fg(tailwind::BLACK),
                 Cell::new("a").bg(tailwind::LIME.c300).fg(tailwind::BLACK),
                 Cell::new("b").bg(tailwind::LIME.c300).fg(tailwind::BLACK)
             ]
@@ -150,9 +164,9 @@ mod tests {
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
         let table_cells = record_batch_to_table_row_cells(&batch);
         let expected = vec![
-            vec![Cell::new("a")],
-            vec![Cell::new("b")],
-            vec![Cell::new("c")],
+            vec![Cell::new("0"), Cell::new("a")],
+            vec![Cell::new("1"), Cell::new("b")],
+            vec![Cell::new("2"), Cell::new("c")],
         ];
         assert_eq!(table_cells, expected);
 
@@ -160,9 +174,9 @@ mod tests {
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
         let a_table_cells = record_batch_to_table_row_cells(&batch);
         let expected = vec![
-            vec![Cell::new("1")],
-            vec![Cell::new("2")],
-            vec![Cell::new("3")],
+            vec![Cell::new("0"), Cell::new("1")],
+            vec![Cell::new("1"), Cell::new("2")],
+            vec![Cell::new("2"), Cell::new("3")],
         ];
         assert_eq!(a_table_cells, expected);
 
@@ -170,9 +184,9 @@ mod tests {
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
         let a_table_cells = record_batch_to_table_row_cells(&batch);
         let expected = vec![
-            vec![Cell::new("1")],
-            vec![Cell::new("2")],
-            vec![Cell::new("3")],
+            vec![Cell::new("0"), Cell::new("1")],
+            vec![Cell::new("1"), Cell::new("2")],
+            vec![Cell::new("2"), Cell::new("3")],
         ];
         assert_eq!(a_table_cells, expected);
 
@@ -180,9 +194,9 @@ mod tests {
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
         let a_table_cells = record_batch_to_table_row_cells(&batch);
         let expected = vec![
-            vec![Cell::new("1")],
-            vec![Cell::new("2")],
-            vec![Cell::new("3")],
+            vec![Cell::new("0"), Cell::new("1")],
+            vec![Cell::new("1"), Cell::new("2")],
+            vec![Cell::new("2"), Cell::new("3")],
         ];
         assert_eq!(a_table_cells, expected);
 
@@ -190,9 +204,9 @@ mod tests {
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
         let a_table_cells = record_batch_to_table_row_cells(&batch);
         let expected = vec![
-            vec![Cell::new("1")],
-            vec![Cell::new("2")],
-            vec![Cell::new("3")],
+            vec![Cell::new("0"), Cell::new("1")],
+            vec![Cell::new("1"), Cell::new("2")],
+            vec![Cell::new("2"), Cell::new("3")],
         ];
         assert_eq!(a_table_cells, expected);
 
@@ -200,9 +214,9 @@ mod tests {
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
         let a_table_cells = record_batch_to_table_row_cells(&batch);
         let expected = vec![
-            vec![Cell::new("1")],
-            vec![Cell::new("2")],
-            vec![Cell::new("3")],
+            vec![Cell::new("0"), Cell::new("1")],
+            vec![Cell::new("1"), Cell::new("2")],
+            vec![Cell::new("2"), Cell::new("3")],
         ];
         assert_eq!(a_table_cells, expected);
 
@@ -210,9 +224,9 @@ mod tests {
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
         let a_table_cells = record_batch_to_table_row_cells(&batch);
         let expected = vec![
-            vec![Cell::new("1")],
-            vec![Cell::new("2")],
-            vec![Cell::new("3")],
+            vec![Cell::new("0"), Cell::new("1")],
+            vec![Cell::new("1"), Cell::new("2")],
+            vec![Cell::new("2"), Cell::new("3")],
         ];
         assert_eq!(a_table_cells, expected);
 
@@ -220,9 +234,9 @@ mod tests {
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
         let a_table_cells = record_batch_to_table_row_cells(&batch);
         let expected = vec![
-            vec![Cell::new("1")],
-            vec![Cell::new("2")],
-            vec![Cell::new("3")],
+            vec![Cell::new("0"), Cell::new("1")],
+            vec![Cell::new("1"), Cell::new("2")],
+            vec![Cell::new("2"), Cell::new("3")],
         ];
         assert_eq!(a_table_cells, expected);
 
@@ -230,9 +244,9 @@ mod tests {
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
         let a_table_cells = record_batch_to_table_row_cells(&batch);
         let expected = vec![
-            vec![Cell::new("1")],
-            vec![Cell::new("2")],
-            vec![Cell::new("3")],
+            vec![Cell::new("0"), Cell::new("1")],
+            vec![Cell::new("1"), Cell::new("2")],
+            vec![Cell::new("2"), Cell::new("3")],
         ];
         assert_eq!(a_table_cells, expected);
     }
@@ -244,9 +258,9 @@ mod tests {
         let batch = RecordBatch::try_from_iter(vec![("a", a), ("b", b)]).unwrap();
         let a_table_cells = record_batch_to_table_row_cells(&batch);
         let expected = vec![
-            vec![Cell::new("1"), Cell::new("a")],
-            vec![Cell::new("2"), Cell::new("b")],
-            vec![Cell::new("3"), Cell::new("c")],
+            vec![Cell::new("0"), Cell::new("1"), Cell::new("a")],
+            vec![Cell::new("1"), Cell::new("2"), Cell::new("b")],
+            vec![Cell::new("2"), Cell::new("3"), Cell::new("c")],
         ];
         assert_eq!(a_table_cells, expected);
     }
