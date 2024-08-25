@@ -17,15 +17,15 @@
 
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{palette::tailwind, Style, Stylize},
-    widgets::{Block, Borders, Row, StatefulWidget, Table, Widget},
+    widgets::{Block, Borders, Paragraph, Row, StatefulWidget, Table, Widget},
 };
 
 use crate::{app::App, ui::convert::record_batches_to_table};
 
 pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
-    let border_color = if app.state.explore_tab.is_editable() {
+    let border_color = if app.state.explore_tab.editor_editable() {
         tailwind::GREEN.c300
     } else {
         tailwind::WHITE
@@ -61,11 +61,30 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
     }
 }
 
+pub fn render_sql_help(area: Rect, buf: &mut Buffer, app: &App) {
+    let block = Block::default();
+    let help = if app.state.explore_tab.editor_editable() {
+        vec!["'Esc' to exit edit mode"]
+    } else {
+        vec!["'e' to edit", "'c' to clear editor", "'Enter' to run query"]
+    };
+
+    let help_text = help.join(" | ");
+    let p = Paragraph::new(help_text)
+        .block(block)
+        .alignment(Alignment::Center);
+    p.render(area, buf);
+}
+
 pub fn render_explore(area: Rect, buf: &mut Buffer, app: &App) {
-    let constraints = vec![Constraint::Percentage(50), Constraint::Percentage(50)];
-    let layout = Layout::new(Direction::Vertical, constraints).split(area);
-    let editor = layout[0];
-    let results = layout[1];
-    render_sql_editor(editor, buf, app);
-    render_sql_results(results, buf, app);
+    let constraints = vec![
+        Constraint::Fill(1),
+        Constraint::Fill(1),
+        Constraint::Length(1),
+    ];
+    let [editor_area, results_area, help_area] =
+        Layout::new(Direction::Vertical, constraints).areas(area);
+    render_sql_editor(editor_area, buf, app);
+    render_sql_results(results_area, buf, app);
+    render_sql_help(help_area, buf, app);
 }

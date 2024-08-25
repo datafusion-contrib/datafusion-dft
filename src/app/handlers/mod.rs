@@ -143,7 +143,7 @@ fn explore_tab_editable_handler(app: &mut App, key: KeyEvent) {
 
 fn explore_tab_app_event_handler(app: &mut App, event: AppEvent) {
     match event {
-        AppEvent::Key(key) => match app.state.explore_tab.is_editable() {
+        AppEvent::Key(key) => match app.state.explore_tab.editor_editable() {
             true => explore_tab_editable_handler(app, key),
             false => explore_tab_normal_mode_handler(app, key),
         },

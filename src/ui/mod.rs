@@ -18,7 +18,7 @@
 pub mod convert;
 pub mod tabs;
 
-use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
+use ratatui::{prelude::*, style::palette::tailwind};
 use strum::{Display, EnumIter, FromRepr};
 
 use crate::app::App;
@@ -61,13 +61,6 @@ impl SelectedTab {
         }
     }
 
-    const fn palette(self) -> tailwind::Palette {
-        match self {
-            Self::Queries => tailwind::STONE,
-            Self::Logs => tailwind::STONE,
-        }
-    }
-
     /// Get the previous tab, if there is no previous tab return the current tab.
     pub fn previous(self) -> Self {
         let current_index: usize = self as usize;
@@ -80,15 +73,6 @@ impl SelectedTab {
         let current_index = self as usize;
         let next_index = current_index.saturating_add(1);
         Self::from_repr(next_index).unwrap_or(self)
-    }
-
-    /// A block surrounding the tab's content
-    fn block(self) -> Block<'static> {
-        Block::default()
-            .borders(Borders::ALL)
-            .border_set(symbols::border::PROPORTIONAL_TALL)
-            .padding(Padding::horizontal(1))
-            .border_style(self.palette().c700)
     }
 
     fn render_explore(self, area: Rect, buf: &mut Buffer, app: &App) {

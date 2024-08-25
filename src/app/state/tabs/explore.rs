@@ -57,10 +57,6 @@ impl<'app> ExploreTabState<'app> {
         self.query_results_state = Some(TableState::default());
     }
 
-    // pub fn query_results_state_mut(&mut self) -> &mut Option<TableState> {
-    //     &mut self.query_results_state
-    // }
-
     pub fn query_error(&self) -> &Option<String> {
         &self.query_error
     }
@@ -102,7 +98,7 @@ impl<'app> ExploreTabState<'app> {
         self.editor_editable = false;
     }
 
-    pub fn is_editable(&self) -> bool {
+    pub fn editor_editable(&self) -> bool {
         self.editor_editable
     }
 
