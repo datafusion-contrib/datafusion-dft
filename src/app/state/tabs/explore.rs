@@ -86,6 +86,10 @@ impl<'app> ExploreTabState<'app> {
         }
     }
 
+    pub fn clear_editor(&mut self) {
+        self.editor = TextArea::new(vec!["".to_string()]);
+    }
+
     pub fn update_editor_content(&mut self, key: KeyEvent) {
         self.editor.input(key);
     }

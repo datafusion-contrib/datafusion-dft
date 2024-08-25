@@ -40,7 +40,7 @@ pub fn crossterm_event_handler(event: event::Event) -> Option<AppEvent> {
 
 fn tab_navigation_handler(app: &mut App, key: KeyCode) {
     match key {
-        KeyCode::Char('e') => app.state.tabs.selected = SelectedTab::Queries,
+        KeyCode::Char('s') => app.state.tabs.selected = SelectedTab::Queries,
         KeyCode::Char('l') => app.state.tabs.selected = SelectedTab::Logs,
         _ => {}
     };
@@ -49,7 +49,8 @@ fn tab_navigation_handler(app: &mut App, key: KeyCode) {
 fn explore_tab_normal_mode_handler(app: &mut App, key: KeyEvent) {
     match key.code {
         KeyCode::Char('q') => app.state.should_quit = true,
-        KeyCode::Char('i') => {
+        KeyCode::Char('c') => app.state.explore_tab.clear_editor(),
+        KeyCode::Char('e') => {
             let editor = app.state.explore_tab.editor();
             let lines = editor.lines();
             let content = lines.join("");
@@ -74,7 +75,7 @@ fn explore_tab_normal_mode_handler(app: &mut App, key: KeyEvent) {
             }
         }
 
-        tab @ (KeyCode::Char('e') | KeyCode::Char('l')) => tab_navigation_handler(app, tab),
+        tab @ (KeyCode::Char('s') | KeyCode::Char('l')) => tab_navigation_handler(app, tab),
         KeyCode::Enter => {
             info!("Run query");
             let query = app.state.explore_tab.editor().lines().join("");
