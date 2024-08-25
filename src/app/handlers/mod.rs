@@ -110,7 +110,7 @@ fn explore_tab_normal_mode_handler(app: &mut App, key: KeyEvent) {
                             let elapsed = start.elapsed();
                             query.set_error(Some(e.to_string()));
                             query.set_elapsed_time(elapsed);
-                            let _ = _event_tx.send(AppEvent::ExploreQueryError(e.to_string()));
+                            // let _ = _event_tx.send(AppEvent::ExploreQueryError(e.to_string()));
                         }
                     },
                     Err(e) => {
@@ -118,7 +118,7 @@ fn explore_tab_normal_mode_handler(app: &mut App, key: KeyEvent) {
                         let elapsed = start.elapsed();
                         query.set_error(Some(e.to_string()));
                         query.set_elapsed_time(elapsed);
-                        let _ = _event_tx.send(AppEvent::ExploreQueryError(e.to_string()));
+                        // let _ = _event_tx.send(AppEvent::ExploreQueryError(e.to_string()));
                     }
                 }
                 let _ = _event_tx.send(AppEvent::ExploreQueryResult(query));
@@ -172,6 +172,7 @@ fn explore_tab_app_event_handler(app: &mut App, event: AppEvent) {
             false => explore_tab_normal_mode_handler(app, key),
         },
         AppEvent::ExploreQueryResult(r) => {
+            info!("Query results: {:?}", r);
             app.state.explore_tab.set_query(r);
             app.state.explore_tab.refresh_query_results_state();
         }
@@ -243,7 +244,6 @@ fn logs_tab_app_event_handler(app: &mut App, event: AppEvent) {
 
 pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
     let now = std::time::Instant::now();
-    //TODO: Create event to action
     trace!("Tui::Event: {:?}", event);
     if let AppEvent::ExecuteDDL(ddl) = event {
         let queries: Vec<String> = ddl.split(";").map(|s| s.to_string()).collect();
@@ -257,8 +257,6 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                 }
             });
         })
-    } else if let AppEvent::ExploreQueryError(e) = event {
-        app.state.explore_tab.set_query_error(e);
     } else {
         match app.state.tabs.selected {
             SelectedTab::Queries => explore_tab_app_event_handler(app, event),

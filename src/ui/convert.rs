@@ -39,9 +39,8 @@ macro_rules! convert_array_values_to_cells {
 }
 
 pub fn record_batch_to_table_header_cells(record_batch: &RecordBatch) -> Vec<Cell> {
-    let fields = record_batch.schema().fields().clone();
     let mut cells = vec![Cell::new("#").bg(tailwind::LIME.c300).fg(tailwind::BLACK)];
-    fields.iter().for_each(|f| {
+    record_batch.schema().fields().iter().for_each(|f| {
         let cell = Cell::new(f.name().to_string())
             .bg(tailwind::LIME.c300)
             .fg(tailwind::BLACK);

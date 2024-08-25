@@ -59,15 +59,12 @@ pub enum AppEvent {
     Resize(u16, u16),
     ExecuteDDL(String),
     ExploreQueryResult(Query),
-    ExploreQueryError(String),
 }
 
 pub struct App<'app> {
     pub cli: DftCli,
     pub state: state::AppState<'app>,
     pub execution: ExecutionContext,
-    /// Client for making API calls with.  Holds a connection pool
-    /// internally so it should be reused.
     pub app_event_tx: UnboundedSender<AppEvent>,
     pub app_event_rx: UnboundedReceiver<AppEvent>,
     pub app_cancellation_token: CancellationToken,
@@ -253,9 +250,6 @@ impl<'app> App<'app> {
             .ok_or(eyre!("Unable to get event"))
     }
 
-    /// Load portfolio positions from disk, store them in application state with snapshot
-    /// information, and connect to the relevant websockets to stream data for the positions.
-
     fn handle_app_event(&mut self, event: AppEvent) -> Result<()> {
         app_event_handler(self, event)
     }
@@ -304,10 +298,8 @@ pub async fn run_app(cli: cli::DftCli, state: state::AppState<'_>) -> Result<()>
     match &cli.command {
         Some(cli::Command::App(_)) | None => {
             app.execute_ddl();
-            // app.load_data(false).await?;
             let mut terminal =
                 ratatui::Terminal::new(CrosstermBackend::new(std::io::stdout())).unwrap();
-            // Start event loop
             app.enter(true)?;
             // Main loop for handling events
             loop {

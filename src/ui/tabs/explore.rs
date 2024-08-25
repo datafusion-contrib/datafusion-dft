@@ -15,8 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::borrow::BorrowMut;
-
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -45,8 +43,8 @@ pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
 pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
     let block = Block::default().title(" Results ").borders(Borders::ALL);
     if let Some(q) = app.state.explore_tab.query() {
-        if let Some(s) = app.state.explore_tab.query_results_state() {
-            if let Some(r) = q.results() {
+        if let Some(r) = q.results() {
+            if let Some(s) = app.state.explore_tab.query_results_state() {
                 let block = block
                     .title_bottom(format!(
                         " {} rows in {}ms",
@@ -60,12 +58,12 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
                 let mut s = s.borrow_mut();
                 StatefulWidget::render(table, area, buf, &mut s);
             }
+        } else if let Some(e) = q.error() {
+            let row = Row::new(vec![e.to_string()]);
+            let widths = vec![Constraint::Percentage(100)];
+            let table = Table::new(vec![row], widths).block(block);
+            Widget::render(table, area, buf);
         }
-    } else if let Some(e) = app.state.explore_tab.query_error() {
-        let row = Row::new(vec![e.to_string()]);
-        let widths = vec![Constraint::Percentage(100)];
-        let table = Table::new(vec![row], widths).block(block);
-        Widget::render(table, area, buf);
     } else {
         let row = Row::new(vec!["Run a query to generate results"]);
         let widths = vec![Constraint::Percentage(100)];
