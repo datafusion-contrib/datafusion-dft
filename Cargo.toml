@@ -1,5 +1,12 @@
 [package]
-name = "dft"
+name = "datafusion-tui"
+description = "Terminal based, extensible, interactive data analysis tool using SQL "
+homepage = "https://github.com/datafusion-contrib/datafusion-tui"
+repository = "https://github.com/datafusion-contrib/datafusion-tui"
+readme = "README.md"
+authors = ["Matthew Turner <matthew.m.turner@outlook.com>"]
+license = "Apache-2.0"
+keywords = ["arrow", "query", "sql", "datafusion"]
 version = "0.1.0"
 edition = "2021"
 
@@ -26,6 +33,10 @@ tokio-util = "0.7.10"
 toml = "0.8.12"
 tui-logger = {version = "0.12", features = ["tracing-support"]}
 tui-textarea = "0.6.1"
+
+[[bin]]
+name = "dft"
+path = "src/main.rs"
 
 [lints.clippy]
 clone_on_ref_ptr = "deny"
