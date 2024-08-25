@@ -1,8 +1,8 @@
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Direction, Layout, Rect},
-    style::{palette::tailwind, Stylize},
-    widgets::{Block, Borders, Row, Table, Widget},
+    style::{palette::tailwind, Style, Stylize},
+    widgets::{Block, Borders, Row, StatefulWidget, Table, Widget},
 };
 
 use crate::{app::App, ui::convert::record_batches_to_table};
@@ -26,12 +26,21 @@ pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
 pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
     let block = Block::default().title(" Results ").borders(Borders::ALL);
     if let Some(r) = app.state.explore_tab.query_results() {
-        record_batches_to_table(r).render(area, buf);
+        if let Some(mut s) = app.state.explore_tab.query_results_state_clone() {
+            let table = record_batches_to_table(r)
+                .highlight_style(Style::default().bg(tailwind::WHITE).fg(tailwind::BLACK));
+            StatefulWidget::render(table, area, buf, &mut s);
+        }
+    } else if let Some(e) = app.state.explore_tab.query_error() {
+        let row = Row::new(vec![e.to_string()]);
+        let widths = vec![Constraint::Percentage(100)];
+        let table = Table::new(vec![row], widths).block(block);
+        Widget::render(table, area, buf);
     } else {
         let row = Row::new(vec!["Run a query to generate results"]);
         let widths = vec![Constraint::Percentage(100)];
         let table = Table::new(vec![row], widths).block(block);
-        table.render(area, buf);
+        Widget::render(table, area, buf);
     }
 }
 

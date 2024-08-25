@@ -3,6 +3,8 @@ pub mod execution;
 pub mod handlers;
 pub mod state;
 
+use std::path::PathBuf;
+
 use crate::cli::DftCli;
 use crate::{cli, ui};
 use color_eyre::eyre::eyre;
@@ -199,8 +201,23 @@ impl<'app> App<'app> {
     }
 
     pub fn execute_ddl(&mut self) {
-        let ddl = std::fs::read_to_string("~/.datafusionrc").unwrap();
-        let _ = self.app_event_tx.send(AppEvent::ExecuteDDL(ddl));
+        if let Some(user_dirs) = directories::UserDirs::new() {
+            let datafusion_rc_path = user_dirs.home_dir().join(".datafusionrc");
+            let maybe_ddl = std::fs::read_to_string(datafusion_rc_path);
+            let ddl = match maybe_ddl {
+                Ok(ddl) => {
+                    info!("DDL: {:?}", ddl);
+                    ddl
+                }
+                Err(err) => {
+                    error!("Error reading DDL: {:?}", err);
+                    return;
+                }
+            };
+            let _ = self.app_event_tx.send(AppEvent::ExecuteDDL(ddl));
+        } else {
+            error!("No user directories found");
+        }
     }
 
     /// Dispatch to the appropriate event loop based on the command
@@ -268,6 +285,7 @@ pub async fn run_app(cli: cli::DftCli, state: state::AppState<'_>) -> Result<()>
 
     match &cli.command {
         Some(cli::Command::App(_)) | None => {
+            app.execute_ddl();
             // app.load_data(false).await?;
             let mut terminal =
                 ratatui::Terminal::new(CrosstermBackend::new(std::io::stdout())).unwrap();

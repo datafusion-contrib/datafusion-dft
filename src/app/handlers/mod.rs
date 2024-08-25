@@ -44,6 +44,19 @@ fn explore_tab_normal_mode_handler(app: &mut App, key: KeyEvent) {
             }
             app.state.explore_tab.edit();
         }
+        KeyCode::Down => {
+            if let Some(s) = app.state.explore_tab.query_results_state_mut() {
+                info!("Select next");
+                s.select_next();
+            }
+        }
+        KeyCode::Up => {
+            if let Some(s) = app.state.explore_tab.query_results_state_mut() {
+                info!("Select previous");
+                s.select_previous();
+            }
+        }
+
         tab @ (KeyCode::Char('e') | KeyCode::Char('l')) => tab_navigation_handler(app, tab),
         KeyCode::Enter => {
             info!("Run query");
@@ -116,7 +129,10 @@ fn explore_tab_app_event_handler(app: &mut App, event: AppEvent) {
             true => explore_tab_editable_handler(app, key),
             false => explore_tab_normal_mode_handler(app, key),
         },
-        AppEvent::ExploreQueryResult(r) => app.state.explore_tab.set_query_results(r),
+        AppEvent::ExploreQueryResult(r) => {
+            app.state.explore_tab.set_query_results(r);
+            app.state.explore_tab.refresh_query_results_state();
+        }
         AppEvent::Tick => {}
         AppEvent::Error => {}
         _ => {}
@@ -173,7 +189,10 @@ fn logs_tab_key_event_handler(app: &mut App, key: KeyEvent) {
 fn logs_tab_app_event_handler(app: &mut App, event: AppEvent) {
     match event {
         AppEvent::Key(key) => logs_tab_key_event_handler(app, key),
-        AppEvent::ExploreQueryResult(r) => app.state.explore_tab.set_query_results(r),
+        AppEvent::ExploreQueryResult(r) => {
+            app.state.explore_tab.set_query_results(r);
+            app.state.explore_tab.refresh_query_results_state();
+        }
         AppEvent::Tick => {}
         AppEvent::Error => {}
         _ => {}
@@ -196,6 +215,8 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                 }
             });
         })
+    } else if let AppEvent::ExploreQueryError(e) = event {
+        app.state.explore_tab.set_query_error(e);
     } else {
         match app.state.tabs.selected {
             SelectedTab::Queries => explore_tab_app_event_handler(app, event),

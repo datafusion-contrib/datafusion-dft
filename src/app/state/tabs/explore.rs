@@ -1,6 +1,7 @@
 use datafusion::arrow::array::RecordBatch;
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::{palette::tailwind, Style};
+use ratatui::widgets::TableState;
 use tui_textarea::TextArea;
 
 #[derive(Debug)]
@@ -8,6 +9,8 @@ pub struct ExploreTabState<'app> {
     editor: TextArea<'app>,
     editor_editable: bool,
     query_results: Option<Vec<RecordBatch>>,
+    query_results_state: Option<TableState>,
+    query_error: Option<String>,
 }
 
 impl<'app> ExploreTabState<'app> {
@@ -20,8 +23,33 @@ impl<'app> ExploreTabState<'app> {
             editor: textarea,
             editor_editable: false,
             query_results: None,
-            // query_handle: None,
+            query_results_state: None,
+            query_error: None,
         }
+    }
+
+    pub fn query_results_state_clone(&self) -> Option<TableState> {
+        self.query_results_state.clone()
+    }
+
+    pub fn query_results_state_mut(&mut self) -> &mut Option<TableState> {
+        &mut self.query_results_state
+    }
+
+    pub fn refresh_query_results_state(&mut self) {
+        self.query_results_state = Some(TableState::default());
+    }
+
+    // pub fn query_results_state_mut(&mut self) -> &mut Option<TableState> {
+    //     &mut self.query_results_state
+    // }
+
+    pub fn query_error(&self) -> &Option<String> {
+        &self.query_error
+    }
+
+    pub fn set_query_error(&mut self, error: String) {
+        self.query_error = Some(error);
     }
 
     pub fn editor(&self) -> TextArea {
