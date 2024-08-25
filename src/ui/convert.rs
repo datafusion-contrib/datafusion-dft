@@ -91,7 +91,7 @@ where
     // longer than a frame lifetime.
     'results: 'frame,
 {
-    if record_batches.len() == 0 {
+    if record_batches.is_empty() {
         empty_results_table()
     } else {
         let first_batch = &record_batches[0];
@@ -101,15 +101,12 @@ where
             .iter()
             .flat_map(|b| {
                 let batch_row_cells = record_batch_to_table_row_cells(b);
-                let rows: Vec<Row> = batch_row_cells
-                    .into_iter()
-                    .map(|row_cells| Row::from_iter(row_cells))
-                    .collect();
+                let rows: Vec<Row> = batch_row_cells.into_iter().map(Row::from_iter).collect();
                 rows
             })
             .collect();
         let column_count = first_batch.num_columns();
-        let widths = (0..column_count).into_iter().map(|_| Constraint::Fill(1));
+        let widths = (0..column_count).map(|_| Constraint::Fill(1));
         let block = Block::default().borders(Borders::all());
         Table::new(rows, widths).header(header_row).block(block)
     }

@@ -227,7 +227,7 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
             let ctx = app.execution.session_ctx.clone();
             tokio::spawn(async move {
                 if let Ok(df) = ctx.sql(&q).await {
-                    if let Ok(_) = df.collect().await {
+                    if df.collect().await.is_ok() {
                         info!("Successful DDL");
                     }
                 }

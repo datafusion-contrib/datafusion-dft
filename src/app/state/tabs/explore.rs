@@ -21,7 +21,7 @@ use ratatui::style::{palette::tailwind, Style};
 use ratatui::widgets::TableState;
 use tui_textarea::TextArea;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ExploreTabState<'app> {
     editor: TextArea<'app>,
     editor_editable: bool,

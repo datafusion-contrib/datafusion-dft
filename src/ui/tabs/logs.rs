@@ -37,8 +37,7 @@ fn render_smart_widget(area: Rect, buf: &mut Buffer, app: &App) {
 }
 
 fn render_logs_help(area: Rect, buf: &mut Buffer) {
-    let help_text = vec!["f - Focus logs", "h - Hide logs", "⇧ ⇩ - Select target"].join(" | ");
-
+    let help_text = ["f - Focus logs", "h - Hide logs", "⇧ ⇩ - Select target"].join(" | ");
     let block = Block::default();
     let help = Paragraph::new(help_text)
         .block(block)
