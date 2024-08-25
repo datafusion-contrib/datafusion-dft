@@ -217,7 +217,10 @@ impl<'app> App<'app> {
 
     pub fn execute_ddl(&mut self) {
         if let Some(user_dirs) = directories::UserDirs::new() {
-            let datafusion_rc_path = user_dirs.home_dir().join(".datafusionrc");
+            let datafusion_rc_path = user_dirs
+                .home_dir()
+                .join(".datafusion")
+                .join(".datafusionrc");
             let maybe_ddl = std::fs::read_to_string(datafusion_rc_path);
             let ddl = match maybe_ddl {
                 Ok(ddl) => {

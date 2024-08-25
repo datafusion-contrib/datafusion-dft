@@ -120,7 +120,10 @@ mod tests {
         ArrayRef, Int16Array, Int32Array, Int64Array, Int8Array, RecordBatch, StringArray,
         UInt16Array, UInt32Array, UInt64Array, UInt8Array,
     };
-    use ratatui::widgets::Cell;
+    use ratatui::{
+        style::{palette::tailwind, Stylize},
+        widgets::Cell,
+    };
 
     use super::{record_batch_to_table_header_cells, record_batch_to_table_row_cells};
 
@@ -131,7 +134,13 @@ mod tests {
 
         let batch = RecordBatch::try_from_iter(vec![("a", a), ("b", b)]).unwrap();
         let header_cells = record_batch_to_table_header_cells(&batch);
-        assert_eq!(header_cells, vec![Cell::new("a"), Cell::new("b")]);
+        assert_eq!(
+            header_cells,
+            vec![
+                Cell::new("a").bg(tailwind::LIME.c300).fg(tailwind::BLACK),
+                Cell::new("b").bg(tailwind::LIME.c300).fg(tailwind::BLACK)
+            ]
+        );
     }
 
     #[test]
