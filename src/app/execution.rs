@@ -15,11 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#[cfg(feature = "deltalake")]
+use std::sync::Arc;
+
 use color_eyre::eyre::Result;
 use datafusion::arrow::util::pretty::pretty_format_batches;
+use datafusion::execution::session_state::SessionStateBuilder;
 use datafusion::execution::TaskContext;
 use datafusion::physical_plan::execute_stream;
 use datafusion::prelude::*;
+#[cfg(feature = "deltalake")]
+use deltalake::delta_datafusion::DeltaTableFactory;
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 
@@ -37,7 +43,19 @@ impl ExecutionContext {
             .with_batch_size(1)
             .with_information_schema(true);
 
-        let session_ctx = SessionContext::new_with_config(cfg);
+        let mut state = SessionStateBuilder::new()
+            .with_default_features()
+            .with_config(cfg)
+            .build();
+
+        #[cfg(feature = "deltalake")]
+        {
+            state
+                .table_factories_mut()
+                .insert("DELTATABLE".to_string(), Arc::new(DeltaTableFactory {}));
+        }
+
+        let session_ctx = SessionContext::new_with_state(state);
         let cancellation_token = CancellationToken::new();
 
         Self {
