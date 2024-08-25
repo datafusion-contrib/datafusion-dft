@@ -15,6 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-pub mod catalog_providers;
-pub mod context;
-pub mod object_stores;
+use color_eyre::Result;
+use log::LevelFilter;
+
+pub fn initialize_logs() -> Result<()> {
+    tui_logger::init_logger(LevelFilter::Debug).unwrap();
+    tui_logger::set_default_level(LevelFilter::Debug);
+
+    Ok(())
+}

@@ -29,8 +29,6 @@ Some of the current and planned features are:
   - There are ongoing conversations in DataFusion about adopting a new `ObjectStore` interface that would come with bindings to S3, ADLS, and GCP.  I am  monitoring this and plan on updating to use that interface when it is available.
 - `TableProvider` data sources
   - Delta Table => TODO
-  - Google Big Table => (currently in the bigtable branch which isnt up to date with latest DataFusion )
-  - ApiTable => Will allow treating API endpoints as tables by handling pagination and authentication.  Currently being prototyped in [#85](https://github.com/datafusion-contrib/datafusion-tui/pull/85)
 - Preloading DDL from `~/.datafusion/.datafusionrc` for local database available on startup
 
 ## User Guide
@@ -61,15 +59,6 @@ CREATE VIEW OR REPLACE users_listings AS SELECT * FROM users LEFT JOIN listings 
 
 This would make the tables `users`, `taxis`, `listings`, and the view  `users_listings` available at startup.  Any of these DDL statements could also be run interactively from the SQL editor as well to create the tables.
 
-### Catalog Providers
-
-You can run `dft` with `--features=glue,s3` to registered databases and tables from your AWS Glue Catalogs.  You can optionally use a configuration file to specify which databases you want to register.  To use a configuration create `~/.datafusion/catalog_providers/glue.json`.  In that file you can specify the databases that you want to register:
-
-```json
-{
-  "databases": ["my_database", "my_other_database"]
-}
-```
 
 ### Key Mappings
 
@@ -109,5 +98,3 @@ The interface is split into several tabs so that relevant information can be vie
   - S3: run / install with `--features=s3`
     - If you want to use your default AWS credentials, then no further action is required. For example your credentials in `~/.aws/credentials` will automatically be picked up.
     - If you want to use a custom S3 provider, such as MinIO, then you must create a `s3.json` configuration file in `~/.datafusion/object_stores/` with the fields `endpoint`, `access_key_id`, and `secret_access_key`.
-- Use Ballista as execution engine
-  -  Run / install with `--features=ballista` and provide `--host` and `--port` of the ballista scheduler when running `dft`

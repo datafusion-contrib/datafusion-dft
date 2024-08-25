@@ -15,21 +15,25 @@
 // specific language governing permissions and limitations
 // under the License.
 
-mod app;
-mod cli;
-mod telemetry;
-mod ui;
+use tui_logger::TuiWidgetState;
 
-use crate::app::state;
-use app::run_app;
-use clap::Parser;
-use color_eyre::Result;
+#[derive(Default)]
+pub struct LogsTabState {
+    state: TuiWidgetState,
+}
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    telemetry::initialize_logs()?;
-    let cli = cli::DftCli::parse();
-    let state = state::initialize(&cli);
-    run_app(cli.clone(), state).await?;
-    Ok(())
+impl LogsTabState {
+    pub fn state(&self) -> &TuiWidgetState {
+        &self.state
+    }
+
+    pub fn transition(&mut self, event: tui_logger::TuiWidgetEvent) {
+        self.state.transition(event)
+    }
+}
+
+impl std::fmt::Debug for LogsTabState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LogsTabState").finish()
+    }
 }

@@ -15,7 +15,5 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#[cfg(feature = "glue")]
-mod glue;
-#[cfg(feature = "glue")]
-pub use glue::register_glue;
+pub mod explore;
+pub mod logs;

@@ -15,7 +15,5 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#[cfg(feature = "s3")]
-mod s3;
-#[cfg(feature = "s3")]
-pub use s3::register_s3;
+pub mod explore;
+pub mod logs;
