@@ -20,7 +20,6 @@ crossterm = { version = "0.28.1", features = ["event-stream"] }
 datafusion = "40.0.0"
 directories = "5.0.1"
 futures = "0.3.30"
-futures-util = "0.3.30"
 itertools = "0.13.0"
 lazy_static = "1.4.0"
 log = "0.4.22"

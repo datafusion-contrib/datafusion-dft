@@ -27,7 +27,6 @@ use color_eyre::Result;
 use crossterm::event as ct;
 use datafusion::arrow::array::RecordBatch;
 use futures::FutureExt;
-use futures_util::StreamExt;
 use log::{debug, error, info, trace};
 use ratatui::backend::CrosstermBackend;
 use ratatui::crossterm::{
@@ -38,6 +37,7 @@ use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
 use strum::IntoEnumIterator;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::task::JoinHandle;
+use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 
 use self::execution::ExecutionContext;
