@@ -23,7 +23,7 @@ use strum::{Display, EnumIter, FromRepr};
 
 use crate::app::App;
 
-use self::tabs::{explore, logs};
+use self::tabs::{context, explore, logs};
 
 #[derive(Clone, Copy, Debug, Display, FromRepr, EnumIter)]
 pub enum SelectedTab {
@@ -31,6 +31,8 @@ pub enum SelectedTab {
     Queries,
     #[strum(to_string = "Logs")]
     Logs,
+    #[strum(to_string = "Context")]
+    Context,
 }
 
 impl SelectedTab {
@@ -38,8 +40,8 @@ impl SelectedTab {
         let padding = Span::from("  ");
         match self {
             SelectedTab::Queries => {
-                let bold_char = Span::from("E").bold();
-                let remaining = Span::from("xplore");
+                let bold_char = Span::from("S").bold();
+                let remaining = Span::from("QL");
                 Line::from_iter(vec![padding.clone(), bold_char, remaining, padding.clone()])
                     .fg(tailwind::SLATE.c200)
                     .bg(self.bg())
@@ -51,6 +53,13 @@ impl SelectedTab {
                     .fg(tailwind::SLATE.c200)
                     .bg(self.bg())
             }
+            Self::Context => {
+                let bold_char = Span::from("C").bold();
+                let remaining = Span::from("ontext");
+                Line::from_iter(vec![padding.clone(), bold_char, remaining, padding.clone()])
+                    .fg(tailwind::SLATE.c200)
+                    .bg(self.bg())
+            }
         }
     }
 
@@ -58,6 +67,7 @@ impl SelectedTab {
         match self {
             Self::Queries => tailwind::EMERALD.c700,
             Self::Logs => tailwind::EMERALD.c700,
+            Self::Context => tailwind::EMERALD.c700,
         }
     }
 
@@ -83,6 +93,10 @@ impl SelectedTab {
         logs::render_logs(area, buf, app)
     }
 
+    fn render_context(self, area: Rect, buf: &mut Buffer, app: &App) {
+        context::render_context(area, buf, app)
+    }
+
     /// Render the tab with the provided state.
     ///
     /// This used to be an impl of `Widget` but we weren't able to pass state
@@ -92,6 +106,7 @@ impl SelectedTab {
         match self {
             Self::Queries => self.render_explore(area, buf, app),
             Self::Logs => self.render_logs(area, buf, app),
+            Self::Context => self.render_context(area, buf, app),
         }
     }
 }

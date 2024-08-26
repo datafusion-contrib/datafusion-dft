@@ -47,13 +47,13 @@ fn tab_navigation_handler(app: &mut App, key: KeyCode) {
     match key {
         KeyCode::Char('s') => app.state.tabs.selected = SelectedTab::Queries,
         KeyCode::Char('l') => app.state.tabs.selected = SelectedTab::Logs,
+        KeyCode::Char('x') => app.state.tabs.selected = SelectedTab::Context,
         _ => {}
     };
 }
 
 fn explore_tab_normal_mode_handler(app: &mut App, key: KeyEvent) {
     match key.code {
-        KeyCode::Char('q') => app.state.should_quit = true,
         KeyCode::Char('c') => app.state.explore_tab.clear_editor(),
         KeyCode::Char('e') => {
             let editor = app.state.explore_tab.editor();
@@ -82,7 +82,6 @@ fn explore_tab_normal_mode_handler(app: &mut App, key: KeyEvent) {
             }
         }
 
-        tab @ (KeyCode::Char('s') | KeyCode::Char('l')) => tab_navigation_handler(app, tab),
         KeyCode::Enter => {
             info!("Run query");
             let sql = app.state.explore_tab.editor().lines().join("");
@@ -102,15 +101,12 @@ fn explore_tab_normal_mode_handler(app: &mut App, key: KeyEvent) {
                             query.set_results(Some(res));
                             query.set_num_rows(Some(rows));
                             query.set_elapsed_time(elapsed);
-                            // let query = Query::new(sql, Some(res), Some(rows), None, elapsed);
-                            // let _ = _event_tx.send(AppEvent::ExploreQueryResult(res));
                         }
                         Err(e) => {
                             error!("Error collecting results: {:?}", e);
                             let elapsed = start.elapsed();
                             query.set_error(Some(e.to_string()));
                             query.set_elapsed_time(elapsed);
-                            // let _ = _event_tx.send(AppEvent::ExploreQueryError(e.to_string()));
                         }
                     },
                     Err(e) => {
@@ -118,18 +114,9 @@ fn explore_tab_normal_mode_handler(app: &mut App, key: KeyEvent) {
                         let elapsed = start.elapsed();
                         query.set_error(Some(e.to_string()));
                         query.set_elapsed_time(elapsed);
-                        // let _ = _event_tx.send(AppEvent::ExploreQueryError(e.to_string()));
                     }
                 }
                 let _ = _event_tx.send(AppEvent::ExploreQueryResult(query));
-                // if let Ok(df) = ctx.sql(&query).await {
-                //     if let Ok(res) = df.collect().await.map_err(|e| eyre!(e)) {
-                //         info!("Results: {:?}", res);
-                //         let _ = _event_tx.send(AppEvent::ExploreQueryResult(res));
-                //     }
-                // } else {
-                //     error!("Error creating dataframe")
-                // }
             });
         }
         _ => {}
@@ -196,7 +183,6 @@ fn logs_tab_key_event_handler(app: &mut App, key: KeyEvent) {
         KeyCode::Char('-') => {
             app.state.logs_tab.transition(TuiWidgetEvent::MinusKey);
         }
-        KeyCode::Char('q') => app.state.should_quit = true,
         KeyCode::Char(' ') => {
             app.state.logs_tab.transition(TuiWidgetEvent::SpaceKey);
         }
@@ -222,12 +208,11 @@ fn logs_tab_key_event_handler(app: &mut App, key: KeyEvent) {
         KeyCode::PageUp => {
             app.state.logs_tab.transition(TuiWidgetEvent::PrevPageKey);
         }
-        KeyCode::Char('e') => {
-            app.state.tabs.selected = SelectedTab::Queries;
-        }
         _ => {}
     }
 }
+
+fn context_tab_key_event_handler(_app: &mut App, _key: KeyEvent) {}
 
 fn logs_tab_app_event_handler(app: &mut App, event: AppEvent) {
     match event {
@@ -242,10 +227,33 @@ fn logs_tab_app_event_handler(app: &mut App, event: AppEvent) {
     };
 }
 
+fn context_tab_app_event_handler(app: &mut App, event: AppEvent) {
+    match event {
+        AppEvent::Key(key) => context_tab_key_event_handler(app, key),
+        AppEvent::ExploreQueryResult(r) => {
+            app.state.explore_tab.set_query(r);
+            app.state.explore_tab.refresh_query_results_state();
+        }
+        AppEvent::Tick => {}
+        AppEvent::Error => {}
+        _ => {}
+    };
+}
+
 pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
+    // TODO: AppEvent::ExploreQueryResult can probably be handled here rather than duplicating in
+    // each tab
     let now = std::time::Instant::now();
     trace!("Tui::Event: {:?}", event);
-    if let AppEvent::ExecuteDDL(ddl) = event {
+    if let AppEvent::Key(k) = event {
+        match k.code {
+            KeyCode::Char('q') => app.state.should_quit = true,
+            tab @ (KeyCode::Char('s') | KeyCode::Char('l') | KeyCode::Char('x')) => {
+                tab_navigation_handler(app, tab)
+            }
+            _ => {}
+        }
+    } else if let AppEvent::ExecuteDDL(ddl) = event {
         let queries: Vec<String> = ddl.split(';').map(|s| s.to_string()).collect();
         queries.into_iter().for_each(|q| {
             let ctx = app.execution.session_ctx.clone();
@@ -261,6 +269,7 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
         match app.state.tabs.selected {
             SelectedTab::Queries => explore_tab_app_event_handler(app, event),
             SelectedTab::Logs => logs_tab_app_event_handler(app, event),
+            SelectedTab::Context => context_tab_app_event_handler(app, event),
         };
     }
     trace!("Event handling took: {:?}", now.elapsed());
