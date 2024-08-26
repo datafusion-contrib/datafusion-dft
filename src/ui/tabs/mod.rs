@@ -16,5 +16,6 @@
 // under the License.
 
 pub mod context;
-pub mod explore;
+pub mod flightsql;
 pub mod logs;
+pub mod sql;

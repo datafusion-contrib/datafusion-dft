@@ -36,7 +36,7 @@ pub struct Tabs {
 impl Default for Tabs {
     fn default() -> Self {
         Self {
-            selected: SelectedTab::Queries,
+            selected: SelectedTab::SQL,
         }
     }
 }

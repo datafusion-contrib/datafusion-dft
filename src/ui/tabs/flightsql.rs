@@ -87,7 +87,7 @@ pub fn render_sql_help(area: Rect, buf: &mut Buffer, app: &App) {
     p.render(area, buf);
 }
 
-pub fn render_explore(area: Rect, buf: &mut Buffer, app: &App) {
+pub fn render_sql(area: Rect, buf: &mut Buffer, app: &App) {
     let constraints = vec![
         Constraint::Fill(1),
         Constraint::Fill(1),
