@@ -212,7 +212,7 @@ fn logs_tab_key_event_handler(app: &mut App, key: KeyEvent) {
     }
 }
 
-fn context_tab_key_event_handler(app: &mut App, key: KeyEvent) {}
+fn context_tab_key_event_handler(_app: &mut App, _key: KeyEvent) {}
 
 fn logs_tab_app_event_handler(app: &mut App, event: AppEvent) {
     match event {
