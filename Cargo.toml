@@ -17,7 +17,8 @@ async-trait = "0.1.80"
 clap = { version = "4.5.1", features = ["derive"] }
 color-eyre = "0.6.3"
 crossterm = { version = "0.28.1", features = ["event-stream"] }
-datafusion = "40.0.0"
+datafusion = "41.0.0"
+deltalake = { version = "0.19.0", features = ["datafusion"], optional = true }
 directories = "5.0.1"
 futures = "0.3.30"
 itertools = "0.13.0"
@@ -32,6 +33,9 @@ tokio-util = "0.7.10"
 toml = "0.8.12"
 tui-logger = {version = "0.12", features = ["tracing-support"]}
 tui-textarea = "0.6.1"
+
+[features]
+deltalake = ["dep:deltalake"]
 
 [[bin]]
 name = "dft"
