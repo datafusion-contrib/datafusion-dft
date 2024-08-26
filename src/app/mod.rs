@@ -254,10 +254,6 @@ impl<'app> App<'app> {
         app_event_handler(self, event)
     }
 
-    fn render_footer(&self, area: Rect, buf: &mut Buffer) {
-        Line::raw(" Press q to quit ").centered().render(area, buf);
-    }
-
     fn render_tabs(&self, area: Rect, buf: &mut Buffer) {
         let titles = ui::SelectedTab::iter().map(ui::SelectedTab::title);
         let highlight_style = (Color::default(), tailwind::GRAY.c700);
@@ -276,18 +272,13 @@ impl Widget for &App<'_> {
     /// on every frame based on application state. There is no permanent widget object
     /// in memory.
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let vertical = Layout::vertical([
-            Constraint::Length(1),
-            Constraint::Min(0),
-            Constraint::Length(1),
-        ]);
-        let [header_area, inner_area, footer_area] = vertical.areas(area);
+        let vertical = Layout::vertical([Constraint::Length(1), Constraint::Min(0)]);
+        let [header_area, inner_area] = vertical.areas(area);
 
         let horizontal = Layout::horizontal([Constraint::Min(0)]);
         let [tabs_area] = horizontal.areas(header_area);
         self.render_tabs(tabs_area, buf);
         self.state.tabs.selected.render(inner_area, buf, self);
-        self.render_footer(footer_area, buf);
     }
 }
 

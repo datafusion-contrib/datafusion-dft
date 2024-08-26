@@ -51,6 +51,10 @@ impl ExecutionContext {
         Ok(())
     }
 
+    pub fn session_ctx(&self) -> &SessionContext {
+        &self.session_ctx
+    }
+
     pub async fn execute_stream_sql(&mut self, query: &str) -> Result<()> {
         let df = self.session_ctx.sql(query).await.unwrap();
         let physical_plan = df.create_physical_plan().await.unwrap();
