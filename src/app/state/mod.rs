@@ -18,7 +18,7 @@
 pub mod tabs;
 
 use crate::app::config::get_data_dir;
-use crate::app::state::tabs::explore::ExploreTabState;
+use crate::app::state::tabs::sql::SQLTabState;
 use crate::cli;
 use crate::ui::SelectedTab;
 use log::{debug, error, info};
@@ -27,6 +27,8 @@ use std::path::PathBuf;
 use self::tabs::logs::LogsTabState;
 
 use super::config::AppConfig;
+#[cfg(feature = "flightsql")]
+use crate::state::tabs::flightsql::FlightSQLTabState;
 
 #[derive(Debug)]
 pub struct Tabs {
@@ -46,7 +48,9 @@ pub struct AppState<'app> {
     pub config: AppConfig,
     pub should_quit: bool,
     pub data_dir: PathBuf,
-    pub explore_tab: ExploreTabState<'app>,
+    pub sql_tab: SQLTabState<'app>,
+    #[cfg(feature = "flightsql")]
+    pub flightsql_tab: FlightSQLTabState<'app>,
     pub logs_tab: LogsTabState,
     pub tabs: Tabs,
 }
@@ -81,14 +85,18 @@ pub fn initialize(args: &cli::DftCli) -> AppState {
 
     let tabs = Tabs::default();
 
-    let explore_tab_state = ExploreTabState::new();
+    let sql_tab_state = SQLTabState::new();
+    #[cfg(feature = "flightsql")]
+    let flightsql_tab_state = FlightSQLTabState::new();
     let logs_tab_state = LogsTabState::default();
 
     AppState {
         config,
         data_dir,
         tabs,
-        explore_tab: explore_tab_state,
+        sql_tab: sql_tab_state,
+        #[cfg(feature = "flightsql")]
+        flightsql_tab: flightsql_tab_state,
         logs_tab: logs_tab_state,
         should_quit: false,
     }

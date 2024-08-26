@@ -16,6 +16,7 @@
 // under the License.
 
 pub mod context;
+#[cfg(feature = "flightsql")]
 pub mod flightsql;
 pub mod logs;
 pub mod sql;

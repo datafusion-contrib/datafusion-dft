@@ -99,7 +99,7 @@ pub fn record_batches_to_table<'frame, 'results>(
     record_batches: &'results [RecordBatch],
 ) -> Table<'frame>
 where
-    // The results come from explore_tab state which persists until the next query is run which is
+    // The results come from sql_tab state which persists until the next query is run which is
     // longer than a frame lifetime.
     'results: 'frame,
 {

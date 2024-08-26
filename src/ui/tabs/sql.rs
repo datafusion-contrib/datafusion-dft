@@ -25,7 +25,7 @@ use ratatui::{
 use crate::{app::App, ui::convert::record_batches_to_table};
 
 pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
-    let border_color = if app.state.explore_tab.editor_editable() {
+    let border_color = if app.state.sql_tab.editor_editable() {
         tailwind::GREEN.c300
     } else {
         tailwind::WHITE
@@ -35,16 +35,16 @@ pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
         .borders(Borders::ALL)
         .fg(border_color)
         .title_bottom(" Cmd+Enter to run query ");
-    let mut editor = app.state.explore_tab.editor();
+    let mut editor = app.state.sql_tab.editor();
     editor.set_block(block);
     editor.render(area, buf)
 }
 
 pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
     let block = Block::default().title(" Results ").borders(Borders::ALL);
-    if let Some(q) = app.state.explore_tab.query() {
+    if let Some(q) = app.state.sql_tab.query() {
         if let Some(r) = q.results() {
-            if let Some(s) = app.state.explore_tab.query_results_state() {
+            if let Some(s) = app.state.sql_tab.query_results_state() {
                 let block = block
                     .title_bottom(format!(
                         " {} rows in {}ms",
@@ -74,7 +74,7 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
 
 pub fn render_sql_help(area: Rect, buf: &mut Buffer, app: &App) {
     let block = Block::default();
-    let help = if app.state.explore_tab.editor_editable() {
+    let help = if app.state.sql_tab.editor_editable() {
         vec!["'Esc' to exit edit mode"]
     } else {
         vec!["'e' to edit", "'c' to clear editor", "'Enter' to run query"]

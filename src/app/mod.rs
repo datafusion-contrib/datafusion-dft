@@ -41,7 +41,10 @@ use tokio_util::sync::CancellationToken;
 
 use self::execution::ExecutionContext;
 use self::handlers::{app_event_handler, crossterm_event_handler};
-use self::state::tabs::explore::Query;
+use self::state::tabs::sql::Query;
+
+#[cfg(feature = "flightsql")]
+use self::state::tabs::flightsql::FlightSQLQuery;
 
 #[derive(Clone, Debug)]
 pub enum AppEvent {
@@ -61,6 +64,8 @@ pub enum AppEvent {
     QueryResult(Query),
     #[cfg(feature = "flightsql")]
     EstablishFlightSQLConnection,
+    #[cfg(feature = "flightsql")]
+    FlightSQLQueryResult(FlightSQLQuery),
 }
 
 pub struct App<'app> {

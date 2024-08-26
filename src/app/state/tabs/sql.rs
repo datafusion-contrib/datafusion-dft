@@ -88,16 +88,16 @@ impl Query {
 }
 
 #[derive(Debug, Default)]
-pub struct ExploreTabState<'app> {
+pub struct SQLTabState<'app> {
     editor: TextArea<'app>,
     editor_editable: bool,
     query: Option<Query>,
-    query_results: Option<Vec<RecordBatch>>,
+    // query_results: Option<Vec<RecordBatch>>,
     query_results_state: Option<RefCell<TableState>>,
-    query_error: Option<String>,
+    // query_error: Option<String>,
 }
 
-impl<'app> ExploreTabState<'app> {
+impl<'app> SQLTabState<'app> {
     pub fn new() -> Self {
         let empty_text = vec!["Enter a query here.".to_string()];
         // TODO: Enable vim mode from config?
@@ -107,9 +107,9 @@ impl<'app> ExploreTabState<'app> {
             editor: textarea,
             editor_editable: false,
             query: None,
-            query_results: None,
+            // query_results: None,
             query_results_state: None,
-            query_error: None,
+            // query_error: None,
         }
     }
 
@@ -121,13 +121,13 @@ impl<'app> ExploreTabState<'app> {
         self.query_results_state = Some(RefCell::new(TableState::default()));
     }
 
-    pub fn query_error(&self) -> &Option<String> {
-        &self.query_error
-    }
+    // pub fn query_error(&self) -> &Option<String> {
+    //     &self.query_error
+    // }
 
-    pub fn set_query_error(&mut self, error: String) {
-        self.query_error = Some(error);
-    }
+    // pub fn set_query_error(&mut self, error: String) {
+    //     self.query_error = Some(error);
+    // }
 
     pub fn editor(&self) -> TextArea {
         // TODO: Figure out how to do this without clone. Probably need logic in handler to make
@@ -174,11 +174,11 @@ impl<'app> ExploreTabState<'app> {
         &self.query
     }
 
-    pub fn set_query_results(&mut self, query_results: Vec<RecordBatch>) {
-        self.query_results = Some(query_results);
-    }
+    // pub fn set_query_results(&mut self, query_results: Vec<RecordBatch>) {
+    //     self.query_results = Some(query_results);
+    // }
 
-    pub fn query_results(&self) -> &Option<Vec<RecordBatch>> {
-        &self.query_results
-    }
+    // pub fn query_results(&self) -> &Option<Vec<RecordBatch>> {
+    //     &self.query_results
+    // }
 }
