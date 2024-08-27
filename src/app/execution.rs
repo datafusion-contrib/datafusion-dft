@@ -52,7 +52,7 @@ impl ExecutionContext {
             .with_batch_size(1)
             .with_information_schema(true);
 
-        let mut state = SessionStateBuilder::new()
+        let state = SessionStateBuilder::new()
             .with_default_features()
             .with_config(cfg)
             .build();
@@ -68,13 +68,13 @@ impl ExecutionContext {
             let session_ctx = SessionContext::new_with_state(state);
             let cancellation_token = CancellationToken::new();
 
-            return Self {
+            Self {
                 config,
                 session_ctx,
                 cancellation_token,
                 #[cfg(feature = "flightsql")]
                 flightsql_client: Arc::new(Mutex::new(None)),
-            };
+            }
         }
     }
 

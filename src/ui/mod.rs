@@ -27,6 +27,7 @@ use self::tabs::{context, logs, sql};
 
 #[derive(Clone, Copy, Debug, Display, FromRepr, EnumIter)]
 pub enum SelectedTab {
+    #[allow(clippy::upper_case_acronyms)]
     #[strum(to_string = "SQL")]
     SQL,
     #[cfg(feature = "flightsql")]
