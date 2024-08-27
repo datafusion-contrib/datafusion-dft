@@ -15,10 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#[cfg(any(feature = "deltalake", feature = "flightsql"))]
+#[cfg(any(feature = "deltalake", feature = "flightsql", feature = "s3"))]
 use std::sync::Arc;
 
-use datafusion::execution::runtime_env::RuntimeEnv;
+use datafusion::execution::runtime_env::{self, RuntimeEnv};
 use tokio::runtime::Runtime;
 #[cfg(feature = "flightsql")]
 use tokio::sync::Mutex;
@@ -33,6 +33,8 @@ use datafusion::physical_plan::execute_stream;
 use datafusion::prelude::*;
 #[cfg(feature = "deltalake")]
 use deltalake::delta_datafusion::DeltaTableFactory;
+#[cfg(feature = "s3")]
+use object_store::aws::AmazonS3Builder;
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 #[cfg(feature = "flightsql")]
@@ -58,7 +60,13 @@ impl ExecutionContext {
 
         #[cfg(feature = "s3")]
         {
-            if let Some(object_store_config) = &config.object_store_config {}
+            if let Some(object_store_config) = &config.object_store_config {
+                if let Some(s3_config) = object_store_config {
+                    let object_store = s3_config.to_object_store();
+                    runtime_env
+                        .register_object_store(s3_config.aws_endpoint, Arc::new(object_store));
+                }
+            }
         }
 
         let state = SessionStateBuilder::new()
