@@ -44,7 +44,7 @@ impl SelectedTab {
         let padding = Span::from("  ");
         match self {
             SelectedTab::SQL => {
-                let bold_char = Span::from("S").bold();
+                let bold_char = Span::from("S").bold().black();
                 let remaining = Span::from("QL");
                 Line::from_iter(vec![padding.clone(), bold_char, remaining, padding.clone()])
                     .fg(tailwind::SLATE.c200)
@@ -52,14 +52,14 @@ impl SelectedTab {
             }
             #[cfg(feature = "flightsql")]
             Self::FlightSQL => {
-                let bold_char = Span::from("F").bold();
+                let bold_char = Span::from("F").bold().black();
                 let remaining = Span::from("lightSQL");
                 Line::from_iter(vec![padding.clone(), bold_char, remaining, padding.clone()])
                     .fg(tailwind::SLATE.c200)
                     .bg(self.bg())
             }
             Self::Logs => {
-                let bold_char = Span::from("L").bold();
+                let bold_char = Span::from("L").bold().black();
                 let remaining = Span::from("OGS");
                 Line::from_iter(vec![padding.clone(), bold_char, remaining, padding.clone()])
                     .fg(tailwind::SLATE.c200)
@@ -67,7 +67,7 @@ impl SelectedTab {
             }
             Self::Context => {
                 let start = Span::from("CONTE");
-                let bold_char = Span::from("X").bold();
+                let bold_char = Span::from("X").bold().black();
                 let remaining = Span::from("T");
                 Line::from_iter(vec![
                     padding.clone(),
