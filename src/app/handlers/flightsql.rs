@@ -78,42 +78,52 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
                 let start = Instant::now();
                 if let Some(ref mut c) = *client.lock().await {
                     info!("Sending query");
-                    let flight_info = c.execute(sql, None).await.unwrap();
+                    match c.execute(sql, None).await {
+                        Ok(flight_info) => {
+                            for endpoint in flight_info.endpoint {
+                                if let Some(ticket) = endpoint.ticket {
+                                    match c.do_get(ticket.into_request()).await {
+                                        Ok(mut stream) => {
+                                            let mut batches: Vec<RecordBatch> = Vec::new();
+                                            while let Some(maybe_batch) = stream.next().await {
+                                                match maybe_batch {
+                                                    Ok(batch) => {
+                                                        info!("Batch rows: {}", batch.num_rows());
+                                                        batches.push(batch);
+                                                        break;
+                                                    }
+                                                    Err(e) => {
+                                                        error!("Error getting batch: {:?}", e);
+                                                        let elapsed = start.elapsed();
+                                                        query.set_error(Some(e.to_string()));
+                                                        query.set_elapsed_time(elapsed);
+                                                        break;
+                                                    }
+                                                }
+                                            }
 
-                    for endpoint in flight_info.endpoint {
-                        if let Some(ticket) = endpoint.ticket {
-                            match c.do_get(ticket.into_request()).await {
-                                Ok(mut stream) => {
-                                    let mut batches: Vec<RecordBatch> = Vec::new();
-                                    while let Some(maybe_batch) = stream.next().await {
-                                        match maybe_batch {
-                                            Ok(batch) => {
-                                                info!("Batch rows: {}", batch.num_rows());
-                                                batches.push(batch);
-                                            }
-                                            Err(e) => {
-                                                error!("Error getting batch: {:?}", e);
-                                                let elapsed = start.elapsed();
-                                                query.set_error(Some(e.to_string()));
-                                                query.set_elapsed_time(elapsed);
-                                                break;
-                                            }
+                                            let elapsed = start.elapsed();
+                                            let rows: usize =
+                                                batches.iter().map(|r| r.num_rows()).sum();
+                                            query.set_results(Some(batches));
+                                            query.set_num_rows(Some(rows));
+                                            query.set_elapsed_time(elapsed);
+                                        }
+                                        Err(e) => {
+                                            error!("Error getting response: {:?}", e);
+                                            let elapsed = start.elapsed();
+                                            query.set_error(Some(e.to_string()));
+                                            query.set_elapsed_time(elapsed);
                                         }
                                     }
-
-                                    let elapsed = start.elapsed();
-                                    let rows: usize = batches.iter().map(|r| r.num_rows()).sum();
-                                    query.set_results(Some(batches));
-                                    query.set_num_rows(Some(rows));
-                                    query.set_elapsed_time(elapsed);
-                                }
-                                Err(e) => {
-                                    error!("Error getting response: {:?}", e);
-                                    let elapsed = start.elapsed();
-                                    query.set_error(Some(e.to_string()));
-                                    query.set_elapsed_time(elapsed);
                                 }
                             }
+                        }
+                        Err(e) => {
+                            error!("Error getting response: {:?}", e);
+                            let elapsed = start.elapsed();
+                            query.set_error(Some(e.to_string()));
+                            query.set_elapsed_time(elapsed);
                         }
                     }
                 }

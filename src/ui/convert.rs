@@ -15,12 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use color_eyre::{eyre::eyre, Result};
 use datafusion::arrow::{
     array::{
-        Int16Array, Int32Array, Int64Array, Int8Array, RecordBatch, StringArray, UInt16Array,
-        UInt32Array, UInt64Array, UInt8Array,
+        BooleanArray, Date32Array, Date64Array, Float16Array, Float32Array, Float64Array,
+        Int16Array, Int32Array, Int64Array, Int8Array, RecordBatch, StringArray,
+        TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray,
+        TimestampSecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
     },
-    datatypes::DataType,
+    datatypes::{DataType, TimeUnit},
 };
 use ratatui::{
     layout::Constraint,
@@ -56,7 +59,7 @@ pub fn create_row_number_cells(record_batch: &RecordBatch) -> Vec<Cell> {
     cells
 }
 
-pub fn record_batch_to_table_row_cells(record_batch: &RecordBatch) -> Vec<Vec<Cell>> {
+pub fn record_batch_to_table_row_cells(record_batch: &RecordBatch) -> Result<Vec<Vec<Cell>>> {
     let row_count = record_batch.num_rows();
     let column_count = record_batch.num_columns();
 
@@ -82,10 +85,29 @@ pub fn record_batch_to_table_row_cells(record_batch: &RecordBatch) -> Vec<Vec<Ce
             DataType::UInt16 => convert_array_values_to_cells!(rows, arr, UInt16Array),
             DataType::UInt32 => convert_array_values_to_cells!(rows, arr, UInt32Array),
             DataType::UInt64 => convert_array_values_to_cells!(rows, arr, UInt64Array),
-            _ => {}
+            DataType::Date32 => convert_array_values_to_cells!(rows, arr, Date32Array),
+            DataType::Date64 => convert_array_values_to_cells!(rows, arr, Date64Array),
+            DataType::Timestamp(TimeUnit::Second, _) => {
+                convert_array_values_to_cells!(rows, arr, TimestampSecondArray)
+            }
+            DataType::Timestamp(TimeUnit::Nanosecond, _) => {
+                convert_array_values_to_cells!(rows, arr, TimestampNanosecondArray)
+            }
+            DataType::Timestamp(TimeUnit::Microsecond, _) => {
+                convert_array_values_to_cells!(rows, arr, TimestampMicrosecondArray)
+            }
+            DataType::Timestamp(TimeUnit::Millisecond, _) => {
+                convert_array_values_to_cells!(rows, arr, TimestampMillisecondArray)
+            }
+            DataType::Float16 => convert_array_values_to_cells!(rows, arr, Float16Array),
+            DataType::Float32 => convert_array_values_to_cells!(rows, arr, Float32Array),
+            DataType::Float64 => convert_array_values_to_cells!(rows, arr, Float64Array),
+            DataType::Boolean => convert_array_values_to_cells!(rows, arr, BooleanArray),
+
+            dtype => return Err(eyre!("Table conversion not setup for type {}", dtype)),
         }
     }
-    rows
+    Ok(rows)
 }
 
 pub fn empty_results_table<'frame>() -> Table<'frame> {
@@ -97,30 +119,28 @@ pub fn empty_results_table<'frame>() -> Table<'frame> {
 
 pub fn record_batches_to_table<'frame, 'results>(
     record_batches: &'results [RecordBatch],
-) -> Table<'frame>
+) -> Result<Table<'frame>>
 where
     // The results come from sql_tab state which persists until the next query is run which is
     // longer than a frame lifetime.
     'results: 'frame,
 {
     if record_batches.is_empty() {
-        empty_results_table()
+        Ok(empty_results_table())
     } else {
         let first_batch = &record_batches[0];
         let header_cells = record_batch_to_table_header_cells(first_batch);
         let header_row = Row::from_iter(header_cells).bold();
-        let rows: Vec<Row> = record_batches
-            .iter()
-            .flat_map(|b| {
-                let batch_row_cells = record_batch_to_table_row_cells(b);
-                let rows: Vec<Row> = batch_row_cells.into_iter().map(Row::from_iter).collect();
-                rows
-            })
-            .collect();
+        let rows: Result<Vec<Row>> = record_batches.iter().try_fold(Vec::new(), |mut acc, b| {
+            let batch_row_cells = record_batch_to_table_row_cells(b)?;
+            let rows: Vec<Row> = batch_row_cells.into_iter().map(Row::from_iter).collect();
+            acc.extend(rows);
+            Ok(acc)
+        });
         let column_count = first_batch.num_columns() + 1;
         let widths = (0..column_count).map(|_| Constraint::Fill(1));
         let block = Block::default().borders(Borders::all());
-        Table::new(rows, widths).header(header_row).block(block)
+        Ok(Table::new(rows?, widths).header(header_row).block(block))
     }
 }
 
@@ -161,7 +181,7 @@ mod tests {
         let a: ArrayRef = Arc::new(StringArray::from(vec!["a", "b", "c"]));
 
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
-        let table_cells = record_batch_to_table_row_cells(&batch);
+        let table_cells = record_batch_to_table_row_cells(&batch).unwrap();
         let expected = vec![
             vec![Cell::new("0"), Cell::new("a")],
             vec![Cell::new("1"), Cell::new("b")],
@@ -171,7 +191,7 @@ mod tests {
 
         let a: ArrayRef = Arc::new(Int8Array::from(vec![1, 2, 3]));
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
-        let a_table_cells = record_batch_to_table_row_cells(&batch);
+        let a_table_cells = record_batch_to_table_row_cells(&batch).unwrap();
         let expected = vec![
             vec![Cell::new("0"), Cell::new("1")],
             vec![Cell::new("1"), Cell::new("2")],
@@ -181,7 +201,7 @@ mod tests {
 
         let a: ArrayRef = Arc::new(Int16Array::from(vec![1, 2, 3]));
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
-        let a_table_cells = record_batch_to_table_row_cells(&batch);
+        let a_table_cells = record_batch_to_table_row_cells(&batch).unwrap();
         let expected = vec![
             vec![Cell::new("0"), Cell::new("1")],
             vec![Cell::new("1"), Cell::new("2")],
@@ -191,7 +211,7 @@ mod tests {
 
         let a: ArrayRef = Arc::new(Int32Array::from(vec![1, 2, 3]));
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
-        let a_table_cells = record_batch_to_table_row_cells(&batch);
+        let a_table_cells = record_batch_to_table_row_cells(&batch).unwrap();
         let expected = vec![
             vec![Cell::new("0"), Cell::new("1")],
             vec![Cell::new("1"), Cell::new("2")],
@@ -201,7 +221,7 @@ mod tests {
 
         let a: ArrayRef = Arc::new(Int64Array::from(vec![1, 2, 3]));
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
-        let a_table_cells = record_batch_to_table_row_cells(&batch);
+        let a_table_cells = record_batch_to_table_row_cells(&batch).unwrap();
         let expected = vec![
             vec![Cell::new("0"), Cell::new("1")],
             vec![Cell::new("1"), Cell::new("2")],
@@ -211,7 +231,7 @@ mod tests {
 
         let a: ArrayRef = Arc::new(UInt8Array::from(vec![1, 2, 3]));
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
-        let a_table_cells = record_batch_to_table_row_cells(&batch);
+        let a_table_cells = record_batch_to_table_row_cells(&batch).unwrap();
         let expected = vec![
             vec![Cell::new("0"), Cell::new("1")],
             vec![Cell::new("1"), Cell::new("2")],
@@ -221,7 +241,7 @@ mod tests {
 
         let a: ArrayRef = Arc::new(UInt16Array::from(vec![1, 2, 3]));
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
-        let a_table_cells = record_batch_to_table_row_cells(&batch);
+        let a_table_cells = record_batch_to_table_row_cells(&batch).unwrap();
         let expected = vec![
             vec![Cell::new("0"), Cell::new("1")],
             vec![Cell::new("1"), Cell::new("2")],
@@ -231,7 +251,7 @@ mod tests {
 
         let a: ArrayRef = Arc::new(UInt32Array::from(vec![1, 2, 3]));
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
-        let a_table_cells = record_batch_to_table_row_cells(&batch);
+        let a_table_cells = record_batch_to_table_row_cells(&batch).unwrap();
         let expected = vec![
             vec![Cell::new("0"), Cell::new("1")],
             vec![Cell::new("1"), Cell::new("2")],
@@ -241,7 +261,7 @@ mod tests {
 
         let a: ArrayRef = Arc::new(UInt64Array::from(vec![1, 2, 3]));
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
-        let a_table_cells = record_batch_to_table_row_cells(&batch);
+        let a_table_cells = record_batch_to_table_row_cells(&batch).unwrap();
         let expected = vec![
             vec![Cell::new("0"), Cell::new("1")],
             vec![Cell::new("1"), Cell::new("2")],
@@ -255,7 +275,7 @@ mod tests {
         let a: ArrayRef = Arc::new(Int32Array::from(vec![1, 2, 3]));
         let b: ArrayRef = Arc::new(StringArray::from(vec!["a", "b", "c"]));
         let batch = RecordBatch::try_from_iter(vec![("a", a), ("b", b)]).unwrap();
-        let a_table_cells = record_batch_to_table_row_cells(&batch);
+        let a_table_cells = record_batch_to_table_row_cells(&batch).unwrap();
         let expected = vec![
             vec![Cell::new("0"), Cell::new("1"), Cell::new("a")],
             vec![Cell::new("1"), Cell::new("2"), Cell::new("b")],
