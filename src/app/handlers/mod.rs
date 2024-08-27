@@ -136,20 +136,20 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
     trace!("Tui::Event: {:?}", event);
     let now = std::time::Instant::now();
     match event {
-        AppEvent::Key(KeyEvent {
-            code: KeyCode::Char('q'),
-            ..
-        }) => {
-            app.state.should_quit = true;
-        }
-        AppEvent::Key(KeyEvent {
-            code:
-                tab
-                @ (KeyCode::Char('s') | KeyCode::Char('l') | KeyCode::Char('x') | KeyCode::Char('f')),
-            ..
-        }) => {
-            tab_navigation_handler(app, tab);
-        }
+        // AppEvent::Key(KeyEvent {
+        //     code: KeyCode::Char('q'),
+        //     ..
+        // }) => {
+        //     app.state.should_quit = true;
+        // }
+        // AppEvent::Key(KeyEvent {
+        //     code:
+        //         tab
+        //         @ (KeyCode::Char('s') | KeyCode::Char('l') | KeyCode::Char('x') | KeyCode::Char('f')),
+        //     ..
+        // }) => {
+        //     tab_navigation_handler(app, tab);
+        // }
         AppEvent::ExecuteDDL(ddl) => {
             let queries: Vec<String> = ddl.split(';').map(|s| s.to_string()).collect();
             queries.into_iter().for_each(|q| {
@@ -175,7 +175,7 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                 match maybe_channel {
                     Ok(channel) => {
                         let flightsql_client = FlightSqlServiceClient::new(channel);
-                        let mut locked_client = client.lock().unwrap();
+                        let mut locked_client = client.lock().await;
                         *locked_client = Some(flightsql_client);
                     }
                     Err(e) => {

@@ -21,23 +21,25 @@ use color_eyre::eyre::eyre;
 use log::{error, info};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::app::{state::tabs::sql::Query, AppEvent};
+use crate::app::{handlers::tab_navigation_handler, state::tabs::sql::Query, AppEvent};
 
 use super::App;
 
 pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
     info!("Normal mode handler");
     match key.code {
+        KeyCode::Char('q') => app.state.should_quit = true,
+        tab @ (KeyCode::Char('s')
+        | KeyCode::Char('l')
+        | KeyCode::Char('x')
+        | KeyCode::Char('f')) => tab_navigation_handler(app, tab),
         KeyCode::Char('c') => app.state.sql_tab.clear_editor(),
         KeyCode::Char('e') => {
-            info!("Handling");
             let editor = app.state.sql_tab.editor();
             let lines = editor.lines();
             let content = lines.join("");
-            info!("Conent: {}", content);
             let default = "Enter a query here.";
             if content == default {
-                info!("Clearing default content");
                 app.state.sql_tab.clear_placeholder();
             }
             app.state.sql_tab.edit();

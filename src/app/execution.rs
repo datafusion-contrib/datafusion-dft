@@ -19,7 +19,7 @@
 use std::sync::Arc;
 
 #[cfg(feature = "flightsql")]
-use std::sync::Mutex;
+use tokio::sync::Mutex;
 
 #[cfg(feature = "flightsql")]
 use arrow_flight::sql::client::FlightSqlServiceClient;

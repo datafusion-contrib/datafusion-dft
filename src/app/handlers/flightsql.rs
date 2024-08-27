@@ -19,16 +19,25 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use color_eyre::eyre::eyre;
+use datafusion::arrow::array::RecordBatch;
 use log::{error, info};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use tokio_stream::StreamExt;
+use tonic::IntoRequest;
 
-use crate::app::{state::tabs::sql::Query, AppEvent};
+use crate::app::state::tabs::flightsql::FlightSQLQuery;
+use crate::app::{handlers::tab_navigation_handler, AppEvent};
 
 use super::App;
 
 pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
     info!("FSNormal mode handler");
     match key.code {
+        KeyCode::Char('q') => app.state.should_quit = true,
+        tab @ (KeyCode::Char('s')
+        | KeyCode::Char('l')
+        | KeyCode::Char('x')
+        | KeyCode::Char('f')) => tab_navigation_handler(app, tab),
         KeyCode::Char('c') => app.state.flightsql_tab.clear_editor(),
         KeyCode::Char('e') => {
             info!("Handling");
@@ -62,17 +71,55 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
             info!("Run FS query");
             let sql = app.state.flightsql_tab.editor().lines().join("");
             info!("SQL: {}", sql);
-            let mut query = Query::new(sql.clone(), None, None, None, Duration::default());
             let client = Arc::clone(&app.execution.flightsql_client);
             let _event_tx = app.app_event_tx.clone();
-            // TODO: Maybe this should be on a separate runtime to prevent blocking main thread /
-            // runtime
             tokio::spawn(async move {
+                let mut query =
+                    FlightSQLQuery::new(sql.clone(), None, None, None, Duration::default());
                 let start = std::time::Instant::now();
-                if let Some(ref mut c) = *client.lock().unwrap() {
+                if let Some(ref mut c) = *client.lock().await {
                     info!("Sending query");
-                    let r = c.execute(sql, None);
+                    let flight_info = c.execute(sql, None).await.unwrap();
+
+                    for endpoint in flight_info.endpoint {
+                        if let Some(ticket) = endpoint.ticket {
+                            match c.do_get(ticket.into_request()).await {
+                                Ok(mut stream) => {
+                                    let mut batches: Vec<RecordBatch> = Vec::new();
+                                    while let Some(maybe_batch) = stream.next().await {
+                                        match maybe_batch {
+                                            Ok(batch) => {
+                                                info!("Batch rows: {}", batch.num_rows());
+                                                batches.push(batch);
+                                            }
+                                            Err(e) => {
+                                                error!("Error getting batch: {:?}", e);
+                                                let elapsed = start.elapsed();
+                                                query.set_error(Some(e.to_string()));
+                                                query.set_elapsed_time(elapsed);
+                                                break;
+                                            }
+                                        }
+                                    }
+
+                                    let elapsed = start.elapsed();
+                                    let rows: usize = batches.iter().map(|r| r.num_rows()).sum();
+                                    query.set_results(Some(batches));
+                                    query.set_num_rows(Some(rows));
+                                    query.set_elapsed_time(elapsed);
+                                }
+                                Err(e) => {
+                                    error!("Error getting response: {:?}", e);
+                                    let elapsed = start.elapsed();
+                                    query.set_error(Some(e.to_string()));
+                                    query.set_elapsed_time(elapsed);
+                                }
+                            }
+                        }
+                    }
                 }
+
+                let _ = _event_tx.send(AppEvent::FlightSQLQueryResult(query));
 
                 // match ctx.sql(&sql).await {
                 //     Ok(df) => match df.collect().await {
