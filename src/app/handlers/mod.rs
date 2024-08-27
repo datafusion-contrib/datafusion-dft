@@ -61,11 +61,13 @@ fn tab_navigation_handler(app: &mut App, key: KeyCode) {
 
 fn logs_tab_key_event_handler(app: &mut App, key: KeyEvent) {
     match key.code {
+        KeyCode::Char('q') => app.state.should_quit = true,
+        tab @ (KeyCode::Char('s')
+        | KeyCode::Char('l')
+        | KeyCode::Char('x')
+        | KeyCode::Char('f')) => tab_navigation_handler(app, tab),
         KeyCode::Char('h') => {
             app.state.logs_tab.transition(TuiWidgetEvent::HideKey);
-        }
-        KeyCode::Char('f') => {
-            app.state.logs_tab.transition(TuiWidgetEvent::FocusKey);
         }
         KeyCode::Char('+') => {
             app.state.logs_tab.transition(TuiWidgetEvent::PlusKey);
@@ -102,7 +104,16 @@ fn logs_tab_key_event_handler(app: &mut App, key: KeyEvent) {
     }
 }
 
-fn context_tab_key_event_handler(_app: &mut App, _key: KeyEvent) {}
+fn context_tab_key_event_handler(app: &mut App, key: KeyEvent) {
+    match key.code {
+        KeyCode::Char('q') => app.state.should_quit = true,
+        tab @ (KeyCode::Char('s')
+        | KeyCode::Char('l')
+        | KeyCode::Char('x')
+        | KeyCode::Char('f')) => tab_navigation_handler(app, tab),
+        _ => {}
+    }
+}
 
 fn logs_tab_app_event_handler(app: &mut App, event: AppEvent) {
     match event {
