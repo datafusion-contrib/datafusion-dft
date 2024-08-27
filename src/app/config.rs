@@ -60,6 +60,9 @@ pub struct AppConfig {
     pub display: DisplayConfig,
     #[serde(default = "default_interaction_config")]
     pub interaction: InteractionConfig,
+    #[cfg(feature = "flightsql")]
+    #[serde(default = "default_flightsql_config")]
+    pub flightsql: FlightSQLConfig,
 }
 
 fn default_datafusion_config() -> DataFusionConfig {
@@ -72,6 +75,11 @@ fn default_display_config() -> DisplayConfig {
 
 fn default_interaction_config() -> InteractionConfig {
     InteractionConfig::default()
+}
+
+#[cfg(feature = "flightsql")]
+fn default_flightsql_config() -> FlightSQLConfig {
+    FlightSQLConfig::default()
 }
 
 #[derive(Debug, Deserialize)]
@@ -131,4 +139,25 @@ fn default_mouse() -> bool {
 
 fn default_paste() -> bool {
     false
+}
+
+#[cfg(feature = "flightsql")]
+#[derive(Debug, Deserialize)]
+pub struct FlightSQLConfig {
+    #[serde(default = "default_connection_url")]
+    pub connection_url: String,
+}
+
+#[cfg(feature = "flightsql")]
+impl Default for FlightSQLConfig {
+    fn default() -> Self {
+        Self {
+            connection_url: default_connection_url(),
+        }
+    }
+}
+
+#[cfg(feature = "flightsql")]
+pub fn default_connection_url() -> String {
+    "http://localhost:50051".to_string()
 }

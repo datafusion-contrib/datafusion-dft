@@ -14,18 +14,23 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
+#[cfg(feature = "flightsql")]
+pub mod flightsql;
+pub mod sql;
 
-use std::time::{Duration, Instant};
-
-use color_eyre::{eyre::eyre, Result};
-use log::{debug, error, info, trace};
-use ratatui::crossterm::event::{self, KeyCode, KeyEvent, KeyModifiers};
+use color_eyre::Result;
+use log::{debug, info, trace};
+use ratatui::crossterm::event::{self, KeyCode, KeyEvent};
 use tui_logger::TuiWidgetEvent;
 
-use crate::{
-    app::{state::tabs::explore::Query, AppEvent},
-    ui::SelectedTab,
-};
+#[cfg(feature = "flightsql")]
+use arrow_flight::sql::client::FlightSqlServiceClient;
+#[cfg(feature = "flightsql")]
+use std::sync::Arc;
+#[cfg(feature = "flightsql")]
+use tonic::transport::Channel;
+
+use crate::{app::AppEvent, ui::SelectedTab};
 
 use super::App;
 
@@ -45,126 +50,11 @@ pub fn crossterm_event_handler(event: event::Event) -> Option<AppEvent> {
 
 fn tab_navigation_handler(app: &mut App, key: KeyCode) {
     match key {
-        KeyCode::Char('s') => app.state.tabs.selected = SelectedTab::Queries,
+        KeyCode::Char('s') => app.state.tabs.selected = SelectedTab::SQL,
         KeyCode::Char('l') => app.state.tabs.selected = SelectedTab::Logs,
         KeyCode::Char('x') => app.state.tabs.selected = SelectedTab::Context,
-        _ => {}
-    };
-}
-
-fn explore_tab_normal_mode_handler(app: &mut App, key: KeyEvent) {
-    match key.code {
-        KeyCode::Char('c') => app.state.explore_tab.clear_editor(),
-        KeyCode::Char('e') => {
-            let editor = app.state.explore_tab.editor();
-            let lines = editor.lines();
-            let content = lines.join("");
-            info!("Conent: {}", content);
-            let default = "Enter a query here.";
-            if content == default {
-                info!("Clearing default content");
-                app.state.explore_tab.clear_placeholder();
-            }
-            app.state.explore_tab.edit();
-        }
-        KeyCode::Down => {
-            if let Some(s) = app.state.explore_tab.query_results_state() {
-                info!("Select next");
-                let mut s = s.borrow_mut();
-                s.select_next();
-            }
-        }
-        KeyCode::Up => {
-            if let Some(s) = app.state.explore_tab.query_results_state() {
-                info!("Select previous");
-                let mut s = s.borrow_mut();
-                s.select_previous();
-            }
-        }
-
-        KeyCode::Enter => {
-            info!("Run query");
-            let sql = app.state.explore_tab.editor().lines().join("");
-            info!("SQL: {}", sql);
-            let mut query = Query::new(sql.clone(), None, None, None, Duration::default());
-            let ctx = app.execution.session_ctx.clone();
-            let _event_tx = app.app_event_tx.clone();
-            // TODO: Maybe this should be on a separate runtime to prevent blocking main thread /
-            // runtime
-            tokio::spawn(async move {
-                let start = std::time::Instant::now();
-                match ctx.sql(&sql).await {
-                    Ok(df) => match df.collect().await {
-                        Ok(res) => {
-                            let elapsed = start.elapsed();
-                            let rows: usize = res.iter().map(|r| r.num_rows()).sum();
-                            query.set_results(Some(res));
-                            query.set_num_rows(Some(rows));
-                            query.set_elapsed_time(elapsed);
-                        }
-                        Err(e) => {
-                            error!("Error collecting results: {:?}", e);
-                            let elapsed = start.elapsed();
-                            query.set_error(Some(e.to_string()));
-                            query.set_elapsed_time(elapsed);
-                        }
-                    },
-                    Err(e) => {
-                        error!("Error creating dataframe: {:?}", e);
-                        let elapsed = start.elapsed();
-                        query.set_error(Some(e.to_string()));
-                        query.set_elapsed_time(elapsed);
-                    }
-                }
-                let _ = _event_tx.send(AppEvent::ExploreQueryResult(query));
-            });
-        }
-        _ => {}
-    }
-}
-
-fn explore_tab_editable_handler(app: &mut App, key: KeyEvent) {
-    info!("KeyEvent: {:?}", key);
-    match (key.code, key.modifiers) {
-        (KeyCode::Esc, _) => app.state.explore_tab.exit_edit(),
-        (KeyCode::Enter, KeyModifiers::CONTROL) => {
-            let query = app.state.explore_tab.editor().lines().join("");
-            let ctx = app.execution.session_ctx.clone();
-            let _event_tx = app.app_event_tx.clone();
-            // TODO: Maybe this should be on a separate runtime to prevent blocking main thread /
-            // runtime
-            tokio::spawn(async move {
-                // TODO: Turn this into a match and return the error somehow
-                let start = Instant::now();
-                if let Ok(df) = ctx.sql(&query).await {
-                    if let Ok(res) = df.collect().await.map_err(|e| eyre!(e)) {
-                        info!("Results: {:?}", res);
-                        let elapsed = start.elapsed();
-                        let query = Query::new(query, Some(res), None, None, elapsed);
-                        let _ = _event_tx.send(AppEvent::ExploreQueryResult(query));
-                    }
-                } else {
-                    error!("Error creating dataframe")
-                }
-            });
-        }
-        _ => app.state.explore_tab.update_editor_content(key),
-    }
-}
-
-fn explore_tab_app_event_handler(app: &mut App, event: AppEvent) {
-    match event {
-        AppEvent::Key(key) => match app.state.explore_tab.editor_editable() {
-            true => explore_tab_editable_handler(app, key),
-            false => explore_tab_normal_mode_handler(app, key),
-        },
-        AppEvent::ExploreQueryResult(r) => {
-            info!("Query results: {:?}", r);
-            app.state.explore_tab.set_query(r);
-            app.state.explore_tab.refresh_query_results_state();
-        }
-        AppEvent::Tick => {}
-        AppEvent::Error => {}
+        #[cfg(feature = "flightsql")]
+        KeyCode::Char('f') => app.state.tabs.selected = SelectedTab::FlightSQL,
         _ => {}
     };
 }
@@ -217,10 +107,10 @@ fn context_tab_key_event_handler(_app: &mut App, _key: KeyEvent) {}
 fn logs_tab_app_event_handler(app: &mut App, event: AppEvent) {
     match event {
         AppEvent::Key(key) => logs_tab_key_event_handler(app, key),
-        AppEvent::ExploreQueryResult(r) => {
-            app.state.explore_tab.set_query(r);
-            app.state.explore_tab.refresh_query_results_state();
-        }
+        // AppEvent::QueryResult(r) => {
+        //     app.state.sql_tab.set_query(r);
+        //     app.state.sql_tab.refresh_query_results_state();
+        // }
         AppEvent::Tick => {}
         AppEvent::Error => {}
         _ => {}
@@ -230,10 +120,10 @@ fn logs_tab_app_event_handler(app: &mut App, event: AppEvent) {
 fn context_tab_app_event_handler(app: &mut App, event: AppEvent) {
     match event {
         AppEvent::Key(key) => context_tab_key_event_handler(app, key),
-        AppEvent::ExploreQueryResult(r) => {
-            app.state.explore_tab.set_query(r);
-            app.state.explore_tab.refresh_query_results_state();
-        }
+        // AppEvent::QueryResult(r) => {
+        //     app.state.sql_tab.set_query(r);
+        //     app.state.sql_tab.refresh_query_results_state();
+        // }
         AppEvent::Tick => {}
         AppEvent::Error => {}
         _ => {}
@@ -241,36 +131,77 @@ fn context_tab_app_event_handler(app: &mut App, event: AppEvent) {
 }
 
 pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
-    // TODO: AppEvent::ExploreQueryResult can probably be handled here rather than duplicating in
+    // TODO: AppEvent::QueryResult can probably be handled here rather than duplicating in
     // each tab
-    let now = std::time::Instant::now();
     trace!("Tui::Event: {:?}", event);
-    if let AppEvent::Key(k) = event {
-        match k.code {
-            KeyCode::Char('q') => app.state.should_quit = true,
-            tab @ (KeyCode::Char('s') | KeyCode::Char('l') | KeyCode::Char('x')) => {
-                tab_navigation_handler(app, tab)
-            }
-            _ => {}
+    let now = std::time::Instant::now();
+    match event {
+        // AppEvent::Key(KeyEvent {
+        //     code: KeyCode::Char('q'),
+        //     ..
+        // }) => {
+        //     app.state.should_quit = true;
+        // }
+        // AppEvent::Key(KeyEvent {
+        //     code:
+        //         tab
+        //         @ (KeyCode::Char('s') | KeyCode::Char('l') | KeyCode::Char('x') | KeyCode::Char('f')),
+        //     ..
+        // }) => {
+        //     tab_navigation_handler(app, tab);
+        // }
+        AppEvent::ExecuteDDL(ddl) => {
+            let queries: Vec<String> = ddl.split(';').map(|s| s.to_string()).collect();
+            queries.into_iter().for_each(|q| {
+                let ctx = app.execution.session_ctx.clone();
+                tokio::spawn(async move {
+                    if let Ok(df) = ctx.sql(&q).await {
+                        if df.collect().await.is_ok() {
+                            info!("Successful DDL");
+                        }
+                    }
+                });
+            })
         }
-    } else if let AppEvent::ExecuteDDL(ddl) = event {
-        let queries: Vec<String> = ddl.split(';').map(|s| s.to_string()).collect();
-        queries.into_iter().for_each(|q| {
-            let ctx = app.execution.session_ctx.clone();
+        AppEvent::QueryResult(r) => {
+            app.state.sql_tab.set_query(r);
+            app.state.sql_tab.refresh_query_results_state();
+        }
+        #[cfg(feature = "flightsql")]
+        AppEvent::FlightSQLQueryResult(r) => {
+            app.state.flightsql_tab.set_query(r);
+            app.state.flightsql_tab.refresh_query_results_state();
+        }
+        #[cfg(feature = "flightsql")]
+        AppEvent::EstablishFlightSQLConnection => {
+            let url = app.state.config.flightsql.connection_url.clone();
+            info!("Connection to FlightSQL host: {}", url);
+            let url: &'static str = Box::leak(url.into_boxed_str());
+            let client = Arc::clone(&app.execution.flightsql_client);
             tokio::spawn(async move {
-                if let Ok(df) = ctx.sql(&q).await {
-                    if df.collect().await.is_ok() {
-                        info!("Successful DDL");
+                let maybe_channel = Channel::from_static(&url).connect().await;
+                info!("Created channel");
+                match maybe_channel {
+                    Ok(channel) => {
+                        let flightsql_client = FlightSqlServiceClient::new(channel);
+                        let mut locked_client = client.lock().await;
+                        *locked_client = Some(flightsql_client);
+                    }
+                    Err(e) => {
+                        info!("Error creating channel for FlightSQL: {:?}", e);
                     }
                 }
             });
-        })
-    } else {
-        match app.state.tabs.selected {
-            SelectedTab::Queries => explore_tab_app_event_handler(app, event),
-            SelectedTab::Logs => logs_tab_app_event_handler(app, event),
-            SelectedTab::Context => context_tab_app_event_handler(app, event),
-        };
+        }
+        _ => {
+            match app.state.tabs.selected {
+                SelectedTab::SQL => sql::app_event_handler(app, event),
+                SelectedTab::Logs => logs_tab_app_event_handler(app, event),
+                SelectedTab::Context => context_tab_app_event_handler(app, event),
+                #[cfg(feature = "flightsql")]
+                SelectedTab::FlightSQL => flightsql::app_event_handler(app, event),
+            };
+        }
     }
     trace!("Event handling took: {:?}", now.elapsed());
     Ok(())

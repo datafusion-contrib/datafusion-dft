@@ -15,5 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-pub mod explore;
+#[cfg(feature = "flightsql")]
+pub mod flightsql;
 pub mod logs;
+pub mod sql;

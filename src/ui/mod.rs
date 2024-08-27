@@ -23,12 +23,16 @@ use strum::{Display, EnumIter, FromRepr};
 
 use crate::app::App;
 
-use self::tabs::{context, explore, logs};
+use self::tabs::{context, logs, sql};
 
 #[derive(Clone, Copy, Debug, Display, FromRepr, EnumIter)]
 pub enum SelectedTab {
-    #[strum(to_string = "Queries")]
-    Queries,
+    #[allow(clippy::upper_case_acronyms)]
+    #[strum(to_string = "SQL")]
+    SQL,
+    #[cfg(feature = "flightsql")]
+    #[strum(to_string = "FlightSQL")]
+    FlightSQL,
     #[strum(to_string = "Logs")]
     Logs,
     #[strum(to_string = "Context")]
@@ -39,35 +43,52 @@ impl SelectedTab {
     pub fn title(self) -> Line<'static> {
         let padding = Span::from("  ");
         match self {
-            SelectedTab::Queries => {
+            SelectedTab::SQL => {
                 let bold_char = Span::from("S").bold();
                 let remaining = Span::from("QL");
                 Line::from_iter(vec![padding.clone(), bold_char, remaining, padding.clone()])
                     .fg(tailwind::SLATE.c200)
                     .bg(self.bg())
             }
+            #[cfg(feature = "flightsql")]
+            Self::FlightSQL => {
+                let bold_char = Span::from("F").bold();
+                let remaining = Span::from("lightSQL");
+                Line::from_iter(vec![padding.clone(), bold_char, remaining, padding.clone()])
+                    .fg(tailwind::SLATE.c200)
+                    .bg(self.bg())
+            }
             Self::Logs => {
                 let bold_char = Span::from("L").bold();
-                let remaining = Span::from("ogs");
+                let remaining = Span::from("OGS");
                 Line::from_iter(vec![padding.clone(), bold_char, remaining, padding.clone()])
                     .fg(tailwind::SLATE.c200)
                     .bg(self.bg())
             }
             Self::Context => {
-                let bold_char = Span::from("C").bold();
-                let remaining = Span::from("ontext");
-                Line::from_iter(vec![padding.clone(), bold_char, remaining, padding.clone()])
-                    .fg(tailwind::SLATE.c200)
-                    .bg(self.bg())
+                let start = Span::from("CONTE");
+                let bold_char = Span::from("X").bold();
+                let remaining = Span::from("T");
+                Line::from_iter(vec![
+                    padding.clone(),
+                    start,
+                    bold_char,
+                    remaining,
+                    padding.clone(),
+                ])
+                .fg(tailwind::SLATE.c200)
+                .bg(self.bg())
             }
         }
     }
 
     const fn bg(self) -> Color {
         match self {
-            Self::Queries => tailwind::EMERALD.c700,
+            Self::SQL => tailwind::EMERALD.c700,
             Self::Logs => tailwind::EMERALD.c700,
             Self::Context => tailwind::EMERALD.c700,
+            #[cfg(feature = "flightsql")]
+            Self::FlightSQL => tailwind::EMERALD.c700,
         }
     }
 
@@ -85,8 +106,8 @@ impl SelectedTab {
         Self::from_repr(next_index).unwrap_or(self)
     }
 
-    fn render_explore(self, area: Rect, buf: &mut Buffer, app: &App) {
-        explore::render_explore(area, buf, app)
+    fn render_sql(self, area: Rect, buf: &mut Buffer, app: &App) {
+        sql::render_sql(area, buf, app)
     }
 
     fn render_logs(self, area: Rect, buf: &mut Buffer, app: &App) {
@@ -97,6 +118,13 @@ impl SelectedTab {
         context::render_context(area, buf, app)
     }
 
+    #[cfg(feature = "flightsql")]
+    fn render_flightsql(self, area: Rect, buf: &mut Buffer, app: &App) {
+        use self::tabs::flightsql;
+
+        flightsql::render_sql(area, buf, app)
+    }
+
     /// Render the tab with the provided state.
     ///
     /// This used to be an impl of `Widget` but we weren't able to pass state
@@ -104,9 +132,11 @@ impl SelectedTab {
     /// It's not clear if this will have future impact.
     pub fn render(self, area: Rect, buf: &mut Buffer, app: &App) {
         match self {
-            Self::Queries => self.render_explore(area, buf, app),
+            Self::SQL => self.render_sql(area, buf, app),
             Self::Logs => self.render_logs(area, buf, app),
             Self::Context => self.render_context(area, buf, app),
+            #[cfg(feature = "flightsql")]
+            Self::FlightSQL => self.render_flightsql(area, buf, app),
         }
     }
 }

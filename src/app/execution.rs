@@ -15,9 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#[cfg(feature = "deltalake")]
+#[cfg(any(feature = "deltalake", feature = "flightsql"))]
 use std::sync::Arc;
 
+#[cfg(feature = "flightsql")]
+use tokio::sync::Mutex;
+
+#[cfg(feature = "flightsql")]
+use arrow_flight::sql::client::FlightSqlServiceClient;
 use color_eyre::eyre::Result;
 use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::execution::session_state::SessionStateBuilder;
@@ -28,6 +33,8 @@ use datafusion::prelude::*;
 use deltalake::delta_datafusion::DeltaTableFactory;
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
+#[cfg(feature = "flightsql")]
+use tonic::transport::Channel;
 
 use super::config::DataFusionConfig;
 
@@ -35,6 +42,8 @@ pub struct ExecutionContext {
     pub session_ctx: SessionContext,
     pub config: DataFusionConfig,
     pub cancellation_token: CancellationToken,
+    #[cfg(feature = "flightsql")]
+    pub flightsql_client: Arc<Mutex<Option<FlightSqlServiceClient<Channel>>>>,
 }
 
 impl ExecutionContext {
@@ -43,7 +52,7 @@ impl ExecutionContext {
             .with_batch_size(1)
             .with_information_schema(true);
 
-        let mut state = SessionStateBuilder::new()
+        let state = SessionStateBuilder::new()
             .with_default_features()
             .with_config(cfg)
             .build();
@@ -55,13 +64,17 @@ impl ExecutionContext {
                 .insert("DELTATABLE".to_string(), Arc::new(DeltaTableFactory {}));
         }
 
-        let session_ctx = SessionContext::new_with_state(state);
-        let cancellation_token = CancellationToken::new();
+        {
+            let session_ctx = SessionContext::new_with_state(state);
+            let cancellation_token = CancellationToken::new();
 
-        Self {
-            config,
-            session_ctx,
-            cancellation_token,
+            Self {
+                config,
+                session_ctx,
+                cancellation_token,
+                #[cfg(feature = "flightsql")]
+                flightsql_client: Arc::new(Mutex::new(None)),
+            }
         }
     }
 

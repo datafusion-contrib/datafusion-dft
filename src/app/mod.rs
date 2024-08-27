@@ -41,7 +41,10 @@ use tokio_util::sync::CancellationToken;
 
 use self::execution::ExecutionContext;
 use self::handlers::{app_event_handler, crossterm_event_handler};
-use self::state::tabs::explore::Query;
+use self::state::tabs::sql::Query;
+
+#[cfg(feature = "flightsql")]
+use self::state::tabs::flightsql::FlightSQLQuery;
 
 #[derive(Clone, Debug)]
 pub enum AppEvent {
@@ -58,7 +61,11 @@ pub enum AppEvent {
     Mouse(event::MouseEvent),
     Resize(u16, u16),
     ExecuteDDL(String),
-    ExploreQueryResult(Query),
+    QueryResult(Query),
+    #[cfg(feature = "flightsql")]
+    EstablishFlightSQLConnection,
+    #[cfg(feature = "flightsql")]
+    FlightSQLQueryResult(FlightSQLQuery),
 }
 
 pub struct App<'app> {
@@ -235,6 +242,13 @@ impl<'app> App<'app> {
         }
     }
 
+    #[cfg(feature = "flightsql")]
+    pub fn establish_flightsql_connection(&self) {
+        let _ = self
+            .app_event_tx
+            .send(AppEvent::EstablishFlightSQLConnection);
+    }
+
     /// Dispatch to the appropriate event loop based on the command
     pub fn start_event_loop(&mut self) {
         match self.cli.command {
@@ -289,6 +303,10 @@ pub async fn run_app(cli: cli::DftCli, state: state::AppState<'_>) -> Result<()>
     match &cli.command {
         Some(cli::Command::App(_)) | None => {
             app.execute_ddl();
+
+            #[cfg(feature = "flightsql")]
+            app.establish_flightsql_connection();
+
             let mut terminal =
                 ratatui::Terminal::new(CrosstermBackend::new(std::io::stdout())).unwrap();
             app.enter(true)?;
