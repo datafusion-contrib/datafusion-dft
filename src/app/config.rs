@@ -54,8 +54,8 @@ pub fn get_data_dir() -> PathBuf {
 
 #[derive(Debug, Default, Deserialize)]
 pub struct AppConfig {
-    #[serde(default = "default_datafusion_config")]
-    pub datafusion: DataFusionConfig,
+    #[serde(default = "default_execution_config")]
+    pub datafusion: ExecutionConfig,
     #[serde(default = "default_display_config")]
     pub display: DisplayConfig,
     #[serde(default = "default_interaction_config")]
@@ -65,8 +65,8 @@ pub struct AppConfig {
     pub flightsql: FlightSQLConfig,
 }
 
-fn default_datafusion_config() -> DataFusionConfig {
-    DataFusionConfig::default()
+fn default_execution_config() -> ExecutionConfig {
+    ExecutionConfig::default()
 }
 
 fn default_display_config() -> DisplayConfig {
@@ -107,20 +107,44 @@ impl Default for DisplayConfig {
     }
 }
 
+#[cfg(feature = "s3")]
 #[derive(Clone, Debug, Deserialize)]
-pub struct DataFusionConfig {
+pub struct S3Config {
+    aws_access_key_id: String,
+    aws_secret_access_key: String,
+    aws_default_region: String,
+    aws_endpoint: String,
+    aws_session_token: String,
+    aws_allow_http: bool,
+}
+
+#[cfg(feature = "s3")]
+impl S3Config {
+    fn to_object_store(&self) -> AmazonS3 {}
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ObjectStoreConfig {
+    #[cfg(feature = "s3")]
+    pub s3: Option<S3Config>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct ExecutionConfig {
     #[serde(default = "default_stream_batch_size")]
     pub stream_batch_size: usize,
+    pub object_store_config: Option<ObjectStoreConfig>,
 }
 
 fn default_stream_batch_size() -> usize {
     1
 }
 
-impl Default for DataFusionConfig {
+impl Default for ExecutionConfig {
     fn default() -> Self {
         Self {
             stream_batch_size: 1,
+            object_store_config: None,
         }
     }
 }

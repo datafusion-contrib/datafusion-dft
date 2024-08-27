@@ -18,6 +18,8 @@
 #[cfg(any(feature = "deltalake", feature = "flightsql"))]
 use std::sync::Arc;
 
+use datafusion::execution::runtime_env::RuntimeEnv;
+use tokio::runtime::Runtime;
 #[cfg(feature = "flightsql")]
 use tokio::sync::Mutex;
 
@@ -36,24 +38,32 @@ use tokio_util::sync::CancellationToken;
 #[cfg(feature = "flightsql")]
 use tonic::transport::Channel;
 
-use super::config::DataFusionConfig;
+use super::config::ExecutionConfig;
 
 pub struct ExecutionContext {
     pub session_ctx: SessionContext,
-    pub config: DataFusionConfig,
+    pub config: ExecutionConfig,
     pub cancellation_token: CancellationToken,
     #[cfg(feature = "flightsql")]
     pub flightsql_client: Arc<Mutex<Option<FlightSqlServiceClient<Channel>>>>,
 }
 
 impl ExecutionContext {
-    pub fn new(config: DataFusionConfig) -> Self {
+    pub fn new(config: ExecutionConfig) -> Self {
         let cfg = SessionConfig::default()
             .with_batch_size(1)
             .with_information_schema(true);
 
+        let runtime_env = RuntimeEnv::default();
+
+        #[cfg(feature = "s3")]
+        {
+            if let Some(object_store_config) = &config.object_store_config {}
+        }
+
         let state = SessionStateBuilder::new()
             .with_default_features()
+            .with_runtime_env(runtime_env.into())
             .with_config(cfg)
             .build();
 

@@ -25,6 +25,7 @@ futures = "0.3.30"
 itertools = "0.13.0"
 lazy_static = "1.4.0"
 log = "0.4.22"
+object_store = { version = "0.11.0", features = ["aws"], optional = true }
 ratatui = "0.28.0"
 serde = { version = "1.0.197", features = ["derive"] }
 strum = "0.26.2"
@@ -39,6 +40,7 @@ tui-textarea = "0.6.1"
 [features]
 deltalake = ["dep:deltalake"]
 flightsql = ["dep:arrow-flight", "dep:tonic"]
+s3 = ["object_store/aws"]
 
 [[bin]]
 name = "dft"
