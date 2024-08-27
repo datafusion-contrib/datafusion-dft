@@ -107,10 +107,10 @@ fn context_tab_key_event_handler(_app: &mut App, _key: KeyEvent) {}
 fn logs_tab_app_event_handler(app: &mut App, event: AppEvent) {
     match event {
         AppEvent::Key(key) => logs_tab_key_event_handler(app, key),
-        AppEvent::QueryResult(r) => {
-            app.state.sql_tab.set_query(r);
-            app.state.sql_tab.refresh_query_results_state();
-        }
+        // AppEvent::QueryResult(r) => {
+        //     app.state.sql_tab.set_query(r);
+        //     app.state.sql_tab.refresh_query_results_state();
+        // }
         AppEvent::Tick => {}
         AppEvent::Error => {}
         _ => {}
@@ -120,10 +120,10 @@ fn logs_tab_app_event_handler(app: &mut App, event: AppEvent) {
 fn context_tab_app_event_handler(app: &mut App, event: AppEvent) {
     match event {
         AppEvent::Key(key) => context_tab_key_event_handler(app, key),
-        AppEvent::QueryResult(r) => {
-            app.state.sql_tab.set_query(r);
-            app.state.sql_tab.refresh_query_results_state();
-        }
+        // AppEvent::QueryResult(r) => {
+        //     app.state.sql_tab.set_query(r);
+        //     app.state.sql_tab.refresh_query_results_state();
+        // }
         AppEvent::Tick => {}
         AppEvent::Error => {}
         _ => {}
@@ -162,6 +162,15 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                     }
                 });
             })
+        }
+        AppEvent::QueryResult(r) => {
+            app.state.sql_tab.set_query(r);
+            app.state.sql_tab.refresh_query_results_state();
+        }
+        #[cfg(feature = "flightsql")]
+        AppEvent::FlightSQLQueryResult(r) => {
+            app.state.flightsql_tab.set_query(r);
+            app.state.flightsql_tab.refresh_query_results_state();
         }
         #[cfg(feature = "flightsql")]
         AppEvent::EstablishFlightSQLConnection => {

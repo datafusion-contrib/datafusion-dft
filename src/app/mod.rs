@@ -244,7 +244,8 @@ impl<'app> App<'app> {
 
     #[cfg(feature = "flightsql")]
     pub fn establish_flightsql_connection(&self) {
-        self.app_event_tx
+        let _ = self
+            .app_event_tx
             .send(AppEvent::EstablishFlightSQLConnection);
     }
 

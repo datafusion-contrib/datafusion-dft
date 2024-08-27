@@ -18,10 +18,9 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use color_eyre::eyre::eyre;
 use datafusion::arrow::array::RecordBatch;
 use log::{error, info};
-use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ratatui::crossterm::event::{KeyCode, KeyEvent};
 use tokio_stream::StreamExt;
 use tonic::IntoRequest;
 
@@ -76,7 +75,7 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
             tokio::spawn(async move {
                 let mut query =
                     FlightSQLQuery::new(sql.clone(), None, None, None, Duration::default());
-                let start = std::time::Instant::now();
+                let start = Instant::now();
                 if let Some(ref mut c) = *client.lock().await {
                     info!("Sending query");
                     let flight_info = c.execute(sql, None).await.unwrap();
@@ -120,31 +119,6 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
                 }
 
                 let _ = _event_tx.send(AppEvent::FlightSQLQueryResult(query));
-
-                // match ctx.sql(&sql).await {
-                //     Ok(df) => match df.collect().await {
-                //         Ok(res) => {
-                //             let elapsed = start.elapsed();
-                //             let rows: usize = res.iter().map(|r| r.num_rows()).sum();
-                //             query.set_results(Some(res));
-                //             query.set_num_rows(Some(rows));
-                //             query.set_elapsed_time(elapsed);
-                //         }
-                //         Err(e) => {
-                //             error!("Error collecting results: {:?}", e);
-                //             let elapsed = start.elapsed();
-                //             query.set_error(Some(e.to_string()));
-                //             query.set_elapsed_time(elapsed);
-                //         }
-                //     },
-                //     Err(e) => {
-                //         error!("Error creating dataframe: {:?}", e);
-                //         let elapsed = start.elapsed();
-                //         query.set_error(Some(e.to_string()));
-                //         query.set_elapsed_time(elapsed);
-                //     }
-                // }
-                // let _ = _event_tx.send(AppEvent::QueryResult(query));
             });
         }
         _ => {}
