@@ -30,7 +30,6 @@ use crate::app::{handlers::tab_navigation_handler, AppEvent};
 use super::App;
 
 pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
-    info!("FSNormal mode handler");
     match key.code {
         KeyCode::Char('q') => app.state.should_quit = true,
         tab @ (KeyCode::Char('s')
@@ -136,7 +135,6 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
 }
 
 pub fn editable_handler(app: &mut App, key: KeyEvent) {
-    info!("FSEditable handler: {:?}", key);
     match (key.code, key.modifiers) {
         (KeyCode::Esc, _) => app.state.flightsql_tab.exit_edit(),
         _ => app.state.flightsql_tab.update_editor_content(key),
@@ -144,7 +142,6 @@ pub fn editable_handler(app: &mut App, key: KeyEvent) {
 }
 
 pub fn app_event_handler(app: &mut App, event: AppEvent) {
-    info!("FSSQL Tab handling: {:?}", event);
     match event {
         AppEvent::Key(key) => match app.state.flightsql_tab.editor_editable() {
             true => editable_handler(app, key),

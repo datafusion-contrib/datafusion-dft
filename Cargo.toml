@@ -25,6 +25,7 @@ futures = "0.3.30"
 itertools = "0.13.0"
 lazy_static = "1.4.0"
 log = "0.4.22"
+object_store = { version = "0.10.2", features = ["aws"], optional = true }
 ratatui = "0.28.0"
 serde = { version = "1.0.197", features = ["derive"] }
 strum = "0.26.2"
@@ -35,10 +36,13 @@ toml = "0.8.12"
 tonic = { version = "0.11.0", optional = true }
 tui-logger = {version = "0.12", features = ["tracing-support"]}
 tui-textarea = "0.6.1"
+url = { version = "2.5.2", optional = true }
 
 [features]
 deltalake = ["dep:deltalake"]
 flightsql = ["dep:arrow-flight", "dep:tonic"]
+s3 = ["object_store/aws", "url"]
+url = ["dep:url"]
 
 [[bin]]
 name = "dft"

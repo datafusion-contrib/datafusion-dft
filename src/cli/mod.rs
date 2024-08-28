@@ -49,7 +49,7 @@ impl DftCli {
     pub fn get_config(&self) -> Option<PathBuf> {
         match &self.command {
             Some(Command::App(args)) => Some(get_config_path(&args.config)),
-            _ => None,
+            _ => Some(get_config_path(&None)),
         }
     }
 }

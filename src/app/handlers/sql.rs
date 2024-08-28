@@ -26,7 +26,6 @@ use crate::app::{handlers::tab_navigation_handler, state::tabs::sql::Query, AppE
 use super::App;
 
 pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
-    info!("Normal mode handler");
     match key.code {
         KeyCode::Char('q') => app.state.should_quit = true,
         tab @ (KeyCode::Char('s')
@@ -101,7 +100,6 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
 }
 
 pub fn editable_handler(app: &mut App, key: KeyEvent) {
-    info!("Editable handler: {:?}", key);
     match (key.code, key.modifiers) {
         (KeyCode::Esc, _) => app.state.sql_tab.exit_edit(),
         (KeyCode::Enter, KeyModifiers::CONTROL) => {
@@ -130,7 +128,6 @@ pub fn editable_handler(app: &mut App, key: KeyEvent) {
 }
 
 pub fn app_event_handler(app: &mut App, event: AppEvent) {
-    info!("SQL Tab handling: {:?}", event);
     match event {
         AppEvent::Key(key) => match app.state.sql_tab.editor_editable() {
             true => editable_handler(app, key),

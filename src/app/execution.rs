@@ -15,16 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#[cfg(any(feature = "deltalake", feature = "flightsql"))]
+#[cfg(any(feature = "deltalake", feature = "flightsql", feature = "s3"))]
 use std::sync::Arc;
 
-#[cfg(feature = "flightsql")]
-use tokio::sync::Mutex;
-
-#[cfg(feature = "flightsql")]
-use arrow_flight::sql::client::FlightSqlServiceClient;
 use color_eyre::eyre::Result;
 use datafusion::arrow::util::pretty::pretty_format_batches;
+use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::execution::session_state::SessionStateBuilder;
 use datafusion::execution::TaskContext;
 use datafusion::physical_plan::execute_stream;
@@ -34,26 +30,67 @@ use deltalake::delta_datafusion::DeltaTableFactory;
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 #[cfg(feature = "flightsql")]
-use tonic::transport::Channel;
+use {
+    arrow_flight::sql::client::FlightSqlServiceClient, tokio::sync::Mutex,
+    tonic::transport::Channel,
+};
+#[cfg(feature = "s3")]
+use {
+    log::{error, info},
+    url::Url,
+};
 
-use super::config::DataFusionConfig;
+use super::config::ExecutionConfig;
 
 pub struct ExecutionContext {
     pub session_ctx: SessionContext,
-    pub config: DataFusionConfig,
+    pub config: ExecutionConfig,
     pub cancellation_token: CancellationToken,
     #[cfg(feature = "flightsql")]
     pub flightsql_client: Arc<Mutex<Option<FlightSqlServiceClient<Channel>>>>,
 }
 
 impl ExecutionContext {
-    pub fn new(config: DataFusionConfig) -> Self {
+    pub fn new(config: ExecutionConfig) -> Self {
         let cfg = SessionConfig::default()
             .with_batch_size(1)
             .with_information_schema(true);
 
+        let runtime_env = RuntimeEnv::default();
+
+        #[cfg(feature = "s3")]
+        {
+            if let Some(object_store_config) = &config.object_store {
+                if let Some(s3_configs) = &object_store_config.s3 {
+                    info!("S3 configs exists");
+                    for s3_config in s3_configs {
+                        match s3_config.to_object_store() {
+                            Ok(object_store) => {
+                                info!("Created object store");
+                                if let Some(object_store_url) = s3_config.object_store_url() {
+                                    info!("Endpoint exists");
+                                    if let Ok(parsed_endpoint) = Url::parse(object_store_url) {
+                                        info!("Parsed endpoint");
+                                        runtime_env.register_object_store(
+                                            &parsed_endpoint,
+                                            Arc::new(object_store),
+                                        );
+                                        info!("Registered s3 object store");
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                error!("Error creating object store: {:?}", e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         let state = SessionStateBuilder::new()
             .with_default_features()
+            .with_runtime_env(runtime_env.into())
             .with_config(cfg)
             .build();
 
@@ -91,7 +128,7 @@ impl ExecutionContext {
         let physical_plan = df.create_physical_plan().await.unwrap();
         // We use small batch size because web socket stream comes in small increments (each
         // message usually only has at most a few records).
-        let stream_cfg = SessionConfig::default().with_batch_size(self.config.stream_batch_size);
+        let stream_cfg = SessionConfig::default();
         let stream_task_ctx = TaskContext::default().with_session_config(stream_cfg);
         let mut stream = execute_stream(physical_plan, stream_task_ctx.into()).unwrap();
 
