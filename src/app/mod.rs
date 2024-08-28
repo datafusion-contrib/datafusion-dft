@@ -85,7 +85,7 @@ impl<'app> App<'app> {
         let app_cancellation_token = CancellationToken::new();
         let task = tokio::spawn(async {});
         let streams_task = tokio::spawn(async {});
-        let execution = ExecutionContext::new(state.config.datafusion.clone());
+        let execution = ExecutionContext::new(state.config.execution.clone());
 
         Self {
             cli,

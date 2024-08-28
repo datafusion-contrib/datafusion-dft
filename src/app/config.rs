@@ -21,6 +21,11 @@ use directories::{ProjectDirs, UserDirs};
 use lazy_static::lazy_static;
 use serde::Deserialize;
 
+#[cfg(feature = "s3")]
+use color_eyre::Result;
+#[cfg(feature = "s3")]
+use object_store::aws::{AmazonS3, AmazonS3Builder};
+
 lazy_static! {
     pub static ref PROJECT_NAME: String = env!("CARGO_CRATE_NAME").to_uppercase().to_string();
     pub static ref DATA_FOLDER: Option<PathBuf> =
@@ -55,7 +60,7 @@ pub fn get_data_dir() -> PathBuf {
 #[derive(Debug, Default, Deserialize)]
 pub struct AppConfig {
     #[serde(default = "default_execution_config")]
-    pub datafusion: ExecutionConfig,
+    pub execution: ExecutionConfig,
     #[serde(default = "default_display_config")]
     pub display: DisplayConfig,
     #[serde(default = "default_interaction_config")]
@@ -110,17 +115,39 @@ impl Default for DisplayConfig {
 #[cfg(feature = "s3")]
 #[derive(Clone, Debug, Deserialize)]
 pub struct S3Config {
-    aws_access_key_id: String,
-    aws_secret_access_key: String,
-    aws_default_region: String,
-    aws_endpoint: String,
-    aws_session_token: String,
-    aws_allow_http: bool,
+    bucket_name: String,
+    aws_access_key_id: Option<String>,
+    aws_secret_access_key: Option<String>,
+    aws_default_region: Option<String>,
+    aws_endpoint: Option<String>,
+    aws_session_token: Option<String>,
+    aws_allow_http: Option<bool>,
 }
 
 #[cfg(feature = "s3")]
 impl S3Config {
-    fn to_object_store(&self) -> AmazonS3 {}
+    pub fn aws_endpoint(&self) -> &Option<String> {
+        &self.aws_endpoint
+    }
+}
+
+#[cfg(feature = "s3")]
+impl S3Config {
+    pub fn to_object_store(&self) -> Result<AmazonS3> {
+        let mut builder = AmazonS3Builder::new();
+        builder = builder.with_bucket_name(&self.bucket_name);
+        if let Some(access_key) = &self.aws_access_key_id {
+            builder = builder.with_access_key_id(access_key)
+        }
+        if let Some(secret) = &self.aws_secret_access_key {
+            builder = builder.with_secret_access_key(secret)
+        }
+        if let Some(endpoint) = &self.aws_endpoint {
+            builder = builder.with_endpoint(endpoint);
+        }
+
+        Ok(builder.build()?)
+    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -133,7 +160,7 @@ pub struct ObjectStoreConfig {
 pub struct ExecutionConfig {
     #[serde(default = "default_stream_batch_size")]
     pub stream_batch_size: usize,
-    pub object_store_config: Option<ObjectStoreConfig>,
+    pub object_store: Option<ObjectStoreConfig>,
 }
 
 fn default_stream_batch_size() -> usize {
@@ -144,7 +171,7 @@ impl Default for ExecutionConfig {
     fn default() -> Self {
         Self {
             stream_batch_size: 1,
-            object_store_config: None,
+            object_store: None,
         }
     }
 }

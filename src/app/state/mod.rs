@@ -59,6 +59,7 @@ pub fn initialize(args: &cli::DftCli) -> AppState {
     debug!("Initializing state");
     let data_dir = get_data_dir();
     let config_path = args.get_config();
+    debug!("Config path: {:?}", config_path);
     let config = if config_path.clone().is_some_and(|p| p.exists()) {
         debug!("Config exists");
         let maybe_config_contents = std::fs::read_to_string(config_path.unwrap());

@@ -33,12 +33,16 @@ use datafusion::physical_plan::execute_stream;
 use datafusion::prelude::*;
 #[cfg(feature = "deltalake")]
 use deltalake::delta_datafusion::DeltaTableFactory;
-#[cfg(feature = "s3")]
-use object_store::aws::AmazonS3Builder;
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 #[cfg(feature = "flightsql")]
 use tonic::transport::Channel;
+#[cfg(feature = "s3")]
+use {
+    log::{error, info},
+    object_store::{aws::AmazonS3Builder, ObjectStore},
+    url::Url,
+};
 
 use super::config::ExecutionConfig;
 
@@ -60,11 +64,28 @@ impl ExecutionContext {
 
         #[cfg(feature = "s3")]
         {
-            if let Some(object_store_config) = &config.object_store_config {
-                if let Some(s3_config) = object_store_config {
-                    let object_store = s3_config.to_object_store();
-                    runtime_env
-                        .register_object_store(s3_config.aws_endpoint, Arc::new(object_store));
+            if let Some(object_store_config) = &config.object_store {
+                if let Some(s3_config) = &object_store_config.s3 {
+                    info!("S3 config exists");
+                    match s3_config.to_object_store() {
+                        Ok(object_store) => {
+                            info!("Created object store");
+                            if let Some(endpoint) = s3_config.aws_endpoint() {
+                                info!("Endpoint exists");
+                                if let Ok(parsed_endpoint) = Url::parse("ny2://atlas") {
+                                    info!("Parsed endpoint");
+                                    runtime_env.register_object_store(
+                                        &parsed_endpoint,
+                                        Arc::new(object_store),
+                                    );
+                                    info!("Registered s3 object store");
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            error!("Error creating object store: {:?}", e);
+                        }
+                    }
                 }
             }
         }

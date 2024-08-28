@@ -19,7 +19,7 @@ pub mod flightsql;
 pub mod sql;
 
 use color_eyre::Result;
-use log::{debug, info, trace};
+use log::{debug, error, info, trace};
 use ratatui::crossterm::event::{self, KeyCode, KeyEvent};
 use tui_logger::TuiWidgetEvent;
 
@@ -61,12 +61,17 @@ fn tab_navigation_handler(app: &mut App, key: KeyCode) {
 
 fn logs_tab_key_event_handler(app: &mut App, key: KeyEvent) {
     match key.code {
+        KeyCode::Char('q') => app.state.should_quit = true,
+        tab @ (KeyCode::Char('s')
+        | KeyCode::Char('l')
+        | KeyCode::Char('x')
+        | KeyCode::Char('f')) => tab_navigation_handler(app, tab),
         KeyCode::Char('h') => {
             app.state.logs_tab.transition(TuiWidgetEvent::HideKey);
         }
-        KeyCode::Char('f') => {
-            app.state.logs_tab.transition(TuiWidgetEvent::FocusKey);
-        }
+        // KeyCode::Char('f') => {
+        //     app.state.logs_tab.transition(TuiWidgetEvent::FocusKey);
+        // }
         KeyCode::Char('+') => {
             app.state.logs_tab.transition(TuiWidgetEvent::PlusKey);
         }
@@ -107,10 +112,6 @@ fn context_tab_key_event_handler(_app: &mut App, _key: KeyEvent) {}
 fn logs_tab_app_event_handler(app: &mut App, event: AppEvent) {
     match event {
         AppEvent::Key(key) => logs_tab_key_event_handler(app, key),
-        // AppEvent::QueryResult(r) => {
-        //     app.state.sql_tab.set_query(r);
-        //     app.state.sql_tab.refresh_query_results_state();
-        // }
         AppEvent::Tick => {}
         AppEvent::Error => {}
         _ => {}
@@ -120,10 +121,6 @@ fn logs_tab_app_event_handler(app: &mut App, event: AppEvent) {
 fn context_tab_app_event_handler(app: &mut App, event: AppEvent) {
     match event {
         AppEvent::Key(key) => context_tab_key_event_handler(app, key),
-        // AppEvent::QueryResult(r) => {
-        //     app.state.sql_tab.set_query(r);
-        //     app.state.sql_tab.refresh_query_results_state();
-        // }
         AppEvent::Tick => {}
         AppEvent::Error => {}
         _ => {}
@@ -136,28 +133,19 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
     trace!("Tui::Event: {:?}", event);
     let now = std::time::Instant::now();
     match event {
-        // AppEvent::Key(KeyEvent {
-        //     code: KeyCode::Char('q'),
-        //     ..
-        // }) => {
-        //     app.state.should_quit = true;
-        // }
-        // AppEvent::Key(KeyEvent {
-        //     code:
-        //         tab
-        //         @ (KeyCode::Char('s') | KeyCode::Char('l') | KeyCode::Char('x') | KeyCode::Char('f')),
-        //     ..
-        // }) => {
-        //     tab_navigation_handler(app, tab);
-        // }
         AppEvent::ExecuteDDL(ddl) => {
             let queries: Vec<String> = ddl.split(';').map(|s| s.to_string()).collect();
             queries.into_iter().for_each(|q| {
                 let ctx = app.execution.session_ctx.clone();
                 tokio::spawn(async move {
-                    if let Ok(df) = ctx.sql(&q).await {
-                        if df.collect().await.is_ok() {
-                            info!("Successful DDL");
+                    match ctx.sql(&q).await {
+                        Ok(df) => {
+                            if df.collect().await.is_ok() {
+                                info!("Successful DDL");
+                            }
+                        }
+                        Err(e) => {
+                            error!("Error executing DDL: {:?}", e);
                         }
                     }
                 });
