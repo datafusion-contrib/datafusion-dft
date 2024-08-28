@@ -119,7 +119,7 @@ pub struct S3Config {
     object_store_url: Option<String>,
     aws_access_key_id: Option<String>,
     aws_secret_access_key: Option<String>,
-    aws_default_region: Option<String>,
+    _aws_default_region: Option<String>,
     aws_endpoint: Option<String>,
     aws_session_token: Option<String>,
     aws_allow_http: Option<bool>,

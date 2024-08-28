@@ -22,8 +22,7 @@ Some of the current and planned features are:
   - Logs
     - Logs from `dft` and `DataFusion`
 - `ObjectStore` Support
-  - S3 with AWS default credentials
-  - S3 with custom endpoint / provider (i.e. MinIO)
+  - S3 with custom endpoint / provider
   - `ObjectStore` explorer. I.e. able to list files in `ObjectStore`
 - `TableProvider` data sources
   - Delta Table => `CREATE EXTERNAL TABLE table_name STORED AS DELTATABLE LOCATION 's3://bucket/table'` (Only available with `deltalake` feature)
@@ -38,6 +37,10 @@ Currently, the only supported packaging is on [crates.io](https://crates.io/sear
 To install with support for s3 run `cargo install datafusion-tui --features=s3` and to enable using ballista as a execution backend run `cargo install datafusion-tui --features=ballista`.
 
 Once installed you can run `dft` to start the application with DataFusion as the exection engine or `dft --host $HOST --port $PORT` to start the application with Ballista as the execution engine.
+
+### Config
+
+The `dft` configuration is stored in `~/.config/dft/config.toml`
 
 ### Getting Started
 
@@ -57,13 +60,34 @@ CREATE VIEW OR REPLACE users_listings AS SELECT * FROM users LEFT JOIN listings 
 
 This would make the tables `users`, `taxis`, `listings`, and the view  `users_listings` available at startup.  Any of these DDL statements could also be run interactively from the SQL editor as well to create the tables.
 
+### Features
+
+#### S3 (--features=s3)
+
+Mutliple s3 `ObjectStore`s can be registered, following the below model in your configuration file.
+
+```toml
+[[execution.object_store.s3]]
+bucket_name = "my_bucket"
+object_store_url = "s3://my_bucket"
+aws_endpoint = "https://s3.amazonaws"
+aws_access_key_id = "MY_ACCESS_KEY"
+aws_secret_access_key = "MY SECRET"
+
+[[execution.object_store.s3]]
+bucket_name = "my_bucket"
+object_store_url = "ny1://my_bucket"
+aws_endpoint = "https://s3.amazonaws"
+aws_access_key_id = "MY_ACCESS_KEY"
+aws_secret_access_key = "MY SECRET"
+```
+
 
 ### Key Mappings
 
-
 The interface is split into several tabs so that relevant information can be viewed and controlled in a clean and organized manner. When not writing a SQL query keys can be entered to navigate and control the interface.
 
-- SQL Editor: where queries are entered and results can be viewed.  Drawing inspiration from vim there are multiple modes.
+- SQL & FlightSQL Editor: where queries are entered and results can be viewed.  Drawing inspiration from vim there are multiple modes.
   - Normal mode
     - `q` => quit datafusion-tui
     - `e` => start editing SQL Editor in Edit mode
@@ -95,4 +119,3 @@ The interface is split into several tabs so that relevant information can be vie
 - Register custom `ObjectStore`
   - S3: run / install with `--features=s3`
     - If you want to use your default AWS credentials, then no further action is required. For example your credentials in `~/.aws/credentials` will automatically be picked up.
-    - If you want to use a custom S3 provider, such as MinIO, then you must create a `s3.json` configuration file in `~/.datafusion/object_stores/` with the fields `endpoint`, `access_key_id`, and `secret_access_key`.
