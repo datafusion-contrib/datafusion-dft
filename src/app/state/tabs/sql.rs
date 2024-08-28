@@ -92,9 +92,7 @@ pub struct SQLTabState<'app> {
     editor: TextArea<'app>,
     editor_editable: bool,
     query: Option<Query>,
-    // query_results: Option<Vec<RecordBatch>>,
     query_results_state: Option<RefCell<TableState>>,
-    // query_error: Option<String>,
 }
 
 impl<'app> SQLTabState<'app> {
@@ -107,9 +105,7 @@ impl<'app> SQLTabState<'app> {
             editor: textarea,
             editor_editable: false,
             query: None,
-            // query_results: None,
             query_results_state: None,
-            // query_error: None,
         }
     }
 
@@ -120,14 +116,6 @@ impl<'app> SQLTabState<'app> {
     pub fn refresh_query_results_state(&mut self) {
         self.query_results_state = Some(RefCell::new(TableState::default()));
     }
-
-    // pub fn query_error(&self) -> &Option<String> {
-    //     &self.query_error
-    // }
-
-    // pub fn set_query_error(&mut self, error: String) {
-    //     self.query_error = Some(error);
-    // }
 
     pub fn editor(&self) -> TextArea {
         // TODO: Figure out how to do this without clone. Probably need logic in handler to make
@@ -174,11 +162,14 @@ impl<'app> SQLTabState<'app> {
         &self.query
     }
 
-    // pub fn set_query_results(&mut self, query_results: Vec<RecordBatch>) {
-    //     self.query_results = Some(query_results);
-    // }
+    // TODO: Create Editor struct and move this there
+    pub fn next_word(&mut self) {
+        self.editor
+            .move_cursor(tui_textarea::CursorMove::WordForward)
+    }
 
-    // pub fn query_results(&self) -> &Option<Vec<RecordBatch>> {
-    //     &self.query_results
-    // }
+    // TODO: Create Editor struct and move this there
+    pub fn previous_word(&mut self) {
+        self.editor.move_cursor(tui_textarea::CursorMove::WordBack)
+    }
 }
