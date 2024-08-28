@@ -116,6 +116,7 @@ impl Default for DisplayConfig {
 #[derive(Clone, Debug, Deserialize)]
 pub struct S3Config {
     bucket_name: String,
+    object_store_url: Option<String>,
     aws_access_key_id: Option<String>,
     aws_secret_access_key: Option<String>,
     aws_default_region: Option<String>,
@@ -126,8 +127,8 @@ pub struct S3Config {
 
 #[cfg(feature = "s3")]
 impl S3Config {
-    pub fn aws_endpoint(&self) -> &Option<String> {
-        &self.aws_endpoint
+    pub fn object_store_url(&self) -> &Option<String> {
+        &self.object_store_url
     }
 }
 
@@ -145,6 +146,12 @@ impl S3Config {
         if let Some(endpoint) = &self.aws_endpoint {
             builder = builder.with_endpoint(endpoint);
         }
+        if let Some(token) = &self.aws_session_token {
+            builder = builder.with_token(token)
+        }
+        if let Some(allow_http) = &self.aws_allow_http {
+            builder = builder.with_allow_http(*allow_http)
+        }
 
         Ok(builder.build()?)
     }
@@ -158,21 +165,12 @@ pub struct ObjectStoreConfig {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ExecutionConfig {
-    #[serde(default = "default_stream_batch_size")]
-    pub stream_batch_size: usize,
     pub object_store: Option<ObjectStoreConfig>,
-}
-
-fn default_stream_batch_size() -> usize {
-    1
 }
 
 impl Default for ExecutionConfig {
     fn default() -> Self {
-        Self {
-            stream_batch_size: 1,
-            object_store: None,
-        }
+        Self { object_store: None }
     }
 }
 

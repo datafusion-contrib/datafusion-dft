@@ -18,15 +18,9 @@
 #[cfg(any(feature = "deltalake", feature = "flightsql", feature = "s3"))]
 use std::sync::Arc;
 
-use datafusion::execution::runtime_env::{self, RuntimeEnv};
-use tokio::runtime::Runtime;
-#[cfg(feature = "flightsql")]
-use tokio::sync::Mutex;
-
-#[cfg(feature = "flightsql")]
-use arrow_flight::sql::client::FlightSqlServiceClient;
 use color_eyre::eyre::Result;
 use datafusion::arrow::util::pretty::pretty_format_batches;
+use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::execution::session_state::SessionStateBuilder;
 use datafusion::execution::TaskContext;
 use datafusion::physical_plan::execute_stream;
@@ -36,11 +30,13 @@ use deltalake::delta_datafusion::DeltaTableFactory;
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 #[cfg(feature = "flightsql")]
-use tonic::transport::Channel;
+use {
+    arrow_flight::sql::client::FlightSqlServiceClient, tokio::sync::Mutex,
+    tonic::transport::Channel,
+};
 #[cfg(feature = "s3")]
 use {
     log::{error, info},
-    object_store::{aws::AmazonS3Builder, ObjectStore},
     url::Url,
 };
 
@@ -70,9 +66,9 @@ impl ExecutionContext {
                     match s3_config.to_object_store() {
                         Ok(object_store) => {
                             info!("Created object store");
-                            if let Some(endpoint) = s3_config.aws_endpoint() {
+                            if let Some(object_store_url) = s3_config.object_store_url() {
                                 info!("Endpoint exists");
-                                if let Ok(parsed_endpoint) = Url::parse("ny2://atlas") {
+                                if let Ok(parsed_endpoint) = Url::parse(object_store_url) {
                                     info!("Parsed endpoint");
                                     runtime_env.register_object_store(
                                         &parsed_endpoint,
@@ -130,7 +126,7 @@ impl ExecutionContext {
         let physical_plan = df.create_physical_plan().await.unwrap();
         // We use small batch size because web socket stream comes in small increments (each
         // message usually only has at most a few records).
-        let stream_cfg = SessionConfig::default().with_batch_size(self.config.stream_batch_size);
+        let stream_cfg = SessionConfig::default();
         let stream_task_ctx = TaskContext::default().with_session_config(stream_cfg);
         let mut stream = execute_stream(physical_plan, stream_task_ctx.into()).unwrap();
 
