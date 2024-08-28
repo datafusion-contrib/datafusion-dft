@@ -163,15 +163,9 @@ pub struct ObjectStoreConfig {
     pub s3: Option<Vec<S3Config>>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 pub struct ExecutionConfig {
     pub object_store: Option<ObjectStoreConfig>,
-}
-
-impl Default for ExecutionConfig {
-    fn default() -> Self {
-        Self { object_store: None }
-    }
 }
 
 #[derive(Debug, Default, Deserialize)]
