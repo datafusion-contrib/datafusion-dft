@@ -51,6 +51,7 @@ pub struct ExecutionContext {
 }
 
 impl ExecutionContext {
+    #[allow(unused_mut)]
     pub fn new(config: ExecutionConfig) -> Self {
         let cfg = SessionConfig::default()
             .with_batch_size(1)
@@ -88,7 +89,7 @@ impl ExecutionContext {
             }
         }
 
-        let state = SessionStateBuilder::new()
+        let mut state = SessionStateBuilder::new()
             .with_default_features()
             .with_runtime_env(runtime_env.into())
             .with_config(cfg)
