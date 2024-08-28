@@ -160,7 +160,7 @@ impl S3Config {
 #[derive(Clone, Debug, Deserialize)]
 pub struct ObjectStoreConfig {
     #[cfg(feature = "s3")]
-    pub s3: Option<S3Config>,
+    pub s3: Option<Vec<S3Config>>,
 }
 
 #[derive(Clone, Debug, Deserialize)]

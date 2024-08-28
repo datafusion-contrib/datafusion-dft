@@ -61,25 +61,27 @@ impl ExecutionContext {
         #[cfg(feature = "s3")]
         {
             if let Some(object_store_config) = &config.object_store {
-                if let Some(s3_config) = &object_store_config.s3 {
-                    info!("S3 config exists");
-                    match s3_config.to_object_store() {
-                        Ok(object_store) => {
-                            info!("Created object store");
-                            if let Some(object_store_url) = s3_config.object_store_url() {
-                                info!("Endpoint exists");
-                                if let Ok(parsed_endpoint) = Url::parse(object_store_url) {
-                                    info!("Parsed endpoint");
-                                    runtime_env.register_object_store(
-                                        &parsed_endpoint,
-                                        Arc::new(object_store),
-                                    );
-                                    info!("Registered s3 object store");
+                if let Some(s3_configs) = &object_store_config.s3 {
+                    info!("S3 configs exists");
+                    for s3_config in s3_configs {
+                        match s3_config.to_object_store() {
+                            Ok(object_store) => {
+                                info!("Created object store");
+                                if let Some(object_store_url) = s3_config.object_store_url() {
+                                    info!("Endpoint exists");
+                                    if let Ok(parsed_endpoint) = Url::parse(object_store_url) {
+                                        info!("Parsed endpoint");
+                                        runtime_env.register_object_store(
+                                            &parsed_endpoint,
+                                            Arc::new(object_store),
+                                        );
+                                        info!("Registered s3 object store");
+                                    }
                                 }
                             }
-                        }
-                        Err(e) => {
-                            error!("Error creating object store: {:?}", e);
+                            Err(e) => {
+                                error!("Error creating object store: {:?}", e);
+                            }
                         }
                     }
                 }
