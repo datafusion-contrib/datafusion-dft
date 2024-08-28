@@ -161,4 +161,15 @@ impl<'app> FlightSQLTabState<'app> {
     pub fn query(&self) -> &Option<FlightSQLQuery> {
         &self.query
     }
+
+    // TODO: Create Editor struct and move this there
+    pub fn next_word(&mut self) {
+        self.editor
+            .move_cursor(tui_textarea::CursorMove::WordForward)
+    }
+
+    // TODO: Create Editor struct and move this there
+    pub fn previous_word(&mut self) {
+        self.editor.move_cursor(tui_textarea::CursorMove::WordBack)
+    }
 }
