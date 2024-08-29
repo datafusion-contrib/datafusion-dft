@@ -169,9 +169,9 @@ mod tests {
         assert_eq!(
             header_cells,
             vec![
-                Cell::new("#").bg(tailwind::LIME.c300).fg(tailwind::BLACK),
-                Cell::new("a").bg(tailwind::LIME.c300).fg(tailwind::BLACK),
-                Cell::new("b").bg(tailwind::LIME.c300).fg(tailwind::BLACK)
+                Cell::new("#").bg(tailwind::ORANGE.c300).fg(tailwind::BLACK),
+                Cell::new("a").bg(tailwind::ORANGE.c300).fg(tailwind::BLACK),
+                Cell::new("b").bg(tailwind::ORANGE.c300).fg(tailwind::BLACK)
             ]
         );
     }
