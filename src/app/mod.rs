@@ -270,7 +270,7 @@ impl<'app> App<'app> {
 
     fn render_tabs(&self, area: Rect, buf: &mut Buffer) {
         let titles = ui::SelectedTab::iter().map(ui::SelectedTab::title);
-        let highlight_style = (Color::default(), tailwind::GRAY.c700);
+        let highlight_style = (Color::default(), tailwind::ORANGE.c500);
         let selected_tab_index = self.state.tabs.selected as usize;
         Tabs::new(titles)
             .highlight_style(highlight_style)

@@ -28,7 +28,7 @@ use crate::app::App;
 fn render_smart_widget(area: Rect, buf: &mut Buffer, app: &App) {
     let logs = TuiLoggerSmartWidget::default()
         .style_error(Style::default().fg(tailwind::RED.c700))
-        .style_debug(Style::default().fg(tailwind::ORANGE.c700))
+        .style_debug(Style::default().fg(tailwind::ORANGE.c500))
         .style_warn(Style::default().fg(tailwind::YELLOW.c700))
         .style_trace(Style::default().fg(tailwind::GRAY.c700))
         .style_info(Style::default().fg(tailwind::WHITE))

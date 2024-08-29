@@ -42,10 +42,10 @@ macro_rules! convert_array_values_to_cells {
 }
 
 pub fn record_batch_to_table_header_cells(record_batch: &RecordBatch) -> Vec<Cell> {
-    let mut cells = vec![Cell::new("#").bg(tailwind::LIME.c300).fg(tailwind::BLACK)];
+    let mut cells = vec![Cell::new("#").bg(tailwind::ORANGE.c300).fg(tailwind::BLACK)];
     record_batch.schema_ref().fields().iter().for_each(|f| {
         let cell = Cell::new(f.name().as_str())
-            .bg(tailwind::LIME.c300)
+            .bg(tailwind::ORANGE.c300)
             .fg(tailwind::BLACK);
         cells.push(cell);
     });
@@ -169,9 +169,9 @@ mod tests {
         assert_eq!(
             header_cells,
             vec![
-                Cell::new("#").bg(tailwind::LIME.c300).fg(tailwind::BLACK),
-                Cell::new("a").bg(tailwind::LIME.c300).fg(tailwind::BLACK),
-                Cell::new("b").bg(tailwind::LIME.c300).fg(tailwind::BLACK)
+                Cell::new("#").bg(tailwind::ORANGE.c300).fg(tailwind::BLACK),
+                Cell::new("a").bg(tailwind::ORANGE.c300).fg(tailwind::BLACK),
+                Cell::new("b").bg(tailwind::ORANGE.c300).fg(tailwind::BLACK)
             ]
         );
     }

@@ -115,6 +115,7 @@ fn context_tab_key_event_handler(app: &mut App, key: KeyEvent) {
         KeyCode::Char('q') => app.state.should_quit = true,
         tab @ (KeyCode::Char('s')
         | KeyCode::Char('l')
+        | KeyCode::Char('h')
         | KeyCode::Char('x')
         | KeyCode::Char('f')) => tab_navigation_handler(app, tab),
         _ => {}

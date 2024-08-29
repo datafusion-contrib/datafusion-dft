@@ -93,10 +93,10 @@ impl SelectedTab {
 
     const fn bg(self) -> Color {
         match self {
-            Self::SQL => tailwind::EMERALD.c700,
-            Self::Logs => tailwind::EMERALD.c700,
-            Self::Context => tailwind::EMERALD.c700,
-            Self::History => tailwind::EMERALD.c700,
+            Self::SQL => tailwind::ORANGE.c700,
+            Self::Logs => tailwind::ORANGE.c700,
+            Self::Context => tailwind::ORANGE.c700,
+            Self::History => tailwind::ORANGE.c700,
             #[cfg(feature = "flightsql")]
             Self::FlightSQL => tailwind::EMERALD.c700,
         }
