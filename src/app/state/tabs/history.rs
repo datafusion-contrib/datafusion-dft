@@ -48,7 +48,7 @@ pub struct HistoryTabState {
     history_table_state: Option<RefCell<TableState>>,
 }
 
-impl<'app> HistoryTabState {
+impl HistoryTabState {
     pub fn new() -> Self {
         Self {
             history: Vec::new(),

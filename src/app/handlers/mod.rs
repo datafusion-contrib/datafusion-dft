@@ -166,7 +166,7 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
         AppEvent::QueryResult(r) => {
             app.state.sql_tab.set_query(r.clone());
             app.state.sql_tab.refresh_query_results_state();
-            let history_query = HistoryQuery::new(r.sql().clone(), r.execution_time().clone());
+            let history_query = HistoryQuery::new(r.sql().clone(), *r.execution_time());
             app.state.history_tab.add_to_history(history_query);
             app.state.history_tab.refresh_history_table_state()
         }
