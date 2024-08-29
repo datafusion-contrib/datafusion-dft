@@ -33,6 +33,7 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
     match key.code {
         KeyCode::Char('q') => app.state.should_quit = true,
         tab @ (KeyCode::Char('s')
+        | KeyCode::Char('h')
         | KeyCode::Char('l')
         | KeyCode::Char('x')
         | KeyCode::Char('f')) => tab_navigation_handler(app, tab),

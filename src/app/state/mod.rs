@@ -24,7 +24,7 @@ use crate::ui::SelectedTab;
 use log::{debug, error, info};
 use std::path::PathBuf;
 
-use self::tabs::logs::LogsTabState;
+use self::tabs::{history::HistoryTabState, logs::LogsTabState};
 
 use super::config::AppConfig;
 #[cfg(feature = "flightsql")]
@@ -52,6 +52,7 @@ pub struct AppState<'app> {
     #[cfg(feature = "flightsql")]
     pub flightsql_tab: FlightSQLTabState<'app>,
     pub logs_tab: LogsTabState,
+    pub history_tab: HistoryTabState,
     pub tabs: Tabs,
 }
 
@@ -90,6 +91,7 @@ pub fn initialize(args: &cli::DftCli) -> AppState {
     #[cfg(feature = "flightsql")]
     let flightsql_tab_state = FlightSQLTabState::new();
     let logs_tab_state = LogsTabState::default();
+    let history_tab_state = HistoryTabState::default();
 
     AppState {
         config,
@@ -99,6 +101,7 @@ pub fn initialize(args: &cli::DftCli) -> AppState {
         #[cfg(feature = "flightsql")]
         flightsql_tab: flightsql_tab_state,
         logs_tab: logs_tab_state,
+        history_tab: history_tab_state,
         should_quit: false,
     }
 }
