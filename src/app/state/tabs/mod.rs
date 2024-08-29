@@ -17,5 +17,6 @@
 
 #[cfg(feature = "flightsql")]
 pub mod flightsql;
+pub mod history;
 pub mod logs;
 pub mod sql;

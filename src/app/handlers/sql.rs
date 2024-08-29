@@ -29,6 +29,7 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
     match key.code {
         KeyCode::Char('q') => app.state.should_quit = true,
         tab @ (KeyCode::Char('s')
+        | KeyCode::Char('h')
         | KeyCode::Char('l')
         | KeyCode::Char('x')
         | KeyCode::Char('f')) => tab_navigation_handler(app, tab),
@@ -76,20 +77,20 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
                             let rows: usize = res.iter().map(|r| r.num_rows()).sum();
                             query.set_results(Some(res));
                             query.set_num_rows(Some(rows));
-                            query.set_elapsed_time(elapsed);
+                            query.set_execution_time(elapsed);
                         }
                         Err(e) => {
                             error!("Error collecting results: {:?}", e);
                             let elapsed = start.elapsed();
                             query.set_error(Some(e.to_string()));
-                            query.set_elapsed_time(elapsed);
+                            query.set_execution_time(elapsed);
                         }
                     },
                     Err(e) => {
                         error!("Error creating dataframe: {:?}", e);
                         let elapsed = start.elapsed();
                         query.set_error(Some(e.to_string()));
-                        query.set_elapsed_time(elapsed);
+                        query.set_execution_time(elapsed);
                     }
                 }
                 let _ = _event_tx.send(AppEvent::QueryResult(query));

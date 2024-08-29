@@ -30,7 +30,7 @@ pub struct Query {
     results: Option<Vec<RecordBatch>>,
     num_rows: Option<usize>,
     error: Option<String>,
-    elapsed_time: Duration,
+    execution_time: Duration,
 }
 
 impl Query {
@@ -39,19 +39,23 @@ impl Query {
         results: Option<Vec<RecordBatch>>,
         num_rows: Option<usize>,
         error: Option<String>,
-        elapsed_time: Duration,
+        execution_time: Duration,
     ) -> Self {
         Self {
             sql,
             results,
             num_rows,
             error,
-            elapsed_time,
+            execution_time,
         }
     }
 
     pub fn sql(&self) -> &String {
         &self.sql
+    }
+
+    pub fn execution_time(&self) -> &Duration {
+        &self.execution_time
     }
 
     pub fn set_results(&mut self, results: Option<Vec<RecordBatch>>) {
@@ -78,12 +82,8 @@ impl Query {
         &self.error
     }
 
-    pub fn set_elapsed_time(&mut self, elapsed_time: Duration) {
-        self.elapsed_time = elapsed_time;
-    }
-
-    pub fn elapsed_time(&self) -> Duration {
-        self.elapsed_time
+    pub fn set_execution_time(&mut self, elapsed_time: Duration) {
+        self.execution_time = elapsed_time;
     }
 }
 

@@ -16,6 +16,7 @@
 // under the License.
 #[cfg(feature = "flightsql")]
 pub mod flightsql;
+pub mod history;
 pub mod sql;
 
 use color_eyre::Result;
@@ -30,7 +31,10 @@ use std::sync::Arc;
 #[cfg(feature = "flightsql")]
 use tonic::transport::Channel;
 
-use crate::{app::AppEvent, ui::SelectedTab};
+use crate::{
+    app::{state::tabs::history::HistoryQuery, AppEvent},
+    ui::SelectedTab,
+};
 
 use super::App;
 
@@ -53,6 +57,7 @@ fn tab_navigation_handler(app: &mut App, key: KeyCode) {
         KeyCode::Char('s') => app.state.tabs.selected = SelectedTab::SQL,
         KeyCode::Char('l') => app.state.tabs.selected = SelectedTab::Logs,
         KeyCode::Char('x') => app.state.tabs.selected = SelectedTab::Context,
+        KeyCode::Char('h') => app.state.tabs.selected = SelectedTab::History,
         #[cfg(feature = "flightsql")]
         KeyCode::Char('f') => app.state.tabs.selected = SelectedTab::FlightSQL,
         _ => {}
@@ -63,12 +68,13 @@ fn logs_tab_key_event_handler(app: &mut App, key: KeyEvent) {
     match key.code {
         KeyCode::Char('q') => app.state.should_quit = true,
         tab @ (KeyCode::Char('s')
+        | KeyCode::Char('h')
         | KeyCode::Char('l')
         | KeyCode::Char('x')
         | KeyCode::Char('f')) => tab_navigation_handler(app, tab),
-        KeyCode::Char('h') => {
-            app.state.logs_tab.transition(TuiWidgetEvent::HideKey);
-        }
+        // KeyCode::Char('h') => {
+        //     app.state.logs_tab.transition(TuiWidgetEvent::HideKey);
+        // }
         KeyCode::Char('+') => {
             app.state.logs_tab.transition(TuiWidgetEvent::PlusKey);
         }
@@ -158,8 +164,11 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
             })
         }
         AppEvent::QueryResult(r) => {
-            app.state.sql_tab.set_query(r);
+            app.state.sql_tab.set_query(r.clone());
             app.state.sql_tab.refresh_query_results_state();
+            let history_query = HistoryQuery::new(r.sql().clone(), *r.execution_time());
+            app.state.history_tab.add_to_history(history_query);
+            app.state.history_tab.refresh_history_table_state()
         }
         #[cfg(feature = "flightsql")]
         AppEvent::FlightSQLQueryResult(r) => {
@@ -192,6 +201,7 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                 SelectedTab::SQL => sql::app_event_handler(app, event),
                 SelectedTab::Logs => logs_tab_app_event_handler(app, event),
                 SelectedTab::Context => context_tab_app_event_handler(app, event),
+                SelectedTab::History => history::app_event_handler(app, event),
                 #[cfg(feature = "flightsql")]
                 SelectedTab::FlightSQL => flightsql::app_event_handler(app, event),
             };

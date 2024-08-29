@@ -23,7 +23,7 @@ use strum::{Display, EnumIter, FromRepr};
 
 use crate::app::App;
 
-use self::tabs::{context, logs, sql};
+use self::tabs::{context, history, logs, sql};
 
 #[derive(Clone, Copy, Debug, Display, FromRepr, EnumIter)]
 pub enum SelectedTab {
@@ -33,6 +33,8 @@ pub enum SelectedTab {
     #[cfg(feature = "flightsql")]
     #[strum(to_string = "FlightSQL")]
     FlightSQL,
+    #[strum(to_string = "History")]
+    History,
     #[strum(to_string = "Logs")]
     Logs,
     #[strum(to_string = "Context")]
@@ -79,6 +81,13 @@ impl SelectedTab {
                 .fg(tailwind::SLATE.c200)
                 .bg(self.bg())
             }
+            Self::History => {
+                let bold_char = Span::from("H").bold().black();
+                let remaining = Span::from("ISTORY");
+                Line::from_iter(vec![padding.clone(), bold_char, remaining, padding.clone()])
+                    .fg(tailwind::SLATE.c200)
+                    .bg(self.bg())
+            }
         }
     }
 
@@ -87,6 +96,7 @@ impl SelectedTab {
             Self::SQL => tailwind::EMERALD.c700,
             Self::Logs => tailwind::EMERALD.c700,
             Self::Context => tailwind::EMERALD.c700,
+            Self::History => tailwind::EMERALD.c700,
             #[cfg(feature = "flightsql")]
             Self::FlightSQL => tailwind::EMERALD.c700,
         }
@@ -118,6 +128,10 @@ impl SelectedTab {
         context::render_context(area, buf, app)
     }
 
+    fn render_history(self, area: Rect, buf: &mut Buffer, app: &App) {
+        history::render_history(area, buf, app)
+    }
+
     #[cfg(feature = "flightsql")]
     fn render_flightsql(self, area: Rect, buf: &mut Buffer, app: &App) {
         use self::tabs::flightsql;
@@ -135,6 +149,7 @@ impl SelectedTab {
             Self::SQL => self.render_sql(area, buf, app),
             Self::Logs => self.render_logs(area, buf, app),
             Self::Context => self.render_context(area, buf, app),
+            Self::History => self.render_history(area, buf, app),
             #[cfg(feature = "flightsql")]
             Self::FlightSQL => self.render_flightsql(area, buf, app),
         }
