@@ -25,11 +25,11 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) {
     match event {
         AppEvent::Key(key) => match key.code {
             KeyCode::Char('q') => app.state.should_quit = true,
-            tab @ (KeyCode::Char('s')
-            | KeyCode::Char('h')
-            | KeyCode::Char('l')
-            | KeyCode::Char('x')
-            | KeyCode::Char('f')) => tab_navigation_handler(app, tab),
+            tab @ (KeyCode::Char('1')
+            | KeyCode::Char('2')
+            | KeyCode::Char('3')
+            | KeyCode::Char('4')
+            | KeyCode::Char('5')) => tab_navigation_handler(app, tab),
 
             KeyCode::Down => {
                 if let Some(s) = app.state.history_tab.history_table_state() {

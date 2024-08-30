@@ -53,13 +53,21 @@ pub fn crossterm_event_handler(event: event::Event) -> Option<AppEvent> {
 }
 
 fn tab_navigation_handler(app: &mut App, key: KeyCode) {
+    #[cfg(feature = "flightsql")]
     match key {
-        KeyCode::Char('s') => app.state.tabs.selected = SelectedTab::SQL,
-        KeyCode::Char('l') => app.state.tabs.selected = SelectedTab::Logs,
-        KeyCode::Char('x') => app.state.tabs.selected = SelectedTab::Context,
-        KeyCode::Char('h') => app.state.tabs.selected = SelectedTab::History,
-        #[cfg(feature = "flightsql")]
-        KeyCode::Char('f') => app.state.tabs.selected = SelectedTab::FlightSQL,
+        KeyCode::Char('1') => app.state.tabs.selected = SelectedTab::SQL,
+        KeyCode::Char('2') => app.state.tabs.selected = SelectedTab::FlightSQL,
+        KeyCode::Char('3') => app.state.tabs.selected = SelectedTab::History,
+        KeyCode::Char('4') => app.state.tabs.selected = SelectedTab::Logs,
+        KeyCode::Char('5') => app.state.tabs.selected = SelectedTab::Context,
+        _ => {}
+    };
+    #[cfg(not(feature = "flightsql"))]
+    match key {
+        KeyCode::Char('1') => app.state.tabs.selected = SelectedTab::SQL,
+        KeyCode::Char('2') => app.state.tabs.selected = SelectedTab::History,
+        KeyCode::Char('3') => app.state.tabs.selected = SelectedTab::Logs,
+        KeyCode::Char('4') => app.state.tabs.selected = SelectedTab::Context,
         _ => {}
     };
 }
@@ -67,14 +75,17 @@ fn tab_navigation_handler(app: &mut App, key: KeyCode) {
 fn logs_tab_key_event_handler(app: &mut App, key: KeyEvent) {
     match key.code {
         KeyCode::Char('q') => app.state.should_quit = true,
-        tab @ (KeyCode::Char('s')
-        | KeyCode::Char('h')
-        | KeyCode::Char('l')
-        | KeyCode::Char('x')
-        | KeyCode::Char('f')) => tab_navigation_handler(app, tab),
-        // KeyCode::Char('h') => {
-        //     app.state.logs_tab.transition(TuiWidgetEvent::HideKey);
-        // }
+        tab @ (KeyCode::Char('1')
+        | KeyCode::Char('2')
+        | KeyCode::Char('3')
+        | KeyCode::Char('4')
+        | KeyCode::Char('5')) => tab_navigation_handler(app, tab),
+        KeyCode::Char('f') => {
+            app.state.logs_tab.transition(TuiWidgetEvent::FocusKey);
+        }
+        KeyCode::Char('h') => {
+            app.state.logs_tab.transition(TuiWidgetEvent::HideKey);
+        }
         KeyCode::Char('+') => {
             app.state.logs_tab.transition(TuiWidgetEvent::PlusKey);
         }
@@ -113,11 +124,11 @@ fn logs_tab_key_event_handler(app: &mut App, key: KeyEvent) {
 fn context_tab_key_event_handler(app: &mut App, key: KeyEvent) {
     match key.code {
         KeyCode::Char('q') => app.state.should_quit = true,
-        tab @ (KeyCode::Char('s')
-        | KeyCode::Char('l')
-        | KeyCode::Char('h')
-        | KeyCode::Char('x')
-        | KeyCode::Char('f')) => tab_navigation_handler(app, tab),
+        tab @ (KeyCode::Char('1')
+        | KeyCode::Char('2')
+        | KeyCode::Char('3')
+        | KeyCode::Char('4')
+        | KeyCode::Char('5')) => tab_navigation_handler(app, tab),
         _ => {}
     }
 }

@@ -28,11 +28,11 @@ use super::App;
 pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
     match key.code {
         KeyCode::Char('q') => app.state.should_quit = true,
-        tab @ (KeyCode::Char('s')
-        | KeyCode::Char('h')
-        | KeyCode::Char('l')
-        | KeyCode::Char('x')
-        | KeyCode::Char('f')) => tab_navigation_handler(app, tab),
+        tab @ (KeyCode::Char('1')
+        | KeyCode::Char('2')
+        | KeyCode::Char('3')
+        | KeyCode::Char('4')
+        | KeyCode::Char('5')) => tab_navigation_handler(app, tab),
         KeyCode::Char('c') => app.state.sql_tab.clear_editor(),
         KeyCode::Char('e') => {
             let editor = app.state.sql_tab.editor();

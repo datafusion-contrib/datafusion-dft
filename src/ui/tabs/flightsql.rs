@@ -26,7 +26,7 @@ use crate::{app::App, ui::convert::record_batches_to_table};
 
 pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
     let border_color = if app.state.flightsql_tab.editor_editable() {
-        tailwind::GREEN.c300
+        tailwind::ORANGE.c300
     } else {
         tailwind::WHITE
     };
@@ -51,7 +51,7 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
                         q.num_rows().unwrap_or(0),
                         q.elapsed_time().as_millis()
                     ))
-                    .fg(tailwind::GREEN.c300);
+                    .fg(tailwind::ORANGE.c500);
                 let maybe_table = record_batches_to_table(r);
                 match maybe_table {
                     Ok(table) => {
