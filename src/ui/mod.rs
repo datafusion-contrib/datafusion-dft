@@ -46,45 +46,46 @@ impl SelectedTab {
         let padding = Span::from("  ");
         match self {
             SelectedTab::SQL => {
-                let bold_char = Span::from("S").bold().black();
-                let remaining = Span::from("QL");
-                Line::from_iter(vec![padding.clone(), bold_char, remaining, padding.clone()])
+                let title = Span::from("SQL (1)").bold();
+                Line::from_iter(vec![padding.clone(), title, padding.clone()])
                     .fg(tailwind::SLATE.c200)
                     .bg(self.bg())
             }
             #[cfg(feature = "flightsql")]
             Self::FlightSQL => {
-                let bold_char = Span::from("F").bold().black();
-                let remaining = Span::from("lightSQL");
-                Line::from_iter(vec![padding.clone(), bold_char, remaining, padding.clone()])
+                let title = Span::from("FlightSQL (2)").bold();
+                Line::from_iter(vec![padding.clone(), title, padding.clone()])
                     .fg(tailwind::SLATE.c200)
                     .bg(self.bg())
             }
             Self::Logs => {
-                let bold_char = Span::from("L").bold().black();
-                let remaining = Span::from("OGS");
-                Line::from_iter(vec![padding.clone(), bold_char, remaining, padding.clone()])
+                #[cfg(feature = "flightsql")]
+                let title = Span::from("LOGS (4)").bold();
+
+                #[cfg(not(feature = "flightsql"))]
+                let title = Span::from("LOGS (3)").bold();
+
+                Line::from_iter(vec![padding.clone(), title, padding.clone()])
                     .fg(tailwind::SLATE.c200)
                     .bg(self.bg())
             }
             Self::Context => {
-                let start = Span::from("CONTE");
-                let bold_char = Span::from("X").bold().black();
-                let remaining = Span::from("T");
-                Line::from_iter(vec![
-                    padding.clone(),
-                    start,
-                    bold_char,
-                    remaining,
-                    padding.clone(),
-                ])
-                .fg(tailwind::SLATE.c200)
-                .bg(self.bg())
+                #[cfg(feature = "flightsql")]
+                let title = Span::from("CONTEXT (5)").bold();
+
+                #[cfg(not(feature = "flightsql"))]
+                let title = Span::from("CONTEXT (4)").bold();
+
+                Line::from_iter(vec![padding.clone(), title, padding.clone()])
+                    .fg(tailwind::SLATE.c200)
+                    .bg(self.bg())
             }
             Self::History => {
-                let bold_char = Span::from("H").bold().black();
-                let remaining = Span::from("ISTORY");
-                Line::from_iter(vec![padding.clone(), bold_char, remaining, padding.clone()])
+                #[cfg(feature = "flightsql")]
+                let title = Span::from("HISTORY (3)");
+                #[cfg(not(feature = "flightsql"))]
+                let title = Span::from("HISTORY (2)");
+                Line::from_iter(vec![padding.clone(), title, padding.clone()])
                     .fg(tailwind::SLATE.c200)
                     .bg(self.bg())
             }
@@ -98,7 +99,7 @@ impl SelectedTab {
             Self::Context => tailwind::ORANGE.c700,
             Self::History => tailwind::ORANGE.c700,
             #[cfg(feature = "flightsql")]
-            Self::FlightSQL => tailwind::EMERALD.c700,
+            Self::FlightSQL => tailwind::ORANGE.c700,
         }
     }
 
