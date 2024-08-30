@@ -10,22 +10,21 @@ Some of the current and planned features are:
 
 - Tab management to provide clean and structured organization of DataFusion queries, results, and context
   - SQL editor
-    - Text editor for writing SQL queries
-    - Scrollable query results
-    - Track memory usage during query (TODO)
     - Write query results to file (TODO)
     - Multiple SQL Editor tabs (TODO)
   - Query history
-    - History of executed queries
+    - History and statistics of executed queries
   - ExecutionContext information
     - Information from ExecutionContext / Catalog / ObjectStore / State / Config
   - Logs
     - Logs from `dft` and `DataFusion`
-- `ObjectStore` Support
-  - S3 with custom endpoint / provider
+- Custom `ObjectStore` Support
+  - S3, Azure(TODO), GCP(TODO)
   - `ObjectStore` explorer. I.e. able to list files in `ObjectStore`
-- `TableProvider` data sources
-  - Delta Table => `CREATE EXTERNAL TABLE table_name STORED AS DELTATABLE LOCATION 's3://bucket/table'` (Only available with `deltalake` feature)
+- `TableProviderFactory` data sources
+  - Deltalake
+  - Iceberg (TODO)
+  - Hudi (TODO)
 - Preloading DDL from `~/.datafusion/.datafusionrc` for local database available on startup
 
 ## User Guide
@@ -34,7 +33,7 @@ Some of the current and planned features are:
 
 Currently, the only supported packaging is on [crates.io](https://crates.io/search?q=datafusion-tui).  If you already have Rust installed it can be installed by running `cargo install datafusion-tui`.  If rust is not installed you can download following the directions [here](https://www.rust-lang.org/tools/install).
 
-Once installed you can run `dft` to start the application with DataFusion as the exection engine or `dft --host $HOST --port $PORT` to start the application with Ballista as the execution engine.
+Once installed you can run `dft` to start the application.
 
 #### Features
 
@@ -75,6 +74,14 @@ The default `connection_url` is `http://localhost:50051` but this can be configu
 ```toml
 [execution.flight_sql]
 connection_url = "http://myhost:myport"
+```
+
+#### Deltalake (`--features=deltalake`)
+
+Register deltalake tables.  For example:
+
+```sql
+CREATE EXTERNAL TABLE table_name STORED AS DELTATABLE LOCATION 's3://bucket/table'
 ```
 
 ### Config
