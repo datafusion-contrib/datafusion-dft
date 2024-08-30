@@ -1,6 +1,6 @@
 # datafusion-tui (dft)
 
-DataFusion-tui provides an extensible terminal based data analysis tool that uses [DataFusion](https://github.com/apache/arrow-datafusion) (single node) and [Ballista](https://github.com/apache/arrow-ballista) (distributed) as query execution engines. It has drawn inspiration and several features from `datafusion-cli`. In contrast to `datafusion-cli` a focus of `dft` is to provide an interface for leveraging DataFusions extensibility (for example connecting to `ObjectStore`s or querying custom `TableProvider`s).  
+DataFusion-tui provides an extensible terminal based data analysis tool that uses [DataFusion](https://github.com/apache/arrow-datafusion) as query execution engines. It has drawn inspiration and several features from `datafusion-cli`. In contrast to `datafusion-cli` a focus of `dft` is to provide an interface for leveraging DataFusions extensibility (for example connecting to `ObjectStore`s or querying custom `TableProvider`s).
 
 The objective of `dft` is to provide users with the experience of having their own local database that allows them to query and join data from disparate data sources all from the terminal.  
 
@@ -34,35 +34,11 @@ Some of the current and planned features are:
 
 Currently, the only supported packaging is on [crates.io](https://crates.io/search?q=datafusion-tui).  If you already have Rust installed it can be installed by running `cargo install datafusion-tui`.  If rust is not installed you can download following the directions [here](https://www.rust-lang.org/tools/install).
 
-To install with support for s3 run `cargo install datafusion-tui --features=s3` and to enable using ballista as a execution backend run `cargo install datafusion-tui --features=ballista`.
-
 Once installed you can run `dft` to start the application with DataFusion as the exection engine or `dft --host $HOST --port $PORT` to start the application with Ballista as the execution engine.
 
-### Config
+#### Features
 
-The `dft` configuration is stored in `~/.config/dft/config.toml`
-
-### Getting Started
-
-To have the best experience with `dft` it is highly recommended to define all of your DDL in `~/.datafusion/.datafusionrc` so that any tables you wish to query are available at startup.  Additionally, now that DataFusion supports `CREATE VIEW` via sql you can also make a `VIEW` based on these tables.
-
-For example, your `~/.datafusion/.datafusionrc` file could look like the following:
-
-```
-CREATE EXTERNAL TABLE users STORED AS NDJSON LOCATION 's3://bucket/users';
-
-CREATE EXTERNAL TABLE taxis STORED AS PARQUET LOCATION 's3://bucket/transactions';
-
-CREATE EXTERNAL TABLE listings STORED AS PARQUET LOCATION 'file://folder/listings';
-
-CREATE VIEW OR REPLACE users_listings AS SELECT * FROM users LEFT JOIN listings USING (user_id);
-```
-
-This would make the tables `users`, `taxis`, `listings`, and the view  `users_listings` available at startup.  Any of these DDL statements could also be run interactively from the SQL editor as well to create the tables.
-
-### Features
-
-#### S3 (--features=s3)
+#### S3 (`--features=s3`)
 
 Mutliple s3 `ObjectStore`s can be registered, following the below model in your configuration file.
 
@@ -82,6 +58,46 @@ aws_access_key_id = "MY_ACCESS_KEY"
 aws_secret_access_key = "MY SECRET"
 ```
 
+Then you can run DDL such as 
+
+```sql
+CREATE EXTERNAL TABLE my_table STORED AS PARQUET LOCATION 's3://my_bucket/table';
+
+CREATE EXTERNAL TABLE other_table STORED AS PARQUET LOCATION 'ny1://other_bucket/table';
+```
+
+#### FlightSQL (`--features=flightsql`)
+
+A separate editor for connecting to a FlightSQL server is provided.
+
+The default `connection_url` is `http://localhost:50051` but this can be configured your config as well:
+
+```toml
+[execution.flight_sql]
+connection_url = "http://myhost:myport"
+```
+
+### Config
+
+The `dft` configuration is stored in `~/.config/dft/config.toml`
+
+### Getting Started
+
+To have the best experience with `dft` it is highly recommended to define all of your DDL in `~/.datafusion/.datafusionrc` so that any tables you wish to query are available at startup.  Additionally, now that DataFusion supports `CREATE VIEW` via sql you can also make a `VIEW` based on these tables.
+
+For example, your `~/.datafusion/.datafusionrc` file could look like the following:
+
+```
+CREATE EXTERNAL TABLE users STORED AS NDJSON LOCATION 's3://bucket/users';
+
+CREATE EXTERNAL TABLE transactions STORED AS PARQUET LOCATION 's3://bucket/transactions';
+
+CREATE EXTERNAL TABLE listings STORED AS PARQUET LOCATION 'file://folder/listings';
+
+CREATE VIEW OR REPLACE users_listings AS SELECT * FROM users LEFT JOIN listings USING (user_id);
+```
+
+This would make the tables `users`, `transactions`, `listings`, and the view  `users_listings` available at startup.  Any of these DDL statements could also be run interactively from the SQL editor as well to create the tables.
 
 ### Key Mappings
 
@@ -100,9 +116,9 @@ The interface is split into several tabs so that relevant information can be vie
     - Backspace / tab / enter work same as normal
     - `esc` to exit Edit mode and go back to Normal mode
   - Rc mode
-    - `l` => load `~/.datafusion/.datafusionrc` into editor
-    - `r` => rerun `~/.datafusion/.datafusionrc`
-    - `w` => write editor contents to `~/.datafusion/.datafusionrc`
+    - `l` => load `~/.datafusion/.datafusionrc` into editor (TODO)
+    - `r` => rerun `~/.datafusion/.datafusionrc` (TODO)
+    - `w` => write editor contents to `~/.datafusion/.datafusionrc` (TODO)
   - Logging mode (coming from [tui_logger](https://docs.rs/tui-logger/latest/tui_logger/index.html))
     - `h` => Toggles target selector widget hidden/visible
     - `f` => Toggle focus on the selected target only
@@ -116,6 +132,3 @@ The interface is split into several tabs so that relevant information can be vie
     - `PAGEDOWN` => Only in page mode: scroll 10 events down in log history.
     - `ESCAPE` => Exit page mode and go back to scrolling mode
     - `SPACE` => Toggles hiding of targets, which have logfilter set to off
-- Register custom `ObjectStore`
-  - S3: run / install with `--features=s3`
-    - If you want to use your default AWS credentials, then no further action is required. For example your credentials in `~/.aws/credentials` will automatically be picked up.
