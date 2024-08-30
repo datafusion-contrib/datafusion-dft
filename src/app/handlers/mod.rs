@@ -24,6 +24,8 @@ use log::{debug, error, info, trace};
 use ratatui::crossterm::event::{self, KeyCode, KeyEvent};
 use tui_logger::TuiWidgetEvent;
 
+use crate::state::tabs::history::Context;
+
 #[cfg(feature = "flightsql")]
 use arrow_flight::sql::client::FlightSqlServiceClient;
 #[cfg(feature = "flightsql")]
@@ -178,14 +180,19 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
         AppEvent::QueryResult(r) => {
             app.state.sql_tab.set_query(r.clone());
             app.state.sql_tab.refresh_query_results_state();
-            let history_query = HistoryQuery::new(r.sql().clone(), *r.execution_time());
+            let history_query =
+                HistoryQuery::new(Context::Local, r.sql().clone(), *r.execution_time());
             app.state.history_tab.add_to_history(history_query);
             app.state.history_tab.refresh_history_table_state()
         }
         #[cfg(feature = "flightsql")]
         AppEvent::FlightSQLQueryResult(r) => {
-            app.state.flightsql_tab.set_query(r);
+            app.state.flightsql_tab.set_query(r.clone());
             app.state.flightsql_tab.refresh_query_results_state();
+            let history_query =
+                HistoryQuery::new(Context::FlightSQL, r.sql().clone(), *r.execution_time());
+            app.state.history_tab.add_to_history(history_query);
+            app.state.history_tab.refresh_history_table_state()
         }
         #[cfg(feature = "flightsql")]
         AppEvent::EstablishFlightSQLConnection => {

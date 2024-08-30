@@ -21,14 +21,31 @@ use std::time::Duration;
 use ratatui::widgets::TableState;
 
 #[derive(Debug)]
+pub enum Context {
+    Local,
+    FlightSQL,
+}
+
+impl Context {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Context::Local => "Local",
+            Context::FlightSQL => "FlightSQL",
+        }
+    }
+}
+
+#[derive(Debug)]
 pub struct HistoryQuery {
+    context: Context,
     sql: String,
     execution_time: Duration,
 }
 
 impl HistoryQuery {
-    pub fn new(sql: String, execution_time: Duration) -> Self {
+    pub fn new(context: Context, sql: String, execution_time: Duration) -> Self {
         Self {
+            context,
             sql,
             execution_time,
         }
@@ -39,6 +56,10 @@ impl HistoryQuery {
 
     pub fn execution_time(&self) -> &Duration {
         &self.execution_time
+    }
+
+    pub fn context(&self) -> &Context {
+        &self.context
     }
 }
 

@@ -19,7 +19,7 @@ use log::info;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{palette::tailwind, Style},
+    style::{palette::tailwind, Style, Stylize},
     widgets::{Block, Borders, Cell, Paragraph, Row, StatefulWidget, Table, Widget},
 };
 
@@ -71,19 +71,30 @@ pub fn render_query_history(area: Rect, buf: &mut Buffer, app: &App) {
             Widget::render(table, area, buf);
         }
         (_, Some(table_state)) => {
-            let widths = vec![Constraint::Percentage(50), Constraint::Percentage(50)];
+            let widths = vec![
+                Constraint::Percentage(33),
+                Constraint::Percentage(33),
+                Constraint::Percentage(33),
+            ];
             let history = app.state.history_tab.history();
             let rows: Vec<Row> = history
                 .iter()
                 .map(|q| {
                     Row::new(vec![
+                        Cell::from(q.context().as_str()),
                         Cell::from(q.sql().as_str()),
                         Cell::from(q.execution_time().as_millis().to_string()),
                     ])
                 })
                 .collect();
 
-            let header = Row::new(vec![Cell::from("Query"), Cell::from("Execution Time(ms)")]);
+            let header = Row::new(vec![
+                Cell::from("Context"),
+                Cell::from("Query"),
+                Cell::from("Execution Time(ms)"),
+            ])
+            .bg(tailwind::WHITE)
+            .fg(tailwind::BLACK);
             let table = Table::new(rows, widths).header(header).block(block.clone());
 
             let table = table

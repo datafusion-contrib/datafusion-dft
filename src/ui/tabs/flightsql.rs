@@ -49,7 +49,7 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
                     .title_bottom(format!(
                         " {} rows in {}ms",
                         q.num_rows().unwrap_or(0),
-                        q.elapsed_time().as_millis()
+                        q.execution_time().as_millis()
                     ))
                     .fg(tailwind::ORANGE.c500);
                 let maybe_table = record_batches_to_table(r);

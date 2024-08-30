@@ -96,7 +96,7 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
                                                         error!("Error getting batch: {:?}", e);
                                                         let elapsed = start.elapsed();
                                                         query.set_error(Some(e.to_string()));
-                                                        query.set_elapsed_time(elapsed);
+                                                        query.set_execution_time(elapsed);
                                                         break;
                                                     }
                                                 }
@@ -107,13 +107,13 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
                                                 batches.iter().map(|r| r.num_rows()).sum();
                                             query.set_results(Some(batches));
                                             query.set_num_rows(Some(rows));
-                                            query.set_elapsed_time(elapsed);
+                                            query.set_execution_time(elapsed);
                                         }
                                         Err(e) => {
                                             error!("Error getting response: {:?}", e);
                                             let elapsed = start.elapsed();
                                             query.set_error(Some(e.to_string()));
-                                            query.set_elapsed_time(elapsed);
+                                            query.set_execution_time(elapsed);
                                         }
                                     }
                                 }
@@ -123,7 +123,7 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
                             error!("Error getting response: {:?}", e);
                             let elapsed = start.elapsed();
                             query.set_error(Some(e.to_string()));
-                            query.set_elapsed_time(elapsed);
+                            query.set_execution_time(elapsed);
                         }
                     }
                 }
