@@ -20,7 +20,6 @@ use std::time::Duration;
 
 use datafusion::arrow::array::RecordBatch;
 use ratatui::crossterm::event::KeyEvent;
-use ratatui::style::{palette::tailwind, Style};
 use ratatui::widgets::TableState;
 use tui_textarea::TextArea;
 
