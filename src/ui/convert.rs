@@ -35,13 +35,17 @@ macro_rules! convert_array_values_to_cells {
     ($rows:expr, $arr:expr, $typ:ty) => {
         if let Some(a) = $arr.as_any().downcast_ref::<$typ>() {
             for i in 0..$rows.len() {
-                $rows[i].push(a.value(i).to_string().into());
+                let cell = Cell::from(a.value(i).to_string())
+                    .bg(tailwind::BLACK)
+                    .fg(tailwind::WHITE);
+                $rows[i].push(cell);
             }
         }
     };
 }
 
 pub fn record_batch_to_table_header_cells(record_batch: &RecordBatch) -> Vec<Cell> {
+    // let mut cells = vec![Cell::new("#")];
     let mut cells = vec![Cell::new("#").bg(tailwind::ORANGE.c300).fg(tailwind::BLACK)];
     record_batch.schema_ref().fields().iter().for_each(|f| {
         let cell = Cell::new(f.name().as_str())
@@ -54,7 +58,11 @@ pub fn record_batch_to_table_header_cells(record_batch: &RecordBatch) -> Vec<Cel
 
 pub fn create_row_number_cells(record_batch: &RecordBatch) -> Vec<Cell> {
     let cells: Vec<Cell> = (0..record_batch.num_rows())
-        .map(|i| Cell::new(i.to_string()))
+        .map(|i| {
+            Cell::new(i.to_string())
+                .bg(tailwind::BLACK)
+                .fg(tailwind::WHITE)
+        })
         .collect();
     cells
 }

@@ -20,7 +20,6 @@ use std::time::Duration;
 
 use datafusion::arrow::array::RecordBatch;
 use ratatui::crossterm::event::KeyEvent;
-use ratatui::style::{palette::tailwind, Style};
 use ratatui::widgets::TableState;
 use tui_textarea::TextArea;
 
@@ -99,8 +98,7 @@ impl<'app> SQLTabState<'app> {
     pub fn new() -> Self {
         let empty_text = vec!["Enter a query here.".to_string()];
         // TODO: Enable vim mode from config?
-        let mut textarea = TextArea::new(empty_text);
-        textarea.set_line_number_style(Style::default().bg(tailwind::GRAY.c400));
+        let textarea = TextArea::new(empty_text);
         Self {
             editor: textarea,
             editor_editable: false,
@@ -171,5 +169,9 @@ impl<'app> SQLTabState<'app> {
     // TODO: Create Editor struct and move this there
     pub fn previous_word(&mut self) {
         self.editor.move_cursor(tui_textarea::CursorMove::WordBack)
+    }
+
+    pub fn delete_word(&mut self) {
+        self.editor.delete_word();
     }
 }

@@ -104,6 +104,7 @@ pub fn editable_handler(app: &mut App, key: KeyEvent) {
     match (key.code, key.modifiers) {
         (KeyCode::Left, KeyModifiers::ALT) => app.state.sql_tab.previous_word(),
         (KeyCode::Right, KeyModifiers::ALT) => app.state.sql_tab.next_word(),
+        (KeyCode::Backspace, KeyModifiers::ALT) => app.state.sql_tab.delete_word(),
         (KeyCode::Esc, _) => app.state.sql_tab.exit_edit(),
         (KeyCode::Enter, KeyModifiers::CONTROL) => {
             let query = app.state.sql_tab.editor().lines().join("");
