@@ -139,6 +139,7 @@ pub fn editable_handler(app: &mut App, key: KeyEvent) {
     match (key.code, key.modifiers) {
         (KeyCode::Left, KeyModifiers::ALT) => app.state.flightsql_tab.previous_word(),
         (KeyCode::Right, KeyModifiers::ALT) => app.state.flightsql_tab.next_word(),
+        (KeyCode::Backspace, KeyModifiers::ALT) => app.state.flightsql_tab.delete_word(),
         (KeyCode::Esc, _) => app.state.flightsql_tab.exit_edit(),
         _ => app.state.flightsql_tab.update_editor_content(key),
     }

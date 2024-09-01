@@ -19,6 +19,7 @@ use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{palette::tailwind, Style, Stylize},
+    text::Span,
     widgets::{Block, Borders, Paragraph, Row, StatefulWidget, Table, Widget},
 };
 
@@ -26,12 +27,13 @@ use crate::{app::App, ui::convert::record_batches_to_table};
 
 pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
     let border_color = if app.state.sql_tab.editor_editable() {
-        tailwind::ORANGE.c300
+        tailwind::ORANGE.c500
     } else {
         tailwind::WHITE
     };
+    let title = Span::from(" Editor ").fg(tailwind::WHITE);
     let block = Block::default()
-        .title(" Editor ")
+        .title(title)
         .borders(Borders::ALL)
         .fg(border_color)
         .title_bottom(" Cmd+Enter to run query ");
@@ -45,13 +47,13 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
     if let Some(q) = app.state.sql_tab.query() {
         if let Some(r) = q.results() {
             if let Some(s) = app.state.sql_tab.query_results_state() {
-                let block = block
-                    .title_bottom(format!(
-                        " {} rows in {}ms ",
-                        q.num_rows().unwrap_or(0),
-                        q.execution_time().as_millis()
-                    ))
-                    .fg(tailwind::ORANGE.c500);
+                let stats = Span::from(format!(
+                    " {} rows in {}ms ",
+                    q.num_rows().unwrap_or(0),
+                    q.execution_time().as_millis()
+                ))
+                .fg(tailwind::WHITE);
+                let block = block.title_bottom(stats).fg(tailwind::ORANGE.c500);
                 let maybe_table = record_batches_to_table(r);
                 match maybe_table {
                     Ok(table) => {

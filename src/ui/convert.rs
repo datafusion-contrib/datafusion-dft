@@ -35,7 +35,10 @@ macro_rules! convert_array_values_to_cells {
     ($rows:expr, $arr:expr, $typ:ty) => {
         if let Some(a) = $arr.as_any().downcast_ref::<$typ>() {
             for i in 0..$rows.len() {
-                $rows[i].push(a.value(i).to_string().into());
+                let cell = Cell::from(a.value(i).to_string())
+                    .bg(tailwind::BLACK)
+                    .fg(tailwind::WHITE);
+                $rows[i].push(cell);
             }
         }
     };
@@ -54,7 +57,11 @@ pub fn record_batch_to_table_header_cells(record_batch: &RecordBatch) -> Vec<Cel
 
 pub fn create_row_number_cells(record_batch: &RecordBatch) -> Vec<Cell> {
     let cells: Vec<Cell> = (0..record_batch.num_rows())
-        .map(|i| Cell::new(i.to_string()))
+        .map(|i| {
+            Cell::new(i.to_string())
+                .bg(tailwind::BLACK)
+                .fg(tailwind::WHITE)
+        })
         .collect();
     cells
 }
@@ -170,8 +177,16 @@ mod tests {
             header_cells,
             vec![
                 Cell::new("#").bg(tailwind::ORANGE.c300).fg(tailwind::BLACK),
-                Cell::new("a").bg(tailwind::ORANGE.c300).fg(tailwind::BLACK),
-                Cell::new("b").bg(tailwind::ORANGE.c300).fg(tailwind::BLACK)
+                Cell::new("a")
+                    .bg(tailwind::BLACK)
+                    .fg(tailwind::WHITE)
+                    .bg(tailwind::ORANGE.c300)
+                    .fg(tailwind::BLACK),
+                Cell::new("b")
+                    .bg(tailwind::BLACK)
+                    .fg(tailwind::WHITE)
+                    .bg(tailwind::ORANGE.c300)
+                    .fg(tailwind::BLACK)
             ]
         );
     }
@@ -183,9 +198,18 @@ mod tests {
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
         let table_cells = record_batch_to_table_row_cells(&batch).unwrap();
         let expected = vec![
-            vec![Cell::new("0"), Cell::new("a")],
-            vec![Cell::new("1"), Cell::new("b")],
-            vec![Cell::new("2"), Cell::new("c")],
+            vec![
+                Cell::new("0").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("a").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
+            vec![
+                Cell::new("1").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("b").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
+            vec![
+                Cell::new("2").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("c").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
         ];
         assert_eq!(table_cells, expected);
 
@@ -193,9 +217,18 @@ mod tests {
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
         let a_table_cells = record_batch_to_table_row_cells(&batch).unwrap();
         let expected = vec![
-            vec![Cell::new("0"), Cell::new("1")],
-            vec![Cell::new("1"), Cell::new("2")],
-            vec![Cell::new("2"), Cell::new("3")],
+            vec![
+                Cell::new("0").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("1").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
+            vec![
+                Cell::new("1").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("2").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
+            vec![
+                Cell::new("2").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("3").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
         ];
         assert_eq!(a_table_cells, expected);
 
@@ -203,9 +236,18 @@ mod tests {
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
         let a_table_cells = record_batch_to_table_row_cells(&batch).unwrap();
         let expected = vec![
-            vec![Cell::new("0"), Cell::new("1")],
-            vec![Cell::new("1"), Cell::new("2")],
-            vec![Cell::new("2"), Cell::new("3")],
+            vec![
+                Cell::new("0").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("1").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
+            vec![
+                Cell::new("1").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("2").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
+            vec![
+                Cell::new("2").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("3").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
         ];
         assert_eq!(a_table_cells, expected);
 
@@ -213,9 +255,18 @@ mod tests {
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
         let a_table_cells = record_batch_to_table_row_cells(&batch).unwrap();
         let expected = vec![
-            vec![Cell::new("0"), Cell::new("1")],
-            vec![Cell::new("1"), Cell::new("2")],
-            vec![Cell::new("2"), Cell::new("3")],
+            vec![
+                Cell::new("0").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("1").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
+            vec![
+                Cell::new("1").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("2").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
+            vec![
+                Cell::new("2").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("3").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
         ];
         assert_eq!(a_table_cells, expected);
 
@@ -223,9 +274,18 @@ mod tests {
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
         let a_table_cells = record_batch_to_table_row_cells(&batch).unwrap();
         let expected = vec![
-            vec![Cell::new("0"), Cell::new("1")],
-            vec![Cell::new("1"), Cell::new("2")],
-            vec![Cell::new("2"), Cell::new("3")],
+            vec![
+                Cell::new("0").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("1").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
+            vec![
+                Cell::new("1").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("2").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
+            vec![
+                Cell::new("2").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("3").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
         ];
         assert_eq!(a_table_cells, expected);
 
@@ -233,9 +293,18 @@ mod tests {
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
         let a_table_cells = record_batch_to_table_row_cells(&batch).unwrap();
         let expected = vec![
-            vec![Cell::new("0"), Cell::new("1")],
-            vec![Cell::new("1"), Cell::new("2")],
-            vec![Cell::new("2"), Cell::new("3")],
+            vec![
+                Cell::new("0").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("1").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
+            vec![
+                Cell::new("1").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("2").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
+            vec![
+                Cell::new("2").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("3").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
         ];
         assert_eq!(a_table_cells, expected);
 
@@ -243,9 +312,18 @@ mod tests {
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
         let a_table_cells = record_batch_to_table_row_cells(&batch).unwrap();
         let expected = vec![
-            vec![Cell::new("0"), Cell::new("1")],
-            vec![Cell::new("1"), Cell::new("2")],
-            vec![Cell::new("2"), Cell::new("3")],
+            vec![
+                Cell::new("0").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("1").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
+            vec![
+                Cell::new("1").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("2").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
+            vec![
+                Cell::new("2").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("3").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
         ];
         assert_eq!(a_table_cells, expected);
 
@@ -253,9 +331,18 @@ mod tests {
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
         let a_table_cells = record_batch_to_table_row_cells(&batch).unwrap();
         let expected = vec![
-            vec![Cell::new("0"), Cell::new("1")],
-            vec![Cell::new("1"), Cell::new("2")],
-            vec![Cell::new("2"), Cell::new("3")],
+            vec![
+                Cell::new("0").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("1").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
+            vec![
+                Cell::new("1").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("2").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
+            vec![
+                Cell::new("2").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("3").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
         ];
         assert_eq!(a_table_cells, expected);
 
@@ -263,9 +350,18 @@ mod tests {
         let batch = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
         let a_table_cells = record_batch_to_table_row_cells(&batch).unwrap();
         let expected = vec![
-            vec![Cell::new("0"), Cell::new("1")],
-            vec![Cell::new("1"), Cell::new("2")],
-            vec![Cell::new("2"), Cell::new("3")],
+            vec![
+                Cell::new("0").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("1").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
+            vec![
+                Cell::new("1").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("2").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
+            vec![
+                Cell::new("2").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("3").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
         ];
         assert_eq!(a_table_cells, expected);
     }
@@ -277,9 +373,21 @@ mod tests {
         let batch = RecordBatch::try_from_iter(vec![("a", a), ("b", b)]).unwrap();
         let a_table_cells = record_batch_to_table_row_cells(&batch).unwrap();
         let expected = vec![
-            vec![Cell::new("0"), Cell::new("1"), Cell::new("a")],
-            vec![Cell::new("1"), Cell::new("2"), Cell::new("b")],
-            vec![Cell::new("2"), Cell::new("3"), Cell::new("c")],
+            vec![
+                Cell::new("0").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("1").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("a").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
+            vec![
+                Cell::new("1").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("2").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("b").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
+            vec![
+                Cell::new("2").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("3").bg(tailwind::BLACK).fg(tailwind::WHITE),
+                Cell::new("c").bg(tailwind::BLACK).fg(tailwind::WHITE),
+            ],
         ];
         assert_eq!(a_table_cells, expected);
     }

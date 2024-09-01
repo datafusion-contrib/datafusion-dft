@@ -99,8 +99,7 @@ impl<'app> FlightSQLTabState<'app> {
     pub fn new() -> Self {
         let empty_text = vec!["Enter a query here.".to_string()];
         // TODO: Enable vim mode from config?
-        let mut textarea = TextArea::new(empty_text);
-        textarea.set_line_number_style(Style::default().bg(tailwind::GRAY.c400));
+        let textarea = TextArea::new(empty_text);
         Self {
             editor: textarea,
             editor_editable: false,
@@ -171,5 +170,9 @@ impl<'app> FlightSQLTabState<'app> {
     // TODO: Create Editor struct and move this there
     pub fn previous_word(&mut self) {
         self.editor.move_cursor(tui_textarea::CursorMove::WordBack)
+    }
+
+    pub fn delete_word(&mut self) {
+        self.editor.delete_word();
     }
 }
