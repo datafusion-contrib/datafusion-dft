@@ -19,6 +19,7 @@ use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{palette::tailwind, Style, Stylize},
+    text::Span,
     widgets::{Block, Borders, Paragraph, Row, StatefulWidget, Table, Widget},
 };
 

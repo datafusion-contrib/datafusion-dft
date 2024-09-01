@@ -48,7 +48,7 @@ jobs:
       # No tests yet
       - name: Run tests
         run: |
-          cargo test
+          cargo test --all-features
   fmt:
     name: Rust formatting
     runs-on: ubuntu-latest
