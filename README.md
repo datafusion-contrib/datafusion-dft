@@ -4,7 +4,32 @@ DataFusion-tui provides an extensible terminal based data analysis tool that use
 
 The objective of `dft` is to provide users with the experience of having their own local database that allows them to query and join data from disparate data sources all from the terminal.  
 
-https://user-images.githubusercontent.com/622789/161690194-c7c1e1b0-e432-43ab-9e44-f7673868b9cb.mp4
+<table width="100%">
+    <tr>
+        <th>SQL & FlightSQL Editor and Results</th>
+        <th>Query History and Stats</th>
+    </tr>
+    <tr>
+        <td width="50%">
+            <img width="1728" alt="image" src="https://github.com/user-attachments/assets/f9af22c2-665b-487b-bd8c-d714fc7c65d4">
+        </td>
+        <td width="50%">
+            <img width="1728" alt="image" src="https://github.com/user-attachments/assets/e05a8ff3-17e8-4663-a297-5bb4ab19fdc7">
+        </td>
+    </tr>
+    <tr>
+        <th>Filterable Logs</th>
+        <th>DataFusion Session Context Details</th>
+    </tr>
+    <tr>
+        <td width="50%">
+            <img width="1728" alt="image" src="https://github.com/user-attachments/assets/94861585-e1ca-481d-9b46-c1ced4976b9a">
+        </td>
+        <td width="50%">
+            <img width="1728" alt="image" src="https://github.com/user-attachments/assets/0f272db1-3432-4dd7-9fb6-2e438db1b268">
+        </td>
+    </tr>
+</table>
 
 Some of the current and planned features are:
 
