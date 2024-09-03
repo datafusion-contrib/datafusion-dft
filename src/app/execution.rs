@@ -15,18 +15,21 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use std::sync::Arc;
 #[cfg(any(feature = "deltalake", feature = "flightsql", feature = "s3"))]
 use std::sync::Arc;
 
 use color_eyre::eyre::Result;
-use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::execution::session_state::SessionStateBuilder;
 use datafusion::execution::TaskContext;
-use datafusion::physical_plan::execute_stream;
+use datafusion::physical_plan::metrics::MetricValue;
+use datafusion::physical_plan::{execute_stream, visit_execution_plan, ExecutionPlanVisitor};
 use datafusion::prelude::*;
+use datafusion::{arrow::util::pretty::pretty_format_batches, physical_plan::ExecutionPlan};
 #[cfg(feature = "deltalake")]
 use deltalake::delta_datafusion::DeltaTableFactory;
+use log::{error, info};
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 #[cfg(feature = "flightsql")]
@@ -146,5 +149,61 @@ impl ExecutionContext {
         let formatted = pretty_format_batches(&tables).unwrap();
         println!("{}", formatted);
         Ok(())
+    }
+}
+
+pub struct ExecMetrics {
+    name: String,
+    bytes_scanned: usize,
+}
+
+#[derive(Debug)]
+pub struct ExecutionStats {
+    total_bytes_scanned: usize,
+    // exec_metrics: Vec<ExecMetrics>,
+}
+
+#[derive(Default)]
+struct PlanVisitor {
+    total_bytes_scanned: usize,
+    // exec_metrics: Vec<ExecMetrics>,
+}
+
+impl From<PlanVisitor> for ExecutionStats {
+    fn from(value: PlanVisitor) -> Self {
+        Self {
+            total_bytes_scanned: value.total_bytes_scanned,
+        }
+    }
+}
+
+impl ExecutionPlanVisitor for PlanVisitor {
+    type Error = datafusion_common::DataFusionError;
+
+    fn pre_visit(&mut self, plan: &dyn ExecutionPlan) -> Result<bool, Self::Error> {
+        if let Some(metrics) = plan.metrics() {
+            if let Some(bytes_scanned) = metrics.sum_by_name("bytes_scanned") {
+                let name = plan.name();
+                let exec_metrics = ExecMetrics {
+                    name: name.to_string(),
+                    bytes_scanned: bytes_scanned.as_usize(),
+                };
+                info!("Adding {} to total_bytes_scanned", bytes_scanned.as_usize());
+                self.total_bytes_scanned += bytes_scanned.as_usize();
+            } else {
+                error!("Error summing bytes scanned");
+                return Ok(true);
+            }
+        }
+        Ok(true)
+    }
+}
+
+pub fn collect_plan_stats(plan: Arc<dyn ExecutionPlan>) -> Option<ExecutionStats> {
+    let mut visitor = PlanVisitor::default();
+    if let Ok(_) = visit_execution_plan(plan.as_ref(), &mut visitor) {
+        Some(visitor.into())
+    } else {
+        None
     }
 }

@@ -1334,6 +1334,7 @@ dependencies = [
  "color-eyre",
  "crossterm",
  "datafusion",
+ "datafusion-common",
  "deltalake",
  "directories",
  "futures",
