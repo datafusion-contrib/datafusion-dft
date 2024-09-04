@@ -16,14 +16,11 @@
 // under the License.
 
 use std::sync::Arc;
-#[cfg(any(feature = "deltalake", feature = "flightsql", feature = "s3"))]
-use std::sync::Arc;
 
 use color_eyre::eyre::Result;
 use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::execution::session_state::SessionStateBuilder;
 use datafusion::execution::TaskContext;
-use datafusion::physical_plan::metrics::MetricValue;
 use datafusion::physical_plan::{execute_stream, visit_execution_plan, ExecutionPlanVisitor};
 use datafusion::prelude::*;
 use datafusion::{arrow::util::pretty::pretty_format_batches, physical_plan::ExecutionPlan};
@@ -32,15 +29,12 @@ use deltalake::delta_datafusion::DeltaTableFactory;
 use log::{error, info};
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
+#[cfg(feature = "s3")]
+use url::Url;
 #[cfg(feature = "flightsql")]
 use {
     arrow_flight::sql::client::FlightSqlServiceClient, tokio::sync::Mutex,
     tonic::transport::Channel,
-};
-#[cfg(feature = "s3")]
-use {
-    log::{error, info},
-    url::Url,
 };
 
 use super::config::ExecutionConfig;
@@ -152,15 +146,22 @@ impl ExecutionContext {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct ExecMetrics {
     name: String,
     bytes_scanned: usize,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct ExecutionStats {
-    total_bytes_scanned: usize,
+    bytes_scanned: usize,
     // exec_metrics: Vec<ExecMetrics>,
+}
+
+impl ExecutionStats {
+    pub fn bytes_scanned(&self) -> usize {
+        self.bytes_scanned
+    }
 }
 
 #[derive(Default)]
@@ -172,7 +173,7 @@ struct PlanVisitor {
 impl From<PlanVisitor> for ExecutionStats {
     fn from(value: PlanVisitor) -> Self {
         Self {
-            total_bytes_scanned: value.total_bytes_scanned,
+            bytes_scanned: value.total_bytes_scanned,
         }
     }
 }
@@ -181,21 +182,44 @@ impl ExecutionPlanVisitor for PlanVisitor {
     type Error = datafusion_common::DataFusionError;
 
     fn pre_visit(&mut self, plan: &dyn ExecutionPlan) -> Result<bool, Self::Error> {
-        if let Some(metrics) = plan.metrics() {
-            if let Some(bytes_scanned) = metrics.sum_by_name("bytes_scanned") {
-                let name = plan.name();
-                let exec_metrics = ExecMetrics {
-                    name: name.to_string(),
-                    bytes_scanned: bytes_scanned.as_usize(),
-                };
-                info!("Adding {} to total_bytes_scanned", bytes_scanned.as_usize());
-                self.total_bytes_scanned += bytes_scanned.as_usize();
-            } else {
-                error!("Error summing bytes scanned");
-                return Ok(true);
+        match plan.metrics() {
+            Some(metrics) => match metrics.sum_by_name("bytes_scanned") {
+                Some(bytes_scanned) => {
+                    info!("Adding {} to total_bytes_scanned", bytes_scanned.as_usize());
+                    self.total_bytes_scanned += bytes_scanned.as_usize();
+                }
+                None => {
+                    info!("No bytes_scanned for {}", plan.name())
+                }
+            },
+            None => {
+                info!("No MetricsSet for {}", plan.name())
             }
         }
         Ok(true)
+        // match plan.metrics() {
+        //     Some(metrics) => {
+        //         match metrics.sum_by_name("bytes_scanned") {
+        //             Some(bytes_scanned) => {
+        //
+        //             let name = plan.name();
+        //             let exec_metrics = ExecMetrics {
+        //                 name: name.to_string(),
+        //                 bytes_scanned: bytes_scanned.as_usize(),
+        //             };
+        //             info!("Adding {} to total_bytes_scanned", bytes_scanned.as_usize());
+        //             self.total_bytes_scanned += bytes_scanned.as_usize();
+        //             },
+        //             None => {
+        //                 error!("Error summing bytes scanned");
+        //                 return Ok(true);
+        //             }
+        //         }
+        //     None => {
+        //         info!("No MetricsSet for {}", plan.name());
+        //     }
+        // }
+        // Ok(true)
     }
 }
 

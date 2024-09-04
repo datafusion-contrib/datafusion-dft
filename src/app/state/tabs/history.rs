@@ -20,6 +20,8 @@ use std::time::Duration;
 
 use ratatui::widgets::TableState;
 
+use crate::app::execution::ExecutionStats;
+
 #[derive(Debug)]
 pub enum Context {
     Local,
@@ -40,14 +42,21 @@ pub struct HistoryQuery {
     context: Context,
     sql: String,
     execution_time: Duration,
+    execution_stats: Option<ExecutionStats>,
 }
 
 impl HistoryQuery {
-    pub fn new(context: Context, sql: String, execution_time: Duration) -> Self {
+    pub fn new(
+        context: Context,
+        sql: String,
+        execution_time: Duration,
+        execution_stats: Option<ExecutionStats>,
+    ) -> Self {
         Self {
             context,
             sql,
             execution_time,
+            execution_stats,
         }
     }
     pub fn sql(&self) -> &String {
@@ -56,6 +65,18 @@ impl HistoryQuery {
 
     pub fn execution_time(&self) -> &Duration {
         &self.execution_time
+    }
+
+    pub fn execution_stats(&self) -> &Option<ExecutionStats> {
+        &self.execution_stats
+    }
+
+    pub fn scanned_bytes(&self) -> usize {
+        if let Some(stats) = &self.execution_stats {
+            stats.bytes_scanned()
+        } else {
+            0
+        }
     }
 
     pub fn context(&self) -> &Context {

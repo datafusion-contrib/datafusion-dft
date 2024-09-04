@@ -17,7 +17,6 @@
 
 use std::time::{Duration, Instant};
 
-use color_eyre::eyre::eyre;
 use datafusion::{arrow::array::RecordBatch, physical_plan::execute_stream};
 use log::{error, info};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -68,11 +67,12 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
             info!("Run query");
             let sql = app.state.sql_tab.editor().lines().join("");
             info!("SQL: {}", sql);
-            let mut query = Query::new(sql.clone(), None, None, None, Duration::default());
+            let mut query = Query::new(sql.clone(), None, None, None, Duration::default(), None);
             let ctx = app.execution.session_ctx.clone();
             let _event_tx = app.app_event_tx.clone();
             // TODO: Maybe this should be on a separate runtime to prevent blocking main thread /
             // runtime
+            // TODO: Extract this into function to be used in both normal and editable handler
             tokio::spawn(async move {
                 let start = std::time::Instant::now();
                 match ctx.sql(&sql).await {
@@ -87,40 +87,36 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
                                     Ok(mut s) => {
                                         while let Some(b) = s.next().await {
                                             match b {
-                                                Ok(b) => batches.push(b),
-                                                Err(e) => {}
+                                                Ok(b) => {
+                                                    info!("Got batch with {} rows", b.num_rows());
+                                                    batches.push(b)
+                                                }
+                                                Err(e) => {
+                                                    error!("Error getting batch {:?}", e);
+                                                }
                                             }
                                         }
 
                                         let elapsed = start.elapsed();
                                         let stats = collect_plan_stats(p);
                                         info!("Got stats: {:?}", stats);
-                                        let query =
-                                            Query::new(sql, Some(batches), None, None, elapsed);
-                                        let _ = _event_tx.send(AppEvent::QueryResult(query));
+                                        let rows: usize =
+                                            batches.iter().map(|b| b.num_rows()).sum();
+                                        query.set_num_rows(Some(rows));
+                                        query.set_execution_time(elapsed);
+                                        query.set_results(Some(batches));
+                                        query.set_execution_stats(stats);
                                     }
-                                    Err(e) => {}
+                                    Err(e) => {
+                                        error!("Error getting RecordBatchStream: {:?}", e)
+                                    }
                                 }
                             }
-                            Err(e) => {}
+                            Err(e) => {
+                                error!("Error constructing physical plan: {:?}", e)
+                            }
                         }
                     }
-
-                    // Ok(df) => match df.collect().await {
-                    //     Ok(res) => {
-                    //         let elapsed = start.elapsed();
-                    //         let rows: usize = res.iter().map(|r| r.num_rows()).sum();
-                    //         query.set_results(Some(res));
-                    //         query.set_num_rows(Some(rows));
-                    //         query.set_execution_time(elapsed);
-                    //     }
-                    //     Err(e) => {
-                    //         error!("Error collecting results: {:?}", e);
-                    //         let elapsed = start.elapsed();
-                    //         query.set_error(Some(e.to_string()));
-                    //         query.set_execution_time(elapsed);
-                    //     }
-                    // },
                     Err(e) => {
                         error!("Error creating dataframe: {:?}", e);
                         let elapsed = start.elapsed();
@@ -170,7 +166,7 @@ pub fn editable_handler(app: &mut App, key: KeyEvent) {
                                     let stats = collect_plan_stats(p);
                                     info!("Got stats: {:?}", stats);
                                     let query =
-                                        Query::new(query, Some(batches), None, None, elapsed);
+                                        Query::new(query, Some(batches), None, None, elapsed, None);
                                     let _ = _event_tx.send(AppEvent::QueryResult(query));
                                 }
                                 Err(e) => {}
@@ -178,12 +174,6 @@ pub fn editable_handler(app: &mut App, key: KeyEvent) {
                         }
                         Err(e) => {}
                     }
-                    // if let Ok(res) = df.collect().await.map_err(|e| eyre!(e)) {
-                    //     info!("Results: {:?}", res);
-                    //     let elapsed = start.elapsed();
-                    //     let query = Query::new(query, Some(res), None, None, elapsed);
-                    //     let _ = _event_tx.send(AppEvent::QueryResult(query));
-                    // }
                 } else {
                     error!("Error creating dataframe")
                 }
@@ -199,11 +189,6 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) {
             true => editable_handler(app, key),
             false => normal_mode_handler(app, key),
         },
-        AppEvent::QueryResult(r) => {
-            info!("Query results: {:?}", r);
-            app.state.sql_tab.set_query(r);
-            app.state.sql_tab.refresh_query_results_state();
-        }
         AppEvent::Tick => {}
         AppEvent::Error => {}
         _ => {}

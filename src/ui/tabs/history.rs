@@ -72,9 +72,10 @@ pub fn render_query_history(area: Rect, buf: &mut Buffer, app: &App) {
         }
         (_, Some(table_state)) => {
             let widths = vec![
-                Constraint::Percentage(33),
-                Constraint::Percentage(33),
-                Constraint::Percentage(33),
+                Constraint::Percentage(25),
+                Constraint::Percentage(25),
+                Constraint::Percentage(25),
+                Constraint::Percentage(25),
             ];
             let history = app.state.history_tab.history();
             let rows: Vec<Row> = history
@@ -84,6 +85,8 @@ pub fn render_query_history(area: Rect, buf: &mut Buffer, app: &App) {
                         Cell::from(q.context().as_str()),
                         Cell::from(q.sql().as_str()),
                         Cell::from(q.execution_time().as_millis().to_string()),
+                        Cell::from(q.scanned_bytes().to_string()),
+                        // Cell::from(q),
                     ])
                 })
                 .collect();
@@ -92,6 +95,7 @@ pub fn render_query_history(area: Rect, buf: &mut Buffer, app: &App) {
                 Cell::from("Context"),
                 Cell::from("Query"),
                 Cell::from("Execution Time(ms)"),
+                Cell::from("Scanned Bytes"),
             ])
             .bg(tailwind::WHITE)
             .fg(tailwind::BLACK);
