@@ -15,7 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::time::{Duration, Instant};
+use std::{
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use datafusion::{arrow::array::RecordBatch, physical_plan::execute_stream};
 use log::{error, info};
@@ -81,7 +84,7 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
                         match plan {
                             Ok(p) => {
                                 let task_ctx = ctx.task_ctx();
-                                let stream = execute_stream(p.clone(), task_ctx);
+                                let stream = execute_stream(Arc::clone(&p), task_ctx);
                                 let mut batches: Vec<RecordBatch> = Vec::new();
                                 match stream {
                                     Ok(mut s) => {
@@ -151,14 +154,16 @@ pub fn editable_handler(app: &mut App, key: KeyEvent) {
                     match plan {
                         Ok(p) => {
                             let task_ctx = ctx.task_ctx();
-                            let stream = execute_stream(p.clone(), task_ctx);
+                            let stream = execute_stream(Arc::clone(&p), task_ctx);
                             let mut batches: Vec<RecordBatch> = Vec::new();
                             match stream {
                                 Ok(mut s) => {
                                     while let Some(b) = s.next().await {
                                         match b {
                                             Ok(b) => batches.push(b),
-                                            Err(e) => {}
+                                            Err(e) => {
+                                                error!("Error getting RecordBatch: {:?}", e)
+                                            }
                                         }
                                     }
 
@@ -169,10 +174,14 @@ pub fn editable_handler(app: &mut App, key: KeyEvent) {
                                         Query::new(query, Some(batches), None, None, elapsed, None);
                                     let _ = _event_tx.send(AppEvent::QueryResult(query));
                                 }
-                                Err(e) => {}
+                                Err(e) => {
+                                    error!("Error creating RecordBatchStream: {:?}", e)
+                                }
                             }
                         }
-                        Err(e) => {}
+                        Err(e) => {
+                            error!("Error creating physical plan: {:?}", e)
+                        }
                     }
                 } else {
                     error!("Error creating dataframe")

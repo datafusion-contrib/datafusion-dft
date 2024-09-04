@@ -18,11 +18,10 @@
 use color_eyre::{eyre::eyre, Result};
 use datafusion::arrow::{
     array::{
-        ArrayAccessor, BooleanArray, Date32Array, Date64Array, Float16Array, Float32Array,
-        Float64Array, Int16Array, Int32Array, Int64Array, Int8Array, ListArray, RecordBatch,
-        StringArray, TimestampMicrosecondArray, TimestampMillisecondArray,
-        TimestampNanosecondArray, TimestampSecondArray, UInt16Array, UInt32Array, UInt64Array,
-        UInt8Array,
+        BooleanArray, Date32Array, Date64Array, Float16Array, Float32Array, Float64Array,
+        Int16Array, Int32Array, Int64Array, Int8Array, ListArray, RecordBatch, StringArray,
+        TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray,
+        TimestampSecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
     },
     datatypes::{DataType, TimeUnit},
 };
@@ -113,7 +112,7 @@ pub fn record_batch_to_table_row_cells(record_batch: &RecordBatch) -> Result<Vec
             DataType::Boolean => convert_array_values_to_cells!(rows, arr, BooleanArray),
             DataType::List(_) => {
                 if let Some(a) = arr.as_any().downcast_ref::<ListArray>() {
-                    for i in 0..arr.len() {
+                    for (i, d) in rows.iter_mut().enumerate().take(arr.len()) {
                         let v = a.value(i);
                         match v.data_type() {
                             DataType::Int32 => {
@@ -128,7 +127,7 @@ pub fn record_batch_to_table_row_cells(record_batch: &RecordBatch) -> Result<Vec
                                             }
                                         })
                                         .collect();
-                                    rows[i].push(Cell::from(combined.join(",")))
+                                    d.push(Cell::from(combined.join(",")))
                                 }
                             }
                             _ => {}

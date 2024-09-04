@@ -26,16 +26,16 @@ use datafusion::prelude::*;
 use datafusion::{arrow::util::pretty::pretty_format_batches, physical_plan::ExecutionPlan};
 #[cfg(feature = "deltalake")]
 use deltalake::delta_datafusion::DeltaTableFactory;
-use log::{error, info};
+use log::info;
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
-#[cfg(feature = "s3")]
-use url::Url;
 #[cfg(feature = "flightsql")]
 use {
     arrow_flight::sql::client::FlightSqlServiceClient, tokio::sync::Mutex,
     tonic::transport::Channel,
 };
+#[cfg(feature = "s3")]
+use {log::error, url::Url};
 
 use super::config::ExecutionConfig;
 
@@ -146,11 +146,11 @@ impl ExecutionContext {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct ExecMetrics {
-    name: String,
-    bytes_scanned: usize,
-}
+// #[derive(Debug, Clone)]
+// pub struct ExecMetrics {
+//     name: String,
+//     bytes_scanned: usize,
+// }
 
 #[derive(Clone, Debug)]
 pub struct ExecutionStats {
@@ -197,35 +197,12 @@ impl ExecutionPlanVisitor for PlanVisitor {
             }
         }
         Ok(true)
-        // match plan.metrics() {
-        //     Some(metrics) => {
-        //         match metrics.sum_by_name("bytes_scanned") {
-        //             Some(bytes_scanned) => {
-        //
-        //             let name = plan.name();
-        //             let exec_metrics = ExecMetrics {
-        //                 name: name.to_string(),
-        //                 bytes_scanned: bytes_scanned.as_usize(),
-        //             };
-        //             info!("Adding {} to total_bytes_scanned", bytes_scanned.as_usize());
-        //             self.total_bytes_scanned += bytes_scanned.as_usize();
-        //             },
-        //             None => {
-        //                 error!("Error summing bytes scanned");
-        //                 return Ok(true);
-        //             }
-        //         }
-        //     None => {
-        //         info!("No MetricsSet for {}", plan.name());
-        //     }
-        // }
-        // Ok(true)
     }
 }
 
 pub fn collect_plan_stats(plan: Arc<dyn ExecutionPlan>) -> Option<ExecutionStats> {
     let mut visitor = PlanVisitor::default();
-    if let Ok(_) = visit_execution_plan(plan.as_ref(), &mut visitor) {
+    if visit_execution_plan(plan.as_ref(), &mut visitor).is_ok() {
         Some(visitor.into())
     } else {
         None

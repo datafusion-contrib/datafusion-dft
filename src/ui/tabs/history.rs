@@ -86,7 +86,6 @@ pub fn render_query_history(area: Rect, buf: &mut Buffer, app: &App) {
                         Cell::from(q.sql().as_str()),
                         Cell::from(q.execution_time().as_millis().to_string()),
                         Cell::from(q.scanned_bytes().to_string()),
-                        // Cell::from(q),
                     ])
                 })
                 .collect();
