@@ -35,8 +35,7 @@ pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
     let block = Block::default()
         .title(title)
         .borders(Borders::ALL)
-        .fg(border_color)
-        .title_bottom(" Cmd+Enter to run query ");
+        .fg(border_color);
     let mut editor = app.state.flightsql_tab.editor();
     editor.set_block(block);
     editor.render(area, buf)

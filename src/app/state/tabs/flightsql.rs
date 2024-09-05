@@ -20,6 +20,8 @@ use std::time::Duration;
 
 use datafusion::arrow::array::RecordBatch;
 use ratatui::crossterm::event::KeyEvent;
+use ratatui::style::palette::tailwind;
+use ratatui::style::Style;
 use ratatui::widgets::TableState;
 use tui_textarea::TextArea;
 
@@ -111,7 +113,9 @@ impl<'app> FlightSQLTabState<'app> {
     pub fn new() -> Self {
         let empty_text = vec!["Enter a query here.".to_string()];
         // TODO: Enable vim mode from config?
-        let textarea = TextArea::new(empty_text);
+        let mut textarea = TextArea::new(empty_text);
+        textarea.set_style(Style::default().fg(tailwind::WHITE));
+
         Self {
             editor: textarea,
             editor_editable: false,
@@ -146,7 +150,9 @@ impl<'app> FlightSQLTabState<'app> {
     }
 
     pub fn clear_editor(&mut self) {
-        self.editor = TextArea::new(vec!["".to_string()]);
+        let mut textarea = TextArea::new(vec!["".to_string()]);
+        textarea.set_style(Style::default().fg(tailwind::WHITE));
+        self.editor = textarea;
     }
 
     pub fn update_editor_content(&mut self, key: KeyEvent) {
