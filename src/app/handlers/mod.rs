@@ -193,8 +193,12 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
         AppEvent::FlightSQLQueryResult(r) => {
             app.state.flightsql_tab.set_query(r.clone());
             app.state.flightsql_tab.refresh_query_results_state();
-            let history_query =
-                HistoryQuery::new(Context::FlightSQL, r.sql().clone(), *r.execution_time());
+            let history_query = HistoryQuery::new(
+                Context::FlightSQL,
+                r.sql().clone(),
+                *r.execution_time(),
+                r.execution_stats().clone(),
+            );
             app.state.history_tab.add_to_history(history_query);
             app.state.history_tab.refresh_history_table_state()
         }

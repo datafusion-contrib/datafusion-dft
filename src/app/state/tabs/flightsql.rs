@@ -23,6 +23,8 @@ use ratatui::crossterm::event::KeyEvent;
 use ratatui::widgets::TableState;
 use tui_textarea::TextArea;
 
+use crate::app::execution::ExecutionStats;
+
 #[derive(Clone, Debug)]
 pub struct FlightSQLQuery {
     sql: String,
@@ -30,6 +32,7 @@ pub struct FlightSQLQuery {
     num_rows: Option<usize>,
     error: Option<String>,
     execution_time: Duration,
+    execution_stats: Option<ExecutionStats>,
 }
 
 impl FlightSQLQuery {
@@ -39,6 +42,7 @@ impl FlightSQLQuery {
         num_rows: Option<usize>,
         error: Option<String>,
         execution_time: Duration,
+        execution_stats: Option<ExecutionStats>,
     ) -> Self {
         Self {
             sql,
@@ -46,6 +50,7 @@ impl FlightSQLQuery {
             num_rows,
             error,
             execution_time,
+            execution_stats,
         }
     }
 
@@ -83,6 +88,14 @@ impl FlightSQLQuery {
 
     pub fn execution_time(&self) -> &Duration {
         &self.execution_time
+    }
+
+    pub fn execution_stats(&self) -> &Option<ExecutionStats> {
+        &self.execution_stats
+    }
+
+    pub fn set_execution_stats(&mut self, stats: Option<ExecutionStats>) {
+        self.execution_stats = stats;
     }
 }
 
