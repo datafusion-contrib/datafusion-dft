@@ -74,7 +74,7 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
             let _event_tx = app.app_event_tx.clone();
             tokio::spawn(async move {
                 let mut query =
-                    FlightSQLQuery::new(sql.clone(), None, None, None, Duration::default());
+                    FlightSQLQuery::new(sql.clone(), None, None, None, Duration::default(), None);
                 let start = Instant::now();
                 if let Some(ref mut c) = *client.lock().await {
                     info!("Sending query");

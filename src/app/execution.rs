@@ -15,18 +15,18 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#[cfg(any(feature = "deltalake", feature = "flightsql", feature = "s3"))]
 use std::sync::Arc;
 
 use color_eyre::eyre::Result;
-use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::execution::session_state::SessionStateBuilder;
 use datafusion::execution::TaskContext;
-use datafusion::physical_plan::execute_stream;
+use datafusion::physical_plan::{execute_stream, visit_execution_plan, ExecutionPlanVisitor};
 use datafusion::prelude::*;
+use datafusion::{arrow::util::pretty::pretty_format_batches, physical_plan::ExecutionPlan};
 #[cfg(feature = "deltalake")]
 use deltalake::delta_datafusion::DeltaTableFactory;
+use log::info;
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 #[cfg(feature = "flightsql")]
@@ -35,10 +35,7 @@ use {
     tonic::transport::Channel,
 };
 #[cfg(feature = "s3")]
-use {
-    log::{error, info},
-    url::Url,
-};
+use {log::error, url::Url};
 
 use super::config::ExecutionConfig;
 
@@ -146,5 +143,68 @@ impl ExecutionContext {
         let formatted = pretty_format_batches(&tables).unwrap();
         println!("{}", formatted);
         Ok(())
+    }
+}
+
+// #[derive(Debug, Clone)]
+// pub struct ExecMetrics {
+//     name: String,
+//     bytes_scanned: usize,
+// }
+
+#[derive(Clone, Debug)]
+pub struct ExecutionStats {
+    bytes_scanned: usize,
+    // exec_metrics: Vec<ExecMetrics>,
+}
+
+impl ExecutionStats {
+    pub fn bytes_scanned(&self) -> usize {
+        self.bytes_scanned
+    }
+}
+
+#[derive(Default)]
+struct PlanVisitor {
+    total_bytes_scanned: usize,
+    // exec_metrics: Vec<ExecMetrics>,
+}
+
+impl From<PlanVisitor> for ExecutionStats {
+    fn from(value: PlanVisitor) -> Self {
+        Self {
+            bytes_scanned: value.total_bytes_scanned,
+        }
+    }
+}
+
+impl ExecutionPlanVisitor for PlanVisitor {
+    type Error = datafusion_common::DataFusionError;
+
+    fn pre_visit(&mut self, plan: &dyn ExecutionPlan) -> Result<bool, Self::Error> {
+        match plan.metrics() {
+            Some(metrics) => match metrics.sum_by_name("bytes_scanned") {
+                Some(bytes_scanned) => {
+                    info!("Adding {} to total_bytes_scanned", bytes_scanned.as_usize());
+                    self.total_bytes_scanned += bytes_scanned.as_usize();
+                }
+                None => {
+                    info!("No bytes_scanned for {}", plan.name())
+                }
+            },
+            None => {
+                info!("No MetricsSet for {}", plan.name())
+            }
+        }
+        Ok(true)
+    }
+}
+
+pub fn collect_plan_stats(plan: Arc<dyn ExecutionPlan>) -> Option<ExecutionStats> {
+    let mut visitor = PlanVisitor::default();
+    if visit_execution_plan(plan.as_ref(), &mut visitor).is_ok() {
+        Some(visitor.into())
+    } else {
+        None
     }
 }

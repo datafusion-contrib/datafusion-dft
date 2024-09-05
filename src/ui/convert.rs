@@ -19,7 +19,7 @@ use color_eyre::{eyre::eyre, Result};
 use datafusion::arrow::{
     array::{
         BooleanArray, Date32Array, Date64Array, Float16Array, Float32Array, Float64Array,
-        Int16Array, Int32Array, Int64Array, Int8Array, RecordBatch, StringArray,
+        Int16Array, Int32Array, Int64Array, Int8Array, ListArray, RecordBatch, StringArray,
         TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray,
         TimestampSecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
     },
@@ -110,6 +110,47 @@ pub fn record_batch_to_table_row_cells(record_batch: &RecordBatch) -> Result<Vec
             DataType::Float32 => convert_array_values_to_cells!(rows, arr, Float32Array),
             DataType::Float64 => convert_array_values_to_cells!(rows, arr, Float64Array),
             DataType::Boolean => convert_array_values_to_cells!(rows, arr, BooleanArray),
+            DataType::List(_) => {
+                if let Some(a) = arr.as_any().downcast_ref::<ListArray>() {
+                    for (i, d) in rows.iter_mut().enumerate().take(arr.len()) {
+                        let v = a.value(i);
+                        match v.data_type() {
+                            DataType::Int16 => {
+                                if let Some(i_arr) = v.as_any().downcast_ref::<Int16Array>() {
+                                    let combined: Vec<String> = i_arr
+                                        .iter()
+                                        .map(|maybe_v| {
+                                            if let Some(v) = maybe_v {
+                                                v.to_string()
+                                            } else {
+                                                "".to_string()
+                                            }
+                                        })
+                                        .collect();
+                                    d.push(Cell::from(combined.join(",")))
+                                }
+                            }
+                            DataType::Int32 => {
+                                if let Some(i_arr) = v.as_any().downcast_ref::<Int32Array>() {
+                                    let combined: Vec<String> = i_arr
+                                        .iter()
+                                        .map(|maybe_v| {
+                                            if let Some(v) = maybe_v {
+                                                v.to_string()
+                                            } else {
+                                                "".to_string()
+                                            }
+                                        })
+                                        .collect();
+                                    d.push(Cell::from(combined.join(",")))
+                                }
+                            }
+
+                            _ => {}
+                        }
+                    }
+                }
+            }
 
             dtype => return Err(eyre!("Table conversion not setup for type {}", dtype)),
         }

@@ -20,8 +20,12 @@ use std::time::Duration;
 
 use datafusion::arrow::array::RecordBatch;
 use ratatui::crossterm::event::KeyEvent;
+use ratatui::style::palette::tailwind;
+use ratatui::style::Style;
 use ratatui::widgets::TableState;
 use tui_textarea::TextArea;
+
+use crate::app::execution::ExecutionStats;
 
 #[derive(Clone, Debug)]
 pub struct Query {
@@ -30,6 +34,7 @@ pub struct Query {
     num_rows: Option<usize>,
     error: Option<String>,
     execution_time: Duration,
+    execution_stats: Option<ExecutionStats>,
 }
 
 impl Query {
@@ -39,6 +44,7 @@ impl Query {
         num_rows: Option<usize>,
         error: Option<String>,
         execution_time: Duration,
+        execution_stats: Option<ExecutionStats>,
     ) -> Self {
         Self {
             sql,
@@ -46,6 +52,7 @@ impl Query {
             num_rows,
             error,
             execution_time,
+            execution_stats,
         }
     }
 
@@ -84,6 +91,14 @@ impl Query {
     pub fn set_execution_time(&mut self, elapsed_time: Duration) {
         self.execution_time = elapsed_time;
     }
+
+    pub fn execution_stats(&self) -> &Option<ExecutionStats> {
+        &self.execution_stats
+    }
+
+    pub fn set_execution_stats(&mut self, stats: Option<ExecutionStats>) {
+        self.execution_stats = stats;
+    }
 }
 
 #[derive(Debug, Default)]
@@ -98,7 +113,8 @@ impl<'app> SQLTabState<'app> {
     pub fn new() -> Self {
         let empty_text = vec!["Enter a query here.".to_string()];
         // TODO: Enable vim mode from config?
-        let textarea = TextArea::new(empty_text);
+        let mut textarea = TextArea::new(empty_text);
+        textarea.set_style(Style::default().fg(tailwind::WHITE));
         Self {
             editor: textarea,
             editor_editable: false,
@@ -133,7 +149,9 @@ impl<'app> SQLTabState<'app> {
     }
 
     pub fn clear_editor(&mut self) {
-        self.editor = TextArea::new(vec!["".to_string()]);
+        let mut textarea = TextArea::new(vec!["".to_string()]);
+        textarea.set_style(Style::default().fg(tailwind::WHITE));
+        self.editor = textarea;
     }
 
     pub fn update_editor_content(&mut self, key: KeyEvent) {

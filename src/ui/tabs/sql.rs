@@ -35,9 +35,9 @@ pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
     let block = Block::default()
         .title(title)
         .borders(Borders::ALL)
-        .fg(border_color)
-        .title_bottom(" Cmd+Enter to run query ");
+        .fg(border_color);
     let mut editor = app.state.sql_tab.editor();
+    editor.set_style(Style::default().fg(tailwind::WHITE));
     editor.set_block(block);
     editor.render(area, buf)
 }
