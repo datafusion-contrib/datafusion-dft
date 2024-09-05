@@ -20,7 +20,7 @@ pub mod history;
 pub mod sql;
 
 use color_eyre::Result;
-use log::{debug, error, info, trace};
+use log::{error, info, trace};
 use ratatui::crossterm::event::{self, KeyCode, KeyEvent};
 use tui_logger::TuiWidgetEvent;
 
@@ -41,7 +41,6 @@ use crate::{
 use super::App;
 
 pub fn crossterm_event_handler(event: event::Event) -> Option<AppEvent> {
-    debug!("crossterm::event: {:?}", event);
     match event {
         event::Event::Key(key) => {
             if key.kind == event::KeyEventKind::Press {
@@ -171,7 +170,7 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                             }
                         }
                         Err(e) => {
-                            error!("Error executing DDL: {:?}", e);
+                            error!("Error executing DDL {:?}: {:?}", q, e);
                         }
                     }
                 });

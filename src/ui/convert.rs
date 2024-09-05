@@ -115,6 +115,21 @@ pub fn record_batch_to_table_row_cells(record_batch: &RecordBatch) -> Result<Vec
                     for (i, d) in rows.iter_mut().enumerate().take(arr.len()) {
                         let v = a.value(i);
                         match v.data_type() {
+                            DataType::Int16 => {
+                                if let Some(i_arr) = v.as_any().downcast_ref::<Int16Array>() {
+                                    let combined: Vec<String> = i_arr
+                                        .iter()
+                                        .map(|maybe_v| {
+                                            if let Some(v) = maybe_v {
+                                                v.to_string()
+                                            } else {
+                                                "".to_string()
+                                            }
+                                        })
+                                        .collect();
+                                    d.push(Cell::from(combined.join(",")))
+                                }
+                            }
                             DataType::Int32 => {
                                 if let Some(i_arr) = v.as_any().downcast_ref::<Int32Array>() {
                                     let combined: Vec<String> = i_arr
@@ -130,6 +145,7 @@ pub fn record_batch_to_table_row_cells(record_batch: &RecordBatch) -> Result<Vec
                                     d.push(Cell::from(combined.join(",")))
                                 }
                             }
+
                             _ => {}
                         }
                     }
