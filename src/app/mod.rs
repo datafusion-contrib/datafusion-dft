@@ -251,9 +251,7 @@ impl<'app> App<'app> {
 
     /// Dispatch to the appropriate event loop based on the command
     pub fn start_event_loop(&mut self) {
-        match self.cli.command {
-            Some(cli::Command::App(_)) | None => self.start_app_event_loop(),
-        }
+        self.start_app_event_loop()
     }
 
     /// Get the next event from event loop
@@ -300,33 +298,26 @@ pub async fn run_app(cli: cli::DftCli, state: state::AppState<'_>) -> Result<()>
     info!("Running app with state: {:?}", state);
     let mut app = App::new(state, cli.clone());
 
-    match &cli.command {
-        Some(cli::Command::App(_)) | None => {
-            app.execute_ddl();
+    app.execute_ddl();
 
-            #[cfg(feature = "flightsql")]
-            app.establish_flightsql_connection();
+    #[cfg(feature = "flightsql")]
+    app.establish_flightsql_connection();
 
-            let mut terminal =
-                ratatui::Terminal::new(CrosstermBackend::new(std::io::stdout())).unwrap();
-            app.enter(true)?;
-            // Main loop for handling events
-            loop {
-                let event = app.next().await?;
+    let mut terminal = ratatui::Terminal::new(CrosstermBackend::new(std::io::stdout())).unwrap();
+    app.enter(true)?;
+    // Main loop for handling events
+    loop {
+        let event = app.next().await?;
 
-                if let AppEvent::Render = event.clone() {
-                    terminal.draw(|f| f.render_widget(&app, f.area()))?;
-                };
+        if let AppEvent::Render = event.clone() {
+            terminal.draw(|f| f.render_widget(&app, f.area()))?;
+        };
 
-                app.handle_app_event(event)?;
+        app.handle_app_event(event)?;
 
-                if app.state.should_quit {
-                    break;
-                }
-            }
-            app.exit()?;
+        if app.state.should_quit {
+            break;
         }
     }
-
-    Ok(())
+    app.exit()
 }
