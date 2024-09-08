@@ -1,6 +1,16 @@
-# datafusion-tui (dft)
+# dft
 
-DataFusion-tui provides an extensible terminal based data analysis tool that uses [DataFusion](https://github.com/apache/arrow-datafusion) as query execution engines. It has drawn inspiration and several features from `datafusion-cli`. In contrast to `datafusion-cli` a focus of `dft` is to provide an interface for leveraging DataFusions extensibility (for example connecting to `ObjectStore`s or querying custom `TableProvider`s).
+`dft` provides two interfaces to the [DataFusion](https://github.com/apache/arrow-datafusion) query execution engine:
+1. Text User Interface (TUI): An extensible terminal based data analysis tool that allows users to query and join data from disparate data sources.
+2. Command Line Interface (CLI): Scriptable engine for executing queries from files.
+
+`dft` is inspired by  [`datafusion-cli`], but has some differences:
+1. `dft` TUI focuses on more complete and interactive experience for users.
+2. `dft` contains many built in integrations such as Delta Lake, Iceberg, and MySQL that are not available in `datafusion-cli`.
+
+[`datafusion-cli`]: https://datafusion.apache.org/user-guide/cli/overview.html
+
+## `dft` TUI
 
 The objective of `dft` is to provide users with the experience of having their own local database that allows them to query and join data from disparate data sources all from the terminal.  
 
@@ -51,6 +61,20 @@ Some of the current and planned features are:
   - Iceberg (TODO)
   - Hudi (TODO)
 - Preloading DDL from `~/.datafusion/.datafusionrc` for local database available on startup
+- "Catalog File" support
+  - Save table definitions *and* data
+  - Save parquet metadata from remote object stores
+
+  
+## `dft` CLI
+
+The `dft` CLI is a scriptable engine for executing queries from files.  It is used in a similar manner to `datafusion-cli` but with the added benefit of being able to query from multiple data sources.
+
+For example you can run the contents of `query.sql` with 
+
+```shell
+$ dft -f query.sql
+```
 
 ## User Guide
 
