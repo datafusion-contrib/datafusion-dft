@@ -22,10 +22,18 @@ use clap::{Parser, Subcommand};
 use crate::app::config::get_data_dir;
 
 const LONG_ABOUT: &str = "
-Dft
+dft - DataFusion TUI
+
+CLI and terminal UI data analysis tool using Apache DataFusion as query
+execution engine.
+
+dft provides a rich terminal UI as well as a broad array of pre-integrated
+data sources, formats to make querying and analyzing data from
+various sources.
 
 Environment Variables
-RUST_LOG { trace | debug | info | error }: Standard across rust ecosystem for determining log level of application.  Default is info.
+
+RUST_LOG { trace | debug | info | error }: Standard rust logging level.  Default is info.
 ";
 
 #[derive(Clone, Debug, Parser)]
