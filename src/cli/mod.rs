@@ -45,7 +45,8 @@ pub struct DftCli {
         help = "Execute commands from file(s), then exit",
         value_parser(parse_valid_file)
     )]
-    file: Vec<String>,
+    pub file: Vec<PathBuf>,
+
     #[clap(short, long, help = "Path to the configuration file")]
     pub config: Option<String>,
 }
@@ -66,10 +67,13 @@ impl DftCli {
     }
 }
 
-fn parse_valid_file(dir: &str) -> Result<String, String> {
-    if Path::new(dir).is_file() {
-        Ok(dir.to_string())
+fn parse_valid_file(file: &str) -> Result<PathBuf, String> {
+    let path = PathBuf::from(file);
+    if !path.exists() {
+        Err(format!("File does not exist: '{file}'"))
+    } else if !path.is_file() {
+        Err(format!("Exists but is not a file: '{file}'"))
     } else {
-        Err(format!("Invalid file '{}'", dir))
+        Ok(path)
     }
 }

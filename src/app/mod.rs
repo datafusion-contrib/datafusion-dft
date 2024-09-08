@@ -33,6 +33,9 @@ use ratatui::crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::path::{Path, PathBuf};
 use strum::IntoEnumIterator;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::task::JoinHandle;
@@ -320,4 +323,54 @@ pub async fn run_app(cli: cli::DftCli, state: state::AppState<'_>) -> Result<()>
         }
     }
     app.exit()
+}
+
+pub async fn execute_files(files: Vec<PathBuf>, state: &state::AppState<'_>) -> Result<()> {
+    info!("Executing files: {:?}", files);
+    let execution = ExecutionContext::new(state.config.execution.clone());
+
+    for file in files {
+        exec_from_file(&execution, &file).await?
+    }
+
+    Ok(())
+}
+
+/// run and execute SQL statements and commands from a file, against a context
+/// with the given print options
+pub async fn exec_from_file(ctx: &ExecutionContext, file: &Path) -> Result<()> {
+    let file = File::open(file)?;
+    let reader = BufReader::new(file);
+
+    let mut query = String::new();
+
+    for line in reader.lines() {
+        let line = line?;
+        if line.starts_with("#!") {
+            continue;
+        }
+        if line.starts_with("--") {
+            continue;
+        }
+
+        let line = line.trim_end();
+        query.push_str(line);
+        // if we found the end of a query, run it
+        if line.ends_with(';') {
+            // TODO: if the query errors, should we keep trying to execute
+            // the rest of the file? That is what datafusion-cli does
+            ctx.execute_stream_sql(&query).await?;
+            query.clear();
+        } else {
+            query.push('\n');
+        }
+    }
+
+    // run the last line(s) in file if the last statement doesn't contain ‘;’
+    // ignore if it only consists of '\n'
+    if query.contains(|c| c != '\n') {
+        ctx.execute_stream_sql(&query).await?;
+    }
+
+    Ok(())
 }
