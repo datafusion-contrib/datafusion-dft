@@ -358,7 +358,7 @@ pub async fn exec_from_file(ctx: &ExecutionContext, file: &Path) -> Result<()> {
         // if we found the end of a query, run it
         if line.ends_with(';') {
             // TODO: if the query errors, should we keep trying to execute
-            // the rest of the file? That is what datafusion-cli does
+            // the other queries in the file? That is what datafusion-cli does...
             ctx.execute_stream_sql(&query).await?;
             query.clear();
         } else {
