@@ -17,11 +17,10 @@
 
 //! Tests for the CLI (e.g. run from files)
 
-use crate::util::contains_str;
 use assert_cmd::Command;
+use predicates::str::ContainsPredicate;
 use std::path::PathBuf;
-
-mod util;
+use tempfile::NamedTempFile;
 
 #[test]
 fn test_help() {
@@ -58,12 +57,12 @@ fn test_command_in_file() {
 +---------------------+
     "##;
 
-    let file = util::sql_in_file("SELECT 1 + 1");
-    util::assert_output_contains(vec![file], expected);
+    let file = sql_in_file("SELECT 1 + 1");
+    assert_output_contains(vec![file], expected);
 
     // same test but with a semicolon at the end
-    let file = util::sql_in_file("SELECT 1 + 1;");
-    util::assert_output_contains(vec![file], expected);
+    let file = sql_in_file("SELECT 1 + 1;");
+    assert_output_contains(vec![file], expected);
 }
 
 #[test]
@@ -92,12 +91,12 @@ CREATE TABLE foo as values (42);
 SELECT column1 + 2 FROM foo
     "#;
 
-    let file = util::sql_in_file(sql);
-    util::assert_output_contains(vec![file], expected);
+    let file = sql_in_file(sql);
+    assert_output_contains(vec![file], expected);
 
     // same test but with a semicolon at the end of second command
-    let file = util::sql_in_file(format!("{sql};"));
-    util::assert_output_contains(vec![file], expected);
+    let file = sql_in_file(format!("{sql};"));
+    assert_output_contains(vec![file], expected);
 }
 
 #[test]
@@ -120,14 +119,14 @@ fn test_multiple_commands_in_multiple_files() {
 +----------+
     "##;
 
-    let file1 = util::sql_in_file("SELECT 1 + 2");
-    let file2 = util::sql_in_file("SELECT 1;\nselect 2;");
-    util::assert_output_contains(vec![file1, file2], expected);
+    let file1 = sql_in_file("SELECT 1 + 2");
+    let file2 = sql_in_file("SELECT 1;\nselect 2;");
+    assert_output_contains(vec![file1, file2], expected);
 }
 
 #[test]
 fn test_non_existent_file() {
-    let file = util::sql_in_file("SELECT 1 + 1");
+    let file = sql_in_file("SELECT 1 + 1");
     let p = PathBuf::from(file.path());
     // dropping the file makes it non existent
     drop(file);
@@ -145,8 +144,8 @@ fn test_non_existent_file() {
 
 #[test]
 fn test_one_existent_and_one_non_existent_file() {
-    let file1 = util::sql_in_file("SELECT 1 + 1");
-    let file2 = util::sql_in_file("SELECT 3 + 4");
+    let file1 = sql_in_file("SELECT 1 + 1");
+    let file2 = sql_in_file("SELECT 3 + 4");
     let p1 = PathBuf::from(file1.path());
     let p2 = PathBuf::from(file2.path());
     // dropping the file makes it non existent
@@ -167,7 +166,7 @@ fn test_one_existent_and_one_non_existent_file() {
 
 #[test]
 fn test_sql_err_in_file() {
-    let file = util::sql_in_file("SELECT this is not valid SQL");
+    let file = sql_in_file("SELECT this is not valid SQL");
 
     let assert = Command::cargo_bin("dft")
         .unwrap()
@@ -183,7 +182,7 @@ fn test_sql_err_in_file() {
 
 #[test]
 fn test_sql_err_in_file_after_first() {
-    let file = util::sql_in_file(
+    let file = sql_in_file(
         r#"
 -- First line is valid SQL
 SELECT 1 + 1;
@@ -206,7 +205,7 @@ SELECT this is not valid SQL
 
 #[test]
 fn test_sql_in_file_and_arg() {
-    let file = util::sql_in_file("SELECT 1 + 1");
+    let file = sql_in_file("SELECT 1 + 1");
 
     let assert = Command::cargo_bin("dft")
         .unwrap()
@@ -311,4 +310,36 @@ fn test_multiple_sql_in_multiple_args2() {
         .success();
 
     assert.stdout(contains_str(expected));
+}
+
+/// Creates a temporary file with the given SQL content
+pub fn sql_in_file(sql: impl AsRef<str>) -> NamedTempFile {
+    let file = NamedTempFile::new().unwrap();
+    std::fs::write(file.path(), sql.as_ref()).unwrap();
+    file
+}
+
+/// Returns a predicate that expects the given string to be contained in the
+/// output
+///
+/// Whitespace is trimmed from the start and end of the string
+pub fn contains_str(s: &str) -> ContainsPredicate {
+    predicates::str::contains(s.trim())
+}
+
+/// Invokes `dft -f` with the given files and asserts that it exited
+/// successfully and the output contains the given string
+pub fn assert_output_contains(files: Vec<NamedTempFile>, expected_output: &str) {
+    let mut cmd = Command::cargo_bin("dft").unwrap();
+    for file in &files {
+        cmd.arg("-f").arg(file.path());
+    }
+
+    let assert = cmd.assert().success();
+
+    // Since temp files are deleted when they go out of scope ensure they are
+    // dropped only after the command is run
+    drop(files);
+
+    assert.stdout(contains_str(expected_output));
 }
