@@ -24,7 +24,7 @@ use log::{error, info, trace};
 use ratatui::crossterm::event::{self, KeyCode, KeyEvent};
 use tui_logger::TuiWidgetEvent;
 
-use crate::state::tabs::history::Context;
+use crate::app::state::tabs::history::Context;
 
 #[cfg(feature = "flightsql")]
 use arrow_flight::sql::client::FlightSqlServiceClient;
@@ -208,7 +208,7 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
             let url: &'static str = Box::leak(url.into_boxed_str());
             let client = Arc::clone(&app.execution.flightsql_client);
             tokio::spawn(async move {
-                let maybe_channel = Channel::from_static(&url).connect().await;
+                let maybe_channel = Channel::from_static(url).connect().await;
                 info!("Created channel");
                 match maybe_channel {
                     Ok(channel) => {

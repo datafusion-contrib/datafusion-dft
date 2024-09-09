@@ -83,7 +83,7 @@ pub struct App<'app> {
 }
 
 impl<'app> App<'app> {
-    fn new(state: state::AppState<'app>, cli: DftCli) -> Self {
+    pub fn new(state: state::AppState<'app>, cli: DftCli) -> Self {
         let (app_event_tx, app_event_rx) = mpsc::unbounded_channel();
         let app_cancellation_token = CancellationToken::new();
         let task = tokio::spawn(async {});

@@ -1352,40 +1352,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "datafusion-tui"
-version = "0.1.0"
-dependencies = [
- "arrow-flight",
- "assert_cmd",
- "async-trait",
- "clap",
- "color-eyre",
- "crossterm",
- "datafusion",
- "datafusion-common",
- "deltalake",
- "directories",
- "futures",
- "itertools 0.13.0",
- "lazy_static",
- "log",
- "object_store",
- "predicates",
- "ratatui",
- "serde",
- "strum",
- "tempfile",
- "tokio",
- "tokio-stream",
- "tokio-util",
- "toml",
- "tonic",
- "tui-logger",
- "tui-textarea",
- "url",
-]
-
-[[package]]
 name = "delta_kernel"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1503,6 +1469,40 @@ dependencies = [
  "urlencoding",
  "uuid",
  "z85",
+]
+
+[[package]]
+name = "dft"
+version = "0.1.0"
+dependencies = [
+ "arrow-flight",
+ "assert_cmd",
+ "async-trait",
+ "clap",
+ "color-eyre",
+ "crossterm",
+ "datafusion",
+ "datafusion-common",
+ "deltalake",
+ "directories",
+ "futures",
+ "itertools 0.13.0",
+ "lazy_static",
+ "log",
+ "object_store",
+ "predicates",
+ "ratatui",
+ "serde",
+ "strum",
+ "tempfile",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "toml",
+ "tonic",
+ "tui-logger",
+ "tui-textarea",
+ "url",
 ]
 
 [[package]]
