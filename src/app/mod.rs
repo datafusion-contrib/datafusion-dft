@@ -25,6 +25,8 @@ use crate::{cli, ui};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use crossterm::event as ct;
+use datafusion::sql::parser::DFParser;
+use datafusion::sql::sqlparser::dialect::GenericDialect;
 use futures::FutureExt;
 use log::{debug, error, info, trace};
 use ratatui::backend::CrosstermBackend;
@@ -325,7 +327,21 @@ pub async fn run_app(cli: cli::DftCli, state: state::AppState<'_>) -> Result<()>
     app.exit()
 }
 
-pub async fn execute_files(files: Vec<PathBuf>, state: &state::AppState<'_>) -> Result<()> {
+pub async fn execute_files_or_commands(
+    files: Vec<PathBuf>,
+    commands: Vec<String>,
+    state: &state::AppState<'_>,
+) -> Result<()> {
+    match (files.is_empty(), commands.is_empty()) {
+        (true, true) => Err(eyre!("No files or commands provided to execute")),
+        (false, true) => execute_files(files, state).await,
+        (true, false) => execute_commands(commands, state).await,
+        (false, false) => Err(eyre!(
+            "Cannot execute both files and commands at the same time"
+        )),
+    }
+}
+async fn execute_files(files: Vec<PathBuf>, state: &state::AppState<'_>) -> Result<()> {
     info!("Executing files: {:?}", files);
     let execution = ExecutionContext::new(state.config.execution.clone());
 
@@ -333,6 +349,24 @@ pub async fn execute_files(files: Vec<PathBuf>, state: &state::AppState<'_>) -> 
         exec_from_file(&execution, &file).await?
     }
 
+    Ok(())
+}
+async fn execute_commands(commands: Vec<String>, state: &state::AppState<'_>) -> Result<()> {
+    info!("Executing commands: {:?}", commands);
+    for command in commands {
+        exec_from_string(&command, state).await?
+    }
+
+    Ok(())
+}
+
+async fn exec_from_string(sql: &str, state: &state::AppState<'_>) -> Result<()> {
+    let dialect = GenericDialect {};
+    let execution = ExecutionContext::new(state.config.execution.clone());
+    let statements = DFParser::parse_sql_with_dialect(sql, &dialect)?;
+    for statement in statements {
+        execution.execute_statement(statement).await?;
+    }
     Ok(())
 }
 

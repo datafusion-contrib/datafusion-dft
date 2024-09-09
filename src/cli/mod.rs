@@ -34,7 +34,7 @@ Environment Variables
 RUST_LOG { trace | debug | info | error }: Standard rust logging level.  Default is info.
 ";
 
-#[derive(Clone, Debug, Parser)]
+#[derive(Clone, Debug, Parser, Default)]
 #[command(author, version, about, long_about = LONG_ABOUT)]
 pub struct DftCli {
     #[clap(
@@ -46,7 +46,16 @@ pub struct DftCli {
     )]
     pub files: Vec<PathBuf>,
 
-    #[clap(short, long, help = "Path to the configuration file")]
+    #[clap(
+        short = 'c',
+        long,
+        num_args = 0..,
+        help = "Execute the given SQL string(s), then exit.",
+        value_parser(parse_command)
+    )]
+    pub commands: Vec<String>,
+
+    #[clap(long, help = "Path to the configuration file")]
     pub config: Option<String>,
 }
 
@@ -74,5 +83,13 @@ fn parse_valid_file(file: &str) -> Result<PathBuf, String> {
         Err(format!("Exists but is not a file: '{file}'"))
     } else {
         Ok(path)
+    }
+}
+
+fn parse_command(command: &str) -> Result<String, String> {
+    if !command.is_empty() {
+        Ok(command.to_string())
+    } else {
+        Err("-c flag expects only non empty commands".to_string())
     }
 }

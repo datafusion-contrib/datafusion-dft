@@ -17,21 +17,24 @@
 
 use clap::Parser;
 use color_eyre::Result;
-use dft::app::state;
-use dft::app::{execute_files, run_app};
+use dft::app::{execute_files_or_commands, run_app, state};
 use dft::cli;
 use dft::telemetry;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    telemetry::initialize_logs()?;
     let cli = cli::DftCli::parse();
-    let state = state::initialize(cli.clone());
 
     // If executing commands from files, do so and then exit
-    if !cli.files.is_empty() {
-        execute_files(cli.files.clone(), &state).await?;
+    if !cli.files.is_empty() || !cli.commands.is_empty() {
+        // use env_logger to setup logging for CLI
+        env_logger::init();
+        let state = state::initialize(cli.clone());
+        execute_files_or_commands(cli.files.clone(), cli.commands.clone(), &state).await?;
     } else {
+        // use alternate logging for TUI
+        telemetry::initialize_logs()?;
+        let state = state::initialize(cli.clone());
         run_app(cli.clone(), state).await?;
     }
 
