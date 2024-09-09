@@ -17,25 +17,41 @@
 
 use std::path::{Path, PathBuf};
 
-use clap::{Parser, Subcommand};
+use clap::Parser;
 
 use crate::app::config::get_data_dir;
 
 const LONG_ABOUT: &str = "
-Dft
+dft - DataFusion TUI
+
+CLI and terminal UI data analysis tool using Apache DataFusion as query
+execution engine.
+
+dft provides a rich terminal UI as well as a broad array of pre-integrated
+data sources, formats to make querying and analyzing data from
+various sources.
 
 Environment Variables
-RUST_LOG { trace | debug | info | error }: Standard across rust ecosystem for determining log level of application.  Default is info.
+RUST_LOG { trace | debug | info | error }: Standard rust logging level.  Default is info.
 ";
 
 #[derive(Clone, Debug, Parser)]
 #[command(author, version, about, long_about = LONG_ABOUT)]
 pub struct DftCli {
-    #[command(subcommand)]
-    pub command: Option<Command>,
+    #[clap(
+        short,
+        long,
+        num_args = 0..,
+        help = "Execute commands from file(s), then exit",
+        value_parser(parse_valid_file)
+    )]
+    pub file: Vec<PathBuf>,
+
+    #[clap(short, long, help = "Path to the configuration file")]
+    pub config: Option<String>,
 }
 
-fn get_config_path(cli_config_arg: &Option<String>) -> PathBuf {
+fn get_config_path(cli_config_arg: Option<&String>) -> PathBuf {
     if let Some(config) = cli_config_arg {
         Path::new(config).to_path_buf()
     } else {
@@ -46,22 +62,18 @@ fn get_config_path(cli_config_arg: &Option<String>) -> PathBuf {
 }
 
 impl DftCli {
-    pub fn get_config(&self) -> Option<PathBuf> {
-        match &self.command {
-            Some(Command::App(args)) => Some(get_config_path(&args.config)),
-            _ => Some(get_config_path(&None)),
-        }
+    pub fn get_config(&self) -> PathBuf {
+        get_config_path(self.config.as_ref())
     }
 }
-// TODO: Add a command to get schema / market information
-#[derive(Clone, Debug, Subcommand)]
-pub enum Command {
-    App(AppArgs),
-}
 
-#[derive(Clone, Debug, Default, clap::Args)]
-#[command(version, about, long_about = None, hide = true)]
-pub struct AppArgs {
-    #[arg(short, long)]
-    pub config: Option<String>,
+fn parse_valid_file(file: &str) -> Result<PathBuf, String> {
+    let path = PathBuf::from(file);
+    if !path.exists() {
+        Err(format!("File does not exist: '{file}'"))
+    } else if !path.is_file() {
+        Err(format!("Exists but is not a file: '{file}'"))
+    } else {
+        Ok(path)
+    }
 }

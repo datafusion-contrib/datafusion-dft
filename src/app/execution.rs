@@ -121,7 +121,8 @@ impl ExecutionContext {
         &self.session_ctx
     }
 
-    pub async fn execute_stream_sql(&mut self, query: &str) -> Result<()> {
+    /// Executes the specified query and prints the result to stdout
+    pub async fn execute_stream_sql(&self, query: &str) -> Result<()> {
         let df = self.session_ctx.sql(query).await.unwrap();
         let physical_plan = df.create_physical_plan().await.unwrap();
         // We use small batch size because web socket stream comes in small increments (each

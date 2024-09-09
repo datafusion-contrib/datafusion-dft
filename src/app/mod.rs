@@ -33,6 +33,9 @@ use ratatui::crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::path::{Path, PathBuf};
 use strum::IntoEnumIterator;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::task::JoinHandle;
@@ -251,9 +254,7 @@ impl<'app> App<'app> {
 
     /// Dispatch to the appropriate event loop based on the command
     pub fn start_event_loop(&mut self) {
-        match self.cli.command {
-            Some(cli::Command::App(_)) | None => self.start_app_event_loop(),
-        }
+        self.start_app_event_loop()
     }
 
     /// Get the next event from event loop
@@ -300,32 +301,75 @@ pub async fn run_app(cli: cli::DftCli, state: state::AppState<'_>) -> Result<()>
     info!("Running app with state: {:?}", state);
     let mut app = App::new(state, cli.clone());
 
-    match &cli.command {
-        Some(cli::Command::App(_)) | None => {
-            app.execute_ddl();
+    app.execute_ddl();
 
-            #[cfg(feature = "flightsql")]
-            app.establish_flightsql_connection();
+    #[cfg(feature = "flightsql")]
+    app.establish_flightsql_connection();
 
-            let mut terminal =
-                ratatui::Terminal::new(CrosstermBackend::new(std::io::stdout())).unwrap();
-            app.enter(true)?;
-            // Main loop for handling events
-            loop {
-                let event = app.next().await?;
+    let mut terminal = ratatui::Terminal::new(CrosstermBackend::new(std::io::stdout())).unwrap();
+    app.enter(true)?;
+    // Main loop for handling events
+    loop {
+        let event = app.next().await?;
 
-                if let AppEvent::Render = event.clone() {
-                    terminal.draw(|f| f.render_widget(&app, f.area()))?;
-                };
+        if let AppEvent::Render = event.clone() {
+            terminal.draw(|f| f.render_widget(&app, f.area()))?;
+        };
 
-                app.handle_app_event(event)?;
+        app.handle_app_event(event)?;
 
-                if app.state.should_quit {
-                    break;
-                }
-            }
-            app.exit()?;
+        if app.state.should_quit {
+            break;
         }
+    }
+    app.exit()
+}
+
+pub async fn execute_files(files: Vec<PathBuf>, state: &state::AppState<'_>) -> Result<()> {
+    info!("Executing files: {:?}", files);
+    let execution = ExecutionContext::new(state.config.execution.clone());
+
+    for file in files {
+        exec_from_file(&execution, &file).await?
+    }
+
+    Ok(())
+}
+
+/// run and execute SQL statements and commands from a file, against a context
+/// with the given print options
+pub async fn exec_from_file(ctx: &ExecutionContext, file: &Path) -> Result<()> {
+    let file = File::open(file)?;
+    let reader = BufReader::new(file);
+
+    let mut query = String::new();
+
+    for line in reader.lines() {
+        let line = line?;
+        if line.starts_with("#!") {
+            continue;
+        }
+        if line.starts_with("--") {
+            continue;
+        }
+
+        let line = line.trim_end();
+        query.push_str(line);
+        // if we found the end of a query, run it
+        if line.ends_with(';') {
+            // TODO: if the query errors, should we keep trying to execute
+            // the other queries in the file? That is what datafusion-cli does...
+            ctx.execute_stream_sql(&query).await?;
+            query.clear();
+        } else {
+            query.push('\n');
+        }
+    }
+
+    // run the last line(s) in file if the last statement doesn't contain ‘;’
+    // ignore if it only consists of '\n'
+    if query.contains(|c| c != '\n') {
+        ctx.execute_stream_sql(&query).await?;
     }
 
     Ok(())

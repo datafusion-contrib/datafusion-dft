@@ -21,7 +21,7 @@ mod telemetry;
 mod ui;
 
 use crate::app::state;
-use app::run_app;
+use app::{execute_files, run_app};
 use clap::Parser;
 use color_eyre::Result;
 
@@ -30,6 +30,13 @@ async fn main() -> Result<()> {
     telemetry::initialize_logs()?;
     let cli = cli::DftCli::parse();
     let state = state::initialize(&cli);
-    run_app(cli.clone(), state).await?;
+
+    // If executing commands from files, do so and then exit
+    if !cli.file.is_empty() {
+        execute_files(cli.file.clone(), &state).await?;
+    } else {
+        run_app(cli.clone(), state).await?;
+    }
+
     Ok(())
 }

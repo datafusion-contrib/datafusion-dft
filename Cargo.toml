@@ -39,6 +39,11 @@ tui-logger = {version = "0.12", features = ["tracing-support"]}
 tui-textarea = "0.6.1"
 url = { version = "2.5.2", optional = true }
 
+[dev-dependencies]
+assert_cmd = "2.0.16"
+predicates = "3.1.2"
+tempfile = "3.2.0"
+
 [features]
 deltalake = ["dep:deltalake"]
 flightsql = ["dep:arrow-flight", "dep:tonic"]
