@@ -17,10 +17,10 @@
 
 pub mod tabs;
 
+use crate::app::cli;
 use crate::app::config::get_data_dir;
 use crate::app::state::tabs::sql::SQLTabState;
-use crate::cli;
-use crate::ui::SelectedTab;
+use crate::app::ui::SelectedTab;
 use log::{debug, error, info};
 use std::path::PathBuf;
 
@@ -28,7 +28,7 @@ use self::tabs::{history::HistoryTabState, logs::LogsTabState};
 
 use super::config::AppConfig;
 #[cfg(feature = "flightsql")]
-use crate::state::tabs::flightsql::FlightSQLTabState;
+use crate::app::state::tabs::flightsql::FlightSQLTabState;
 
 #[derive(Debug)]
 pub struct Tabs {
@@ -56,7 +56,7 @@ pub struct AppState<'app> {
     pub tabs: Tabs,
 }
 
-pub fn initialize(args: &cli::DftCli) -> AppState {
+pub fn initialize<'app>(args: cli::DftCli) -> AppState<'app> {
     debug!("Initializing state");
     let data_dir = get_data_dir();
     let config_path = args.get_config();

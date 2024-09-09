@@ -1,5 +1,5 @@
 [package]
-name = "datafusion-tui"
+name = "dft"
 description = "Terminal based, extensible, interactive data analysis tool using SQL "
 homepage = "https://github.com/datafusion-contrib/datafusion-tui"
 repository = "https://github.com/datafusion-contrib/datafusion-tui"
@@ -9,6 +9,7 @@ license = "Apache-2.0"
 keywords = ["arrow", "query", "sql", "datafusion"]
 version = "0.1.0"
 edition = "2021"
+default-run = "dft"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

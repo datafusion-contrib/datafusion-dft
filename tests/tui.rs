@@ -15,25 +15,23 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use clap::Parser;
-use color_eyre::Result;
-use dft::app::state;
-use dft::app::{execute_files, run_app};
-use dft::cli;
-use dft::telemetry;
+//! Tests for the TUI (e.g. user application with keyboard commands)
 
-#[tokio::main]
-async fn main() -> Result<()> {
-    telemetry::initialize_logs()?;
-    let cli = cli::DftCli::parse();
-    let state = state::initialize(cli.clone());
+use dft::app::state::initialize;
+use dft::app::App;
+use dft::cli::DftCli;
 
-    // If executing commands from files, do so and then exit
-    if !cli.file.is_empty() {
-        execute_files(cli.file.clone(), &state).await?;
-    } else {
-        run_app(cli.clone(), state).await?;
-    }
+fn setup_app() -> App<'static> {
+    let args = DftCli {
+        file: Vec::new(),
+        config: None,
+    };
+    let state = initialize(&args.clone());
+    let app = App::new(state, args);
+    app
+}
 
-    Ok(())
+#[test]
+fn run_app_with_no_args() {
+    let app = setup_app();
 }
