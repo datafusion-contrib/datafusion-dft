@@ -6,7 +6,7 @@
 
 `dft` is inspired by  [`datafusion-cli`], but has some differences:
 1. `dft` TUI focuses on more complete and interactive experience for users.
-2. `dft` contains many built in integrations such as Delta Lake, Iceberg, and MySQL that are not available in `datafusion-cli`.
+2. `dft` contains many built in integrations such as Delta Lake, Iceberg, and MySQL (Coming Soon) that are not available in `datafusion-cli`.
 
 [`datafusion-cli`]: https://datafusion.apache.org/user-guide/cli/overview.html
 
@@ -61,7 +61,7 @@ Some of the current and planned features are:
   - Iceberg (TODO)
   - Hudi (TODO)
 - Preloading DDL from `~/.datafusion/.datafusionrc` for local database available on startup
-- "Catalog File" support
+- "Catalog File" support - see [#122](https://github.com/datafusion-contrib/datafusion-tui/issues/122)
   - Save table definitions *and* data
   - Save parquet metadata from remote object stores
 

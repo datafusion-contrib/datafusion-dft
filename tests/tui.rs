@@ -23,7 +23,7 @@ use dft::cli::DftCli;
 
 fn setup_app() -> App<'static> {
     let args = DftCli {
-        file: Vec::new(),
+        files: Vec::new(),
         config: None,
     };
     let state = initialize(args.clone());

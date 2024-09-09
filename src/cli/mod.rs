@@ -28,8 +28,7 @@ CLI and terminal UI data analysis tool using Apache DataFusion as query
 execution engine.
 
 dft provides a rich terminal UI as well as a broad array of pre-integrated
-data sources, formats to make querying and analyzing data from
-various sources.
+data sources and formats for querying and analyzing data.
 
 Environment Variables
 RUST_LOG { trace | debug | info | error }: Standard rust logging level.  Default is info.
@@ -45,7 +44,7 @@ pub struct DftCli {
         help = "Execute commands from file(s), then exit",
         value_parser(parse_valid_file)
     )]
-    pub file: Vec<PathBuf>,
+    pub files: Vec<PathBuf>,
 
     #[clap(short, long, help = "Path to the configuration file")]
     pub config: Option<String>,
