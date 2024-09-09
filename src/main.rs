@@ -29,8 +29,8 @@ async fn main() -> Result<()> {
     let state = state::initialize(cli.clone());
 
     // If executing commands from files, do so and then exit
-    if !cli.file.is_empty() {
-        execute_files(cli.file.clone(), &state).await?;
+    if !cli.files.is_empty() {
+        execute_files(cli.files.clone(), &state).await?;
     } else {
         run_app(cli.clone(), state).await?;
     }
