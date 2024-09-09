@@ -68,13 +68,23 @@ Some of the current and planned features are:
   
 ## `dft` CLI
 
-The `dft` CLI is a scriptable engine for executing queries from files.  It is used in a similar manner to `datafusion-cli` but with the added benefit of being able to query from multiple data sources.
+The `dft` CLI is a scriptable interface to the `tui` engine for executing
+queries from files or the command line. The CLI is used in a similar manner to
+`datafusion-cli` but with the added benefit of supporting multiple pre-integrated
+data sources.
 
-For example you can run the contents of `query.sql` with 
+### Example: Run the contents of `query.sql` 
 
 ```shell
 $ dft -f query.sql
 ```
+
+### Example: Run a query from the command line
+
+```shell
+$ dft -c "SELECT 1+2"
+```
+
 
 ## User Guide
 
