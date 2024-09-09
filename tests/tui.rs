@@ -31,7 +31,7 @@ fn setup_app() -> App<'static> {
     app
 }
 
-#[test]
-fn run_app_with_no_args() {
+#[tokio::test]
+async fn run_app_with_no_args() {
     let _app = setup_app();
 }
