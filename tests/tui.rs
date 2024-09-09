@@ -26,12 +26,12 @@ fn setup_app() -> App<'static> {
         file: Vec::new(),
         config: None,
     };
-    let state = initialize(&args.clone());
+    let state = initialize(args.clone());
     let app = App::new(state, args);
     app
 }
 
 #[test]
 fn run_app_with_no_args() {
-    let app = setup_app();
+    let _app = setup_app();
 }
