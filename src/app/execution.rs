@@ -23,6 +23,7 @@ use datafusion::execution::session_state::SessionStateBuilder;
 use datafusion::execution::TaskContext;
 use datafusion::physical_plan::{execute_stream, visit_execution_plan, ExecutionPlanVisitor};
 use datafusion::prelude::*;
+use datafusion::sql::parser::Statement;
 use datafusion::{arrow::util::pretty::pretty_format_batches, physical_plan::ExecutionPlan};
 #[cfg(feature = "deltalake")]
 use deltalake::delta_datafusion::DeltaTableFactory;
@@ -121,10 +122,25 @@ impl ExecutionContext {
         &self.session_ctx
     }
 
+    /// Executes the specified parsed DataFusion statement and prints the result to stdout
+    pub async fn execute_statement(&self, statement: Statement) -> Result<()> {
+        let plan = self
+            .session_ctx
+            .state()
+            .statement_to_plan(statement)
+            .await?;
+        let df = self.session_ctx.execute_logical_plan(plan).await?;
+        self.execute_stream_dataframe(df).await
+    }
+
     /// Executes the specified query and prints the result to stdout
     pub async fn execute_stream_sql(&self, query: &str) -> Result<()> {
-        let df = self.session_ctx.sql(query).await.unwrap();
-        let physical_plan = df.create_physical_plan().await.unwrap();
+        let df = self.session_ctx.sql(query).await?;
+        self.execute_stream_dataframe(df).await
+    }
+
+    pub async fn execute_stream_dataframe(&self, df: DataFrame) -> Result<()> {
+        let physical_plan = df.create_physical_plan().await?;
         // We use small batch size because web socket stream comes in small increments (each
         // message usually only has at most a few records).
         let stream_cfg = SessionConfig::default();

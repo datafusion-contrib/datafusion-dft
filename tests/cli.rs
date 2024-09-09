@@ -17,6 +17,7 @@
 
 //! Tests for the CLI (e.g. run from files)
 
+use crate::util::contains_str;
 use assert_cmd::Command;
 use std::path::PathBuf;
 
@@ -30,7 +31,7 @@ fn test_help() {
         .assert()
         .success();
 
-    assert.stdout(util::contains_str("dft"));
+    assert.stdout(contains_str("dft"));
 }
 
 #[test]
@@ -44,7 +45,7 @@ fn test_logging() {
         .assert()
         .success();
 
-    assert.stdout(util::contains_str("INFO"));
+    assert.stdout(contains_str("INFO"));
 }
 
 #[test]
@@ -139,7 +140,7 @@ fn test_non_existent_file() {
         .failure();
 
     let expected = format!("File does not exist: '{}'", p.to_string_lossy());
-    assert.code(2).stderr(util::contains_str(&expected));
+    assert.code(2).stderr(contains_str(&expected));
 }
 
 #[test]
@@ -161,7 +162,7 @@ fn test_one_existent_and_one_non_existent_file() {
         .failure();
 
     let expected_err = format!("File does not exist: '{}'", p2.to_string_lossy());
-    assert.code(2).stderr(util::contains_str(&expected_err));
+    assert.code(2).stderr(contains_str(&expected_err));
 }
 
 #[test]
@@ -177,7 +178,7 @@ fn test_sql_err_in_file() {
 
     let expected_err =
         "Expected: [NOT] NULL or TRUE|FALSE or [NOT] DISTINCT FROM after IS, found: not";
-    assert.code(101).stderr(util::contains_str(expected_err));
+    assert.code(1).stderr(contains_str(expected_err));
 }
 
 #[test]
@@ -200,5 +201,114 @@ SELECT this is not valid SQL
 
     let expected_err =
         "Expected: [NOT] NULL or TRUE|FALSE or [NOT] DISTINCT FROM after IS, found: not";
-    assert.code(101).stderr(util::contains_str(expected_err));
+    assert.code(1).stderr(contains_str(expected_err));
+}
+
+#[test]
+fn test_sql_in_file_and_arg() {
+    let file = util::sql_in_file("SELECT 1 + 1");
+
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-f")
+        .arg(file.path())
+        // also specify a query on the command line
+        .arg("-c")
+        .arg("SELECT 3 + 4")
+        .assert()
+        .failure();
+
+    assert.code(1).stderr(contains_str(
+        "Error: Cannot execute both files and commands at the same time",
+    ));
+}
+
+#[test]
+fn test_sql_in_arg() {
+    let expected = r##"
++---------------------+
+| Int64(1) + Int64(2) |
++---------------------+
+| 3                   |
++---------------------+
+    "##;
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT 1 + 2;")
+        .assert()
+        .success();
+
+    assert.stdout(contains_str(expected));
+}
+
+#[test]
+fn test_multiple_sql_in_arg() {
+    let expected = r##"
++------------+
+| sum(foo.x) |
++------------+
+| 3          |
++------------+
+    "##;
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        // use multiple SQL statements in one argument that need to run in the same
+        // context
+        .arg("CREATE TABLE foo(x int) as values (1), (2); SELECT sum(x) FROM foo")
+        .assert()
+        .success();
+
+    assert.stdout(contains_str(expected));
+}
+#[test]
+fn test_multiple_sql_in_multiple_args() {
+    let expected = r##"
++---------------------+
+| Int64(1) + Int64(2) |
++---------------------+
+| 3                   |
++---------------------+
++---------------------+
+| Int64(3) + Int64(5) |
++---------------------+
+| 8                   |
++---------------------+
+    "##;
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT 1 + 2")
+        .arg("SELECT 3 + 5")
+        .assert()
+        .success();
+
+    assert.stdout(contains_str(expected));
+}
+
+#[test]
+fn test_multiple_sql_in_multiple_args2() {
+    let expected = r##"
++---------------------+
+| Int64(1) + Int64(2) |
++---------------------+
+| 3                   |
++---------------------+
++---------------------+
+| Int64(3) + Int64(5) |
++---------------------+
+| 8                   |
++---------------------+
+    "##;
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT 1 + 2")
+        .arg("-c") // add second -c
+        .arg("SELECT 3 + 5")
+        .assert()
+        .success();
+
+    assert.stdout(contains_str(expected));
 }
