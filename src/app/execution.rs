@@ -15,7 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -126,24 +125,6 @@ impl ExecutionContext {
     pub fn session_ctx(&self) -> &SessionContext {
         &self.session_ctx
     }
-
-    // pub async fn run_statements(
-    //     &self,
-    //     statements: VecDeque<Statement>,
-    //     sender: UnboundedSender<AppEvent>,
-    // ) -> Result<()> {
-    //     let statement_count = statements.len();
-    //     for (i, statement) in statements.into_iter().enumerate() {
-    //         if i == statement_count - 1 {
-    //             self.execute_and_measure_statement(statement, ResultHandler::DisplayInTui)
-    //                 .await?;
-    //         } else {
-    //             self.execute_and_measure_statement(statement, ResultHandler::Discard)
-    //                 .await?;
-    //         }
-    //     }
-    //     Ok(())
-    // }
 
     pub async fn run_sqls(&self, sqls: Vec<&str>, sender: UnboundedSender<AppEvent>) -> Result<()> {
         let statement_count = sqls.len();
