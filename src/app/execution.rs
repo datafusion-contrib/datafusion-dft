@@ -127,12 +127,11 @@ impl ExecutionContext {
     }
 
     pub async fn run_sqls(&self, sqls: Vec<&str>, sender: UnboundedSender<AppEvent>) -> Result<()> {
-        let statement_count = sqls.len();
-        for (i, sql) in sqls.into_iter().enumerate() {
-            if sql.is_empty() {
-                info!("Query is empty, skipping");
-                continue;
-            }
+        // We need to filter out empty strings to correctly determine the last query for displaying
+        // results.
+        let non_empty_sqls: Vec<&str> = sqls.into_iter().filter(|s| !s.is_empty()).collect();
+        let statement_count = non_empty_sqls.len();
+        for (i, sql) in non_empty_sqls.into_iter().enumerate() {
             info!("Running query {}", i);
             let _sender = sender.clone();
             let mut query =
