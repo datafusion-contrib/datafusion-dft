@@ -20,7 +20,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-use datafusion::{arrow::array::RecordBatch, physical_plan::execute_stream};
+use datafusion::{
+    arrow::array::RecordBatch,
+    physical_plan::execute_stream,
+    sql::{parser::DFParser, sqlparser::dialect::GenericDialect},
+};
 use log::{error, info};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use tokio_stream::StreamExt;
@@ -70,64 +74,76 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
             info!("Run query");
             let sql = app.state.sql_tab.editor().lines().join("");
             info!("SQL: {}", sql);
-            let mut query = Query::new(sql.clone(), None, None, None, Duration::default(), None);
-            let ctx = app.execution.session_ctx.clone();
+            // let mut query = Query::new(sql.clone(), None, None, None, Duration::default(), None);
+            // let ctx = app.execution.session_ctx.clone();
+            let execution = Arc::clone(&app.execution);
             let _event_tx = app.app_event_tx.clone();
             // TODO: Maybe this should be on a separate runtime to prevent blocking main thread /
             // runtime
             // TODO: Extract this into function to be used in both normal and editable handler
             tokio::spawn(async move {
-                let start = std::time::Instant::now();
-                match ctx.sql(&sql).await {
-                    Ok(df) => {
-                        let plan = df.create_physical_plan().await;
-                        match plan {
-                            Ok(p) => {
-                                let task_ctx = ctx.task_ctx();
-                                let stream = execute_stream(Arc::clone(&p), task_ctx);
-                                let mut batches: Vec<RecordBatch> = Vec::new();
-                                match stream {
-                                    Ok(mut s) => {
-                                        while let Some(b) = s.next().await {
-                                            match b {
-                                                Ok(b) => {
-                                                    info!("Got batch with {} rows", b.num_rows());
-                                                    batches.push(b)
-                                                }
-                                                Err(e) => {
-                                                    error!("Error getting batch {:?}", e);
-                                                }
-                                            }
-                                        }
+                let dialect = GenericDialect {};
+                // let statements = DFParser::parse_sql_with_dialect(&sql, &dialect);
+                let sqls: Vec<&str> = sql.split(';').collect();
+                execution.run_sqls(sqls, _event_tx).await;
+                // match sqls {
+                //     Ok(statements) => {
+                //         execution.run_statements(statements, _event_tx).await;
+                //     }
+                //     Err(e) => error!("Error parsing SQL: {:?}", e),
+                // }
 
-                                        let elapsed = start.elapsed();
-                                        let stats = collect_plan_stats(p);
-                                        info!("Got stats: {:?}", stats);
-                                        let rows: usize =
-                                            batches.iter().map(|b| b.num_rows()).sum();
-                                        query.set_num_rows(Some(rows));
-                                        query.set_execution_time(elapsed);
-                                        query.set_results(Some(batches));
-                                        query.set_execution_stats(stats);
-                                    }
-                                    Err(e) => {
-                                        error!("Error getting RecordBatchStream: {:?}", e)
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                error!("Error constructing physical plan: {:?}", e)
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        error!("Error creating dataframe: {:?}", e);
-                        let elapsed = start.elapsed();
-                        query.set_error(Some(e.to_string()));
-                        query.set_execution_time(elapsed);
-                    }
-                }
-                let _ = _event_tx.send(AppEvent::QueryResult(query));
+                // let start = std::time::Instant::now();
+                // match ctx.sql(&sql).await {
+                //     Ok(df) => {
+                //         let plan = df.create_physical_plan().await;
+                //         match plan {
+                //             Ok(p) => {
+                //                 let task_ctx = ctx.task_ctx();
+                //                 let stream = execute_stream(Arc::clone(&p), task_ctx);
+                //                 let mut batches: Vec<RecordBatch> = Vec::new();
+                //                 match stream {
+                //                     Ok(mut s) => {
+                //                         while let Some(b) = s.next().await {
+                //                             match b {
+                //                                 Ok(b) => {
+                //                                     info!("Got batch with {} rows", b.num_rows());
+                //                                     batches.push(b)
+                //                                 }
+                //                                 Err(e) => {
+                //                                     error!("Error getting batch {:?}", e);
+                //                                 }
+                //                             }
+                //                         }
+                //
+                //                         let elapsed = start.elapsed();
+                //                         let stats = collect_plan_stats(p);
+                //                         info!("Got stats: {:?}", stats);
+                //                         let rows: usize =
+                //                             batches.iter().map(|b| b.num_rows()).sum();
+                //                         query.set_num_rows(Some(rows));
+                //                         query.set_execution_time(elapsed);
+                //                         query.set_results(Some(batches));
+                //                         query.set_execution_stats(stats);
+                //                     }
+                //                     Err(e) => {
+                //                         error!("Error getting RecordBatchStream: {:?}", e)
+                //                     }
+                //                 }
+                //             }
+                //             Err(e) => {
+                //                 error!("Error constructing physical plan: {:?}", e)
+                //             }
+                //         }
+                //     }
+                //     Err(e) => {
+                //         error!("Error creating dataframe: {:?}", e);
+                //         let elapsed = start.elapsed();
+                //         query.set_error(Some(e.to_string()));
+                //         query.set_execution_time(elapsed);
+                //     }
+                // }
+                // let _ = _event_tx.send(AppEvent::QueryResult(query));
             });
         }
         _ => {}

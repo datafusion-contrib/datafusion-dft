@@ -15,7 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use std::collections::VecDeque;
 use std::sync::Arc;
+use std::time::Duration;
 
 use color_eyre::eyre::Result;
 use datafusion::execution::runtime_env::RuntimeEnv;
@@ -28,6 +30,7 @@ use datafusion::{arrow::util::pretty::pretty_format_batches, physical_plan::Exec
 #[cfg(feature = "deltalake")]
 use deltalake::delta_datafusion::DeltaTableFactory;
 use log::info;
+use tokio::sync::mpsc::UnboundedSender;
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 #[cfg(feature = "flightsql")]
@@ -39,13 +42,15 @@ use {
 use {log::error, url::Url};
 
 use super::config::ExecutionConfig;
+use super::state::tabs::sql::Query;
+use super::AppEvent;
 
 pub struct ExecutionContext {
     pub session_ctx: SessionContext,
     pub config: ExecutionConfig,
     pub cancellation_token: CancellationToken,
     #[cfg(feature = "flightsql")]
-    pub flightsql_client: Arc<Mutex<Option<FlightSqlServiceClient<Channel>>>>,
+    pub flightsql_client: Mutex<Option<FlightSqlServiceClient<Channel>>>,
 }
 
 impl ExecutionContext {
@@ -109,7 +114,7 @@ impl ExecutionContext {
                 session_ctx,
                 cancellation_token,
                 #[cfg(feature = "flightsql")]
-                flightsql_client: Arc::new(Mutex::new(None)),
+                flightsql_client: Mutex::new(None),
             }
         }
     }
@@ -122,35 +127,119 @@ impl ExecutionContext {
         &self.session_ctx
     }
 
+    // pub async fn run_statements(
+    //     &self,
+    //     statements: VecDeque<Statement>,
+    //     sender: UnboundedSender<AppEvent>,
+    // ) -> Result<()> {
+    //     let statement_count = statements.len();
+    //     for (i, statement) in statements.into_iter().enumerate() {
+    //         if i == statement_count - 1 {
+    //             self.execute_and_measure_statement(statement, ResultHandler::DisplayInTui)
+    //                 .await?;
+    //         } else {
+    //             self.execute_and_measure_statement(statement, ResultHandler::Discard)
+    //                 .await?;
+    //         }
+    //     }
+    //     Ok(())
+    // }
+
+    pub async fn run_sqls(&self, sqls: Vec<&str>, sender: UnboundedSender<AppEvent>) -> Result<()> {
+        let statement_count = sqls.len();
+        for (i, sql) in sqls.into_iter().enumerate() {
+            if sql.is_empty() {
+                info!("Query is empty, skipping");
+                continue;
+            }
+            info!("Running query {}", i);
+            let _sender = sender.clone();
+            let mut query =
+                Query::new(sql.to_string(), None, None, None, Duration::default(), None);
+            let start = std::time::Instant::now();
+            if i == statement_count - 1 {
+                info!("Executing last query and display results");
+                if let Ok(df) = self.session_ctx.sql(sql).await {
+                    if let Ok(physical_plan) = df.create_physical_plan().await {
+                        let stream_cfg = SessionConfig::default();
+                        let stream_task_ctx =
+                            TaskContext::default().with_session_config(stream_cfg);
+                        let mut stream =
+                            execute_stream(physical_plan, stream_task_ctx.into()).unwrap();
+                        let mut batches = Vec::new();
+                        while let Some(maybe_batch) = stream.next().await {
+                            match maybe_batch {
+                                Ok(batch) => {
+                                    batches.push(batch);
+                                }
+                                Err(e) => {
+                                    let elapsed = start.elapsed();
+                                    query.set_error(Some(e.to_string()));
+                                    query.set_execution_time(elapsed);
+                                    break;
+                                }
+                            }
+                        }
+                        let elapsed = start.elapsed();
+                        let rows: usize = batches.iter().map(|r| r.num_rows()).sum();
+                        query.set_results(Some(batches));
+                        query.set_num_rows(Some(rows));
+                        query.set_execution_time(elapsed);
+                    }
+                } else {
+                    info!("Executing query and discarding results");
+                    self.execute_sql(sql, false).await?;
+                    let elapsed = start.elapsed();
+                    query.set_execution_time(elapsed);
+                }
+            } else {
+                self.execute_sql(sql, false).await?;
+                let elapsed = start.elapsed();
+                query.set_execution_time(elapsed);
+            }
+            _sender.send(AppEvent::QueryResult(query)).unwrap();
+        }
+        Ok(())
+    }
+
+    /// Execcutes the specified parsed DataFusion statement and discards the result
+    pub async fn execute_sql(&self, sql: &str, print: bool) -> Result<()> {
+        let df = self.session_ctx.sql(sql).await?;
+        self.execute_stream_dataframe(df, print).await
+    }
+
     /// Executes the specified parsed DataFusion statement and prints the result to stdout
-    pub async fn execute_statement(&self, statement: Statement) -> Result<()> {
+    pub async fn execute_and_print_statement(&self, statement: Statement) -> Result<()> {
         let plan = self
             .session_ctx
             .state()
             .statement_to_plan(statement)
             .await?;
         let df = self.session_ctx.execute_logical_plan(plan).await?;
-        self.execute_stream_dataframe(df).await
+        self.execute_stream_dataframe(df, true).await
     }
 
     /// Executes the specified query and prints the result to stdout
-    pub async fn execute_stream_sql(&self, query: &str) -> Result<()> {
+    pub async fn execute_and_print_stream_sql(&self, query: &str) -> Result<()> {
         let df = self.session_ctx.sql(query).await?;
-        self.execute_stream_dataframe(df).await
+        self.execute_stream_dataframe(df, true).await
     }
 
-    pub async fn execute_stream_dataframe(&self, df: DataFrame) -> Result<()> {
+    pub async fn execute_stream_dataframe(&self, df: DataFrame, print: bool) -> Result<()> {
         let physical_plan = df.create_physical_plan().await?;
-        // We use small batch size because web socket stream comes in small increments (each
-        // message usually only has at most a few records).
         let stream_cfg = SessionConfig::default();
         let stream_task_ctx = TaskContext::default().with_session_config(stream_cfg);
         let mut stream = execute_stream(physical_plan, stream_task_ctx.into()).unwrap();
 
         while let Some(maybe_batch) = stream.next().await {
-            let batch = maybe_batch.unwrap();
-            let d = pretty_format_batches(&[batch]).unwrap();
-            println!("{}", d);
+            if print {
+                let batch = maybe_batch.unwrap();
+                let d = pretty_format_batches(&[batch]).unwrap();
+                println!("{}", d);
+            } else {
+                let _ = maybe_batch.unwrap();
+                info!("Discarding batch");
+            }
         }
         Ok(())
     }
