@@ -22,12 +22,9 @@ use log::{error, info};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use tokio_stream::StreamExt;
 
-use crate::app::{
-    execution::collect_plan_stats, handlers::tab_navigation_handler, state::tabs::sql::Query,
-    AppEvent,
-};
-
 use super::App;
+use crate::app::{handlers::tab_navigation_handler, state::tabs::sql::Query, AppEvent};
+use crate::execution::collect_plan_stats;
 
 pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
     match key.code {
@@ -89,7 +86,7 @@ pub fn editable_handler(app: &mut App, key: KeyEvent) {
         (KeyCode::Esc, _) => app.state.sql_tab.exit_edit(),
         (KeyCode::Enter, KeyModifiers::CONTROL) => {
             let query = app.state.sql_tab.editor().lines().join("");
-            let ctx = app.execution.session_ctx.clone();
+            let ctx = app.execution.session_ctx().clone();
             let _event_tx = app.app_event_tx.clone();
             // TODO: Maybe this should be on a separate runtime to prevent blocking main thread /
             // runtime

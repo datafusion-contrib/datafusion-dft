@@ -161,7 +161,7 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
         AppEvent::ExecuteDDL(ddl) => {
             let queries: Vec<String> = ddl.split(';').map(|s| s.to_string()).collect();
             queries.into_iter().for_each(|q| {
-                let ctx = app.execution.session_ctx.clone();
+                let ctx = app.execution.session_ctx().clone();
                 tokio::spawn(async move {
                     match ctx.sql(&q).await {
                         Ok(df) => {
@@ -208,7 +208,7 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
             let url: &'static str = Box::leak(url.into_boxed_str());
             let execution = Arc::clone(&app.execution);
             tokio::spawn(async move {
-                let client = &execution.flightsql_client;
+                let client = execution.flightsql_client();
                 let maybe_channel = Channel::from_static(url).connect().await;
                 info!("Created channel");
                 match maybe_channel {
