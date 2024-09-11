@@ -16,6 +16,7 @@
 // under the License.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use color_eyre::eyre::Result;
 use datafusion::execution::runtime_env::RuntimeEnv;
@@ -27,25 +28,28 @@ use datafusion::sql::parser::Statement;
 use datafusion::{arrow::util::pretty::pretty_format_batches, physical_plan::ExecutionPlan};
 #[cfg(feature = "deltalake")]
 use deltalake::delta_datafusion::DeltaTableFactory;
-use log::info;
+use log::{error, info};
+use tokio::sync::mpsc::UnboundedSender;
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
+#[cfg(feature = "s3")]
+use url::Url;
 #[cfg(feature = "flightsql")]
 use {
     arrow_flight::sql::client::FlightSqlServiceClient, tokio::sync::Mutex,
     tonic::transport::Channel,
 };
-#[cfg(feature = "s3")]
-use {log::error, url::Url};
 
 use super::config::ExecutionConfig;
+use super::state::tabs::sql::Query;
+use super::AppEvent;
 
 pub struct ExecutionContext {
     pub session_ctx: SessionContext,
     pub config: ExecutionConfig,
     pub cancellation_token: CancellationToken,
     #[cfg(feature = "flightsql")]
-    pub flightsql_client: Arc<Mutex<Option<FlightSqlServiceClient<Channel>>>>,
+    pub flightsql_client: Mutex<Option<FlightSqlServiceClient<Channel>>>,
 }
 
 impl ExecutionContext {
@@ -109,7 +113,7 @@ impl ExecutionContext {
                 session_ctx,
                 cancellation_token,
                 #[cfg(feature = "flightsql")]
-                flightsql_client: Arc::new(Mutex::new(None)),
+                flightsql_client: Mutex::new(None),
             }
         }
     }
@@ -122,35 +126,114 @@ impl ExecutionContext {
         &self.session_ctx
     }
 
+    pub async fn run_sqls(&self, sqls: Vec<&str>, sender: UnboundedSender<AppEvent>) -> Result<()> {
+        // We need to filter out empty strings to correctly determine the last query for displaying
+        // results.
+        info!("Running sqls: {:?}", sqls);
+        let non_empty_sqls: Vec<&str> = sqls.into_iter().filter(|s| !s.is_empty()).collect();
+        info!("Non empty SQLs: {:?}", non_empty_sqls);
+        let statement_count = non_empty_sqls.len();
+        for (i, sql) in non_empty_sqls.into_iter().enumerate() {
+            info!("Running query {}", i);
+            let _sender = sender.clone();
+            let mut query =
+                Query::new(sql.to_string(), None, None, None, Duration::default(), None);
+            let start = std::time::Instant::now();
+            if i == statement_count - 1 {
+                info!("Executing last query and display results");
+                match self.session_ctx.sql(sql).await {
+                    Ok(df) => {
+                        if let Ok(physical_plan) = df.create_physical_plan().await {
+                            let stream_cfg = SessionConfig::default();
+                            let stream_task_ctx =
+                                TaskContext::default().with_session_config(stream_cfg);
+                            let mut stream =
+                                execute_stream(physical_plan, stream_task_ctx.into()).unwrap();
+                            let mut batches = Vec::new();
+                            while let Some(maybe_batch) = stream.next().await {
+                                match maybe_batch {
+                                    Ok(batch) => {
+                                        batches.push(batch);
+                                    }
+                                    Err(e) => {
+                                        let elapsed = start.elapsed();
+                                        query.set_error(Some(e.to_string()));
+                                        query.set_execution_time(elapsed);
+                                        break;
+                                    }
+                                }
+                            }
+                            let elapsed = start.elapsed();
+                            let rows: usize = batches.iter().map(|r| r.num_rows()).sum();
+                            query.set_results(Some(batches));
+                            query.set_num_rows(Some(rows));
+                            query.set_execution_time(elapsed);
+                        }
+                    }
+                    Err(e) => {
+                        error!("Error creating dataframe: {:?}", e);
+                        let elapsed = start.elapsed();
+                        query.set_error(Some(e.to_string()));
+                        query.set_execution_time(elapsed);
+                    }
+                }
+            } else {
+                match self.execute_sql(sql, false).await {
+                    Ok(_) => {
+                        let elapsed = start.elapsed();
+                        query.set_execution_time(elapsed);
+                    }
+                    Err(e) => {
+                        // We only log failed queries, we don't want to stop the execution of the
+                        // remaining queries. Perhaps there should be a configuration option for
+                        // this though in case the user wants to stop execution on the first error.
+                        error!("Error executing {sql}: {:?}", e);
+                    }
+                }
+            }
+            _sender.send(AppEvent::QueryResult(query)).unwrap();
+        }
+        Ok(())
+    }
+
+    /// Execcutes the specified parsed DataFusion statement and discards the result
+    pub async fn execute_sql(&self, sql: &str, print: bool) -> Result<()> {
+        let df = self.session_ctx.sql(sql).await?;
+        self.execute_stream_dataframe(df, print).await
+    }
+
     /// Executes the specified parsed DataFusion statement and prints the result to stdout
-    pub async fn execute_statement(&self, statement: Statement) -> Result<()> {
+    pub async fn execute_and_print_statement(&self, statement: Statement) -> Result<()> {
         let plan = self
             .session_ctx
             .state()
             .statement_to_plan(statement)
             .await?;
         let df = self.session_ctx.execute_logical_plan(plan).await?;
-        self.execute_stream_dataframe(df).await
+        self.execute_stream_dataframe(df, true).await
     }
 
     /// Executes the specified query and prints the result to stdout
-    pub async fn execute_stream_sql(&self, query: &str) -> Result<()> {
+    pub async fn execute_and_print_stream_sql(&self, query: &str) -> Result<()> {
         let df = self.session_ctx.sql(query).await?;
-        self.execute_stream_dataframe(df).await
+        self.execute_stream_dataframe(df, true).await
     }
 
-    pub async fn execute_stream_dataframe(&self, df: DataFrame) -> Result<()> {
+    pub async fn execute_stream_dataframe(&self, df: DataFrame, print: bool) -> Result<()> {
         let physical_plan = df.create_physical_plan().await?;
-        // We use small batch size because web socket stream comes in small increments (each
-        // message usually only has at most a few records).
         let stream_cfg = SessionConfig::default();
         let stream_task_ctx = TaskContext::default().with_session_config(stream_cfg);
         let mut stream = execute_stream(physical_plan, stream_task_ctx.into()).unwrap();
 
         while let Some(maybe_batch) = stream.next().await {
-            let batch = maybe_batch.unwrap();
-            let d = pretty_format_batches(&[batch]).unwrap();
-            println!("{}", d);
+            if print {
+                let batch = maybe_batch.unwrap();
+                let d = pretty_format_batches(&[batch]).unwrap();
+                println!("{}", d);
+            } else {
+                let _ = maybe_batch.unwrap();
+                info!("Discarding batch");
+            }
         }
         Ok(())
     }

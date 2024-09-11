@@ -70,9 +70,10 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
             info!("Run FS query");
             let sql = app.state.flightsql_tab.editor().lines().join("");
             info!("SQL: {}", sql);
-            let client = Arc::clone(&app.execution.flightsql_client);
+            let execution = Arc::clone(&app.execution);
             let _event_tx = app.app_event_tx.clone();
             tokio::spawn(async move {
+                let client = &execution.flightsql_client;
                 let mut query =
                     FlightSQLQuery::new(sql.clone(), None, None, None, Duration::default(), None);
                 let start = Instant::now();

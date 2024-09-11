@@ -38,6 +38,7 @@ use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use strum::IntoEnumIterator;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::task::JoinHandle;
@@ -76,7 +77,7 @@ pub enum AppEvent {
 pub struct App<'app> {
     pub cli: DftCli,
     pub state: state::AppState<'app>,
-    pub execution: ExecutionContext,
+    pub execution: Arc<ExecutionContext>,
     pub app_event_tx: UnboundedSender<AppEvent>,
     pub app_event_rx: UnboundedReceiver<AppEvent>,
     pub app_cancellation_token: CancellationToken,
@@ -90,7 +91,7 @@ impl<'app> App<'app> {
         let app_cancellation_token = CancellationToken::new();
         let task = tokio::spawn(async {});
         let streams_task = tokio::spawn(async {});
-        let execution = ExecutionContext::new(state.config.execution.clone());
+        let execution = Arc::new(ExecutionContext::new(state.config.execution.clone()));
 
         Self {
             cli,
@@ -365,7 +366,7 @@ async fn exec_from_string(sql: &str, state: &state::AppState<'_>) -> Result<()> 
     let execution = ExecutionContext::new(state.config.execution.clone());
     let statements = DFParser::parse_sql_with_dialect(sql, &dialect)?;
     for statement in statements {
-        execution.execute_statement(statement).await?;
+        execution.execute_and_print_statement(statement).await?;
     }
     Ok(())
 }
@@ -393,7 +394,7 @@ pub async fn exec_from_file(ctx: &ExecutionContext, file: &Path) -> Result<()> {
         if line.ends_with(';') {
             // TODO: if the query errors, should we keep trying to execute
             // the other queries in the file? That is what datafusion-cli does...
-            ctx.execute_stream_sql(&query).await?;
+            ctx.execute_and_print_stream_sql(&query).await?;
             query.clear();
         } else {
             query.push('\n');
@@ -403,7 +404,7 @@ pub async fn exec_from_file(ctx: &ExecutionContext, file: &Path) -> Result<()> {
     // run the last line(s) in file if the last statement doesn't contain ‘;’
     // ignore if it only consists of '\n'
     if query.contains(|c| c != '\n') {
-        ctx.execute_stream_sql(&query).await?;
+        ctx.execute_and_print_stream_sql(&query).await?;
     }
 
     Ok(())

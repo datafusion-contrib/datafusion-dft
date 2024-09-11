@@ -206,8 +206,9 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
             let url = app.state.config.flightsql.connection_url.clone();
             info!("Connection to FlightSQL host: {}", url);
             let url: &'static str = Box::leak(url.into_boxed_str());
-            let client = Arc::clone(&app.execution.flightsql_client);
+            let execution = Arc::clone(&app.execution);
             tokio::spawn(async move {
+                let client = &execution.flightsql_client;
                 let maybe_channel = Channel::from_static(url).connect().await;
                 info!("Created channel");
                 match maybe_channel {
