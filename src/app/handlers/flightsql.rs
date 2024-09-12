@@ -91,14 +91,12 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
                                                     Ok(batch) => {
                                                         info!("Batch rows: {}", batch.num_rows());
                                                         batches.push(batch);
-                                                        break;
                                                     }
                                                     Err(e) => {
                                                         error!("Error getting batch: {:?}", e);
                                                         let elapsed = start.elapsed();
                                                         query.set_error(Some(e.to_string()));
                                                         query.set_execution_time(elapsed);
-                                                        break;
                                                     }
                                                 }
                                             }
