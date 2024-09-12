@@ -86,23 +86,25 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
                                     match c.do_get(ticket.into_request()).await {
                                         Ok(mut stream) => {
                                             let mut batches: Vec<RecordBatch> = Vec::new();
-                                            while let Some(maybe_batch) = stream.next().await {
+                                            // temporarily only show the first batch to avoid
+                                            // buffering massive result sets. Eventually there should
+                                            // be some sort of paging logic
+                                            // see https://github.com/datafusion-contrib/datafusion-tui/pull/133#discussion_r1756680874
+                                            // while let Some(maybe_batch) = stream.next().await {
+                                            if let Some(maybe_batch) = stream.next().await {
                                                 match maybe_batch {
                                                     Ok(batch) => {
                                                         info!("Batch rows: {}", batch.num_rows());
                                                         batches.push(batch);
-                                                        break;
                                                     }
                                                     Err(e) => {
                                                         error!("Error getting batch: {:?}", e);
                                                         let elapsed = start.elapsed();
                                                         query.set_error(Some(e.to_string()));
                                                         query.set_execution_time(elapsed);
-                                                        break;
                                                     }
                                                 }
                                             }
-
                                             let elapsed = start.elapsed();
                                             let rows: usize =
                                                 batches.iter().map(|r| r.num_rows()).sum();
