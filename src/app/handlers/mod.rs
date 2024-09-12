@@ -159,10 +159,19 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
     let now = std::time::Instant::now();
     match event {
         AppEvent::ExecuteDDL(ddl) => {
-            let queries: Vec<String> = ddl.split(';').map(|s| s.to_string()).collect();
-            queries.into_iter().for_each(|q| {
-                let ctx = app.execution.session_ctx().clone();
-                tokio::spawn(async move {
+            let queries: Vec<String> = ddl
+                .split(';')
+                .filter_map(|s| {
+                    if s.is_empty() || s == "\n" {
+                        return None;
+                    }
+                    Some(s.to_string())
+                })
+                .collect();
+            let ctx = app.execution.session_ctx().clone();
+            tokio::spawn(async move {
+                for q in queries {
+                    info!("Executing DDL: {:?}", q);
                     match ctx.sql(&q).await {
                         Ok(df) => {
                             if df.collect().await.is_ok() {
@@ -173,8 +182,8 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                             error!("Error executing DDL {:?}: {:?}", q, e);
                         }
                     }
-                });
-            })
+                }
+            });
         }
         AppEvent::QueryResult(r) => {
             app.state.sql_tab.set_query(r.clone());
