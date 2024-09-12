@@ -17,10 +17,9 @@
 
 pub mod tabs;
 
-use crate::app::cli;
 use crate::app::config::get_data_dir;
 use crate::app::state::tabs::sql::SQLTabState;
-use crate::app::ui::SelectedTab;
+use crate::app::tui::SelectedTab;
 use log::{debug, error, info};
 use std::path::PathBuf;
 
@@ -56,10 +55,9 @@ pub struct AppState<'app> {
     pub tabs: Tabs,
 }
 
-pub fn initialize<'app>(args: cli::DftCli) -> AppState<'app> {
+pub fn initialize<'app>(config_path: PathBuf) -> AppState<'app> {
     debug!("Initializing state");
     let data_dir = get_data_dir();
-    let config_path = args.get_config();
     debug!("Config path: {:?}", config_path);
     let config = if config_path.exists() {
         debug!("Config exists");

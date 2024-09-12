@@ -19,16 +19,11 @@
 
 use dft::app::state::initialize;
 use dft::app::App;
-use dft::cli::DftCli;
-
-fn setup_app() -> App<'static> {
-    let args = DftCli::default();
-    let state = initialize(args.clone());
-    let app = App::new(state, args);
-    app
-}
+use tempfile::tempdir;
 
 #[tokio::test]
 async fn run_app_with_no_args() {
-    let _app = setup_app();
+    let config_path = tempdir().unwrap();
+    let state = initialize(config_path.path().to_path_buf());
+    let _app = App::new(state);
 }

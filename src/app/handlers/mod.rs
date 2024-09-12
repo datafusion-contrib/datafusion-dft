@@ -35,7 +35,7 @@ use tonic::transport::Channel;
 
 use crate::{
     app::{state::tabs::history::HistoryQuery, AppEvent},
-    ui::SelectedTab,
+    tui::SelectedTab,
 };
 
 use super::App;
