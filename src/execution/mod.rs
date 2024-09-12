@@ -18,20 +18,17 @@
 //! [`ExecutionContext`]: DataFusion based execution context for running SQL queries
 //!
 use std::sync::Arc;
-use std::time::Duration;
 
 use color_eyre::eyre::Result;
 use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::execution::session_state::SessionStateBuilder;
-use datafusion::execution::TaskContext;
-use datafusion::physical_plan::{execute_stream, visit_execution_plan, ExecutionPlanVisitor};
+use datafusion::execution::SendableRecordBatchStream;
+use datafusion::physical_plan::{visit_execution_plan, ExecutionPlan, ExecutionPlanVisitor};
 use datafusion::prelude::*;
 use datafusion::sql::parser::Statement;
-use datafusion::{arrow::util::pretty::pretty_format_batches, physical_plan::ExecutionPlan};
 #[cfg(feature = "deltalake")]
 use deltalake::delta_datafusion::DeltaTableFactory;
-use log::{error, info};
-use tokio::sync::mpsc::UnboundedSender;
+use log::info;
 use tokio_stream::StreamExt;
 #[cfg(feature = "s3")]
 use url::Url;
@@ -42,8 +39,6 @@ use {
 };
 
 use crate::app::config::ExecutionConfig;
-use crate::app::state::tabs::sql::Query;
-use crate::app::AppEvent;
 
 /// Structure for executing queries either locally or remotely (via FlightSQL)
 ///
@@ -97,7 +92,7 @@ impl ExecutionContext {
                                 }
                             }
                             Err(e) => {
-                                error!("Error creating object store: {:?}", e);
+                                log::error!("Error creating object store: {:?}", e);
                             }
                         }
                     }
@@ -145,123 +140,44 @@ impl ExecutionContext {
         &self.flightsql_client
     }
 
-    pub async fn run_sqls(&self, sqls: Vec<&str>, sender: UnboundedSender<AppEvent>) -> Result<()> {
-        // We need to filter out empty strings to correctly determine the last query for displaying
-        // results.
-        info!("Running sqls: {:?}", sqls);
-        let non_empty_sqls: Vec<&str> = sqls.into_iter().filter(|s| !s.is_empty()).collect();
-        info!("Non empty SQLs: {:?}", non_empty_sqls);
-        let statement_count = non_empty_sqls.len();
-        for (i, sql) in non_empty_sqls.into_iter().enumerate() {
-            info!("Running query {}", i);
-            let _sender = sender.clone();
-            let mut query =
-                Query::new(sql.to_string(), None, None, None, Duration::default(), None);
-            let start = std::time::Instant::now();
-            if i == statement_count - 1 {
-                info!("Executing last query and display results");
-                match self.session_ctx.sql(sql).await {
-                    Ok(df) => {
-                        if let Ok(physical_plan) = df.create_physical_plan().await {
-                            let stream_cfg = SessionConfig::default();
-                            let stream_task_ctx =
-                                TaskContext::default().with_session_config(stream_cfg);
-                            let mut stream =
-                                execute_stream(physical_plan, stream_task_ctx.into()).unwrap();
-                            let mut batches = Vec::new();
-                            while let Some(maybe_batch) = stream.next().await {
-                                match maybe_batch {
-                                    Ok(batch) => {
-                                        batches.push(batch);
-                                    }
-                                    Err(e) => {
-                                        let elapsed = start.elapsed();
-                                        query.set_error(Some(e.to_string()));
-                                        query.set_execution_time(elapsed);
-                                        break;
-                                    }
-                                }
-                            }
-                            let elapsed = start.elapsed();
-                            let rows: usize = batches.iter().map(|r| r.num_rows()).sum();
-                            query.set_results(Some(batches));
-                            query.set_num_rows(Some(rows));
-                            query.set_execution_time(elapsed);
-                        }
-                    }
-                    Err(e) => {
-                        error!("Error creating dataframe: {:?}", e);
-                        let elapsed = start.elapsed();
-                        query.set_error(Some(e.to_string()));
-                        query.set_execution_time(elapsed);
-                    }
-                }
-            } else {
-                match self.execute_sql(sql, false).await {
-                    Ok(_) => {
-                        let elapsed = start.elapsed();
-                        query.set_execution_time(elapsed);
-                    }
-                    Err(e) => {
-                        // We only log failed queries, we don't want to stop the execution of the
-                        // remaining queries. Perhaps there should be a configuration option for
-                        // this though in case the user wants to stop execution on the first error.
-                        error!("Error executing {sql}: {:?}", e);
-                    }
-                }
-            }
-            _sender.send(AppEvent::QueryResult(query)).unwrap();
+    /// Executes the specified sql string, driving it to completion but discarding any results
+    pub async fn execute_sql_and_discard_results(
+        &self,
+        sql: &str,
+    ) -> datafusion::error::Result<()> {
+        let mut stream = self.execute_sql(sql).await?;
+        // note we don't call collect() to avoid buffering data
+        while let Some(maybe_batch) = stream.next().await {
+            maybe_batch?; // check for errors
         }
         Ok(())
     }
 
-    /// Executes the specified parsed DataFusion statement and discards the result
-    pub async fn execute_sql(&self, sql: &str, print: bool) -> Result<()> {
-        let df = self.session_ctx.sql(sql).await?;
-        self.execute_stream_dataframe(df, print).await
+    /// Executes the specified sql string, returning the resulting
+    /// [`SendableRecordBatchStream`] of results
+    pub async fn execute_sql(
+        &self,
+        sql: &str,
+    ) -> datafusion::error::Result<SendableRecordBatchStream> {
+        self.session_ctx.sql(sql).await?.execute_stream().await
     }
 
-    /// Executes the specified parsed DataFusion statement and prints the result to stdout
-    pub async fn execute_and_print_statement(&self, statement: Statement) -> Result<()> {
+    /// Executes the a pre-parsed DataFusion [`Statement`], returning the
+    /// resulting [`SendableRecordBatchStream`] of results
+    pub async fn execute_statement(
+        &self,
+        statement: Statement,
+    ) -> datafusion::error::Result<SendableRecordBatchStream> {
         let plan = self
             .session_ctx
             .state()
             .statement_to_plan(statement)
             .await?;
-        let df = self.session_ctx.execute_logical_plan(plan).await?;
-        self.execute_stream_dataframe(df, true).await
-    }
-
-    /// Executes the specified query and prints the result to stdout
-    pub async fn execute_and_print_stream_sql(&self, query: &str) -> Result<()> {
-        let df = self.session_ctx.sql(query).await?;
-        self.execute_stream_dataframe(df, true).await
-    }
-
-    pub async fn execute_stream_dataframe(&self, df: DataFrame, print: bool) -> Result<()> {
-        let physical_plan = df.create_physical_plan().await?;
-        let stream_cfg = SessionConfig::default();
-        let stream_task_ctx = TaskContext::default().with_session_config(stream_cfg);
-        let mut stream = execute_stream(physical_plan, stream_task_ctx.into()).unwrap();
-
-        while let Some(maybe_batch) = stream.next().await {
-            if print {
-                let batch = maybe_batch.unwrap();
-                let d = pretty_format_batches(&[batch]).unwrap();
-                println!("{}", d);
-            } else {
-                let _ = maybe_batch.unwrap();
-                info!("Discarding batch");
-            }
-        }
-        Ok(())
-    }
-
-    pub async fn show_catalog(&self) -> Result<()> {
-        let tables = self.session_ctx.sql("SHOW tables").await?.collect().await?;
-        let formatted = pretty_format_batches(&tables).unwrap();
-        println!("{}", formatted);
-        Ok(())
+        self.session_ctx
+            .execute_logical_plan(plan)
+            .await?
+            .execute_stream()
+            .await
     }
 }
 

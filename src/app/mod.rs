@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+pub mod app_execution;
 pub mod config;
 pub mod handlers;
 pub mod state;
@@ -24,6 +25,8 @@ use crate::{cli, ui};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use crossterm::event as ct;
+use datafusion::arrow::util::pretty::pretty_format_batches;
+use datafusion::execution::SendableRecordBatchStream;
 use datafusion::sql::parser::DFParser;
 use datafusion::sql::sqlparser::dialect::GenericDialect;
 use futures::FutureExt;
@@ -376,9 +379,8 @@ impl CliApp {
         let dialect = GenericDialect {};
         let statements = DFParser::parse_sql_with_dialect(sql, &dialect)?;
         for statement in statements {
-            self.execution
-                .execute_and_print_statement(statement)
-                .await?;
+            let stream = self.execution.execute_statement(statement).await?;
+            self.print_stream(stream).await;
         }
         Ok(())
     }
@@ -406,7 +408,7 @@ impl CliApp {
             if line.ends_with(';') {
                 // TODO: if the query errors, should we keep trying to execute
                 // the other queries in the file? That is what datafusion-cli does...
-                self.execution.execute_and_print_stream_sql(&query).await?;
+                self.execute_and_print_sql(&query).await?;
                 query.clear();
             } else {
                 query.push('\n');
@@ -416,9 +418,29 @@ impl CliApp {
         // run the last line(s) in file if the last statement doesn't contain ‘;’
         // ignore if it only consists of '\n'
         if query.contains(|c| c != '\n') {
-            self.execution.execute_and_print_stream_sql(&query).await?;
+            self.execute_and_print_sql(&query).await?;
         }
 
         Ok(())
+    }
+
+    /// executes a sql statement and prints the result to stdout
+    pub async fn execute_and_print_sql(&self, sql: &str) -> Result<()> {
+        let stream = self.execution.execute_sql(sql).await?;
+        self.print_stream(stream).await;
+        Ok(())
+    }
+
+    /// Prints the stream to stdout
+    async fn print_stream(&self, mut stream: SendableRecordBatchStream) {
+        while let Some(maybe_batch) = stream.next().await {
+            match maybe_batch {
+                Ok(batch) => match pretty_format_batches(&[batch]) {
+                    Ok(d) => println!("{}", d),
+                    Err(e) => println!("Error formatting batch: {e}"),
+                },
+                Err(e) => println!("Error executing SQL: {e}"),
+            }
+        }
     }
 }

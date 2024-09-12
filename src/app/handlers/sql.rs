@@ -23,6 +23,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use tokio_stream::StreamExt;
 
 use super::App;
+use crate::app::app_execution::AppExecution;
 use crate::app::{handlers::tab_navigation_handler, state::tabs::sql::Query, AppEvent};
 use crate::execution::collect_plan_stats;
 
@@ -64,14 +65,14 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
             info!("Run query");
             let sql = app.state.sql_tab.editor().lines().join("");
             info!("SQL: {}", sql);
-            let execution = Arc::clone(&app.execution);
+            let app_execution = AppExecution::new(Arc::clone(&app.execution));
             let _event_tx = app.app_event_tx.clone();
             // TODO: Maybe this should be on a separate runtime to prevent blocking main thread /
             // runtime
             // TODO: Extract this into function to be used in both normal and editable handler
             tokio::spawn(async move {
                 let sqls: Vec<&str> = sql.split(';').collect();
-                let _ = execution.run_sqls(sqls, _event_tx).await;
+                let _ = app_execution.run_sqls(sqls, _event_tx).await;
             });
         }
         _ => {}
