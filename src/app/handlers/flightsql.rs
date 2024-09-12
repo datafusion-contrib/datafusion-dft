@@ -73,7 +73,7 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
             let execution = Arc::clone(&app.execution);
             let _event_tx = app.app_event_tx.clone();
             tokio::spawn(async move {
-                let client = &execution.flightsql_client;
+                let client = execution.flightsql_client();
                 let mut query =
                     FlightSQLQuery::new(sql.clone(), None, None, None, Duration::default(), None);
                 let start = Instant::now();

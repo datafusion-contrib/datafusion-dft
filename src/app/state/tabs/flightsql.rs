@@ -25,7 +25,7 @@ use ratatui::style::Style;
 use ratatui::widgets::TableState;
 use tui_textarea::TextArea;
 
-use crate::app::execution::ExecutionStats;
+use crate::execution::ExecutionStats;
 
 #[derive(Clone, Debug)]
 pub struct FlightSQLQuery {

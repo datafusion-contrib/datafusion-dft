@@ -16,7 +16,6 @@
 // under the License.
 
 pub mod config;
-pub mod execution;
 pub mod handlers;
 pub mod state;
 
@@ -45,9 +44,9 @@ use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 
-use self::execution::ExecutionContext;
 use self::handlers::{app_event_handler, crossterm_event_handler};
 use self::state::tabs::sql::Query;
+use crate::execution::ExecutionContext;
 
 #[cfg(feature = "flightsql")]
 use self::state::tabs::flightsql::FlightSQLQuery;
@@ -328,84 +327,98 @@ pub async fn run_app(cli: cli::DftCli, state: state::AppState<'_>) -> Result<()>
     app.exit()
 }
 
-pub async fn execute_files_or_commands(
-    files: Vec<PathBuf>,
-    commands: Vec<String>,
-    state: &state::AppState<'_>,
-) -> Result<()> {
-    match (files.is_empty(), commands.is_empty()) {
-        (true, true) => Err(eyre!("No files or commands provided to execute")),
-        (false, true) => execute_files(files, state).await,
-        (true, false) => execute_commands(commands, state).await,
-        (false, false) => Err(eyre!(
-            "Cannot execute both files and commands at the same time"
-        )),
-    }
-}
-async fn execute_files(files: Vec<PathBuf>, state: &state::AppState<'_>) -> Result<()> {
-    info!("Executing files: {:?}", files);
-    let execution = ExecutionContext::new(state.config.execution.clone());
-
-    for file in files {
-        exec_from_file(&execution, &file).await?
-    }
-
-    Ok(())
-}
-async fn execute_commands(commands: Vec<String>, state: &state::AppState<'_>) -> Result<()> {
-    info!("Executing commands: {:?}", commands);
-    for command in commands {
-        exec_from_string(&command, state).await?
-    }
-
-    Ok(())
+/// Encapsulates the command line interface
+pub struct CliApp {
+    /// Execution context for running queries
+    execution: ExecutionContext,
 }
 
-async fn exec_from_string(sql: &str, state: &state::AppState<'_>) -> Result<()> {
-    let dialect = GenericDialect {};
-    let execution = ExecutionContext::new(state.config.execution.clone());
-    let statements = DFParser::parse_sql_with_dialect(sql, &dialect)?;
-    for statement in statements {
-        execution.execute_and_print_statement(statement).await?;
+impl CliApp {
+    pub fn new(state: state::AppState<'static>) -> Self {
+        let execution = ExecutionContext::new(state.config.execution.clone());
+
+        Self { execution }
     }
-    Ok(())
-}
 
-/// run and execute SQL statements and commands from a file, against a context
-/// with the given print options
-pub async fn exec_from_file(ctx: &ExecutionContext, file: &Path) -> Result<()> {
-    let file = File::open(file)?;
-    let reader = BufReader::new(file);
-
-    let mut query = String::new();
-
-    for line in reader.lines() {
-        let line = line?;
-        if line.starts_with("#!") {
-            continue;
-        }
-        if line.starts_with("--") {
-            continue;
-        }
-
-        let line = line.trim_end();
-        query.push_str(line);
-        // if we found the end of a query, run it
-        if line.ends_with(';') {
-            // TODO: if the query errors, should we keep trying to execute
-            // the other queries in the file? That is what datafusion-cli does...
-            ctx.execute_and_print_stream_sql(&query).await?;
-            query.clear();
-        } else {
-            query.push('\n');
+    pub async fn execute_files_or_commands(
+        &self,
+        files: Vec<PathBuf>,
+        commands: Vec<String>,
+    ) -> Result<()> {
+        match (files.is_empty(), commands.is_empty()) {
+            (true, true) => Err(eyre!("No files or commands provided to execute")),
+            (false, true) => self.execute_files(files).await,
+            (true, false) => self.execute_commands(commands).await,
+            (false, false) => Err(eyre!(
+                "Cannot execute both files and commands at the same time"
+            )),
         }
     }
 
-    // run the last line(s) in file if the last statement doesn't contain ‘;’
-    // ignore if it only consists of '\n'
-    if query.contains(|c| c != '\n') {
-        ctx.execute_and_print_stream_sql(&query).await?;
+    async fn execute_files(&self, files: Vec<PathBuf>) -> Result<()> {
+        info!("Executing files: {:?}", files);
+        for file in files {
+            self.exec_from_file(&file).await?
+        }
+
+        Ok(())
+    }
+    async fn execute_commands(&self, commands: Vec<String>) -> Result<()> {
+        info!("Executing commands: {:?}", commands);
+        for command in commands {
+            self.exec_from_string(&command).await?
+        }
+
+        Ok(())
     }
 
-    Ok(())
+    async fn exec_from_string(&self, sql: &str) -> Result<()> {
+        let dialect = GenericDialect {};
+        let statements = DFParser::parse_sql_with_dialect(sql, &dialect)?;
+        for statement in statements {
+            self.execution
+                .execute_and_print_statement(statement)
+                .await?;
+        }
+        Ok(())
+    }
+
+    /// run and execute SQL statements and commands from a file, against a context
+    /// with the given print options
+    pub async fn exec_from_file(&self, file: &Path) -> Result<()> {
+        let file = File::open(file)?;
+        let reader = BufReader::new(file);
+
+        let mut query = String::new();
+
+        for line in reader.lines() {
+            let line = line?;
+            if line.starts_with("#!") {
+                continue;
+            }
+            if line.starts_with("--") {
+                continue;
+            }
+
+            let line = line.trim_end();
+            query.push_str(line);
+            // if we found the end of a query, run it
+            if line.ends_with(';') {
+                // TODO: if the query errors, should we keep trying to execute
+                // the other queries in the file? That is what datafusion-cli does...
+                self.execution.execute_and_print_stream_sql(&query).await?;
+                query.clear();
+            } else {
+                query.push('\n');
+            }
+        }
+
+        // run the last line(s) in file if the last statement doesn't contain ‘;’
+        // ignore if it only consists of '\n'
+        if query.contains(|c| c != '\n') {
+            self.execution.execute_and_print_stream_sql(&query).await?;
+        }
+
+        Ok(())
+    }
 }
