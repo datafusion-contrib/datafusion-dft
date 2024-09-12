@@ -17,7 +17,7 @@
 
 use clap::Parser;
 use color_eyre::Result;
-use dft::app::{execute_files_or_commands, run_app, state};
+use dft::app::{run_app, state, CliApp};
 use dft::cli;
 use dft::telemetry;
 
@@ -25,13 +25,17 @@ use dft::telemetry;
 async fn main() -> Result<()> {
     let cli = cli::DftCli::parse();
 
-    // If executing commands from files, do so and then exit
+    // CLI mode: executing commands from files or CLI arguments
     if !cli.files.is_empty() || !cli.commands.is_empty() {
         // use env_logger to setup logging for CLI
         env_logger::init();
         let state = state::initialize(cli.clone());
-        execute_files_or_commands(cli.files.clone(), cli.commands.clone(), &state).await?;
-    } else {
+        let app = CliApp::new(state);
+        app.execute_files_or_commands(cli.files.clone(), cli.commands.clone())
+            .await?;
+    }
+    // UI mode: running the TUI
+    else {
         // use alternate logging for TUI
         telemetry::initialize_logs()?;
         let state = state::initialize(cli.clone());

@@ -15,6 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+//! [`ExecutionContext`]: DataFusion based execution context for running SQL queries
+//!
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -31,7 +33,6 @@ use deltalake::delta_datafusion::DeltaTableFactory;
 use log::{error, info};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_stream::StreamExt;
-use tokio_util::sync::CancellationToken;
 #[cfg(feature = "s3")]
 use url::Url;
 #[cfg(feature = "flightsql")]
@@ -40,21 +41,34 @@ use {
     tonic::transport::Channel,
 };
 
-use super::config::ExecutionConfig;
-use super::state::tabs::sql::Query;
-use super::AppEvent;
+use crate::app::config::ExecutionConfig;
+use crate::app::state::tabs::sql::Query;
+use crate::app::AppEvent;
 
+/// Structure for executing queries either locally or remotely (via FlightSQL)
+///
+/// This context includes both:
+///
+/// 1. The configuration of a [`SessionContext`] with  various extensions enabled
+///
+/// 2. The code for running SQL queries
+///
+/// The design goals for this module are to serve as an example of how to integrate
+/// DataFusion into an application and to provide a simple interface for running SQL queries
+/// with the various extensions enabled.
+///
+/// Thus it is important (eventually) not depend on the code in the app crate
 pub struct ExecutionContext {
-    pub session_ctx: SessionContext,
-    pub config: ExecutionConfig,
-    pub cancellation_token: CancellationToken,
+    session_ctx: SessionContext,
     #[cfg(feature = "flightsql")]
-    pub flightsql_client: Mutex<Option<FlightSqlServiceClient<Channel>>>,
+    flightsql_client: Mutex<Option<FlightSqlServiceClient<Channel>>>,
 }
 
 impl ExecutionContext {
-    #[allow(unused_mut)]
+    /// Construct a new `ExecutionContext` with the specified configuration
     pub fn new(config: ExecutionConfig) -> Self {
+        let _ = &config; // avoid unused variable warning (it is used when some features are enabled)
+
         let cfg = SessionConfig::default()
             .with_batch_size(1)
             .with_information_schema(true);
@@ -91,6 +105,7 @@ impl ExecutionContext {
             }
         }
 
+        #[allow(unused_mut)] // used when deltalake is enabled
         let mut state = SessionStateBuilder::new()
             .with_default_features()
             .with_runtime_env(runtime_env.into())
@@ -106,12 +121,9 @@ impl ExecutionContext {
 
         {
             let session_ctx = SessionContext::new_with_state(state);
-            let cancellation_token = CancellationToken::new();
 
             Self {
-                config,
                 session_ctx,
-                cancellation_token,
                 #[cfg(feature = "flightsql")]
                 flightsql_client: Mutex::new(None),
             }
@@ -122,8 +134,15 @@ impl ExecutionContext {
         Ok(())
     }
 
+    /// Return the inner DataFusion [`SessionContext`]
     pub fn session_ctx(&self) -> &SessionContext {
         &self.session_ctx
+    }
+
+    /// Return a handle to the underlying FlightSQL client, if any
+    #[cfg(feature = "flightsql")]
+    pub fn flightsql_client(&self) -> &Mutex<Option<FlightSqlServiceClient<Channel>>> {
+        &self.flightsql_client
     }
 
     pub async fn run_sqls(&self, sqls: Vec<&str>, sender: UnboundedSender<AppEvent>) -> Result<()> {
@@ -196,7 +215,7 @@ impl ExecutionContext {
         Ok(())
     }
 
-    /// Execcutes the specified parsed DataFusion statement and discards the result
+    /// Executes the specified parsed DataFusion statement and discards the result
     pub async fn execute_sql(&self, sql: &str, print: bool) -> Result<()> {
         let df = self.session_ctx.sql(sql).await?;
         self.execute_stream_dataframe(df, print).await
