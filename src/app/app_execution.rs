@@ -21,6 +21,8 @@ use crate::app::state::tabs::sql::Query;
 use crate::app::AppEvent;
 use crate::execution::ExecutionContext;
 use color_eyre::eyre::Result;
+use datafusion::arrow::array::RecordBatch;
+use datafusion::execution::SendableRecordBatchStream;
 use futures::StreamExt;
 use log::{error, info};
 use std::sync::Arc;
@@ -106,5 +108,181 @@ impl AppExecution {
             _sender.send(AppEvent::QueryResult(query))?; // Send the query result to the UI
         }
         Ok(())
+    }
+}
+
+/// A stream of [`RecordBatch`]es that can be paginated for display in the TUI.
+pub struct PaginatingRecordBatchStream {
+    // currently executing stream
+    inner: SendableRecordBatchStream,
+    // any batches that have been buffered so far
+    batches: Vec<RecordBatch>,
+    // current batch being shown
+    current_batch: Option<usize>,
+}
+
+impl PaginatingRecordBatchStream {
+    pub fn new(inner: SendableRecordBatchStream) -> Self {
+        Self {
+            inner,
+            batches: Vec::new(),
+            current_batch: None,
+        }
+    }
+
+    /// Return the batch at the current index
+    pub fn current_batch(&self) -> Option<&RecordBatch> {
+        if let Some(idx) = self.current_batch {
+            self.batches.get(idx)
+        } else {
+            None
+        }
+    }
+
+    /// Return the next batch
+    /// TBD on logic for handling the end
+    pub async fn next_batch(&mut self) -> Result<Option<&RecordBatch>> {
+        if let Some(b) = self.inner.next().await {
+            match b {
+                Ok(batch) => {
+                    self.batches.push(batch);
+                    self.current_batch = Some(self.batches.len() - 1);
+                    Ok(self.current_batch())
+                }
+                Err(e) => Err(e.into()),
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Return the previous batch
+    /// TBD on logic for handling the beginning
+    pub fn previous_batch(&mut self) -> Option<&RecordBatch> {
+        if let Some(idx) = self.current_batch {
+            if idx > 0 {
+                self.current_batch = Some(idx - 1);
+            }
+        }
+        self.current_batch()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PaginatingRecordBatchStream;
+    use datafusion::{
+        arrow::array::{ArrayRef, Int32Array, RecordBatch},
+        common::Result,
+        physical_plan::stream::RecordBatchStreamAdapter,
+    };
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn test_paginating_record_batch_stream() {
+        let a: ArrayRef = Arc::new(Int32Array::from(vec![1, 2]));
+        let b: ArrayRef = Arc::new(Int32Array::from(vec![1, 1]));
+
+        let record_batch1 = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
+        let record_batch2 = RecordBatch::try_from_iter(vec![("b", b)]).unwrap();
+
+        let schema = record_batch1.schema();
+        let batches: Vec<Result<RecordBatch>> =
+            vec![Ok(record_batch1.clone()), Ok(record_batch2.clone())];
+        let stream = futures::stream::iter(batches);
+        let sendable_stream = Box::pin(RecordBatchStreamAdapter::new(schema, stream));
+
+        let mut paginating_stream = PaginatingRecordBatchStream::new(sendable_stream);
+
+        assert_eq!(paginating_stream.current_batch(), None);
+        assert_eq!(
+            paginating_stream.next_batch().await.unwrap(),
+            Some(&record_batch1)
+        );
+        assert_eq!(
+            paginating_stream.next_batch().await.unwrap(),
+            Some(&record_batch2)
+        );
+        assert_eq!(paginating_stream.next_batch().await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn test_paginating_record_batch_stream_previous() {
+        let a: ArrayRef = Arc::new(Int32Array::from(vec![1, 2]));
+        let b: ArrayRef = Arc::new(Int32Array::from(vec![1, 1]));
+
+        let record_batch1 = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
+        let record_batch2 = RecordBatch::try_from_iter(vec![("b", b)]).unwrap();
+
+        let schema = record_batch1.schema();
+        let batches: Vec<Result<RecordBatch>> =
+            vec![Ok(record_batch1.clone()), Ok(record_batch2.clone())];
+        let stream = futures::stream::iter(batches);
+        let sendable_stream = Box::pin(RecordBatchStreamAdapter::new(schema, stream));
+
+        let mut paginating_stream = PaginatingRecordBatchStream::new(sendable_stream);
+
+        assert_eq!(paginating_stream.current_batch(), None);
+        assert_eq!(
+            paginating_stream.next_batch().await.unwrap(),
+            Some(&record_batch1)
+        );
+        assert_eq!(
+            paginating_stream.next_batch().await.unwrap(),
+            Some(&record_batch2)
+        );
+        assert_eq!(paginating_stream.next_batch().await.unwrap(), None);
+        assert_eq!(paginating_stream.current_batch(), Some(&record_batch2));
+        assert_eq!(paginating_stream.previous_batch(), Some(&record_batch1));
+        assert_eq!(paginating_stream.previous_batch(), Some(&record_batch1));
+    }
+
+    #[tokio::test]
+    async fn test_paginating_record_batch_stream_one_error() {
+        let a: ArrayRef = Arc::new(Int32Array::from(vec![1, 2]));
+        let record_batch1 = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
+
+        let schema = record_batch1.schema();
+        let batches: Vec<Result<RecordBatch>> = vec![Err(
+            datafusion::error::DataFusionError::Execution("Error creating dataframe".to_string()),
+        )];
+        let stream = futures::stream::iter(batches);
+        let sendable_stream = Box::pin(RecordBatchStreamAdapter::new(schema, stream));
+
+        let mut paginating_stream = PaginatingRecordBatchStream::new(sendable_stream);
+
+        assert_eq!(paginating_stream.current_batch(), None);
+
+        let res = paginating_stream.next_batch().await;
+        assert!(res.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_paginating_record_batch_stream_successful_then_error() {
+        let a: ArrayRef = Arc::new(Int32Array::from(vec![1, 2]));
+
+        let record_batch1 = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
+
+        let schema = record_batch1.schema();
+        let batches: Vec<Result<RecordBatch>> = vec![
+            Ok(record_batch1.clone()),
+            Err(datafusion::error::DataFusionError::Execution(
+                "Error creating dataframe".to_string(),
+            )),
+        ];
+        let stream = futures::stream::iter(batches);
+        let sendable_stream = Box::pin(RecordBatchStreamAdapter::new(schema, stream));
+
+        let mut paginating_stream = PaginatingRecordBatchStream::new(sendable_stream);
+
+        assert_eq!(paginating_stream.current_batch(), None);
+        assert_eq!(
+            paginating_stream.next_batch().await.unwrap(),
+            Some(&record_batch1)
+        );
+        let res = paginating_stream.next_batch().await;
+        assert!(res.is_err());
+        assert_eq!(paginating_stream.next_batch().await.unwrap(), None);
+        assert_eq!(paginating_stream.current_batch(), Some(&record_batch1));
     }
 }
