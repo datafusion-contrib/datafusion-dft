@@ -18,7 +18,8 @@
 //! Tests for the TUI (e.g. user application with keyboard commands)
 
 use dft::app::state::initialize;
-use dft::app::App;
+use dft::app::{App, AppEvent};
+use ratatui::crossterm::event;
 use tempfile::tempdir;
 
 #[tokio::test]
@@ -26,4 +27,62 @@ async fn run_app_with_no_args() {
     let config_path = tempdir().unwrap();
     let state = initialize(config_path.path().to_path_buf());
     let _app = App::new(state);
+}
+
+#[tokio::test]
+async fn quit_app_from_all_tabs() {
+    let config_path = tempdir().unwrap();
+    let state = initialize(config_path.path().to_path_buf());
+
+    // SQL Tab
+    let mut app = App::new(state);
+    let key = event::KeyEvent::new(event::KeyCode::Char('q'), event::KeyModifiers::NONE);
+    let app_event = AppEvent::Key(key);
+    app.handle_app_event(app_event).unwrap();
+    // Ideally, we figure out a way to check that the app actually quits
+    assert!(app.state().should_quit);
+
+    // FlightSQL Tab
+    let state = initialize(config_path.path().to_path_buf());
+    let mut app = App::new(state);
+    let flightsql_key = event::KeyEvent::new(event::KeyCode::Char('2'), event::KeyModifiers::NONE);
+    let app_event = AppEvent::Key(flightsql_key);
+    app.handle_app_event(app_event).unwrap();
+    let key = event::KeyEvent::new(event::KeyCode::Char('q'), event::KeyModifiers::NONE);
+    let app_event = AppEvent::Key(key);
+    app.handle_app_event(app_event).unwrap();
+    assert!(app.state().should_quit);
+
+    // History Tab
+    let state = initialize(config_path.path().to_path_buf());
+    let mut app = App::new(state);
+    let history_key = event::KeyEvent::new(event::KeyCode::Char('3'), event::KeyModifiers::NONE);
+    let app_event = AppEvent::Key(history_key);
+    app.handle_app_event(app_event).unwrap();
+    let key = event::KeyEvent::new(event::KeyCode::Char('q'), event::KeyModifiers::NONE);
+    let app_event = AppEvent::Key(key);
+    app.handle_app_event(app_event).unwrap();
+    assert!(app.state().should_quit);
+
+    // Logs Tab
+    let state = initialize(config_path.path().to_path_buf());
+    let mut app = App::new(state);
+    let logs_key = event::KeyEvent::new(event::KeyCode::Char('4'), event::KeyModifiers::NONE);
+    let app_event = AppEvent::Key(logs_key);
+    app.handle_app_event(app_event).unwrap();
+    let key = event::KeyEvent::new(event::KeyCode::Char('q'), event::KeyModifiers::NONE);
+    let app_event = AppEvent::Key(key);
+    app.handle_app_event(app_event).unwrap();
+    assert!(app.state().should_quit);
+
+    // Context Tab
+    let state = initialize(config_path.path().to_path_buf());
+    let mut app = App::new(state);
+    let context_key = event::KeyEvent::new(event::KeyCode::Char('5'), event::KeyModifiers::NONE);
+    let app_event = AppEvent::Key(context_key);
+    app.handle_app_event(app_event).unwrap();
+    let key = event::KeyEvent::new(event::KeyCode::Char('q'), event::KeyModifiers::NONE);
+    let app_event = AppEvent::Key(key);
+    app.handle_app_event(app_event).unwrap();
+    assert!(app.state().should_quit);
 }

@@ -68,33 +68,53 @@ pub enum AppEvent {
 }
 
 pub struct App<'app> {
-    //cli: DftArgs,
-    pub state: state::AppState<'app>,
-    pub execution: Arc<ExecutionContext>,
-    pub app_event_tx: UnboundedSender<AppEvent>,
-    pub app_event_rx: UnboundedReceiver<AppEvent>,
-    pub app_cancellation_token: CancellationToken,
-    pub task: JoinHandle<()>,
-    pub streams_task: JoinHandle<()>,
+    state: state::AppState<'app>,
+    execution: Arc<ExecutionContext>,
+    event_tx: UnboundedSender<AppEvent>,
+    event_rx: UnboundedReceiver<AppEvent>,
+    cancellation_token: CancellationToken,
+    task: JoinHandle<()>,
 }
 
 impl<'app> App<'app> {
     pub fn new(state: state::AppState<'app>) -> Self {
-        let (app_event_tx, app_event_rx) = mpsc::unbounded_channel();
-        let app_cancellation_token = CancellationToken::new();
+        let (event_tx, event_rx) = mpsc::unbounded_channel();
+        let cancellation_token = CancellationToken::new();
         let task = tokio::spawn(async {});
-        let streams_task = tokio::spawn(async {});
         let execution = Arc::new(ExecutionContext::new(state.config.execution.clone()));
 
         Self {
             state,
             task,
-            streams_task,
-            app_event_rx,
-            app_event_tx,
-            app_cancellation_token,
+            event_rx,
+            event_tx,
+            cancellation_token,
             execution,
         }
+    }
+
+    pub fn event_tx(&self) -> UnboundedSender<AppEvent> {
+        self.event_tx.clone()
+    }
+
+    pub fn event_rx(&mut self) -> &mut UnboundedReceiver<AppEvent> {
+        &mut self.event_rx
+    }
+
+    pub fn execution(&self) -> Arc<ExecutionContext> {
+        Arc::clone(&self.execution)
+    }
+
+    pub fn cancellation_token(&self) -> CancellationToken {
+        self.cancellation_token.clone()
+    }
+
+    pub fn set_cancellation_token(&mut self, cancellation_token: CancellationToken) {
+        self.cancellation_token = cancellation_token;
+    }
+
+    pub fn state(&self) -> &state::AppState<'app> {
+        &self.state
     }
 
     /// Enter app, optionally setup `crossterm` with UI settings such as alternative screen and
@@ -149,7 +169,7 @@ impl<'app> App<'app> {
     }
 
     pub fn cancel(&self) {
-        self.app_cancellation_token.cancel();
+        self.cancellation_token.cancel();
     }
 
     /// Convert `crossterm::Event` into an application Event. If `None` is returned then the
@@ -179,9 +199,9 @@ impl<'app> App<'app> {
         // TODO-V1: Add this to config
         debug!("Tick delay: {:?}", tick_delay);
         self.cancel();
-        self.app_cancellation_token = CancellationToken::new();
-        let _cancellation_token = self.app_cancellation_token.clone();
-        let _event_tx = self.app_event_tx.clone();
+        self.set_cancellation_token(CancellationToken::new());
+        let _cancellation_token = self.cancellation_token();
+        let _event_tx = self.event_tx();
 
         self.task = tokio::spawn(async move {
             let mut reader = ct::EventStream::new();
@@ -234,7 +254,7 @@ impl<'app> App<'app> {
                     return;
                 }
             };
-            let _ = self.app_event_tx.send(AppEvent::ExecuteDDL(ddl));
+            let _ = self.event_tx().send(AppEvent::ExecuteDDL(ddl));
         } else {
             error!("No user directories found");
         }
@@ -242,9 +262,7 @@ impl<'app> App<'app> {
 
     #[cfg(feature = "flightsql")]
     pub fn establish_flightsql_connection(&self) {
-        let _ = self
-            .app_event_tx
-            .send(AppEvent::EstablishFlightSQLConnection);
+        let _ = self.event_tx().send(AppEvent::EstablishFlightSQLConnection);
     }
 
     /// Dispatch to the appropriate event loop based on the command
@@ -254,13 +272,13 @@ impl<'app> App<'app> {
 
     /// Get the next event from event loop
     pub async fn next(&mut self) -> Result<AppEvent> {
-        self.app_event_rx
+        self.event_rx()
             .recv()
             .await
             .ok_or(eyre!("Unable to get event"))
     }
 
-    fn handle_app_event(&mut self, event: AppEvent) -> Result<()> {
+    pub fn handle_app_event(&mut self, event: AppEvent) -> Result<()> {
         app_event_handler(self, event)
     }
 
