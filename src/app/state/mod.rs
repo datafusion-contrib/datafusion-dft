@@ -19,7 +19,7 @@ pub mod tabs;
 
 use crate::app::config::get_data_dir;
 use crate::app::state::tabs::sql::SQLTabState;
-use crate::app::tui::SelectedTab;
+use crate::app::ui::SelectedTab;
 use log::{debug, error, info};
 use std::path::PathBuf;
 

@@ -33,11 +33,8 @@ use std::sync::Arc;
 #[cfg(feature = "flightsql")]
 use tonic::transport::Channel;
 
-use crate::{
-    app::{state::tabs::history::HistoryQuery, AppEvent},
-    tui::SelectedTab,
-};
-
+use crate::app::{state::tabs::history::HistoryQuery, AppEvent};
+use crate::app::ui::SelectedTab;
 use super::App;
 
 pub fn crossterm_event_handler(event: event::Event) -> Option<AppEvent> {

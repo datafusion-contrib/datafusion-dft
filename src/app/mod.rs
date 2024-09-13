@@ -19,8 +19,8 @@ pub mod app_execution;
 pub mod config;
 pub mod handlers;
 pub mod state;
+pub mod ui;
 
-use crate::tui;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use crossterm::event as ct;
@@ -266,7 +266,7 @@ impl<'app> App<'app> {
     }
 
     fn render_tabs(&self, area: Rect, buf: &mut Buffer) {
-        let titles = tui::SelectedTab::iter().map(tui::SelectedTab::title);
+        let titles = ui::SelectedTab::iter().map(ui::SelectedTab::title);
         let highlight_style = (Color::default(), tailwind::ORANGE.c500);
         let selected_tab_index = self.state.tabs.selected as usize;
         Tabs::new(titles)
