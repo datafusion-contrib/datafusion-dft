@@ -66,7 +66,7 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
             let sql = app.state.sql_tab.editor().lines().join("");
             info!("SQL: {}", sql);
             let app_execution = AppExecution::new(Arc::clone(&app.execution));
-            let _event_tx = app.app_event_tx.clone();
+            let _event_tx = app.event_tx().clone();
             // TODO: Maybe this should be on a separate runtime to prevent blocking main thread /
             // runtime
             // TODO: Extract this into function to be used in both normal and editable handler
@@ -88,7 +88,7 @@ pub fn editable_handler(app: &mut App, key: KeyEvent) {
         (KeyCode::Enter, KeyModifiers::CONTROL) => {
             let query = app.state.sql_tab.editor().lines().join("");
             let ctx = app.execution.session_ctx().clone();
-            let _event_tx = app.app_event_tx.clone();
+            let _event_tx = app.event_tx();
             // TODO: Maybe this should be on a separate runtime to prevent blocking main thread /
             // runtime
             tokio::spawn(async move {
