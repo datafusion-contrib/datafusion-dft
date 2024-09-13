@@ -19,9 +19,9 @@ use clap::Parser;
 use color_eyre::Result;
 use dft::app::config::get_data_dir;
 use dft::app::{run_app, state};
+use dft::cli::CliApp;
 use dft::telemetry;
 use std::path::{Path, PathBuf};
-use dft::cli::CliApp;
 
 #[tokio::main]
 async fn main() -> Result<()> {

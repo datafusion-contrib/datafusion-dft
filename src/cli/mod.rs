@@ -16,18 +16,17 @@
 // under the License.
 //! [`CliApp`]: Command Line User Interface
 
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
+use crate::app::state;
+use crate::execution::ExecutionContext;
 use color_eyre::eyre::eyre;
 use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::sql::parser::DFParser;
 use futures::StreamExt;
 use log::info;
-use crate::app::state;
-use crate::execution::ExecutionContext;
-
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::path::{Path, PathBuf};
 
 /// Encapsulates the command line interface
 pub struct CliApp {

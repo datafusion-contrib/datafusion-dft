@@ -20,7 +20,7 @@ pub mod config;
 pub mod handlers;
 pub mod state;
 
-use crate::{tui};
+use crate::tui;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use crossterm::event as ct;
