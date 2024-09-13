@@ -14,82 +14,131 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
+//! [`CliApp`]: Command Line User Interface
 
+use crate::app::state;
+use crate::execution::ExecutionContext;
+use color_eyre::eyre::eyre;
+use datafusion::arrow::util::pretty::pretty_format_batches;
+use datafusion::execution::SendableRecordBatchStream;
+use datafusion::sql::parser::DFParser;
+use futures::StreamExt;
+use log::info;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
-use clap::Parser;
-
-use crate::app::config::get_data_dir;
-
-const LONG_ABOUT: &str = "
-dft - DataFusion TUI
-
-CLI and terminal UI data analysis tool using Apache DataFusion as query
-execution engine.
-
-dft provides a rich terminal UI as well as a broad array of pre-integrated
-data sources and formats for querying and analyzing data.
-
-Environment Variables
-RUST_LOG { trace | debug | info | error }: Standard rust logging level.  Default is info.
-";
-
-#[derive(Clone, Debug, Parser, Default)]
-#[command(author, version, about, long_about = LONG_ABOUT)]
-pub struct DftCli {
-    #[clap(
-        short,
-        long,
-        num_args = 0..,
-        help = "Execute commands from file(s), then exit",
-        value_parser(parse_valid_file)
-    )]
-    pub files: Vec<PathBuf>,
-
-    #[clap(
-        short = 'c',
-        long,
-        num_args = 0..,
-        help = "Execute the given SQL string(s), then exit.",
-        value_parser(parse_command)
-    )]
-    pub commands: Vec<String>,
-
-    #[clap(long, help = "Path to the configuration file")]
-    pub config: Option<String>,
+/// Encapsulates the command line interface
+pub struct CliApp {
+    /// Execution context for running queries
+    execution: ExecutionContext,
 }
 
-fn get_config_path(cli_config_arg: Option<&String>) -> PathBuf {
-    if let Some(config) = cli_config_arg {
-        Path::new(config).to_path_buf()
-    } else {
-        let mut config = get_data_dir();
-        config.push("config.toml");
-        config
+impl CliApp {
+    pub fn new(state: state::AppState<'static>) -> Self {
+        let execution = ExecutionContext::new(state.config.execution.clone());
+
+        Self { execution }
     }
-}
 
-impl DftCli {
-    pub fn get_config(&self) -> PathBuf {
-        get_config_path(self.config.as_ref())
+    pub async fn execute_files_or_commands(
+        &self,
+        files: Vec<PathBuf>,
+        commands: Vec<String>,
+    ) -> color_eyre::Result<()> {
+        match (files.is_empty(), commands.is_empty()) {
+            (true, true) => Err(eyre!("No files or commands provided to execute")),
+            (false, true) => self.execute_files(files).await,
+            (true, false) => self.execute_commands(commands).await,
+            (false, false) => Err(eyre!(
+                "Cannot execute both files and commands at the same time"
+            )),
+        }
     }
-}
 
-fn parse_valid_file(file: &str) -> Result<PathBuf, String> {
-    let path = PathBuf::from(file);
-    if !path.exists() {
-        Err(format!("File does not exist: '{file}'"))
-    } else if !path.is_file() {
-        Err(format!("Exists but is not a file: '{file}'"))
-    } else {
-        Ok(path)
+    async fn execute_files(&self, files: Vec<PathBuf>) -> color_eyre::Result<()> {
+        info!("Executing files: {:?}", files);
+        for file in files {
+            self.exec_from_file(&file).await?
+        }
+
+        Ok(())
     }
-}
+    async fn execute_commands(&self, commands: Vec<String>) -> color_eyre::Result<()> {
+        info!("Executing commands: {:?}", commands);
+        for command in commands {
+            self.exec_from_string(&command).await?
+        }
 
-fn parse_command(command: &str) -> Result<String, String> {
-    if !command.is_empty() {
-        Ok(command.to_string())
-    } else {
-        Err("-c flag expects only non empty commands".to_string())
+        Ok(())
+    }
+
+    async fn exec_from_string(&self, sql: &str) -> color_eyre::Result<()> {
+        let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
+        let statements = DFParser::parse_sql_with_dialect(sql, &dialect)?;
+        for statement in statements {
+            let stream = self.execution.execute_statement(statement).await?;
+            self.print_stream(stream).await;
+        }
+        Ok(())
+    }
+
+    /// run and execute SQL statements and commands from a file, against a context
+    /// with the given print options
+    pub async fn exec_from_file(&self, file: &Path) -> color_eyre::Result<()> {
+        let file = File::open(file)?;
+        let reader = BufReader::new(file);
+
+        let mut query = String::new();
+
+        for line in reader.lines() {
+            let line = line?;
+            if line.starts_with("#!") {
+                continue;
+            }
+            if line.starts_with("--") {
+                continue;
+            }
+
+            let line = line.trim_end();
+            query.push_str(line);
+            // if we found the end of a query, run it
+            if line.ends_with(';') {
+                // TODO: if the query errors, should we keep trying to execute
+                // the other queries in the file? That is what datafusion-cli does...
+                self.execute_and_print_sql(&query).await?;
+                query.clear();
+            } else {
+                query.push('\n');
+            }
+        }
+
+        // run the last line(s) in file if the last statement doesn't contain ‘;’
+        // ignore if it only consists of '\n'
+        if query.contains(|c| c != '\n') {
+            self.execute_and_print_sql(&query).await?;
+        }
+
+        Ok(())
+    }
+
+    /// executes a sql statement and prints the result to stdout
+    pub async fn execute_and_print_sql(&self, sql: &str) -> color_eyre::Result<()> {
+        let stream = self.execution.execute_sql(sql).await?;
+        self.print_stream(stream).await;
+        Ok(())
+    }
+
+    /// Prints the stream to stdout
+    async fn print_stream(&self, mut stream: SendableRecordBatchStream) {
+        while let Some(maybe_batch) = stream.next().await {
+            match maybe_batch {
+                Ok(batch) => match pretty_format_batches(&[batch]) {
+                    Ok(d) => println!("{}", d),
+                    Err(e) => println!("Error formatting batch: {e}"),
+                },
+                Err(e) => println!("Error executing SQL: {e}"),
+            }
+        }
     }
 }

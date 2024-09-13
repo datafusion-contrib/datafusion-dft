@@ -16,19 +16,13 @@
 // under the License.
 
 pub mod app_execution;
-pub mod config;
 pub mod handlers;
 pub mod state;
+pub mod ui;
 
-use crate::cli::DftCli;
-use crate::{cli, ui};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use crossterm::event as ct;
-use datafusion::arrow::util::pretty::pretty_format_batches;
-use datafusion::execution::SendableRecordBatchStream;
-use datafusion::sql::parser::DFParser;
-use datafusion::sql::sqlparser::dialect::GenericDialect;
 use futures::FutureExt;
 use log::{debug, error, info, trace};
 use ratatui::backend::CrosstermBackend;
@@ -37,9 +31,6 @@ use ratatui::crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use strum::IntoEnumIterator;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
@@ -77,7 +68,7 @@ pub enum AppEvent {
 }
 
 pub struct App<'app> {
-    pub cli: DftCli,
+    //cli: DftArgs,
     pub state: state::AppState<'app>,
     pub execution: Arc<ExecutionContext>,
     pub app_event_tx: UnboundedSender<AppEvent>,
@@ -88,7 +79,7 @@ pub struct App<'app> {
 }
 
 impl<'app> App<'app> {
-    pub fn new(state: state::AppState<'app>, cli: DftCli) -> Self {
+    pub fn new(state: state::AppState<'app>) -> Self {
         let (app_event_tx, app_event_rx) = mpsc::unbounded_channel();
         let app_cancellation_token = CancellationToken::new();
         let task = tokio::spawn(async {});
@@ -96,7 +87,6 @@ impl<'app> App<'app> {
         let execution = Arc::new(ExecutionContext::new(state.config.execution.clone()));
 
         Self {
-            cli,
             state,
             task,
             streams_task,
@@ -302,9 +292,9 @@ impl Widget for &App<'_> {
     }
 }
 
-pub async fn run_app(cli: cli::DftCli, state: state::AppState<'_>) -> Result<()> {
+pub async fn run_app(state: state::AppState<'_>) -> Result<()> {
     info!("Running app with state: {:?}", state);
-    let mut app = App::new(state, cli.clone());
+    let mut app = App::new(state);
 
     app.execute_ddl();
 
@@ -328,119 +318,4 @@ pub async fn run_app(cli: cli::DftCli, state: state::AppState<'_>) -> Result<()>
         }
     }
     app.exit()
-}
-
-/// Encapsulates the command line interface
-pub struct CliApp {
-    /// Execution context for running queries
-    execution: ExecutionContext,
-}
-
-impl CliApp {
-    pub fn new(state: state::AppState<'static>) -> Self {
-        let execution = ExecutionContext::new(state.config.execution.clone());
-
-        Self { execution }
-    }
-
-    pub async fn execute_files_or_commands(
-        &self,
-        files: Vec<PathBuf>,
-        commands: Vec<String>,
-    ) -> Result<()> {
-        match (files.is_empty(), commands.is_empty()) {
-            (true, true) => Err(eyre!("No files or commands provided to execute")),
-            (false, true) => self.execute_files(files).await,
-            (true, false) => self.execute_commands(commands).await,
-            (false, false) => Err(eyre!(
-                "Cannot execute both files and commands at the same time"
-            )),
-        }
-    }
-
-    async fn execute_files(&self, files: Vec<PathBuf>) -> Result<()> {
-        info!("Executing files: {:?}", files);
-        for file in files {
-            self.exec_from_file(&file).await?
-        }
-
-        Ok(())
-    }
-    async fn execute_commands(&self, commands: Vec<String>) -> Result<()> {
-        info!("Executing commands: {:?}", commands);
-        for command in commands {
-            self.exec_from_string(&command).await?
-        }
-
-        Ok(())
-    }
-
-    async fn exec_from_string(&self, sql: &str) -> Result<()> {
-        let dialect = GenericDialect {};
-        let statements = DFParser::parse_sql_with_dialect(sql, &dialect)?;
-        for statement in statements {
-            let stream = self.execution.execute_statement(statement).await?;
-            self.print_stream(stream).await;
-        }
-        Ok(())
-    }
-
-    /// run and execute SQL statements and commands from a file, against a context
-    /// with the given print options
-    pub async fn exec_from_file(&self, file: &Path) -> Result<()> {
-        let file = File::open(file)?;
-        let reader = BufReader::new(file);
-
-        let mut query = String::new();
-
-        for line in reader.lines() {
-            let line = line?;
-            if line.starts_with("#!") {
-                continue;
-            }
-            if line.starts_with("--") {
-                continue;
-            }
-
-            let line = line.trim_end();
-            query.push_str(line);
-            // if we found the end of a query, run it
-            if line.ends_with(';') {
-                // TODO: if the query errors, should we keep trying to execute
-                // the other queries in the file? That is what datafusion-cli does...
-                self.execute_and_print_sql(&query).await?;
-                query.clear();
-            } else {
-                query.push('\n');
-            }
-        }
-
-        // run the last line(s) in file if the last statement doesn't contain ‘;’
-        // ignore if it only consists of '\n'
-        if query.contains(|c| c != '\n') {
-            self.execute_and_print_sql(&query).await?;
-        }
-
-        Ok(())
-    }
-
-    /// executes a sql statement and prints the result to stdout
-    pub async fn execute_and_print_sql(&self, sql: &str) -> Result<()> {
-        let stream = self.execution.execute_sql(sql).await?;
-        self.print_stream(stream).await;
-        Ok(())
-    }
-
-    /// Prints the stream to stdout
-    async fn print_stream(&self, mut stream: SendableRecordBatchStream) {
-        while let Some(maybe_batch) = stream.next().await {
-            match maybe_batch {
-                Ok(batch) => match pretty_format_batches(&[batch]) {
-                    Ok(d) => println!("{}", d),
-                    Err(e) => println!("Error formatting batch: {e}"),
-                },
-                Err(e) => println!("Error executing SQL: {e}"),
-            }
-        }
-    }
 }

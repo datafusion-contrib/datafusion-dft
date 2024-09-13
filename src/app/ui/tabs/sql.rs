@@ -23,10 +23,11 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Row, StatefulWidget, Table, Widget},
 };
 
-use crate::{app::App, ui::convert::record_batches_to_table};
+use crate::app::ui::convert::record_batches_to_table;
+use crate::app::App;
 
 pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
-    let border_color = if app.state.flightsql_tab.editor_editable() {
+    let border_color = if app.state.sql_tab.editor_editable() {
         tailwind::ORANGE.c500
     } else {
         tailwind::WHITE
@@ -36,16 +37,17 @@ pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
         .title(title)
         .borders(Borders::ALL)
         .fg(border_color);
-    let mut editor = app.state.flightsql_tab.editor();
+    let mut editor = app.state.sql_tab.editor();
+    editor.set_style(Style::default().fg(tailwind::WHITE));
     editor.set_block(block);
     editor.render(area, buf)
 }
 
 pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
     let block = Block::default().title(" Results ").borders(Borders::ALL);
-    if let Some(q) = app.state.flightsql_tab.query() {
+    if let Some(q) = app.state.sql_tab.query() {
         if let Some(r) = q.results() {
-            if let Some(s) = app.state.flightsql_tab.query_results_state() {
+            if let Some(s) = app.state.sql_tab.query_results_state() {
                 let stats = Span::from(format!(
                     " {} rows in {}ms ",
                     q.num_rows().unwrap_or(0),
@@ -89,7 +91,7 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
 
 pub fn render_sql_help(area: Rect, buf: &mut Buffer, app: &App) {
     let block = Block::default();
-    let help = if app.state.flightsql_tab.editor_editable() {
+    let help = if app.state.sql_tab.editor_editable() {
         vec!["'Esc' to exit edit mode"]
     } else {
         vec!["'e' to edit", "'c' to clear editor", "'Enter' to run query"]
