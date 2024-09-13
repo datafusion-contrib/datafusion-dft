@@ -20,7 +20,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{palette::tailwind, Style, Stylize},
     text::Span,
-    widgets::{Block, Borders, Paragraph, Row, StatefulWidget, Table, Widget},
+    widgets::{block::Title, Block, Borders, Paragraph, Row, StatefulWidget, Table, Widget},
 };
 
 use crate::app::ui::convert::record_batches_to_table;
@@ -44,7 +44,10 @@ pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
 }
 
 pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
-    let block = Block::default().title(" Results ").borders(Borders::ALL);
+    let block = Block::default()
+        .title(" Results ")
+        .borders(Borders::ALL)
+        .title(Title::from(" Page ").alignment(Alignment::Right));
     if let Some(q) = app.state.sql_tab.query() {
         if let Some(r) = q.results() {
             if let Some(s) = app.state.sql_tab.query_results_state() {

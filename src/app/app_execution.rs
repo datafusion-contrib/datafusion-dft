@@ -22,23 +22,39 @@ use crate::app::AppEvent;
 use crate::execution::ExecutionContext;
 use color_eyre::eyre::Result;
 use datafusion::arrow::array::RecordBatch;
-use datafusion::execution::SendableRecordBatchStream;
+use datafusion::execution::{RecordBatchStream, SendableRecordBatchStream};
 use futures::StreamExt;
 use log::{error, info};
+use std::fmt::Debug;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::Mutex;
 
 /// Handles executing queries for the TUI application, formatting results
 /// and sending them to the UI.
 pub(crate) struct AppExecution {
     inner: Arc<ExecutionContext>,
+    results: Arc<Mutex<Option<PaginatingRecordBatchStream>>>,
 }
 
 impl AppExecution {
     /// Create a new instance of [`AppExecution`].
     pub fn new(inner: Arc<ExecutionContext>) -> Self {
-        Self { inner }
+        Self {
+            inner,
+            results: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    fn results(&self) -> Arc<Mutex<Option<PaginatingRecordBatchStream>>> {
+        Arc::clone(&self.results)
+    }
+
+    async fn set_results(&self, results: PaginatingRecordBatchStream) {
+        let mut r = self.results.lock().await;
+        *r = Some(results);
     }
 
     /// Run the sequence of SQL queries, sending the results as [`AppEvent::QueryResult`] via the sender.
@@ -63,26 +79,29 @@ impl AppExecution {
             if i == statement_count - 1 {
                 info!("Executing last query and display results");
                 match self.inner.execute_sql(sql).await {
-                    Ok(mut stream) => {
-                        let mut batches = Vec::new();
-                        while let Some(maybe_batch) = stream.next().await {
-                            match maybe_batch {
-                                Ok(batch) => {
-                                    batches.push(batch);
-                                }
-                                Err(e) => {
-                                    let elapsed = start.elapsed();
-                                    query.set_error(Some(e.to_string()));
-                                    query.set_execution_time(elapsed);
-                                    break;
-                                }
-                            }
-                        }
-                        let elapsed = start.elapsed();
-                        let rows: usize = batches.iter().map(|r| r.num_rows()).sum();
-                        query.set_results(Some(batches));
-                        query.set_num_rows(Some(rows));
-                        query.set_execution_time(elapsed);
+                    Ok(stream) => {
+                        let paginating_stream = PaginatingRecordBatchStream::new(stream);
+                        self.set_results(paginating_stream).await;
+
+                        // let mut batches = Vec::new();
+                        // while let Some(maybe_batch) = stream.next().await {
+                        //     match maybe_batch {
+                        //         Ok(batch) => {
+                        //             batches.push(batch);
+                        //         }
+                        //         Err(e) => {
+                        //             let elapsed = start.elapsed();
+                        //             query.set_error(Some(e.to_string()));
+                        //             query.set_execution_time(elapsed);
+                        //             break;
+                        //         }
+                        //     }
+                        // }
+                        // let elapsed = start.elapsed();
+                        // let rows: usize = batches.iter().map(|r| r.num_rows()).sum();
+                        // query.set_results(Some(batches));
+                        // query.set_num_rows(Some(rows));
+                        // query.set_execution_time(elapsed);
                     }
                     Err(e) => {
                         error!("Error creating dataframe: {:?}", e);
@@ -122,7 +141,7 @@ pub struct PaginatingRecordBatchStream {
 }
 
 impl PaginatingRecordBatchStream {
-    pub fn new(inner: SendableRecordBatchStream) -> Self {
+    pub fn new(inner: Pin<Box<dyn RecordBatchStream + Send>>) -> Self {
         Self {
             inner,
             batches: Vec::new(),
@@ -165,6 +184,15 @@ impl PaginatingRecordBatchStream {
             }
         }
         self.current_batch()
+    }
+}
+
+impl Debug for PaginatingRecordBatchStream {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PaginatingRecordBatchStream")
+            .field("batches", &self.batches)
+            .field("current_batch", &self.current_batch)
+            .finish()
     }
 }
 

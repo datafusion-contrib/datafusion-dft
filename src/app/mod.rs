@@ -38,6 +38,7 @@ use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 
+use self::app_execution::PaginatingRecordBatchStream;
 use self::handlers::{app_event_handler, crossterm_event_handler};
 use self::state::tabs::sql::Query;
 use crate::execution::ExecutionContext;
@@ -45,7 +46,7 @@ use crate::execution::ExecutionContext;
 #[cfg(feature = "flightsql")]
 use self::state::tabs::flightsql::FlightSQLQuery;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub enum AppEvent {
     Key(event::KeyEvent),
     Error,
@@ -61,6 +62,7 @@ pub enum AppEvent {
     Resize(u16, u16),
     ExecuteDDL(String),
     QueryResult(Query),
+    // PaginatedQueryResult(PaginatingRecordBatchStream),
     #[cfg(feature = "flightsql")]
     EstablishFlightSQLConnection,
     #[cfg(feature = "flightsql")]
@@ -325,7 +327,7 @@ pub async fn run_app(state: state::AppState<'_>) -> Result<()> {
     loop {
         let event = app.next().await?;
 
-        if let AppEvent::Render = event.clone() {
+        if let AppEvent::Render = &event {
             terminal.draw(|f| f.render_widget(&app, f.area()))?;
         };
 
