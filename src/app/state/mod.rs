@@ -17,17 +17,17 @@
 
 pub mod tabs;
 
-use crate::app::config::get_data_dir;
 use crate::app::state::tabs::sql::SQLTabState;
 use crate::app::ui::SelectedTab;
+use crate::config::get_data_dir;
 use log::{debug, error, info};
 use std::path::PathBuf;
 
 use self::tabs::{history::HistoryTabState, logs::LogsTabState};
 
-use super::config::AppConfig;
 #[cfg(feature = "flightsql")]
 use crate::app::state::tabs::flightsql::FlightSQLTabState;
+use crate::config::AppConfig;
 
 #[derive(Debug)]
 pub struct Tabs {

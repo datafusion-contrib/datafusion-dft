@@ -38,7 +38,7 @@ use {
     tonic::transport::Channel,
 };
 
-use crate::app::config::ExecutionConfig;
+use crate::config::ExecutionConfig;
 
 /// Structure for executing queries either locally or remotely (via FlightSQL)
 ///

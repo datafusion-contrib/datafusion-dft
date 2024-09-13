@@ -16,7 +16,6 @@
 // under the License.
 
 pub mod app_execution;
-pub mod config;
 pub mod handlers;
 pub mod state;
 pub mod ui;

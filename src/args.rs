@@ -17,7 +17,7 @@
 
 //! Command line argument parsing: [`DftArgs`]
 
-use crate::app::config::get_data_dir;
+use crate::config::get_data_dir;
 use clap::Parser;
 use std::path::{Path, PathBuf};
 

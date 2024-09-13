@@ -15,6 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+//! Configuration management handling
+
 use std::path::PathBuf;
 
 use directories::{ProjectDirs, UserDirs};
