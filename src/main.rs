@@ -17,9 +17,10 @@
 
 use clap::Parser;
 use color_eyre::Result;
-use dft::app::{run_app, state};
+use dft::app::{state, App};
 use dft::args::DftArgs;
 use dft::cli::CliApp;
+use dft::execution::ExecutionContext;
 use dft::telemetry;
 
 #[tokio::main]
@@ -31,7 +32,8 @@ async fn main() -> Result<()> {
         // use env_logger to setup logging for CLI
         env_logger::init();
         let state = state::initialize(cli.config_path());
-        let app = CliApp::new(state);
+        let execution = ExecutionContext::try_new(&state.config.execution)?;
+        let app = CliApp::new(execution);
         app.execute_files_or_commands(cli.files.clone(), cli.commands.clone())
             .await?;
     }
@@ -40,7 +42,9 @@ async fn main() -> Result<()> {
         // use alternate logging for TUI
         telemetry::initialize_logs()?;
         let state = state::initialize(cli.config_path());
-        run_app(state).await?;
+        let execution = ExecutionContext::try_new(&state.config.execution)?;
+        let app = App::new(state, execution);
+        app.run_app().await?;
     }
 
     Ok(())
