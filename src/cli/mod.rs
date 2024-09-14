@@ -16,7 +16,6 @@
 // under the License.
 //! [`CliApp`]: Command Line User Interface
 
-use crate::app::state;
 use crate::execution::ExecutionContext;
 use color_eyre::eyre::eyre;
 use datafusion::arrow::util::pretty::pretty_format_batches;
@@ -35,9 +34,7 @@ pub struct CliApp {
 }
 
 impl CliApp {
-    pub fn new(state: state::AppState<'static>) -> Self {
-        let execution = ExecutionContext::new(state.config.execution.clone());
-
+    pub fn new(execution: ExecutionContext) -> Self {
         Self { execution }
     }
 

@@ -20,18 +20,12 @@
 use std::sync::Arc;
 
 use color_eyre::eyre::Result;
-use datafusion::execution::runtime_env::RuntimeEnv;
-use datafusion::execution::session_state::SessionStateBuilder;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::{visit_execution_plan, ExecutionPlan, ExecutionPlanVisitor};
 use datafusion::prelude::*;
 use datafusion::sql::parser::Statement;
-#[cfg(feature = "deltalake")]
-use deltalake::delta_datafusion::DeltaTableFactory;
 use log::info;
 use tokio_stream::StreamExt;
-#[cfg(feature = "s3")]
-use url::Url;
 #[cfg(feature = "flightsql")]
 use {
     arrow_flight::sql::client::FlightSqlServiceClient, tokio::sync::Mutex,
@@ -39,6 +33,7 @@ use {
 };
 
 use crate::config::ExecutionConfig;
+use crate::extensions::{all_extensions, DftSessionStateBuilder};
 
 /// Structure for executing queries either locally or remotely (via FlightSQL)
 ///
@@ -61,68 +56,20 @@ pub struct ExecutionContext {
 
 impl ExecutionContext {
     /// Construct a new `ExecutionContext` with the specified configuration
-    pub fn new(config: ExecutionConfig) -> Self {
-        let _ = &config; // avoid unused variable warning (it is used when some features are enabled)
-
-        let cfg = SessionConfig::default()
-            .with_batch_size(1)
-            .with_information_schema(true);
-
-        let runtime_env = RuntimeEnv::default();
-
-        #[cfg(feature = "s3")]
-        {
-            if let Some(object_store_config) = &config.object_store {
-                if let Some(s3_configs) = &object_store_config.s3 {
-                    info!("S3 configs exists");
-                    for s3_config in s3_configs {
-                        match s3_config.to_object_store() {
-                            Ok(object_store) => {
-                                info!("Created object store");
-                                if let Some(object_store_url) = s3_config.object_store_url() {
-                                    info!("Endpoint exists");
-                                    if let Ok(parsed_endpoint) = Url::parse(object_store_url) {
-                                        info!("Parsed endpoint");
-                                        runtime_env.register_object_store(
-                                            &parsed_endpoint,
-                                            Arc::new(object_store),
-                                        );
-                                        info!("Registered s3 object store");
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                log::error!("Error creating object store: {:?}", e);
-                            }
-                        }
-                    }
-                }
-            }
+    pub fn try_new(config: &ExecutionConfig) -> Result<Self> {
+        let mut builder = DftSessionStateBuilder::new();
+        for extension in all_extensions() {
+            builder = extension.register(config, builder)?;
         }
 
-        #[allow(unused_mut)] // used when deltalake is enabled
-        let mut state = SessionStateBuilder::new()
-            .with_default_features()
-            .with_runtime_env(runtime_env.into())
-            .with_config(cfg)
-            .build();
+        let state = builder.build()?;
+        let session_ctx = SessionContext::new_with_state(state);
 
-        #[cfg(feature = "deltalake")]
-        {
-            state
-                .table_factories_mut()
-                .insert("DELTATABLE".to_string(), Arc::new(DeltaTableFactory {}));
-        }
-
-        {
-            let session_ctx = SessionContext::new_with_state(state);
-
-            Self {
-                session_ctx,
-                #[cfg(feature = "flightsql")]
-                flightsql_client: Mutex::new(None),
-            }
-        }
+        Ok(Self {
+            session_ctx,
+            #[cfg(feature = "flightsql")]
+            flightsql_client: Mutex::new(None),
+        })
     }
 
     pub fn create_tables(&mut self) -> Result<()> {
