@@ -38,7 +38,7 @@ use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 
-use self::app_execution::PaginatingRecordBatchStream;
+use self::app_execution::{AppExecution, PaginatingRecordBatchStream};
 use self::handlers::{app_event_handler, crossterm_event_handler};
 use self::state::tabs::sql::Query;
 use crate::execution::ExecutionContext;
@@ -63,6 +63,7 @@ pub enum AppEvent {
     ExecuteDDL(String),
     QueryResult(Query),
     // PaginatedQueryResult(PaginatingRecordBatchStream),
+    QueryResultsNextPage,
     #[cfg(feature = "flightsql")]
     EstablishFlightSQLConnection,
     #[cfg(feature = "flightsql")]
@@ -71,7 +72,7 @@ pub enum AppEvent {
 
 pub struct App<'app> {
     state: state::AppState<'app>,
-    execution: Arc<ExecutionContext>,
+    execution: Arc<AppExecution>,
     event_tx: UnboundedSender<AppEvent>,
     event_rx: UnboundedReceiver<AppEvent>,
     cancellation_token: CancellationToken,
@@ -83,6 +84,7 @@ impl<'app> App<'app> {
         let (event_tx, event_rx) = mpsc::unbounded_channel();
         let cancellation_token = CancellationToken::new();
         let task = tokio::spawn(async {});
+        let app_execution = Arc::new(AppExecution::new(Arc::new(execution)));
 
         Self {
             state,
@@ -90,7 +92,7 @@ impl<'app> App<'app> {
             event_rx,
             event_tx,
             cancellation_token,
-            execution: Arc::new(execution),
+            execution: app_execution,
         }
     }
 
@@ -102,7 +104,7 @@ impl<'app> App<'app> {
         &mut self.event_rx
     }
 
-    pub fn execution(&self) -> Arc<ExecutionContext> {
+    pub fn execution(&self) -> Arc<AppExecution> {
         Arc::clone(&self.execution)
     }
 

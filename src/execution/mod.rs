@@ -54,6 +54,12 @@ pub struct ExecutionContext {
     flightsql_client: Mutex<Option<FlightSqlServiceClient<Channel>>>,
 }
 
+impl std::fmt::Debug for ExecutionContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ExecutionContext").finish()
+    }
+}
+
 impl ExecutionContext {
     /// Construct a new `ExecutionContext` with the specified configuration
     pub fn try_new(config: &ExecutionConfig) -> Result<Self> {

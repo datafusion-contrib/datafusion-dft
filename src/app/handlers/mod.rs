@@ -194,6 +194,16 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
             app.state.history_tab.add_to_history(history_query);
             app.state.history_tab.refresh_history_table_state()
         }
+        AppEvent::QueryResultsNextPage => {
+            let results = app.execution().results();
+
+            tokio::spawn(async move {
+                let mut locked = results.lock().await;
+                if let Some(stream) = locked.as_mut() {
+                    stream.next_batch().await;
+                }
+            });
+        }
         #[cfg(feature = "flightsql")]
         AppEvent::FlightSQLQueryResult(r) => {
             app.state.flightsql_tab.set_query(r.clone());
@@ -207,28 +217,28 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
             app.state.history_tab.add_to_history(history_query);
             app.state.history_tab.refresh_history_table_state()
         }
-        #[cfg(feature = "flightsql")]
-        AppEvent::EstablishFlightSQLConnection => {
-            let url = app.state.config.flightsql.connection_url.clone();
-            info!("Connection to FlightSQL host: {}", url);
-            let url: &'static str = Box::leak(url.into_boxed_str());
-            let execution = Arc::clone(&app.execution);
-            tokio::spawn(async move {
-                let client = execution.flightsql_client();
-                let maybe_channel = Channel::from_static(url).connect().await;
-                info!("Created channel");
-                match maybe_channel {
-                    Ok(channel) => {
-                        let flightsql_client = FlightSqlServiceClient::new(channel);
-                        let mut locked_client = client.lock().await;
-                        *locked_client = Some(flightsql_client);
-                    }
-                    Err(e) => {
-                        info!("Error creating channel for FlightSQL: {:?}", e);
-                    }
-                }
-            });
-        }
+        // #[cfg(feature = "flightsql")]
+        // AppEvent::EstablishFlightSQLConnection => {
+        //     let url = app.state.config.flightsql.connection_url.clone();
+        //     info!("Connection to FlightSQL host: {}", url);
+        //     let url: &'static str = Box::leak(url.into_boxed_str());
+        //     let execution = Arc::clone(&app.execution);
+        //     tokio::spawn(async move {
+        //         let client = execution.flightsql_client();
+        //         let maybe_channel = Channel::from_static(url).connect().await;
+        //         info!("Created channel");
+        //         match maybe_channel {
+        //             Ok(channel) => {
+        //                 let flightsql_client = FlightSqlServiceClient::new(channel);
+        //                 let mut locked_client = client.lock().await;
+        //                 *locked_client = Some(flightsql_client);
+        //             }
+        //             Err(e) => {
+        //                 info!("Error creating channel for FlightSQL: {:?}", e);
+        //             }
+        //         }
+        //     });
+        // }
         _ => {
             match app.state.tabs.selected {
                 SelectedTab::SQL => sql::app_event_handler(app, event),

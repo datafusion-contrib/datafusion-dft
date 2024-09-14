@@ -22,6 +22,7 @@ use crate::app::AppEvent;
 use crate::execution::ExecutionContext;
 use color_eyre::eyre::Result;
 use datafusion::arrow::array::RecordBatch;
+use datafusion::execution::context::SessionContext;
 use datafusion::execution::{RecordBatchStream, SendableRecordBatchStream};
 use futures::StreamExt;
 use log::{error, info};
@@ -34,6 +35,7 @@ use tokio::sync::Mutex;
 
 /// Handles executing queries for the TUI application, formatting results
 /// and sending them to the UI.
+#[derive(Debug)]
 pub(crate) struct AppExecution {
     inner: Arc<ExecutionContext>,
     results: Arc<Mutex<Option<PaginatingRecordBatchStream>>>,
@@ -48,7 +50,11 @@ impl AppExecution {
         }
     }
 
-    fn results(&self) -> Arc<Mutex<Option<PaginatingRecordBatchStream>>> {
+    pub fn session_ctx(&self) -> &SessionContext {
+        self.inner.session_ctx()
+    }
+
+    pub fn results(&self) -> Arc<Mutex<Option<PaginatingRecordBatchStream>>> {
         Arc::clone(&self.results)
     }
 
@@ -80,7 +86,8 @@ impl AppExecution {
                 info!("Executing last query and display results");
                 match self.inner.execute_sql(sql).await {
                     Ok(stream) => {
-                        let paginating_stream = PaginatingRecordBatchStream::new(stream);
+                        let mut paginating_stream = PaginatingRecordBatchStream::new(stream);
+                        paginating_stream.next_batch().await?;
                         self.set_results(paginating_stream).await;
 
                         // let mut batches = Vec::new();
