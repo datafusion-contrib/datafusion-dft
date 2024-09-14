@@ -33,7 +33,7 @@ use {
 };
 
 use crate::config::ExecutionConfig;
-use crate::extensions::{all_extensions, DftSessionStateBuilder};
+use crate::extensions::{enabled_extensions, DftSessionStateBuilder};
 
 /// Structure for executing queries either locally or remotely (via FlightSQL)
 ///
@@ -58,7 +58,7 @@ impl ExecutionContext {
     /// Construct a new `ExecutionContext` with the specified configuration
     pub fn try_new(config: &ExecutionConfig) -> Result<Self> {
         let mut builder = DftSessionStateBuilder::new();
-        for extension in all_extensions() {
+        for extension in enabled_extensions() {
             builder = extension.register(config, builder)?;
         }
 
