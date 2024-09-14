@@ -39,7 +39,7 @@ pub trait Extension: Debug {
 }
 
 /// Return all extensions currently enabled
-pub fn all_extensions() -> Vec<Box<dyn Extension>> {
+pub fn enabled_extensions() -> Vec<Box<dyn Extension>> {
     vec![
         #[cfg(feature = "s3")]
         Box::new(s3::AwsS3Extension::new()),
