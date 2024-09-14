@@ -77,11 +77,10 @@ pub struct App<'app> {
 }
 
 impl<'app> App<'app> {
-    pub fn new(state: state::AppState<'app>) -> Self {
+    pub fn new(state: state::AppState<'app>, execution: ExecutionContext) -> Self {
         let (event_tx, event_rx) = mpsc::unbounded_channel();
         let cancellation_token = CancellationToken::new();
         let task = tokio::spawn(async {});
-        let execution = Arc::new(ExecutionContext::new(state.config.execution.clone()));
 
         Self {
             state,
@@ -89,7 +88,7 @@ impl<'app> App<'app> {
             event_rx,
             event_tx,
             cancellation_token,
-            execution,
+            execution: Arc::new(execution),
         }
     }
 
@@ -310,30 +309,34 @@ impl Widget for &App<'_> {
     }
 }
 
-pub async fn run_app(state: state::AppState<'_>) -> Result<()> {
-    info!("Running app with state: {:?}", state);
-    let mut app = App::new(state);
+impl App<'_> {
+    /// Run the main event loop for the application
+    pub async fn run_app(self) -> Result<()> {
+        info!("Running app with state: {:?}", self.state);
+        let mut app = self;
 
-    app.execute_ddl();
+        app.execute_ddl();
 
-    #[cfg(feature = "flightsql")]
-    app.establish_flightsql_connection();
+        #[cfg(feature = "flightsql")]
+        app.establish_flightsql_connection();
 
-    let mut terminal = ratatui::Terminal::new(CrosstermBackend::new(std::io::stdout())).unwrap();
-    app.enter(true)?;
-    // Main loop for handling events
-    loop {
-        let event = app.next().await?;
+        let mut terminal =
+            ratatui::Terminal::new(CrosstermBackend::new(std::io::stdout())).unwrap();
+        app.enter(true)?;
+        // Main loop for handling events
+        loop {
+            let event = app.next().await?;
 
-        if let AppEvent::Render = event.clone() {
-            terminal.draw(|f| f.render_widget(&app, f.area()))?;
-        };
+            if let AppEvent::Render = event.clone() {
+                terminal.draw(|f| f.render_widget(&app, f.area()))?;
+            };
 
-        app.handle_app_event(event)?;
+            app.handle_app_event(event)?;
 
-        if app.state.should_quit {
-            break;
+            if app.state.should_quit {
+                break;
+            }
         }
+        app.exit()
     }
-    app.exit()
 }
