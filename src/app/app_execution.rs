@@ -35,10 +35,9 @@ use tokio::sync::Mutex;
 
 /// Handles executing queries for the TUI application, formatting results
 /// and sending them to the UI.
-#[derive(Debug)]
 pub(crate) struct AppExecution {
     inner: Arc<ExecutionContext>,
-    results: Arc<Mutex<Option<PaginatingRecordBatchStream>>>,
+    result_stream: Arc<Mutex<Option<SendableRecordBatchStream>>>, // results: Arc<Mutex<Option<PaginatingRecordBatchStream>>>,
 }
 
 impl AppExecution {
@@ -46,7 +45,7 @@ impl AppExecution {
     pub fn new(inner: Arc<ExecutionContext>) -> Self {
         Self {
             inner,
-            results: Arc::new(Mutex::new(None)),
+            result_stream: Arc::new(Mutex::new(None)), // results: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -54,14 +53,19 @@ impl AppExecution {
         self.inner.session_ctx()
     }
 
-    pub fn results(&self) -> Arc<Mutex<Option<PaginatingRecordBatchStream>>> {
-        Arc::clone(&self.results)
+    // pub fn results(&self) -> Arc<Mutex<Option<PaginatingRecordBatchStream>>> {
+    //     Arc::clone(&self.results)
+    // }
+
+    pub async fn set_result_stream(&self, stream: SendableRecordBatchStream) {
+        let mut s = self.result_stream.lock().await;
+        *s = Some(stream)
     }
 
-    async fn set_results(&self, results: PaginatingRecordBatchStream) {
-        let mut r = self.results.lock().await;
-        *r = Some(results);
-    }
+    // async fn set_results(&self, results: PaginatingRecordBatchStream) {
+    //     let mut r = self.results.lock().await;
+    //     *r = Some(results);
+    // }
 
     /// Run the sequence of SQL queries, sending the results as [`AppEvent::QueryResult`] via the sender.
     ///
@@ -86,10 +90,22 @@ impl AppExecution {
                 info!("Executing last query and display results");
                 match self.inner.execute_sql(sql).await {
                     Ok(stream) => {
-                        let mut paginating_stream = PaginatingRecordBatchStream::new(stream);
-                        paginating_stream.next_batch().await?;
-                        self.set_results(paginating_stream).await;
-
+                        // let mut paginating_stream = PaginatingRecordBatchStream::new(stream);
+                        // paginating_stream.next_batch().await?;
+                        self.set_result_stream(stream).await;
+                        let mut stream = self.result_stream.lock().await;
+                        if let Some(s) = stream.as_mut() {
+                            if let Some(b) = s.next().await {
+                                match b {
+                                    Ok(b) => {
+                                        sender.send(AppEvent::QueryResultsNextPage(b));
+                                    }
+                                    Err(e) => {
+                                        error!("Error getting RecordBatch: {:?}", e);
+                                    }
+                                }
+                            }
+                        }
                         // let mut batches = Vec::new();
                         // while let Some(maybe_batch) = stream.next().await {
                         //     match maybe_batch {
@@ -138,6 +154,8 @@ impl AppExecution {
 }
 
 /// A stream of [`RecordBatch`]es that can be paginated for display in the TUI.
+///
+/// Since `SendabkeRecordBatchStream` is not `Sync` we can't send it as an [`AppEvent`]
 pub struct PaginatingRecordBatchStream {
     // currently executing stream
     inner: SendableRecordBatchStream,

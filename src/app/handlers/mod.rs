@@ -194,15 +194,16 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
             app.state.history_tab.add_to_history(history_query);
             app.state.history_tab.refresh_history_table_state()
         }
-        AppEvent::QueryResultsNextPage => {
-            let results = app.execution().results();
-
-            tokio::spawn(async move {
-                let mut locked = results.lock().await;
-                if let Some(stream) = locked.as_mut() {
-                    stream.next_batch().await;
-                }
-            });
+        AppEvent::QueryResultsNextPage(b) => {
+            app.state.sql_tab.add_batch(b);
+            // let results = app.execution().results();
+            //
+            // tokio::spawn(async move {
+            //     let mut locked = results.lock().await;
+            //     if let Some(stream) = locked.as_mut() {
+            //         stream.next_batch().await;
+            //     }
+            // });
         }
         #[cfg(feature = "flightsql")]
         AppEvent::FlightSQLQueryResult(r) => {

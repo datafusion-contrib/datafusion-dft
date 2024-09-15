@@ -107,6 +107,8 @@ pub struct SQLTabState<'app> {
     editor_editable: bool,
     query: Option<Query>,
     query_results_state: Option<RefCell<TableState>>,
+    result_batches: Option<Vec<RecordBatch>>,
+    results_page: Option<usize>,
 }
 
 impl<'app> SQLTabState<'app> {
@@ -120,6 +122,8 @@ impl<'app> SQLTabState<'app> {
             editor_editable: false,
             query: None,
             query_results_state: None,
+            result_batches: None,
+            results_page: None,
         }
     }
 
@@ -191,5 +195,17 @@ impl<'app> SQLTabState<'app> {
 
     pub fn delete_word(&mut self) {
         self.editor.delete_word();
+    }
+
+    pub fn add_batch(&mut self, batch: RecordBatch) {
+        if let Some(batches) = self.result_batches.as_mut() {
+            batches.push(batch);
+        } else {
+            self.result_batches = Some(vec![batch]);
+        }
+    }
+
+    pub fn current_batch(&self) -> Option<&RecordBatch> {
+        self.result_batches.as_ref().and_then(|b| b.get(0))
     }
 }

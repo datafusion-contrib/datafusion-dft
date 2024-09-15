@@ -49,33 +49,30 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
         .borders(Borders::ALL)
         .title(Title::from(" Page ").alignment(Alignment::Right));
 
-    let results = app.execution().results();
-    let locked = tokio::task::block_in_place(|| results.blocking_lock());
-    let maybe_stream = locked.as_ref();
+    // let results = app.execution().results();
+    // let locked = tokio::task::block_in_place(|| results.blocking_lock());
+    // let maybe_stream = locked.as_ref();
+    // TODO: Change this to a match on state and batch
     if let Some(s) = app.state.sql_tab.query_results_state() {
-        if let Some(stream) = maybe_stream {
-            if let Some(batch) = stream.current_batch() {
-                let batches = vec![batch];
-                let maybe_table = record_batches_to_table(&batches);
+        if let Some(batch) = app.state.sql_tab.current_batch() {
+            let batches = vec![batch];
+            let maybe_table = record_batches_to_table(&batches);
 
-                let block = block.title_bottom("Stats").fg(tailwind::ORANGE.c500);
-                match maybe_table {
-                    Ok(table) => {
-                        let table = table
-                            .highlight_style(
-                                Style::default().bg(tailwind::WHITE).fg(tailwind::BLACK),
-                            )
-                            .block(block);
+            let block = block.title_bottom("Stats").fg(tailwind::ORANGE.c500);
+            match maybe_table {
+                Ok(table) => {
+                    let table = table
+                        .highlight_style(Style::default().bg(tailwind::WHITE).fg(tailwind::BLACK))
+                        .block(block);
 
-                        let mut s = s.borrow_mut();
-                        StatefulWidget::render(table, area, buf, &mut s);
-                    }
-                    Err(e) => {
-                        let row = Row::new(vec![e.to_string()]);
-                        let widths = vec![Constraint::Percentage(100)];
-                        let table = Table::new(vec![row], widths).block(block);
-                        Widget::render(table, area, buf);
-                    }
+                    let mut s = s.borrow_mut();
+                    StatefulWidget::render(table, area, buf, &mut s);
+                }
+                Err(e) => {
+                    let row = Row::new(vec![e.to_string()]);
+                    let widths = vec![Constraint::Percentage(100)];
+                    let table = Table::new(vec![row], widths).block(block);
+                    Widget::render(table, area, buf);
                 }
             }
         }

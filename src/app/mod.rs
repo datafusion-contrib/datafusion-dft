@@ -23,6 +23,7 @@ pub mod ui;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use crossterm::event as ct;
+use datafusion::arrow::array::RecordBatch;
 use futures::FutureExt;
 use log::{debug, error, info, trace};
 use ratatui::backend::CrosstermBackend;
@@ -62,8 +63,7 @@ pub enum AppEvent {
     Resize(u16, u16),
     ExecuteDDL(String),
     QueryResult(Query),
-    // PaginatedQueryResult(PaginatingRecordBatchStream),
-    QueryResultsNextPage,
+    QueryResultsNextPage(RecordBatch),
     #[cfg(feature = "flightsql")]
     EstablishFlightSQLConnection,
     #[cfg(feature = "flightsql")]
