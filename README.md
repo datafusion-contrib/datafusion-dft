@@ -94,7 +94,18 @@ Currently, the only supported packaging is on [crates.io](https://crates.io/sear
 
 Once installed you can run `dft` to start the application.
 
-#### Features
+#### Optional Features (Rust Crate Features)
+
+`dft` has several optional (conditionally compiled features) integrations which are controlled by [Rust Crate Features]
+
+To build with all features, you can run 
+
+```shell
+cargo install --path . --all-features
+````
+
+[Rust Crate Features]: https://doc.rust-lang.org/cargo/reference/features.html
+
 
 #### S3 (`--features=s3`)
 
@@ -142,6 +153,18 @@ Register deltalake tables.  For example:
 ```sql
 CREATE EXTERNAL TABLE table_name STORED AS DELTATABLE LOCATION 's3://bucket/table'
 ```
+
+#### Json Functions (`--features=function-json`)
+
+Adds functions from [datafusion-function-json] for querying JSON strings in DataFusion in `dft`.  For example:
+
+```sql
+select * from foo where json_get(attributes, 'bar')::string='ham'
+(show examples of using operators too)
+```
+
+[datafusion-function-json]: https://github.com/datafusion-contrib/datafusion-functions-json
+
 
 ### Config
 
