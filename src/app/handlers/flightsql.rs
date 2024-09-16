@@ -159,7 +159,6 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) {
             app.state.flightsql_tab.set_query(r);
             app.state.flightsql_tab.refresh_query_results_state();
         }
-        AppEvent::Tick => {}
         AppEvent::Error => {}
         _ => {}
     };

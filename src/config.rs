@@ -91,26 +91,17 @@ fn default_flightsql_config() -> FlightSQLConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct DisplayConfig {
-    #[serde(default = "default_tick_rate")]
-    pub tick_rate: f64,
     #[serde(default = "default_frame_rate")]
     pub frame_rate: f64,
 }
 
-fn default_tick_rate() -> f64 {
-    60.0
-}
-
 fn default_frame_rate() -> f64 {
-    60.0
+    30.0
 }
 
 impl Default for DisplayConfig {
     fn default() -> Self {
-        Self {
-            tick_rate: 5.0,
-            frame_rate: 5.0,
-        }
+        Self { frame_rate: 30.0 }
     }
 }
 
