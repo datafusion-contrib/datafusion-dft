@@ -19,11 +19,14 @@
 
 use crate::config::ExecutionConfig;
 use datafusion::common::Result;
+use datafusion::prelude::SessionContext;
 use std::fmt::Debug;
 
 mod builder;
 #[cfg(feature = "deltalake")]
 mod deltalake;
+#[cfg(feature = "functions-json")]
+mod functions_json;
 #[cfg(feature = "s3")]
 mod s3;
 
@@ -36,6 +39,13 @@ pub trait Extension: Debug {
         _config: &ExecutionConfig,
         _builder: DftSessionStateBuilder,
     ) -> Result<DftSessionStateBuilder>;
+
+    /// Registers this extension after the SessionContext has been created
+    /// (this is to match the historic way many extensions were registered)
+    /// TODO file a ticket upstream to use the builder pattern
+    fn register_on_ctx(&self, _config: &ExecutionConfig, _ctx: &mut SessionContext) -> Result<()> {
+        Ok(())
+    }
 }
 
 /// Return all extensions currently enabled
@@ -45,5 +55,7 @@ pub fn enabled_extensions() -> Vec<Box<dyn Extension>> {
         Box::new(s3::AwsS3Extension::new()),
         #[cfg(feature = "deltalake")]
         Box::new(deltalake::DeltaLakeExtension::new()),
+        #[cfg(feature = "functions-json")]
+        Box::new(functions_json::JsonFunctionsExtension::new()),
     ]
 }

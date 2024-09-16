@@ -58,12 +58,19 @@ impl ExecutionContext {
     /// Construct a new `ExecutionContext` with the specified configuration
     pub fn try_new(config: &ExecutionConfig) -> Result<Self> {
         let mut builder = DftSessionStateBuilder::new();
-        for extension in enabled_extensions() {
+        let extensions = enabled_extensions();
+        for extension in &extensions {
             builder = extension.register(config, builder)?;
         }
 
         let state = builder.build()?;
-        let session_ctx = SessionContext::new_with_state(state);
+        let mut session_ctx = SessionContext::new_with_state(state);
+
+        // Apply any additional setup to the session context (e.g. registering
+        // functions)
+        for extension in &extensions {
+            extension.register_on_ctx(config, &mut session_ctx)?;
+        }
 
         Ok(Self {
             session_ctx,
