@@ -265,4 +265,4 @@ The FlightSQL config is where you can define the connection URL for the FlightSQ
 ```toml
 [flight_sql]
 connection_url = "http://localhost:50051"
-`
+```
