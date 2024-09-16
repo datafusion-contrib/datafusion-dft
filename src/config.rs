@@ -96,7 +96,7 @@ pub struct DisplayConfig {
 }
 
 fn default_frame_rate() -> f64 {
-    60.0
+    30.0
 }
 
 impl Default for DisplayConfig {
