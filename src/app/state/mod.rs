@@ -19,7 +19,6 @@ pub mod tabs;
 
 use crate::app::state::tabs::sql::SQLTabState;
 use crate::app::ui::SelectedTab;
-use crate::config::get_data_dir;
 use log::{debug, error, info};
 use std::path::PathBuf;
 
@@ -46,7 +45,6 @@ impl Default for Tabs {
 pub struct AppState<'app> {
     pub config: AppConfig,
     pub should_quit: bool,
-    pub data_dir: PathBuf,
     pub sql_tab: SQLTabState<'app>,
     #[cfg(feature = "flightsql")]
     pub flightsql_tab: FlightSQLTabState<'app>,
@@ -57,7 +55,6 @@ pub struct AppState<'app> {
 
 pub fn initialize<'app>(config_path: PathBuf) -> AppState<'app> {
     debug!("Initializing state");
-    let data_dir = get_data_dir();
     debug!("Config path: {:?}", config_path);
     let config = if config_path.exists() {
         debug!("Config exists");
@@ -82,24 +79,28 @@ pub fn initialize<'app>(config_path: PathBuf) -> AppState<'app> {
         debug!("No config, using default");
         AppConfig::default()
     };
+    AppState::new(config)
+}
 
-    let tabs = Tabs::default();
+impl<'app> AppState<'app> {
+    pub fn new(config: AppConfig) -> Self {
+        let tabs = Tabs::default();
 
-    let sql_tab_state = SQLTabState::new();
-    #[cfg(feature = "flightsql")]
-    let flightsql_tab_state = FlightSQLTabState::new();
-    let logs_tab_state = LogsTabState::default();
-    let history_tab_state = HistoryTabState::default();
-
-    AppState {
-        config,
-        data_dir,
-        tabs,
-        sql_tab: sql_tab_state,
+        let sql_tab_state = SQLTabState::new();
         #[cfg(feature = "flightsql")]
-        flightsql_tab: flightsql_tab_state,
-        logs_tab: logs_tab_state,
-        history_tab: history_tab_state,
-        should_quit: false,
+        let flightsql_tab_state = FlightSQLTabState::new();
+        let logs_tab_state = LogsTabState::default();
+        let history_tab_state = HistoryTabState::default();
+
+        AppState {
+            config,
+            tabs,
+            sql_tab: sql_tab_state,
+            #[cfg(feature = "flightsql")]
+            flightsql_tab: flightsql_tab_state,
+            logs_tab: logs_tab_state,
+            history_tab: history_tab_state,
+            should_quit: false,
+        }
     }
 }

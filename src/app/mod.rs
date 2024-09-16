@@ -51,7 +51,6 @@ use self::state::tabs::flightsql::FlightSQLQuery;
 pub enum AppEvent {
     Key(event::KeyEvent),
     Error,
-    Tick,
     Quit,
     FocusLost,
     FocusGained,
@@ -191,16 +190,12 @@ impl<'app> App<'app> {
     }
 
     /// Start tokio task which runs an event loop responsible for capturing
-    /// terminal events and triggering render / tick events based
-    /// on user configured rates.
+    /// terminal events and triggering render events based on user configured rates.
     fn start_app_event_loop(&mut self) {
         let render_delay =
             std::time::Duration::from_secs_f64(1.0 / self.state.config.display.frame_rate);
         debug!("Render delay: {:?}", render_delay);
-        let tick_delay =
-            std::time::Duration::from_secs_f64(1.0 / self.state.config.display.tick_rate);
         // TODO-V1: Add this to config
-        debug!("Tick delay: {:?}", tick_delay);
         self.cancel();
         self.set_cancellation_token(CancellationToken::new());
         let _cancellation_token = self.cancellation_token();
@@ -208,13 +203,10 @@ impl<'app> App<'app> {
 
         self.task = tokio::spawn(async move {
             let mut reader = ct::EventStream::new();
-            let mut tick_interval = tokio::time::interval(tick_delay);
-            debug!("Tick interval: {:?}", tick_interval);
             let mut render_interval = tokio::time::interval(render_delay);
             debug!("Render interval: {:?}", render_interval);
             _event_tx.send(AppEvent::Init).unwrap();
             loop {
-                let tick_delay = tick_interval.tick();
                 let render_delay = render_interval.tick();
                 let crossterm_event = reader.next().fuse();
                 tokio::select! {
@@ -233,7 +225,6 @@ impl<'app> App<'app> {
                           Self::send_app_event(app_event, &_event_tx);
                       };
                   },
-                  _ = tick_delay => Self::send_app_event(AppEvent::Tick, &_event_tx),
                   _ = render_delay => Self::send_app_event(AppEvent::Render, &_event_tx),
                 }
             }

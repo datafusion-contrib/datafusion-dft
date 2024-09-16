@@ -94,7 +94,18 @@ Currently, the only supported packaging is on [crates.io](https://crates.io/sear
 
 Once installed you can run `dft` to start the application.
 
-#### Features
+#### Optional Features (Rust Crate Features)
+
+`dft` has several optional (conditionally compiled features) integrations which are controlled by [Rust Crate Features]
+
+To build with all features, you can run 
+
+```shell
+cargo install --path . --all-features
+````
+
+[Rust Crate Features]: https://doc.rust-lang.org/cargo/reference/features.html
+
 
 #### S3 (`--features=s3`)
 
@@ -131,7 +142,7 @@ A separate editor for connecting to a FlightSQL server is provided.
 The default `connection_url` is `http://localhost:50051` but this can be configured your config as well:
 
 ```toml
-[execution.flight_sql]
+[flight_sql]
 connection_url = "http://myhost:myport"
 ```
 
@@ -143,9 +154,17 @@ Register deltalake tables.  For example:
 CREATE EXTERNAL TABLE table_name STORED AS DELTATABLE LOCATION 's3://bucket/table'
 ```
 
-### Config
+#### Json Functions (`--features=function-json`)
 
-The `dft` configuration is stored in `~/.config/dft/config.toml`
+Adds functions from [datafusion-function-json] for querying JSON strings in DataFusion in `dft`.  For example:
+
+```sql
+select * from foo where json_get(attributes, 'bar')::string='ham'
+(show examples of using operators too)
+```
+
+[datafusion-function-json]: https://github.com/datafusion-contrib/datafusion-functions-json
+
 
 ### Getting Started
 
@@ -198,3 +217,52 @@ The interface is split into several tabs so that relevant information can be vie
     - `PAGEDOWN` => Only in page mode: scroll 10 events down in log history.
     - `ESCAPE` => Exit page mode and go back to scrolling mode
     - `SPACE` => Toggles hiding of targets, which have logfilter set to off
+
+### Config Reference
+
+The `dft` configuration is stored in `~/.config/dft/config.toml`.  All configuration options are listed below.
+
+#### Execution Config
+
+The execution config is where you can define the `ObjectStore`s that you want to use in your queries.  For example, if you have an S3 bucket you want to query you could define it like so:
+
+```toml
+[[execution.object_store.s3]]
+bucket_name = "my_bucket"
+object_store_url = "s3://my_bucket"
+aws_endpoint = "https://s3.amazonaws"
+aws_access_key_id = "MY_ACCESS_KEY"
+aws_secret = "MY SECRET"
+aws_session_token = "MY_SESSION"
+aws_allow_http = false
+```
+
+Multiple `ObjectStore`s can be defined in the config file. In the future datafusion `SessionContext` and `SessionState` options can be configured here.
+
+#### Display Config
+
+The display config is where you can define the frame rate of the TUI.
+
+```toml
+[display]
+frame_rate = 60
+```
+
+#### Interaction Config
+
+The interaction config is where mouse and paste behavior can be defined.  This is not currently implemented.
+
+```toml
+[interaction]
+mouse = true
+paste = true
+```
+
+#### FlightSQL Config
+
+The FlightSQL config is where you can define the connection URL for the FlightSQL server.
+
+```toml
+[flight_sql]
+connection_url = "http://localhost:50051"
+```

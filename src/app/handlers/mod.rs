@@ -134,7 +134,6 @@ fn context_tab_key_event_handler(app: &mut App, key: KeyEvent) {
 fn logs_tab_app_event_handler(app: &mut App, event: AppEvent) {
     match event {
         AppEvent::Key(key) => logs_tab_key_event_handler(app, key),
-        AppEvent::Tick => {}
         AppEvent::Error => {}
         _ => {}
     };
@@ -143,7 +142,6 @@ fn logs_tab_app_event_handler(app: &mut App, event: AppEvent) {
 fn context_tab_app_event_handler(app: &mut App, event: AppEvent) {
     match event {
         AppEvent::Key(key) => context_tab_key_event_handler(app, key),
-        AppEvent::Tick => {}
         AppEvent::Error => {}
         _ => {}
     };
@@ -233,6 +231,7 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
         //                 let flightsql_client = FlightSqlServiceClient::new(channel);
         //                 let mut locked_client = client.lock().await;
         //                 *locked_client = Some(flightsql_client);
+        //                 info!("Connected to FlightSQL host");
         //             }
         //             Err(e) => {
         //                 info!("Error creating channel for FlightSQL: {:?}", e);
