@@ -101,7 +101,7 @@ fn default_frame_rate() -> f64 {
 
 impl Default for DisplayConfig {
     fn default() -> Self {
-        Self { frame_rate: 5.0 }
+        Self { frame_rate: 30.0 }
     }
 }
 
