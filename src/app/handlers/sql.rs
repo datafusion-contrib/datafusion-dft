@@ -143,7 +143,6 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) {
             true => editable_handler(app, key),
             false => normal_mode_handler(app, key),
         },
-        AppEvent::Tick => {}
         AppEvent::Error => {}
         _ => {}
     };

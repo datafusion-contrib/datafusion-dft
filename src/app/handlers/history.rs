@@ -45,7 +45,6 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) {
             }
             _ => {}
         },
-        AppEvent::Tick => {}
         AppEvent::Error => {}
         _ => {}
     };
