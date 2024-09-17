@@ -131,53 +131,6 @@ impl AppExecution {
                         sender.send(AppEvent::ExecutionResultsError(e))?;
                     }
                 }
-                // match self.inner.execute_sql(sql).await {
-                //     Ok(stream) => {
-                //         // self.set_result_stream(stream).await;
-                //         // let mut stream = self.result_stream.lock().await;
-                //         // if let Some(s) = stream.as_mut() {
-                //         //     if let Some(b) = s.next().await {
-                //         //         match b {
-                //         //             Ok(b) => {
-                //         //                 sender.send(AppEvent::ExecutionResultsNextPage(b))?;
-                //         //             }
-                //         //             Err(e) => {
-                //         //                 error!("Error getting RecordBatch: {:?}", e);
-                //         //             }
-                //         //         }
-                //         //     }
-                //         // }
-                //         // let mut batches = Vec::new();
-                //         // while let Some(maybe_batch) = stream.next().await {
-                //         //     match maybe_batch {
-                //         //         Ok(batch) => {
-                //         //             batches.push(batch);
-                //         //         }
-                //         //         Err(e) => {
-                //         //             let elapsed = start.elapsed();
-                //         //             query.set_error(Some(e.to_string()));
-                //         //             query.set_execution_time(elapsed);
-                //         //             break;
-                //         //         }
-                //         //     }
-                //         // }
-                //         // let elapsed = start.elapsed();
-                //         // let rows: usize = batches.iter().map(|r| r.num_rows()).sum();
-                //         // query.set_results(Some(batches));
-                //         // query.set_num_rows(Some(rows));
-                //         // query.set_execution_time(elapsed);
-                //     }
-                //     Err(e) => {
-                //         error!("Error creating dataframe: {:?}", e);
-                //         let elapsed = start.elapsed();
-                //         let e = ExecutionError {
-                //             query: sql.to_string(),
-                //             error: e.to_string(),
-                //             duration: elapsed,
-                //         };
-                //         sender.send(AppEvent::ExecutionResultsError(e))?;
-                //     }
-                // }
             } else {
                 match self.inner.execute_sql_and_discard_results(sql).await {
                     Ok(_) => {
