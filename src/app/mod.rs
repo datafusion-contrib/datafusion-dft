@@ -55,6 +55,13 @@ pub struct ExecutionError {
     duration: Duration,
 }
 
+#[derive(Clone, Debug)]
+pub struct ExecutionResultsBatch {
+    query: String,
+    batch: RecordBatch,
+    duration: Duration,
+}
+
 impl ExecutionError {
     pub fn query(&self) -> &str {
         &self.query
@@ -85,7 +92,7 @@ pub enum AppEvent {
     ExecuteDDL(String),
     NewExecution,
     QueryResult(Query),
-    ExecutionResultsNextPage(RecordBatch),
+    ExecutionResultsNextPage(ExecutionResultsBatch),
     ExecutionResultsPreviousPage,
     ExecutionResultsError(ExecutionError),
     #[cfg(feature = "flightsql")]

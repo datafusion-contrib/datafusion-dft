@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use log::info;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -45,12 +46,18 @@ pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
 
 pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
     // TODO: Change this to a match on state and batch
-    if let Some(batch) = app.state.sql_tab.current_batch() {
-        if let Some(s) = app.state.sql_tab.query_results_state() {
+    let sql_tab = &app.state.sql_tab;
+    match (
+        sql_tab.current_batch(),
+        sql_tab.results_page(),
+        sql_tab.query_results_state(),
+        sql_tab.execution_error(),
+    ) {
+        (Some(batch), Some(p), Some(s), None) => {
             let block = Block::default()
                 .title(" Results ")
                 .borders(Borders::ALL)
-                .title(Title::from(" Page ").alignment(Alignment::Right));
+                .title(Title::from(format!(" Page {p} ")).alignment(Alignment::Right));
             let batches = vec![batch];
             let maybe_table = record_batches_to_table(&batches);
 
@@ -72,61 +79,28 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
                 }
             }
         }
-    } else if let Some(e) = app.state.sql_tab.execution_error() {
-        let dur = e.duration().as_millis();
-        let block = Block::default()
-            .title(" Results ")
-            .borders(Borders::ALL)
-            .title(Title::from(" Page ").alignment(Alignment::Right))
-            .title_bottom(format!(" {}ms ", dur));
-        let row = Row::new(vec![e.error().to_string()]);
-        let widths = vec![Constraint::Percentage(100)];
-        let table = Table::new(vec![row], widths).block(block);
-        Widget::render(table, area, buf);
-    } else {
-        let block = Block::default()
-            .title(" Results ")
-            .borders(Borders::ALL)
-            .title(Title::from(" Page ").alignment(Alignment::Right));
-        let row = Row::new(vec!["Run a query to generate results"]);
-        let widths = vec![Constraint::Percentage(100)];
-        let table = Table::new(vec![row], widths).block(block);
-        Widget::render(table, area, buf);
-    }
-
-    if let Some(q) = app.state.sql_tab.query() {
-        if let Some(r) = q.results() {
-            if let Some(s) = app.state.sql_tab.query_results_state() {
-                // let stats = Span::from(format!(
-                //     " {} rows in {}ms ",
-                //     q.num_rows().unwrap_or(0),
-                //     q.execution_time().as_millis()
-                // ))
-                // .fg(tailwind::WHITE);
-                // let block = block.title_bottom(stats).fg(tailwind::ORANGE.c500);
-                // let maybe_table = record_batches_to_table(r);
-                // match maybe_table {
-                //     Ok(table) => {
-                //         let table = table
-                //             .highlight_style(
-                //                 Style::default().bg(tailwind::WHITE).fg(tailwind::BLACK),
-                //             )
-                //             .block(block);
-                //
-                //         let mut s = s.borrow_mut();
-                //         StatefulWidget::render(table, area, buf, &mut s);
-                //     }
-                //     Err(e) => {
-                //         let row = Row::new(vec![e.to_string()]);
-                //         let widths = vec![Constraint::Percentage(100)];
-                //         let table = Table::new(vec![row], widths).block(block);
-                //         Widget::render(table, area, buf);
-                //     }
-                // }
-            }
-        } else if let Some(e) = q.error() {
+        (_, _, _, Some(e)) => {
+            let dur = e.duration().as_millis();
+            let block = Block::default()
+                .title(" Results ")
+                .borders(Borders::ALL)
+                .title(Title::from(" Page ").alignment(Alignment::Right))
+                .title_bottom(format!(" {}ms ", dur));
+            let row = Row::new(vec![e.error().to_string()]);
+            let widths = vec![Constraint::Percentage(100)];
+            let table = Table::new(vec![row], widths).block(block);
+            Widget::render(table, area, buf);
         }
-    } else {
+        _ => {
+            let block = Block::default()
+                .title(" Results ")
+                .borders(Borders::ALL)
+                .title(Title::from(" Page ").alignment(Alignment::Right));
+            let row = Row::new(vec!["Run a query to generate results"]);
+            let widths = vec![Constraint::Percentage(100)];
+            let table = Table::new(vec![row], widths).block(block);
+            Widget::render(table, area, buf);
+        }
     }
 }
 

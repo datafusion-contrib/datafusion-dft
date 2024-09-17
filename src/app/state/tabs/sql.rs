@@ -19,14 +19,15 @@ use core::cell::RefCell;
 use std::time::Duration;
 
 use datafusion::arrow::array::RecordBatch;
+use log::info;
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::palette::tailwind;
 use ratatui::style::Style;
 use ratatui::widgets::TableState;
 use tui_textarea::TextArea;
 
+use crate::app::app_execution::ExecutionStats;
 use crate::app::ExecutionError;
-use crate::execution::ExecutionStats;
 
 #[derive(Clone, Debug)]
 pub struct Query {
@@ -216,7 +217,10 @@ impl<'app> SQLTabState<'app> {
     }
 
     pub fn current_batch(&self) -> Option<&RecordBatch> {
-        self.result_batches.as_ref().and_then(|b| b.get(0))
+        match (self.results_page, self.result_batches.as_ref()) {
+            (Some(page), Some(batches)) => batches.get(page),
+            _ => None,
+        }
     }
 
     pub fn execution_error(&self) -> &Option<ExecutionError> {
@@ -225,5 +229,17 @@ impl<'app> SQLTabState<'app> {
 
     pub fn set_execution_error(&mut self, error: ExecutionError) {
         self.execution_error = Some(error);
+    }
+
+    pub fn results_page(&self) -> Option<usize> {
+        self.results_page
+    }
+
+    pub fn next_page(&mut self) {
+        if let Some(page) = self.results_page {
+            self.results_page = Some(page + 1);
+        } else {
+            self.results_page = Some(0);
+        }
     }
 }

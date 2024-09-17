@@ -20,7 +20,7 @@ use std::time::Duration;
 
 use ratatui::widgets::TableState;
 
-use crate::execution::ExecutionStats;
+use crate::app::app_execution::ExecutionStats;
 
 #[derive(Debug)]
 pub enum Context {
@@ -74,13 +74,13 @@ impl HistoryQuery {
         &self.execution_stats
     }
 
-    pub fn scanned_bytes(&self) -> usize {
-        if let Some(stats) = &self.execution_stats {
-            stats.bytes_scanned()
-        } else {
-            0
-        }
-    }
+    // pub fn scanned_bytes(&self) -> usize {
+    //     if let Some(stats) = &self.execution_stats {
+    //         stats.bytes_scanned()
+    //     } else {
+    //         0
+    //     }
+    // }
 
     pub fn context(&self) -> &Context {
         &self.context

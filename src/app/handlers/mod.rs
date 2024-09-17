@@ -25,6 +25,7 @@ use ratatui::crossterm::event::{self, KeyCode, KeyEvent};
 use tui_logger::TuiWidgetEvent;
 
 use crate::app::state::tabs::history::Context;
+use crate::app::ExecutionResultsBatch;
 
 #[cfg(feature = "flightsql")]
 use arrow_flight::sql::client::FlightSqlServiceClient;
@@ -190,30 +191,22 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                 None,
                 Some(e.error().to_string()),
             );
+            info!("Adding to history: {:?}", history_query);
             app.state.history_tab.add_to_history(history_query);
+            app.state.history_tab.refresh_history_table_state();
         }
-        // AppEvent::QueryResult(r) => {
-        //     app.state.sql_tab.set_query(r.clone());
-        //     app.state.sql_tab.refresh_query_results_state();
-        //     let history_query = HistoryQuery::new(
-        //         Context::Local,
-        //         r.sql().clone(),
-        //         *r.execution_time(),
-        //         r.execution_stats().clone(),
-        //     );
-        //     app.state.history_tab.add_to_history(history_query);
-        //     app.state.history_tab.refresh_history_table_state()
-        // }
-        AppEvent::ExecutionResultsNextPage(b) => {
-            app.state.sql_tab.add_batch(b);
-            // let results = app.execution().results();
-            //
-            // tokio::spawn(async move {
-            //     let mut locked = results.lock().await;
-            //     if let Some(stream) = locked.as_mut() {
-            //         stream.next_batch().await;
-            //     }
-            // });
+        AppEvent::ExecutionResultsNextPage(r) => {
+            let ExecutionResultsBatch {
+                query,
+                duration,
+                batch,
+            } = r;
+            app.state.sql_tab.add_batch(batch);
+            app.state.sql_tab.next_page();
+            let history_query =
+                HistoryQuery::new(Context::Local, query.to_string(), duration, None, None);
+            app.state.history_tab.add_to_history(history_query);
+            app.state.history_tab.refresh_history_table_state();
         }
         #[cfg(feature = "flightsql")]
         AppEvent::FlightSQLQueryResult(r) => {
