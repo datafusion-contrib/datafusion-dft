@@ -18,12 +18,13 @@
 //! [`AppExecution`]: Handles executing queries for the TUI application.
 
 use crate::app::state::tabs::sql::Query;
-use crate::app::AppEvent;
+use crate::app::{AppEvent, ExecutionError};
 use crate::execution::ExecutionContext;
 use color_eyre::eyre::Result;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::execution::context::SessionContext;
 use datafusion::execution::{RecordBatchStream, SendableRecordBatchStream};
+use datafusion::physical_plan::{execute_stream, ExecutionPlan};
 use futures::StreamExt;
 use log::{error, info};
 use std::fmt::Debug;
@@ -37,7 +38,7 @@ use tokio::sync::Mutex;
 /// and sending them to the UI.
 pub(crate) struct AppExecution {
     inner: Arc<ExecutionContext>,
-    result_stream: Arc<Mutex<Option<SendableRecordBatchStream>>>, // results: Arc<Mutex<Option<PaginatingRecordBatchStream>>>,
+    result_stream: Arc<Mutex<Option<SendableRecordBatchStream>>>,
 }
 
 impl AppExecution {
@@ -45,7 +46,7 @@ impl AppExecution {
     pub fn new(inner: Arc<ExecutionContext>) -> Self {
         Self {
             inner,
-            result_stream: Arc::new(Mutex::new(None)), // results: Arc::new(Mutex::new(None)),
+            result_stream: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -53,19 +54,10 @@ impl AppExecution {
         self.inner.session_ctx()
     }
 
-    // pub fn results(&self) -> Arc<Mutex<Option<PaginatingRecordBatchStream>>> {
-    //     Arc::clone(&self.results)
-    // }
-
     pub async fn set_result_stream(&self, stream: SendableRecordBatchStream) {
         let mut s = self.result_stream.lock().await;
         *s = Some(stream)
     }
-
-    // async fn set_results(&self, results: PaginatingRecordBatchStream) {
-    //     let mut r = self.results.lock().await;
-    //     *r = Some(results);
-    // }
 
     /// Run the sequence of SQL queries, sending the results as [`AppEvent::QueryResult`] via the sender.
     ///
@@ -88,51 +80,94 @@ impl AppExecution {
             let start = std::time::Instant::now();
             if i == statement_count - 1 {
                 info!("Executing last query and display results");
-                match self.inner.execute_sql(sql).await {
-                    Ok(stream) => {
-                        // let mut paginating_stream = PaginatingRecordBatchStream::new(stream);
-                        // paginating_stream.next_batch().await?;
-                        self.set_result_stream(stream).await;
-                        let mut stream = self.result_stream.lock().await;
-                        if let Some(s) = stream.as_mut() {
-                            if let Some(b) = s.next().await {
-                                match b {
-                                    Ok(b) => {
-                                        sender.send(AppEvent::QueryResultsNextPage(b));
-                                    }
-                                    Err(e) => {
-                                        error!("Error getting RecordBatch: {:?}", e);
+                sender.send(AppEvent::NewExecution)?;
+                match self.inner.create_physical_plan(sql).await {
+                    Ok(plan) => match execute_stream(plan, self.inner.session_ctx().task_ctx()) {
+                        Ok(stream) => {
+                            self.set_result_stream(stream).await;
+                            let mut stream = self.result_stream.lock().await;
+                            if let Some(s) = stream.as_mut() {
+                                if let Some(b) = s.next().await {
+                                    match b {
+                                        Ok(b) => {
+                                            sender.send(AppEvent::ExecutionResultsNextPage(b))?;
+                                        }
+                                        Err(e) => {
+                                            error!("Error getting RecordBatch: {:?}", e);
+                                        }
                                     }
                                 }
                             }
                         }
-                        // let mut batches = Vec::new();
-                        // while let Some(maybe_batch) = stream.next().await {
-                        //     match maybe_batch {
-                        //         Ok(batch) => {
-                        //             batches.push(batch);
-                        //         }
-                        //         Err(e) => {
-                        //             let elapsed = start.elapsed();
-                        //             query.set_error(Some(e.to_string()));
-                        //             query.set_execution_time(elapsed);
-                        //             break;
-                        //         }
-                        //     }
-                        // }
-                        // let elapsed = start.elapsed();
-                        // let rows: usize = batches.iter().map(|r| r.num_rows()).sum();
-                        // query.set_results(Some(batches));
-                        // query.set_num_rows(Some(rows));
-                        // query.set_execution_time(elapsed);
-                    }
-                    Err(e) => {
-                        error!("Error creating dataframe: {:?}", e);
+                        Err(stream_err) => {
+                            error!("Error creating physical plan: {:?}", stream_err);
+                            let elapsed = start.elapsed();
+                            let e = ExecutionError {
+                                query: sql.to_string(),
+                                error: stream_err.to_string(),
+                                duration: elapsed,
+                            };
+                            sender.send(AppEvent::ExecutionResultsError(e))?;
+                        }
+                    },
+                    Err(plan_err) => {
+                        error!("Error creating physical plan: {:?}", plan_err);
                         let elapsed = start.elapsed();
-                        query.set_error(Some(e.to_string()));
-                        query.set_execution_time(elapsed);
+                        let e = ExecutionError {
+                            query: sql.to_string(),
+                            error: plan_err.to_string(),
+                            duration: elapsed,
+                        };
+                        sender.send(AppEvent::ExecutionResultsError(e))?;
                     }
                 }
+                // match self.inner.execute_sql(sql).await {
+                //     Ok(stream) => {
+                //         // self.set_result_stream(stream).await;
+                //         // let mut stream = self.result_stream.lock().await;
+                //         // if let Some(s) = stream.as_mut() {
+                //         //     if let Some(b) = s.next().await {
+                //         //         match b {
+                //         //             Ok(b) => {
+                //         //                 sender.send(AppEvent::ExecutionResultsNextPage(b))?;
+                //         //             }
+                //         //             Err(e) => {
+                //         //                 error!("Error getting RecordBatch: {:?}", e);
+                //         //             }
+                //         //         }
+                //         //     }
+                //         // }
+                //         // let mut batches = Vec::new();
+                //         // while let Some(maybe_batch) = stream.next().await {
+                //         //     match maybe_batch {
+                //         //         Ok(batch) => {
+                //         //             batches.push(batch);
+                //         //         }
+                //         //         Err(e) => {
+                //         //             let elapsed = start.elapsed();
+                //         //             query.set_error(Some(e.to_string()));
+                //         //             query.set_execution_time(elapsed);
+                //         //             break;
+                //         //         }
+                //         //     }
+                //         // }
+                //         // let elapsed = start.elapsed();
+                //         // let rows: usize = batches.iter().map(|r| r.num_rows()).sum();
+                //         // query.set_results(Some(batches));
+                //         // query.set_num_rows(Some(rows));
+                //         // query.set_execution_time(elapsed);
+                //     }
+                //     Err(e) => {
+                //         error!("Error creating dataframe: {:?}", e);
+                //         let elapsed = start.elapsed();
+                //         let e = ExecutionError {
+                //             query: sql.to_string(),
+                //             error: e.to_string(),
+                //             duration: elapsed,
+                //         };
+                //         sender.send(AppEvent::ExecutionResultsError(e))?;
+                //     }
+                // }
             } else {
                 match self.inner.execute_sql_and_discard_results(sql).await {
                     Ok(_) => {
@@ -150,192 +185,5 @@ impl AppExecution {
             _sender.send(AppEvent::QueryResult(query))?; // Send the query result to the UI
         }
         Ok(())
-    }
-}
-
-/// A stream of [`RecordBatch`]es that can be paginated for display in the TUI.
-///
-/// Since `SendabkeRecordBatchStream` is not `Sync` we can't send it as an [`AppEvent`]
-pub struct PaginatingRecordBatchStream {
-    // currently executing stream
-    inner: SendableRecordBatchStream,
-    // any batches that have been buffered so far
-    batches: Vec<RecordBatch>,
-    // current batch being shown
-    current_batch: Option<usize>,
-}
-
-impl PaginatingRecordBatchStream {
-    pub fn new(inner: Pin<Box<dyn RecordBatchStream + Send>>) -> Self {
-        Self {
-            inner,
-            batches: Vec::new(),
-            current_batch: None,
-        }
-    }
-
-    /// Return the batch at the current index
-    pub fn current_batch(&self) -> Option<&RecordBatch> {
-        if let Some(idx) = self.current_batch {
-            self.batches.get(idx)
-        } else {
-            None
-        }
-    }
-
-    /// Return the next batch
-    /// TBD on logic for handling the end
-    pub async fn next_batch(&mut self) -> Result<Option<&RecordBatch>> {
-        if let Some(b) = self.inner.next().await {
-            match b {
-                Ok(batch) => {
-                    self.batches.push(batch);
-                    self.current_batch = Some(self.batches.len() - 1);
-                    Ok(self.current_batch())
-                }
-                Err(e) => Err(e.into()),
-            }
-        } else {
-            Ok(None)
-        }
-    }
-
-    /// Return the previous batch
-    /// TBD on logic for handling the beginning
-    pub fn previous_batch(&mut self) -> Option<&RecordBatch> {
-        if let Some(idx) = self.current_batch {
-            if idx > 0 {
-                self.current_batch = Some(idx - 1);
-            }
-        }
-        self.current_batch()
-    }
-}
-
-impl Debug for PaginatingRecordBatchStream {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("PaginatingRecordBatchStream")
-            .field("batches", &self.batches)
-            .field("current_batch", &self.current_batch)
-            .finish()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::PaginatingRecordBatchStream;
-    use datafusion::{
-        arrow::array::{ArrayRef, Int32Array, RecordBatch},
-        common::Result,
-        physical_plan::stream::RecordBatchStreamAdapter,
-    };
-    use std::sync::Arc;
-
-    #[tokio::test]
-    async fn test_paginating_record_batch_stream() {
-        let a: ArrayRef = Arc::new(Int32Array::from(vec![1, 2]));
-        let b: ArrayRef = Arc::new(Int32Array::from(vec![1, 1]));
-
-        let record_batch1 = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
-        let record_batch2 = RecordBatch::try_from_iter(vec![("b", b)]).unwrap();
-
-        let schema = record_batch1.schema();
-        let batches: Vec<Result<RecordBatch>> =
-            vec![Ok(record_batch1.clone()), Ok(record_batch2.clone())];
-        let stream = futures::stream::iter(batches);
-        let sendable_stream = Box::pin(RecordBatchStreamAdapter::new(schema, stream));
-
-        let mut paginating_stream = PaginatingRecordBatchStream::new(sendable_stream);
-
-        assert_eq!(paginating_stream.current_batch(), None);
-        assert_eq!(
-            paginating_stream.next_batch().await.unwrap(),
-            Some(&record_batch1)
-        );
-        assert_eq!(
-            paginating_stream.next_batch().await.unwrap(),
-            Some(&record_batch2)
-        );
-        assert_eq!(paginating_stream.next_batch().await.unwrap(), None);
-    }
-
-    #[tokio::test]
-    async fn test_paginating_record_batch_stream_previous() {
-        let a: ArrayRef = Arc::new(Int32Array::from(vec![1, 2]));
-        let b: ArrayRef = Arc::new(Int32Array::from(vec![1, 1]));
-
-        let record_batch1 = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
-        let record_batch2 = RecordBatch::try_from_iter(vec![("b", b)]).unwrap();
-
-        let schema = record_batch1.schema();
-        let batches: Vec<Result<RecordBatch>> =
-            vec![Ok(record_batch1.clone()), Ok(record_batch2.clone())];
-        let stream = futures::stream::iter(batches);
-        let sendable_stream = Box::pin(RecordBatchStreamAdapter::new(schema, stream));
-
-        let mut paginating_stream = PaginatingRecordBatchStream::new(sendable_stream);
-
-        assert_eq!(paginating_stream.current_batch(), None);
-        assert_eq!(
-            paginating_stream.next_batch().await.unwrap(),
-            Some(&record_batch1)
-        );
-        assert_eq!(
-            paginating_stream.next_batch().await.unwrap(),
-            Some(&record_batch2)
-        );
-        assert_eq!(paginating_stream.next_batch().await.unwrap(), None);
-        assert_eq!(paginating_stream.current_batch(), Some(&record_batch2));
-        assert_eq!(paginating_stream.previous_batch(), Some(&record_batch1));
-        assert_eq!(paginating_stream.previous_batch(), Some(&record_batch1));
-    }
-
-    #[tokio::test]
-    async fn test_paginating_record_batch_stream_one_error() {
-        let a: ArrayRef = Arc::new(Int32Array::from(vec![1, 2]));
-        let record_batch1 = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
-
-        let schema = record_batch1.schema();
-        let batches: Vec<Result<RecordBatch>> = vec![Err(
-            datafusion::error::DataFusionError::Execution("Error creating dataframe".to_string()),
-        )];
-        let stream = futures::stream::iter(batches);
-        let sendable_stream = Box::pin(RecordBatchStreamAdapter::new(schema, stream));
-
-        let mut paginating_stream = PaginatingRecordBatchStream::new(sendable_stream);
-
-        assert_eq!(paginating_stream.current_batch(), None);
-
-        let res = paginating_stream.next_batch().await;
-        assert!(res.is_err());
-    }
-
-    #[tokio::test]
-    async fn test_paginating_record_batch_stream_successful_then_error() {
-        let a: ArrayRef = Arc::new(Int32Array::from(vec![1, 2]));
-
-        let record_batch1 = RecordBatch::try_from_iter(vec![("a", a)]).unwrap();
-
-        let schema = record_batch1.schema();
-        let batches: Vec<Result<RecordBatch>> = vec![
-            Ok(record_batch1.clone()),
-            Err(datafusion::error::DataFusionError::Execution(
-                "Error creating dataframe".to_string(),
-            )),
-        ];
-        let stream = futures::stream::iter(batches);
-        let sendable_stream = Box::pin(RecordBatchStreamAdapter::new(schema, stream));
-
-        let mut paginating_stream = PaginatingRecordBatchStream::new(sendable_stream);
-
-        assert_eq!(paginating_stream.current_batch(), None);
-        assert_eq!(
-            paginating_stream.next_batch().await.unwrap(),
-            Some(&record_batch1)
-        );
-        let res = paginating_stream.next_batch().await;
-        assert!(res.is_err());
-        assert_eq!(paginating_stream.next_batch().await.unwrap(), None);
-        assert_eq!(paginating_stream.current_batch(), Some(&record_batch1));
     }
 }

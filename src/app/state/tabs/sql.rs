@@ -25,6 +25,7 @@ use ratatui::style::Style;
 use ratatui::widgets::TableState;
 use tui_textarea::TextArea;
 
+use crate::app::ExecutionError;
 use crate::execution::ExecutionStats;
 
 #[derive(Clone, Debug)]
@@ -109,6 +110,7 @@ pub struct SQLTabState<'app> {
     query_results_state: Option<RefCell<TableState>>,
     result_batches: Option<Vec<RecordBatch>>,
     results_page: Option<usize>,
+    execution_error: Option<ExecutionError>,
 }
 
 impl<'app> SQLTabState<'app> {
@@ -124,6 +126,7 @@ impl<'app> SQLTabState<'app> {
             query_results_state: None,
             result_batches: None,
             results_page: None,
+            execution_error: None,
         }
     }
 
@@ -133,6 +136,13 @@ impl<'app> SQLTabState<'app> {
 
     pub fn refresh_query_results_state(&mut self) {
         self.query_results_state = Some(RefCell::new(TableState::default()));
+    }
+
+    pub fn reset_execution_results(&mut self) {
+        self.result_batches = None;
+        self.results_page = None;
+        self.execution_error = None;
+        self.refresh_query_results_state();
     }
 
     pub fn editor(&self) -> TextArea {
@@ -207,5 +217,13 @@ impl<'app> SQLTabState<'app> {
 
     pub fn current_batch(&self) -> Option<&RecordBatch> {
         self.result_batches.as_ref().and_then(|b| b.get(0))
+    }
+
+    pub fn execution_error(&self) -> &Option<ExecutionError> {
+        &self.execution_error
+    }
+
+    pub fn set_execution_error(&mut self, error: ExecutionError) {
+        self.execution_error = Some(error);
     }
 }

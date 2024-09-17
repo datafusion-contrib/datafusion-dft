@@ -33,19 +33,41 @@ use ratatui::crossterm::{
 };
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
 use std::sync::Arc;
+use std::time::Duration;
 use strum::IntoEnumIterator;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 
-use self::app_execution::{AppExecution, PaginatingRecordBatchStream};
+use self::app_execution::AppExecution;
 use self::handlers::{app_event_handler, crossterm_event_handler};
 use self::state::tabs::sql::Query;
 use crate::execution::ExecutionContext;
 
 #[cfg(feature = "flightsql")]
 use self::state::tabs::flightsql::FlightSQLQuery;
+
+#[derive(Clone, Debug)]
+pub struct ExecutionError {
+    query: String,
+    error: String,
+    duration: Duration,
+}
+
+impl ExecutionError {
+    pub fn query(&self) -> &str {
+        &self.query
+    }
+
+    pub fn error(&self) -> &str {
+        &self.error
+    }
+
+    pub fn duration(&self) -> &Duration {
+        &self.duration
+    }
+}
 
 #[derive(Debug)]
 pub enum AppEvent {
@@ -61,8 +83,11 @@ pub enum AppEvent {
     Mouse(event::MouseEvent),
     Resize(u16, u16),
     ExecuteDDL(String),
+    NewExecution,
     QueryResult(Query),
-    QueryResultsNextPage(RecordBatch),
+    ExecutionResultsNextPage(RecordBatch),
+    ExecutionResultsPreviousPage,
+    ExecutionResultsError(ExecutionError),
     #[cfg(feature = "flightsql")]
     EstablishFlightSQLConnection,
     #[cfg(feature = "flightsql")]

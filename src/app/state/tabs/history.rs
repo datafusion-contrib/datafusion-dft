@@ -43,6 +43,7 @@ pub struct HistoryQuery {
     sql: String,
     execution_time: Duration,
     execution_stats: Option<ExecutionStats>,
+    error: Option<String>,
 }
 
 impl HistoryQuery {
@@ -51,12 +52,14 @@ impl HistoryQuery {
         sql: String,
         execution_time: Duration,
         execution_stats: Option<ExecutionStats>,
+        error: Option<String>,
     ) -> Self {
         Self {
             context,
             sql,
             execution_time,
             execution_stats,
+            error,
         }
     }
     pub fn sql(&self) -> &String {

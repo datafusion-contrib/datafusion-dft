@@ -113,6 +113,16 @@ impl ExecutionContext {
         Ok(())
     }
 
+    /// Create a physical plan from the specified SQL string.  This is useful if you want to store
+    /// the plan and collect metrics from it.
+    pub async fn create_physical_plan(
+        &self,
+        sql: &str,
+    ) -> datafusion::error::Result<Arc<dyn ExecutionPlan>> {
+        let df = self.session_ctx.sql(sql).await?;
+        df.create_physical_plan().await
+    }
+
     /// Executes the specified sql string, returning the resulting
     /// [`SendableRecordBatchStream`] of results
     pub async fn execute_sql(

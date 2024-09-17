@@ -148,8 +148,6 @@ fn context_tab_app_event_handler(app: &mut App, event: AppEvent) {
 }
 
 pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
-    // TODO: AppEvent::QueryResult can probably be handled here rather than duplicating in
-    // each tab
     trace!("Tui::Event: {:?}", event);
     let now = std::time::Instant::now();
     match event {
@@ -180,19 +178,33 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                 }
             });
         }
-        AppEvent::QueryResult(r) => {
-            app.state.sql_tab.set_query(r.clone());
-            app.state.sql_tab.refresh_query_results_state();
+        AppEvent::NewExecution => {
+            app.state.sql_tab.reset_execution_results();
+        }
+        AppEvent::ExecutionResultsError(e) => {
+            app.state.sql_tab.set_execution_error(e.clone());
             let history_query = HistoryQuery::new(
                 Context::Local,
-                r.sql().clone(),
-                *r.execution_time(),
-                r.execution_stats().clone(),
+                e.query().to_string(),
+                *e.duration(),
+                None,
+                Some(e.error().to_string()),
             );
             app.state.history_tab.add_to_history(history_query);
-            app.state.history_tab.refresh_history_table_state()
         }
-        AppEvent::QueryResultsNextPage(b) => {
+        // AppEvent::QueryResult(r) => {
+        //     app.state.sql_tab.set_query(r.clone());
+        //     app.state.sql_tab.refresh_query_results_state();
+        //     let history_query = HistoryQuery::new(
+        //         Context::Local,
+        //         r.sql().clone(),
+        //         *r.execution_time(),
+        //         r.execution_stats().clone(),
+        //     );
+        //     app.state.history_tab.add_to_history(history_query);
+        //     app.state.history_tab.refresh_history_table_state()
+        // }
+        AppEvent::ExecutionResultsNextPage(b) => {
             app.state.sql_tab.add_batch(b);
             // let results = app.execution().results();
             //
@@ -212,6 +224,7 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                 r.sql().clone(),
                 *r.execution_time(),
                 r.execution_stats().clone(),
+                None,
             );
             app.state.history_tab.add_to_history(history_query);
             app.state.history_tab.refresh_history_table_state()

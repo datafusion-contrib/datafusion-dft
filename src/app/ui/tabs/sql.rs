@@ -44,17 +44,13 @@ pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
 }
 
 pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
-    let block = Block::default()
-        .title(" Results ")
-        .borders(Borders::ALL)
-        .title(Title::from(" Page ").alignment(Alignment::Right));
-
-    // let results = app.execution().results();
-    // let locked = tokio::task::block_in_place(|| results.blocking_lock());
-    // let maybe_stream = locked.as_ref();
     // TODO: Change this to a match on state and batch
-    if let Some(s) = app.state.sql_tab.query_results_state() {
-        if let Some(batch) = app.state.sql_tab.current_batch() {
+    if let Some(batch) = app.state.sql_tab.current_batch() {
+        if let Some(s) = app.state.sql_tab.query_results_state() {
+            let block = Block::default()
+                .title(" Results ")
+                .borders(Borders::ALL)
+                .title(Title::from(" Page ").alignment(Alignment::Right));
             let batches = vec![batch];
             let maybe_table = record_batches_to_table(&batches);
 
@@ -76,12 +72,28 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
                 }
             }
         }
+    } else if let Some(e) = app.state.sql_tab.execution_error() {
+        let dur = e.duration().as_millis();
+        let block = Block::default()
+            .title(" Results ")
+            .borders(Borders::ALL)
+            .title(Title::from(" Page ").alignment(Alignment::Right))
+            .title_bottom(format!(" {}ms ", dur));
+        let row = Row::new(vec![e.error().to_string()]);
+        let widths = vec![Constraint::Percentage(100)];
+        let table = Table::new(vec![row], widths).block(block);
+        Widget::render(table, area, buf);
+    } else {
+        let block = Block::default()
+            .title(" Results ")
+            .borders(Borders::ALL)
+            .title(Title::from(" Page ").alignment(Alignment::Right));
+        let row = Row::new(vec!["Run a query to generate results"]);
+        let widths = vec![Constraint::Percentage(100)];
+        let table = Table::new(vec![row], widths).block(block);
+        Widget::render(table, area, buf);
     }
 
-    // let block = Block::default()
-    //     .title(" Results ")
-    //     .borders(Borders::ALL)
-    //     .title(Title::from(" Page ").alignment(Alignment::Right));
     if let Some(q) = app.state.sql_tab.query() {
         if let Some(r) = q.results() {
             if let Some(s) = app.state.sql_tab.query_results_state() {
@@ -113,16 +125,8 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
                 // }
             }
         } else if let Some(e) = q.error() {
-            // let row = Row::new(vec![e.to_string()]);
-            // let widths = vec![Constraint::Percentage(100)];
-            // let table = Table::new(vec![row], widths).block(block);
-            // Widget::render(table, area, buf);
         }
     } else {
-        // let row = Row::new(vec!["Run a query to generate results"]);
-        // let widths = vec![Constraint::Percentage(100)];
-        // let table = Table::new(vec![row], widths).block(block);
-        // Widget::render(table, area, buf);
     }
 }
 
