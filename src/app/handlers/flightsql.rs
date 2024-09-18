@@ -65,6 +65,34 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
                 s.select_previous();
             }
         }
+        KeyCode::Enter => {
+            info!("Run FS query");
+            let sql = app.state.flightsql_tab.editor().lines().join("");
+            info!("SQL: {}", sql);
+            let execution = Arc::clone(&app.execution);
+            let _event_tx = app.event_tx();
+            tokio::spawn(async move {
+                let client = execution.flightsql_client();
+                let mut query =
+                    FlightSQLQuery::new(sql.clone(), None, None, None, Duration::default(), None);
+                let start = Instant::now();
+                if let Some(ref mut c) = *client.lock().await {
+                    match c.execute(sql, None).await {
+                        Ok(flight_info) => {
+                            for endpoint in flight_info.endpoint {
+                                if let Some(ticket) = endpoint.ticket {
+                                    match c.do_get(ticket.into_request()).await {
+                                        Ok(mut stream) => {}
+                                        Err(e) => {}
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {}
+                    }
+                }
+            });
+        }
 
         // KeyCode::Enter => {
         //     info!("Run FS query");
@@ -154,11 +182,6 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) {
             true => editable_handler(app, key),
             false => normal_mode_handler(app, key),
         },
-        AppEvent::FlightSQLQueryResult(r) => {
-            info!("Query results: {:?}", r);
-            app.state.flightsql_tab.set_query(r);
-            app.state.flightsql_tab.refresh_query_results_state();
-        }
         AppEvent::Error => {}
         _ => {}
     };

@@ -20,6 +20,7 @@
 use crate::app::state::tabs::sql::Query;
 use crate::app::{AppEvent, ExecutionError, ExecutionResultsBatch};
 use crate::execution::ExecutionContext;
+use arrow_flight::decode::FlightRecordBatchStream;
 use color_eyre::eyre::Result;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::execution::context::SessionContext;
@@ -36,11 +37,15 @@ use std::time::Duration;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Mutex;
 
+#[cfg(feature = "flightsql")]
+use {arrow_flight::sql::client::FlightSqlServiceClient, tonic::transport::Channel};
+
 /// Handles executing queries for the TUI application, formatting results
 /// and sending them to the UI.
 pub(crate) struct AppExecution {
     inner: Arc<ExecutionContext>,
     result_stream: Arc<Mutex<Option<SendableRecordBatchStream>>>,
+    flight_result_stream: Arc<Mutex<Option<FlightRecordBatchStream>>>,
 }
 
 impl AppExecution {
@@ -49,6 +54,7 @@ impl AppExecution {
         Self {
             inner,
             result_stream: Arc::new(Mutex::new(None)),
+            flight_result_stream: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -56,8 +62,19 @@ impl AppExecution {
         self.inner.session_ctx()
     }
 
+    #[cfg(feature = "flightsql")]
+    pub fn flightsql_client(&self) -> &Mutex<Option<FlightSqlServiceClient<Channel>>> {
+        self.inner.flightsql_client()
+    }
+
     pub async fn set_result_stream(&self, stream: SendableRecordBatchStream) {
         let mut s = self.result_stream.lock().await;
+        *s = Some(stream)
+    }
+
+    #[cfg(feature = "flightsql")]
+    pub async fn set_flight_result_stream(&self, stream: FlightRecordBatchStream) {
+        let mut s = self.flight_result_stream.lock().await;
         *s = Some(stream)
     }
 
