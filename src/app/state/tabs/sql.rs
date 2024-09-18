@@ -242,4 +242,12 @@ impl<'app> SQLTabState<'app> {
             self.results_page = Some(0);
         }
     }
+
+    pub fn previous_page(&mut self) {
+        if let Some(page) = self.results_page {
+            if page > 0 {
+                self.results_page = Some(page - 1);
+            }
+        }
+    }
 }

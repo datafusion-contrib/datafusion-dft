@@ -163,7 +163,7 @@ impl AppExecution {
                             batch: b,
                             duration,
                         };
-                        sender.send(AppEvent::ExecutionResultsNextPage(results));
+                        let _ = sender.send(AppEvent::ExecutionResultsNextPage(results));
                     }
                     Err(e) => {
                         error!("Error getting RecordBatch: {:?}", e);

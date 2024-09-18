@@ -203,6 +203,7 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
             } = r;
             app.state.sql_tab.add_batch(batch);
             app.state.sql_tab.next_page();
+            app.state.sql_tab.refresh_query_results_state();
             let history_query =
                 HistoryQuery::new(Context::Local, query.to_string(), duration, None, None);
             app.state.history_tab.add_to_history(history_query);

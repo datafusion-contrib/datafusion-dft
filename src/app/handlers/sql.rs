@@ -79,6 +79,10 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
                 });
             }
         }
+        KeyCode::Left => {
+            app.state.sql_tab.previous_page();
+            app.state.sql_tab.refresh_query_results_state();
+        }
         _ => {}
     }
 }
