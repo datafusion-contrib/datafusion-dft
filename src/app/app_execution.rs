@@ -33,9 +33,10 @@ use log::{error, info};
 use std::fmt::Debug;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Mutex;
+use tonic::IntoRequest;
 
 #[cfg(feature = "flightsql")]
 use {arrow_flight::sql::client::FlightSqlServiceClient, tonic::transport::Channel};
@@ -44,8 +45,11 @@ use {arrow_flight::sql::client::FlightSqlServiceClient, tonic::transport::Channe
 /// and sending them to the UI.
 pub(crate) struct AppExecution {
     inner: Arc<ExecutionContext>,
+    // TODO: Store the SQL with the stream
     result_stream: Arc<Mutex<Option<SendableRecordBatchStream>>>,
+    // TODO: Store the SQL with the stream
     flight_result_stream: Arc<Mutex<Option<FlightRecordBatchStream>>>,
+    flight_results_current_row_start: Option<usize>,
 }
 
 impl AppExecution {
@@ -55,6 +59,7 @@ impl AppExecution {
             inner,
             result_stream: Arc::new(Mutex::new(None)),
             flight_result_stream: Arc::new(Mutex::new(None)),
+            flight_results_current_row_start: None,
         }
     }
 
@@ -165,6 +170,69 @@ impl AppExecution {
             _sender.send(AppEvent::QueryResult(query))?; // Send the query result to the UI
         }
         Ok(())
+    }
+
+    pub async fn run_flightsqls(&self, sqls: Vec<&str>, sender: UnboundedSender<AppEvent>) {
+        info!("Running sqls: {:?}", sqls);
+        let non_empty_sqls: Vec<&str> = sqls.into_iter().filter(|s| !s.is_empty()).collect();
+        info!("Non empty SQLs: {:?}", non_empty_sqls);
+        let statement_count = non_empty_sqls.len();
+        for (i, sql) in non_empty_sqls.into_iter().enumerate() {
+            let client = self.flightsql_client();
+            // let mut query =
+            //     FlightSQLQuery::new(sql.clone(), None, None, None, Duration::default(), None);
+            let start = Instant::now();
+            if let Some(ref mut c) = *client.lock().await {
+                match c.execute(sql.to_string(), None).await {
+                    Ok(flight_info) => {
+                        for endpoint in flight_info.endpoint {
+                            if let Some(ticket) = endpoint.ticket {
+                                match c.do_get(ticket.into_request()).await {
+                                    Ok(stream) => {
+                                        self.set_flight_result_stream(stream).await;
+                                        let mut stream = self.flight_result_stream.lock().await;
+                                        if let Some(s) = stream.as_mut() {
+                                            if let Some(b) = s.next().await {
+                                                match b {
+                                                    Ok(b) => {
+                                                        let results = ExecutionResultsBatch {
+                                                            query: sql.to_string(),
+                                                            batch: b,
+                                                            duration: start.elapsed(),
+                                                        };
+                                                        let _ = sender.send(AppEvent::FlightSQLExecutionResultsNextPage(results));
+                                                    }
+                                                    Err(e) => {
+                                                        error!(
+                                                            "Error getting RecordBatch: {:?}",
+                                                            e
+                                                        );
+                                                        let e = ExecutionError {
+                                                            query: sql.to_string(),
+                                                            error: e.to_string(),
+                                                            duration: start.elapsed(),
+                                                        };
+                                                        let _ = sender.send(AppEvent::FlightSQLExecutionResultsError(e));
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        error!("Error getting RecordBatch: {:?}", e);
+                                    }
+                                }
+                            } else {
+                                error!("No ticket in endpoint");
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!("Error executing FlightSQL query: {:?}", e);
+                    }
+                }
+            }
+        }
     }
 
     pub async fn next_batch(&self, sql: String, sender: UnboundedSender<AppEvent>) {

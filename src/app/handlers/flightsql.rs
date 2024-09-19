@@ -25,6 +25,7 @@ use tokio_stream::StreamExt;
 use tonic::IntoRequest;
 
 use crate::app::state::tabs::flightsql::FlightSQLQuery;
+use crate::app::state::tabs::history::Context;
 use crate::app::{handlers::tab_navigation_handler, AppEvent};
 
 use super::App;
@@ -67,31 +68,53 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
         }
         KeyCode::Enter => {
             info!("Run FS query");
-            let sql = app.state.flightsql_tab.editor().lines().join("");
-            info!("SQL: {}", sql);
+            let full_text = app.state.flightsql_tab.editor().lines().join("");
             let execution = Arc::clone(&app.execution);
             let _event_tx = app.event_tx();
             tokio::spawn(async move {
-                let client = execution.flightsql_client();
-                let mut query =
-                    FlightSQLQuery::new(sql.clone(), None, None, None, Duration::default(), None);
-                let start = Instant::now();
-                if let Some(ref mut c) = *client.lock().await {
-                    match c.execute(sql, None).await {
-                        Ok(flight_info) => {
-                            for endpoint in flight_info.endpoint {
-                                if let Some(ticket) = endpoint.ticket {
-                                    match c.do_get(ticket.into_request()).await {
-                                        Ok(mut stream) => {}
-                                        Err(e) => {}
-                                    }
-                                }
-                            }
-                        }
-                        Err(e) => {}
-                    }
-                }
+                let sqls = full_text.split(';').collect();
+                execution.run_flightsqls(sqls, _event_tx).await;
+                // let client = execution.flightsql_client();
+                // let mut query =
+                //     FlightSQLQuery::new(sql.clone(), None, None, None, Duration::default(), None);
+                // let start = Instant::now();
+                // if let Some(ref mut c) = *client.lock().await {
+                //     match c.execute(sql, None).await {
+                //         Ok(flight_info) => {
+                //             for endpoint in flight_info.endpoint {
+                //                 if let Some(ticket) = endpoint.ticket {
+                //                     match c.do_get(ticket.into_request()).await {
+                //                         Ok(mut stream) => {
+                //                             execution.set_flight_result_stream(stream).await;
+                //                             exe
+                //                         }
+                //                         Err(e) => {}
+                //                     }
+                //                 }
+                //             }
+                //         }
+                //         Err(e) => {}
+                //     }
+                // }
             });
+        }
+        KeyCode::Right => {
+            if let Some(p) = app
+                .state
+                .history_tab
+                .history()
+                .iter()
+                .filter(|q| *q.context() == Context::FlightSQL)
+                .last()
+            {
+                let execution = Arc::clone(&app.execution);
+                let sql = p.sql().clone();
+                let _event_tx = app.event_tx().clone();
+                app.state.flightsql_tab.next_results_page();
+                // tokio::spawn(async move {
+                //     execution.flightsql_next_page().await;
+                // });
+            }
         }
 
         // KeyCode::Enter => {

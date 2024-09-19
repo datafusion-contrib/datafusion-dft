@@ -19,7 +19,6 @@ use core::cell::RefCell;
 use std::time::Duration;
 
 use datafusion::arrow::array::RecordBatch;
-use log::info;
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::palette::tailwind;
 use ratatui::style::Style;

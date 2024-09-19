@@ -71,10 +71,16 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
         }
         KeyCode::Right => {
             let _event_tx = app.event_tx().clone();
+            // This won't work if you paginate the results, switch to FlightSQL tab, and then
+            // switch back to SQL tab, and paginate again.
+            //
+            // Need to decide if switching tabs should reset pagination.
             if let Some(p) = app.state.history_tab.history().last() {
                 let execution = Arc::clone(&app.execution);
                 let sql = p.sql().clone();
                 tokio::spawn(async move {
+                    // TODO: Should be a call to `next_page` and `next_batch` is implementation
+                    // detail.
                     execution.next_batch(sql, _event_tx).await;
                 });
             }

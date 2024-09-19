@@ -22,7 +22,7 @@ use ratatui::widgets::TableState;
 
 use crate::app::app_execution::ExecutionStats;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Context {
     Local,
     FlightSQL,
