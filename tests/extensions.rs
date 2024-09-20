@@ -19,8 +19,8 @@
 
 use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::util::pretty::pretty_format_batches;
+use datafusion::error::Result;
 use datafusion::sql::parser::DFParser;
-use datafusion_common::Result;
 use dft::config::AppConfig;
 use dft::execution::ExecutionContext;
 use futures::{StreamExt, TryStreamExt};

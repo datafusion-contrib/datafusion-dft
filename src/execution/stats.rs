@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use datafusion::error::DataFusionError;
 use datafusion::physical_plan::{visit_execution_plan, ExecutionPlan, ExecutionPlanVisitor};
 use log::info;
 use std::sync::Arc;
@@ -46,7 +47,7 @@ impl From<PlanVisitor> for ExecutionStats {
 }
 
 impl ExecutionPlanVisitor for PlanVisitor {
-    type Error = datafusion_common::DataFusionError;
+    type Error = DataFusionError;
 
     fn pre_visit(&mut self, plan: &dyn ExecutionPlan) -> color_eyre::Result<bool, Self::Error> {
         match plan.metrics() {

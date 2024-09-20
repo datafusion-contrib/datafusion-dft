@@ -21,8 +21,8 @@
 
 use crate::config::ExecutionConfig;
 use crate::extensions::{DftSessionStateBuilder, Extension};
+use datafusion::error::Result;
 use datafusion::prelude::SessionContext;
-use datafusion_common::Result;
 
 #[derive(Debug, Default)]
 pub struct JsonFunctionsExtension {}
@@ -38,7 +38,7 @@ impl Extension for JsonFunctionsExtension {
         &self,
         _config: &ExecutionConfig,
         builder: DftSessionStateBuilder,
-    ) -> datafusion_common::Result<DftSessionStateBuilder> {
+    ) -> Result<DftSessionStateBuilder> {
         //
         Ok(builder)
     }
