@@ -34,11 +34,15 @@ use std::sync::Arc;
 ///
 /// List of things that would be nice to add upstream:
 /// TODO: Implement Debug for SessionStateBuilder upstream
-/// TODO: Implement with_table_factory to add a single TableProviderFactory to the list of factories
+///  <https://github.com/apache/datafusion/issues/12555>
 /// TODO: Implement some way to get access to the current RuntimeEnv (to register object stores)
+///  <https://github.com/apache/datafusion/issues/12553>
 /// TODO: Implement a way to add just a single TableProviderFactory
+///  <https://github.com/apache/datafusion/issues/12552>
 /// TODO: Make TableFactoryProvider implement Debug
-/// TODO: rename RuntimeEnv::new() to RuntimeEnv::try_new() as it returns a Result
+///   <https://github.com/apache/datafusion/pull/12557>
+/// TODO: rename RuntimeEnv::new() to RuntimeEnv::try_new() as it returns a Result:
+///   <https://github.com/apache/datafusion/issues/12554>
 //#[derive(Debug)]
 pub struct DftSessionStateBuilder {
     session_config: SessionConfig,
