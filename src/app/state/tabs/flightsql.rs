@@ -25,6 +25,7 @@ use ratatui::style::Style;
 use ratatui::widgets::TableState;
 use tui_textarea::TextArea;
 
+use crate::app::state::tabs::sql;
 use crate::execution::ExecutionStats;
 
 #[derive(Clone, Debug)]
@@ -115,7 +116,8 @@ impl<'app> FlightSQLTabState<'app> {
         // TODO: Enable vim mode from config?
         let mut textarea = TextArea::new(empty_text);
         textarea.set_style(Style::default().fg(tailwind::WHITE));
-
+        textarea.set_search_pattern(sql::keyword_regex()).unwrap();
+        textarea.set_search_style(sql::keyword_style());
         Self {
             editor: textarea,
             editor_editable: false,
@@ -152,6 +154,8 @@ impl<'app> FlightSQLTabState<'app> {
     pub fn clear_editor(&mut self) {
         let mut textarea = TextArea::new(vec!["".to_string()]);
         textarea.set_style(Style::default().fg(tailwind::WHITE));
+        textarea.set_search_pattern(sql::keyword_regex()).unwrap();
+        textarea.set_search_style(sql::keyword_style());
         self.editor = textarea;
     }
 
