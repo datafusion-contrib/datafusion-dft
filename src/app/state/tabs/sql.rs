@@ -19,9 +19,10 @@ use core::cell::RefCell;
 use std::time::Duration;
 
 use datafusion::arrow::array::RecordBatch;
+use datafusion::sql::sqlparser::keywords;
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::palette::tailwind;
-use ratatui::style::Style;
+use ratatui::style::{Modifier, Style};
 use ratatui::widgets::TableState;
 use tui_textarea::TextArea;
 
@@ -102,6 +103,27 @@ impl Query {
     }
 }
 
+pub fn get_keywords() -> Vec<String> {
+    keywords::ALL_KEYWORDS
+        .iter()
+        .map(|k| k.to_string())
+        .collect()
+}
+
+pub fn keyword_regex() -> String {
+    format!(
+        "(?i)(^|[^a-zA-Z0-9\'\"`._]*?)({})($|[^a-zA-Z0-9\'\"`._]*)",
+        get_keywords().join("|")
+    )
+}
+
+pub fn keyword_style() -> Style {
+    Style::default()
+        .bg(tailwind::BLACK)
+        .fg(tailwind::YELLOW.c100)
+        .add_modifier(Modifier::BOLD)
+}
+
 #[derive(Debug, Default)]
 pub struct SQLTabState<'app> {
     editor: TextArea<'app>,
@@ -119,6 +141,8 @@ impl<'app> SQLTabState<'app> {
         // TODO: Enable vim mode from config?
         let mut textarea = TextArea::new(empty_text);
         textarea.set_style(Style::default().fg(tailwind::WHITE));
+        textarea.set_search_pattern(keyword_regex()).unwrap();
+        textarea.set_search_style(keyword_style());
         Self {
             editor: textarea,
             editor_editable: false,
@@ -165,6 +189,8 @@ impl<'app> SQLTabState<'app> {
     pub fn clear_editor(&mut self) {
         let mut textarea = TextArea::new(vec!["".to_string()]);
         textarea.set_style(Style::default().fg(tailwind::WHITE));
+        textarea.set_search_pattern(keyword_regex()).unwrap();
+        textarea.set_search_style(keyword_style());
         self.editor = textarea;
     }
 
