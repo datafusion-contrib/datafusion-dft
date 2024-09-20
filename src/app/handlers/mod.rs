@@ -25,6 +25,7 @@ use ratatui::crossterm::event::{self, KeyCode, KeyEvent};
 use tui_logger::TuiWidgetEvent;
 
 use crate::app::state::tabs::history::Context;
+use crate::app::ExecutionResultsBatch;
 
 #[cfg(feature = "flightsql")]
 use arrow_flight::sql::client::FlightSqlServiceClient;
@@ -148,8 +149,6 @@ fn context_tab_app_event_handler(app: &mut App, event: AppEvent) {
 }
 
 pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
-    // TODO: AppEvent::QueryResult can probably be handled here rather than duplicating in
-    // each tab
     trace!("Tui::Event: {:?}", event);
     let now = std::time::Instant::now();
     match event {
@@ -180,17 +179,35 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                 }
             });
         }
-        AppEvent::QueryResult(r) => {
-            app.state.sql_tab.set_query(r.clone());
-            app.state.sql_tab.refresh_query_results_state();
+        AppEvent::NewExecution => {
+            app.state.sql_tab.reset_execution_results();
+        }
+        AppEvent::ExecutionResultsError(e) => {
+            app.state.sql_tab.set_execution_error(e.clone());
             let history_query = HistoryQuery::new(
                 Context::Local,
-                r.sql().clone(),
-                *r.execution_time(),
-                r.execution_stats().clone(),
+                e.query().to_string(),
+                *e.duration(),
+                None,
+                Some(e.error().to_string()),
             );
+            info!("Adding to history: {:?}", history_query);
             app.state.history_tab.add_to_history(history_query);
-            app.state.history_tab.refresh_history_table_state()
+            app.state.history_tab.refresh_history_table_state();
+        }
+        AppEvent::ExecutionResultsNextPage(r) => {
+            let ExecutionResultsBatch {
+                query,
+                duration,
+                batch,
+            } = r;
+            app.state.sql_tab.add_batch(batch);
+            app.state.sql_tab.next_page();
+            app.state.sql_tab.refresh_query_results_state();
+            let history_query =
+                HistoryQuery::new(Context::Local, query.to_string(), duration, None, None);
+            app.state.history_tab.add_to_history(history_query);
+            app.state.history_tab.refresh_history_table_state();
         }
         #[cfg(feature = "flightsql")]
         AppEvent::FlightSQLQueryResult(r) => {
@@ -201,33 +218,34 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                 r.sql().clone(),
                 *r.execution_time(),
                 r.execution_stats().clone(),
+                None,
             );
             app.state.history_tab.add_to_history(history_query);
             app.state.history_tab.refresh_history_table_state()
         }
-        #[cfg(feature = "flightsql")]
-        AppEvent::EstablishFlightSQLConnection => {
-            let url = app.state.config.flightsql.connection_url.clone();
-            info!("Connection to FlightSQL host: {}", url);
-            let url: &'static str = Box::leak(url.into_boxed_str());
-            let execution = Arc::clone(&app.execution);
-            tokio::spawn(async move {
-                let client = execution.flightsql_client();
-                let maybe_channel = Channel::from_static(url).connect().await;
-                info!("Created channel");
-                match maybe_channel {
-                    Ok(channel) => {
-                        let flightsql_client = FlightSqlServiceClient::new(channel);
-                        let mut locked_client = client.lock().await;
-                        *locked_client = Some(flightsql_client);
-                        info!("Connected to FlightSQL host");
-                    }
-                    Err(e) => {
-                        info!("Error creating channel for FlightSQL: {:?}", e);
-                    }
-                }
-            });
-        }
+        // #[cfg(feature = "flightsql")]
+        // AppEvent::EstablishFlightSQLConnection => {
+        //     let url = app.state.config.flightsql.connection_url.clone();
+        //     info!("Connection to FlightSQL host: {}", url);
+        //     let url: &'static str = Box::leak(url.into_boxed_str());
+        //     let execution = Arc::clone(&app.execution);
+        //     tokio::spawn(async move {
+        //         let client = execution.flightsql_client();
+        //         let maybe_channel = Channel::from_static(url).connect().await;
+        //         info!("Created channel");
+        //         match maybe_channel {
+        //             Ok(channel) => {
+        //                 let flightsql_client = FlightSqlServiceClient::new(channel);
+        //                 let mut locked_client = client.lock().await;
+        //                 *locked_client = Some(flightsql_client);
+        //                 info!("Connected to FlightSQL host");
+        //             }
+        //             Err(e) => {
+        //                 info!("Error creating channel for FlightSQL: {:?}", e);
+        //             }
+        //         }
+        //     });
+        // }
         _ => {
             match app.state.tabs.selected {
                 SelectedTab::SQL => sql::app_event_handler(app, event),

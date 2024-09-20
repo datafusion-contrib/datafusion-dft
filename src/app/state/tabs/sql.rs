@@ -20,13 +20,15 @@ use std::time::Duration;
 
 use datafusion::arrow::array::RecordBatch;
 use datafusion::sql::sqlparser::keywords;
+use log::info;
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::palette::tailwind;
 use ratatui::style::{Modifier, Style};
 use ratatui::widgets::TableState;
 use tui_textarea::TextArea;
 
-use crate::execution::ExecutionStats;
+use crate::app::app_execution::ExecutionStats;
+use crate::app::ExecutionError;
 
 #[derive(Clone, Debug)]
 pub struct Query {
@@ -129,6 +131,9 @@ pub struct SQLTabState<'app> {
     editor_editable: bool,
     query: Option<Query>,
     query_results_state: Option<RefCell<TableState>>,
+    result_batches: Option<Vec<RecordBatch>>,
+    results_page: Option<usize>,
+    execution_error: Option<ExecutionError>,
 }
 
 impl<'app> SQLTabState<'app> {
@@ -144,6 +149,9 @@ impl<'app> SQLTabState<'app> {
             editor_editable: false,
             query: None,
             query_results_state: None,
+            result_batches: None,
+            results_page: None,
+            execution_error: None,
         }
     }
 
@@ -153,6 +161,13 @@ impl<'app> SQLTabState<'app> {
 
     pub fn refresh_query_results_state(&mut self) {
         self.query_results_state = Some(RefCell::new(TableState::default()));
+    }
+
+    pub fn reset_execution_results(&mut self) {
+        self.result_batches = None;
+        self.results_page = None;
+        self.execution_error = None;
+        self.refresh_query_results_state();
     }
 
     pub fn editor(&self) -> TextArea {
@@ -217,5 +232,48 @@ impl<'app> SQLTabState<'app> {
 
     pub fn delete_word(&mut self) {
         self.editor.delete_word();
+    }
+
+    pub fn add_batch(&mut self, batch: RecordBatch) {
+        if let Some(batches) = self.result_batches.as_mut() {
+            batches.push(batch);
+        } else {
+            self.result_batches = Some(vec![batch]);
+        }
+    }
+
+    pub fn current_batch(&self) -> Option<&RecordBatch> {
+        match (self.results_page, self.result_batches.as_ref()) {
+            (Some(page), Some(batches)) => batches.get(page),
+            _ => None,
+        }
+    }
+
+    pub fn execution_error(&self) -> &Option<ExecutionError> {
+        &self.execution_error
+    }
+
+    pub fn set_execution_error(&mut self, error: ExecutionError) {
+        self.execution_error = Some(error);
+    }
+
+    pub fn results_page(&self) -> Option<usize> {
+        self.results_page
+    }
+
+    pub fn next_page(&mut self) {
+        if let Some(page) = self.results_page {
+            self.results_page = Some(page + 1);
+        } else {
+            self.results_page = Some(0);
+        }
+    }
+
+    pub fn previous_page(&mut self) {
+        if let Some(page) = self.results_page {
+            if page > 0 {
+                self.results_page = Some(page - 1);
+            }
+        }
     }
 }
