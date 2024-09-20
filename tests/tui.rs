@@ -22,7 +22,7 @@ use dft::{
 };
 use tempfile::{tempdir, TempDir};
 
-mod app_cases;
+mod tui_cases;
 
 /// Fixture with an [`App`] instance and other temporary state
 struct TestApp<'app> {
