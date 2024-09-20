@@ -65,6 +65,9 @@ Some of the current and planned features are:
   - Save table definitions *and* data
   - Save parquet metadata from remote object stores
 
+### Limitations
+
+Currently `dft` does not display wide result sets well (because the widget library that we use does not support horizontal scrolling - we are working with them to see what we can do about this).  As a result, when working with wide data sets its best to be selective with the columns that you would like to view in the ouput.
   
 ## `dft` CLI
 
