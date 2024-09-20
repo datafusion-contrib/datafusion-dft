@@ -15,5 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+mod basic;
 #[cfg(feature = "functions-json")]
 mod functions_json;
+mod url_table;

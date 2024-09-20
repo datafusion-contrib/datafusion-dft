@@ -312,6 +312,34 @@ fn test_multiple_sql_in_multiple_args2() {
     assert.stdout(contains_str(expected));
 }
 
+
+// Validate that the CLI is correctly connected to query files
+#[test]
+fn test_query_file() {
+    // Note that the results come out as two batches as the batch size is set to 1
+    let expected = r##"
++------------+
+| double_col |
++------------+
+| 0.0        |
++------------+
++------------+
+| double_col |
++------------+
+| 10.1       |
++------------+
+    "##;
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT double_col from 'data/alltypes_plain.snappy.parquet'")
+        .assert()
+        .success();
+
+    assert.stdout(contains_str(expected));
+}
+
+
 /// Creates a temporary file with the given SQL content
 pub fn sql_in_file(sql: impl AsRef<str>) -> NamedTempFile {
     let file = NamedTempFile::new().unwrap();

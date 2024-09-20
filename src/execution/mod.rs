@@ -72,6 +72,15 @@ impl ExecutionContext {
             extension.register_on_ctx(config, &mut session_ctx)?;
         }
 
+        // Enable the dynamic file provider (so that we can read files from the
+        // local filesystem)
+        // TODO file a ticket to make the API consuming!!
+        // I did like
+        // session_ctx.enable_url_table();
+        // expecting that to work, but it didn't as the code returns a new session context
+        // instead of modifying the existing one
+        let session_ctx = session_ctx.enable_url_table();
+
         Ok(Self {
             session_ctx,
             #[cfg(feature = "flightsql")]
