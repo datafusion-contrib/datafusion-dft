@@ -19,10 +19,13 @@
 //!
 
 mod stats;
+use std::sync::Arc;
+
 pub use stats::{collect_plan_stats, ExecutionStats};
 
 use color_eyre::eyre::Result;
 use datafusion::execution::SendableRecordBatchStream;
+use datafusion::physical_plan::ExecutionPlan;
 use datafusion::prelude::*;
 use datafusion::sql::parser::Statement;
 use tokio_stream::StreamExt;
@@ -52,6 +55,12 @@ pub struct ExecutionContext {
     session_ctx: SessionContext,
     #[cfg(feature = "flightsql")]
     flightsql_client: Mutex<Option<FlightSqlServiceClient<Channel>>>,
+}
+
+impl std::fmt::Debug for ExecutionContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ExecutionContext").finish()
+    }
 }
 
 impl ExecutionContext {
@@ -105,6 +114,16 @@ impl ExecutionContext {
             maybe_batch?; // check for errors
         }
         Ok(())
+    }
+
+    /// Create a physical plan from the specified SQL string.  This is useful if you want to store
+    /// the plan and collect metrics from it.
+    pub async fn create_physical_plan(
+        &self,
+        sql: &str,
+    ) -> datafusion::error::Result<Arc<dyn ExecutionPlan>> {
+        let df = self.session_ctx.sql(sql).await?;
+        df.create_physical_plan().await
     }
 
     /// Executes the specified sql string, returning the resulting

@@ -166,7 +166,7 @@ pub fn empty_results_table<'frame>() -> Table<'frame> {
 }
 
 pub fn record_batches_to_table<'frame, 'results>(
-    record_batches: &'results [RecordBatch],
+    record_batches: &'results [&RecordBatch],
 ) -> Result<Table<'frame>>
 where
     // The results come from sql_tab state which persists until the next query is run which is

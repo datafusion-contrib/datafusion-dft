@@ -19,6 +19,7 @@ use core::cell::RefCell;
 use std::time::Duration;
 
 use datafusion::arrow::array::RecordBatch;
+use datafusion::arrow::array::UInt32Array;
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::palette::tailwind;
 use ratatui::style::Style;
@@ -27,6 +28,7 @@ use tui_textarea::TextArea;
 
 use crate::app::state::tabs::sql;
 use crate::execution::ExecutionStats;
+use crate::app::ExecutionError;
 
 #[derive(Clone, Debug)]
 pub struct FlightSQLQuery {
@@ -108,6 +110,9 @@ pub struct FlightSQLTabState<'app> {
     editor_editable: bool,
     query: Option<FlightSQLQuery>,
     query_results_state: Option<RefCell<TableState>>,
+    result_batches: Option<Vec<RecordBatch>>,
+    results_page: Option<usize>,
+    execution_error: Option<ExecutionError>,
 }
 
 impl<'app> FlightSQLTabState<'app> {
@@ -123,6 +128,9 @@ impl<'app> FlightSQLTabState<'app> {
             editor_editable: false,
             query: None,
             query_results_state: None,
+            result_batches: None,
+            results_page: None,
+            execution_error: None,
         }
     }
 
@@ -197,4 +205,22 @@ impl<'app> FlightSQLTabState<'app> {
     pub fn delete_word(&mut self) {
         self.editor.delete_word();
     }
+
+    pub fn current_page_results(&self) -> Option<RecordBatch> {
+        match (self.results_page, &self.result_batches) {
+            (Some(p), Some(b)) => Some(get_records(p, b)),
+            _ => None,
+        }
+    }
+
+    pub fn next_results_page(&mut self) {}
+}
+
+fn get_records(page: usize, batches: &[RecordBatch]) -> RecordBatch {
+    let start = page * 100;
+    let end = start + 100;
+    let indices = ((start as u32)..(end as u32)).collect::<Vec<u32>>();
+    let indices_array = UInt32Array::from(indices);
+    let taken = datafusion::arrow::compute::take_record_batch(&batches[0], &indices_array).unwrap();
+    taken
 }

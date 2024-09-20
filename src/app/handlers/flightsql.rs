@@ -25,6 +25,7 @@ use tokio_stream::StreamExt;
 use tonic::IntoRequest;
 
 use crate::app::state::tabs::flightsql::FlightSQLQuery;
+use crate::app::state::tabs::history::Context;
 use crate::app::{handlers::tab_navigation_handler, AppEvent};
 
 use super::App;
@@ -65,75 +66,125 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
                 s.select_previous();
             }
         }
-
         KeyCode::Enter => {
             info!("Run FS query");
-            let sql = app.state.flightsql_tab.editor().lines().join("");
-            info!("SQL: {}", sql);
+            let full_text = app.state.flightsql_tab.editor().lines().join("");
             let execution = Arc::clone(&app.execution);
             let _event_tx = app.event_tx();
             tokio::spawn(async move {
-                let client = execution.flightsql_client();
-                let mut query =
-                    FlightSQLQuery::new(sql.clone(), None, None, None, Duration::default(), None);
-                let start = Instant::now();
-                if let Some(ref mut c) = *client.lock().await {
-                    info!("Sending query");
-                    match c.execute(sql, None).await {
-                        Ok(flight_info) => {
-                            for endpoint in flight_info.endpoint {
-                                if let Some(ticket) = endpoint.ticket {
-                                    match c.do_get(ticket.into_request()).await {
-                                        Ok(mut stream) => {
-                                            let mut batches: Vec<RecordBatch> = Vec::new();
-                                            // temporarily only show the first batch to avoid
-                                            // buffering massive result sets. Eventually there should
-                                            // be some sort of paging logic
-                                            // see https://github.com/datafusion-contrib/datafusion-tui/pull/133#discussion_r1756680874
-                                            // while let Some(maybe_batch) = stream.next().await {
-                                            if let Some(maybe_batch) = stream.next().await {
-                                                match maybe_batch {
-                                                    Ok(batch) => {
-                                                        info!("Batch rows: {}", batch.num_rows());
-                                                        batches.push(batch);
-                                                    }
-                                                    Err(e) => {
-                                                        error!("Error getting batch: {:?}", e);
-                                                        let elapsed = start.elapsed();
-                                                        query.set_error(Some(e.to_string()));
-                                                        query.set_execution_time(elapsed);
-                                                    }
-                                                }
-                                            }
-                                            let elapsed = start.elapsed();
-                                            let rows: usize =
-                                                batches.iter().map(|r| r.num_rows()).sum();
-                                            query.set_results(Some(batches));
-                                            query.set_num_rows(Some(rows));
-                                            query.set_execution_time(elapsed);
-                                        }
-                                        Err(e) => {
-                                            error!("Error getting response: {:?}", e);
-                                            let elapsed = start.elapsed();
-                                            query.set_error(Some(e.to_string()));
-                                            query.set_execution_time(elapsed);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            error!("Error getting response: {:?}", e);
-                            let elapsed = start.elapsed();
-                            query.set_error(Some(e.to_string()));
-                            query.set_execution_time(elapsed);
-                        }
-                    }
-                }
-
-                let _ = _event_tx.send(AppEvent::FlightSQLQueryResult(query));
+                let sqls = full_text.split(';').collect();
+                execution.run_flightsqls(sqls, _event_tx).await;
+                // let client = execution.flightsql_client();
+                // let mut query =
+                //     FlightSQLQuery::new(sql.clone(), None, None, None, Duration::default(), None);
+                // let start = Instant::now();
+                // if let Some(ref mut c) = *client.lock().await {
+                //     match c.execute(sql, None).await {
+                //         Ok(flight_info) => {
+                //             for endpoint in flight_info.endpoint {
+                //                 if let Some(ticket) = endpoint.ticket {
+                //                     match c.do_get(ticket.into_request()).await {
+                //                         Ok(mut stream) => {
+                //                             execution.set_flight_result_stream(stream).await;
+                //                             exe
+                //                         }
+                //                         Err(e) => {}
+                //                     }
+                //                 }
+                //             }
+                //         }
+                //         Err(e) => {}
+                //     }
+                // }
             });
         }
+        KeyCode::Right => {
+            if let Some(p) = app
+                .state
+                .history_tab
+                .history()
+                .iter()
+                .filter(|q| *q.context() == Context::FlightSQL)
+                .last()
+            {
+                let execution = Arc::clone(&app.execution);
+                let sql = p.sql().clone();
+                let _event_tx = app.event_tx().clone();
+                app.state.flightsql_tab.next_results_page();
+                // tokio::spawn(async move {
+                //     execution.flightsql_next_page().await;
+                // });
+            }
+        }
+
+        // KeyCode::Enter => {
+        //     info!("Run FS query");
+        //     let sql = app.state.flightsql_tab.editor().lines().join("");
+        //     info!("SQL: {}", sql);
+        //     let execution = Arc::clone(&app.execution);
+        //     let _event_tx = app.event_tx();
+        //     tokio::spawn(async move {
+        //         let client = execution.flightsql_client();
+        //         let mut query =
+        //             FlightSQLQuery::new(sql.clone(), None, None, None, Duration::default(), None);
+        //         let start = Instant::now();
+        //         if let Some(ref mut c) = *client.lock().await {
+        //             info!("Sending query");
+        //             match c.execute(sql, None).await {
+        //                 Ok(flight_info) => {
+        //                     for endpoint in flight_info.endpoint {
+        //                         if let Some(ticket) = endpoint.ticket {
+        //                             match c.do_get(ticket.into_request()).await {
+        //                                 Ok(mut stream) => {
+        //                                     let mut batches: Vec<RecordBatch> = Vec::new();
+        //                                     // temporarily only show the first batch to avoid
+        //                                     // buffering massive result sets. Eventually there should
+        //                                     // be some sort of paging logic
+        //                                     // see https://github.com/datafusion-contrib/datafusion-tui/pull/133#discussion_r1756680874
+        //                                     // while let Some(maybe_batch) = stream.next().await {
+        //                                     if let Some(maybe_batch) = stream.next().await {
+        //                                         match maybe_batch {
+        //                                             Ok(batch) => {
+        //                                                 info!("Batch rows: {}", batch.num_rows());
+        //                                                 batches.push(batch);
+        //                                             }
+        //                                             Err(e) => {
+        //                                                 error!("Error getting batch: {:?}", e);
+        //                                                 let elapsed = start.elapsed();
+        //                                                 query.set_error(Some(e.to_string()));
+        //                                                 query.set_execution_time(elapsed);
+        //                                             }
+        //                                         }
+        //                                     }
+        //                                     let elapsed = start.elapsed();
+        //                                     let rows: usize =
+        //                                         batches.iter().map(|r| r.num_rows()).sum();
+        //                                     query.set_results(Some(batches));
+        //                                     query.set_num_rows(Some(rows));
+        //                                     query.set_execution_time(elapsed);
+        //                                 }
+        //                                 Err(e) => {
+        //                                     error!("Error getting response: {:?}", e);
+        //                                     let elapsed = start.elapsed();
+        //                                     query.set_error(Some(e.to_string()));
+        //                                     query.set_execution_time(elapsed);
+        //                                 }
+        //                             }
+        //                         }
+        //                     }
+        //                 }
+        //                 Err(e) => {
+        //                     error!("Error getting response: {:?}", e);
+        //                     let elapsed = start.elapsed();
+        //                     query.set_error(Some(e.to_string()));
+        //                     query.set_execution_time(elapsed);
+        //                 }
+        //             }
+        //         }
+        //
+        //         let _ = _event_tx.send(AppEvent::FlightSQLQueryResult(query));
+        //     });
+        // }
         _ => {}
     }
 }
@@ -154,11 +205,6 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) {
             true => editable_handler(app, key),
             false => normal_mode_handler(app, key),
         },
-        AppEvent::FlightSQLQueryResult(r) => {
-            info!("Query results: {:?}", r);
-            app.state.flightsql_tab.set_query(r);
-            app.state.flightsql_tab.refresh_query_results_state();
-        }
         AppEvent::Error => {}
         _ => {}
     };
