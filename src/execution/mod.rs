@@ -19,6 +19,8 @@
 //!
 
 mod stats;
+use std::sync::Arc;
+
 pub use stats::{collect_plan_stats, ExecutionStats};
 
 use color_eyre::eyre::Result;
