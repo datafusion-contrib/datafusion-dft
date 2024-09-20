@@ -15,7 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use log::info;
 use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},

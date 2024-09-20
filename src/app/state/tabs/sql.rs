@@ -20,15 +20,14 @@ use std::time::Duration;
 
 use datafusion::arrow::array::RecordBatch;
 use datafusion::sql::sqlparser::keywords;
-use log::info;
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::palette::tailwind;
 use ratatui::style::{Modifier, Style};
 use ratatui::widgets::TableState;
 use tui_textarea::TextArea;
 
-use crate::app::app_execution::ExecutionStats;
 use crate::app::ExecutionError;
+use crate::execution::ExecutionStats;
 
 #[derive(Clone, Debug)]
 pub struct Query {

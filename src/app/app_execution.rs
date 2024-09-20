@@ -21,16 +21,11 @@ use crate::app::state::tabs::sql::Query;
 use crate::app::{AppEvent, ExecutionError, ExecutionResultsBatch};
 use crate::execution::ExecutionContext;
 use color_eyre::eyre::Result;
-use datafusion::arrow::array::RecordBatch;
 use datafusion::execution::context::SessionContext;
-use datafusion::execution::{RecordBatchStream, SendableRecordBatchStream};
-use datafusion::physical_plan::{
-    execute_stream, visit_execution_plan, ExecutionPlan, ExecutionPlanVisitor,
-};
+use datafusion::execution::SendableRecordBatchStream;
+use datafusion::physical_plan::execute_stream;
 use futures::StreamExt;
 use log::{error, info};
-use std::fmt::Debug;
-use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::UnboundedSender;
@@ -38,7 +33,7 @@ use tokio::sync::Mutex;
 
 /// Handles executing queries for the TUI application, formatting results
 /// and sending them to the UI.
-pub(crate) struct AppExecution {
+pub struct AppExecution {
     inner: Arc<ExecutionContext>,
     result_stream: Arc<Mutex<Option<SendableRecordBatchStream>>>,
 }
@@ -171,68 +166,5 @@ impl AppExecution {
                 }
             }
         }
-    }
-}
-
-// #[derive(Debug, Clone)]
-// pub struct ExecMetrics {
-//     name: String,
-//     bytes_scanned: usize,
-// }
-
-#[derive(Clone, Debug)]
-pub struct ExecutionStats {
-    // bytes_scanned: usize,
-    // exec_metrics: Vec<ExecMetrics>,
-}
-
-// impl ExecutionStats {
-//     pub fn bytes_scanned(&self) -> usize {
-//         self.bytes_scanned
-//     }
-// }
-
-#[derive(Default)]
-struct PlanVisitor {
-    total_bytes_scanned: usize,
-    // exec_metrics: Vec<ExecMetrics>,
-}
-
-impl From<PlanVisitor> for ExecutionStats {
-    fn from(value: PlanVisitor) -> Self {
-        Self {
-            // bytes_scanned: value.total_bytes_scanned,
-        }
-    }
-}
-
-impl ExecutionPlanVisitor for PlanVisitor {
-    type Error = datafusion_common::DataFusionError;
-
-    fn pre_visit(&mut self, plan: &dyn ExecutionPlan) -> Result<bool, Self::Error> {
-        match plan.metrics() {
-            Some(metrics) => match metrics.sum_by_name("bytes_scanned") {
-                Some(bytes_scanned) => {
-                    info!("Adding {} to total_bytes_scanned", bytes_scanned.as_usize());
-                    self.total_bytes_scanned += bytes_scanned.as_usize();
-                }
-                None => {
-                    info!("No bytes_scanned for {}", plan.name())
-                }
-            },
-            None => {
-                info!("No MetricsSet for {}", plan.name())
-            }
-        }
-        Ok(true)
-    }
-}
-
-pub fn collect_plan_stats(plan: Arc<dyn ExecutionPlan>) -> Option<ExecutionStats> {
-    let mut visitor = PlanVisitor::default();
-    if visit_execution_plan(plan.as_ref(), &mut visitor).is_ok() {
-        Some(visitor.into())
-    } else {
-        None
     }
 }
