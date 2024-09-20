@@ -17,14 +17,14 @@
 
 //! [`ExecutionContext`]: DataFusion based execution context for running SQL queries
 //!
-use std::sync::Arc;
+
+mod stats;
+pub use stats::{collect_plan_stats, ExecutionStats};
 
 use color_eyre::eyre::Result;
 use datafusion::execution::SendableRecordBatchStream;
-use datafusion::physical_plan::{visit_execution_plan, ExecutionPlan, ExecutionPlanVisitor};
 use datafusion::prelude::*;
 use datafusion::sql::parser::Statement;
-use log::info;
 use tokio_stream::StreamExt;
 #[cfg(feature = "flightsql")]
 use {
@@ -132,68 +132,5 @@ impl ExecutionContext {
             .await?
             .execute_stream()
             .await
-    }
-}
-
-// #[derive(Debug, Clone)]
-// pub struct ExecMetrics {
-//     name: String,
-//     bytes_scanned: usize,
-// }
-
-#[derive(Clone, Debug)]
-pub struct ExecutionStats {
-    bytes_scanned: usize,
-    // exec_metrics: Vec<ExecMetrics>,
-}
-
-impl ExecutionStats {
-    pub fn bytes_scanned(&self) -> usize {
-        self.bytes_scanned
-    }
-}
-
-#[derive(Default)]
-struct PlanVisitor {
-    total_bytes_scanned: usize,
-    // exec_metrics: Vec<ExecMetrics>,
-}
-
-impl From<PlanVisitor> for ExecutionStats {
-    fn from(value: PlanVisitor) -> Self {
-        Self {
-            bytes_scanned: value.total_bytes_scanned,
-        }
-    }
-}
-
-impl ExecutionPlanVisitor for PlanVisitor {
-    type Error = datafusion_common::DataFusionError;
-
-    fn pre_visit(&mut self, plan: &dyn ExecutionPlan) -> Result<bool, Self::Error> {
-        match plan.metrics() {
-            Some(metrics) => match metrics.sum_by_name("bytes_scanned") {
-                Some(bytes_scanned) => {
-                    info!("Adding {} to total_bytes_scanned", bytes_scanned.as_usize());
-                    self.total_bytes_scanned += bytes_scanned.as_usize();
-                }
-                None => {
-                    info!("No bytes_scanned for {}", plan.name())
-                }
-            },
-            None => {
-                info!("No MetricsSet for {}", plan.name())
-            }
-        }
-        Ok(true)
-    }
-}
-
-pub fn collect_plan_stats(plan: Arc<dyn ExecutionPlan>) -> Option<ExecutionStats> {
-    let mut visitor = PlanVisitor::default();
-    if visit_execution_plan(plan.as_ref(), &mut visitor).is_ok() {
-        Some(visitor.into())
-    } else {
-        None
     }
 }
