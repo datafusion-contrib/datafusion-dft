@@ -20,7 +20,6 @@ use std::time::Duration;
 
 use datafusion::arrow::array::RecordBatch;
 use datafusion::sql::sqlparser::keywords;
-use log::info;
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::palette::tailwind;
 use ratatui::style::{Modifier, Style};
