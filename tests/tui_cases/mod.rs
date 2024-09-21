@@ -16,4 +16,5 @@
 // under the License.
 //
 
+mod pagination;
 mod quit;

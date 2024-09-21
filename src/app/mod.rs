@@ -62,7 +62,37 @@ pub struct ExecutionResultsBatch {
     duration: Duration,
 }
 
+impl ExecutionResultsBatch {
+    pub fn new(query: String, batch: RecordBatch, duration: Duration) -> Self {
+        Self {
+            query,
+            batch,
+            duration,
+        }
+    }
+
+    pub fn query(&self) -> &str {
+        &self.query
+    }
+
+    pub fn batch(&self) -> &RecordBatch {
+        &self.batch
+    }
+
+    pub fn duration(&self) -> &Duration {
+        &self.duration
+    }
+}
+
 impl ExecutionError {
+    pub fn new(query: String, error: String, duration: Duration) -> Self {
+        Self {
+            query,
+            error,
+            duration,
+        }
+    }
+
     pub fn query(&self) -> &str {
         &self.query
     }
