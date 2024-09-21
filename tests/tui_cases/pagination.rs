@@ -26,23 +26,23 @@ use dft::app::{AppEvent, ExecutionResultsBatch};
 
 use crate::TestApp;
 
-fn create_batch() -> RecordBatch {
-    let arr1: ArrayRef = Arc::new(UInt32Array::from(vec![1, 2]));
-    let arr2: ArrayRef = Arc::new(UInt32Array::from(vec![4, 5]));
+fn create_batch(adj: u32) -> RecordBatch {
+    let arr1: ArrayRef = Arc::new(UInt32Array::from(vec![1 + adj, 2 + adj]));
+    let arr2: ArrayRef = Arc::new(UInt32Array::from(vec![3 + adj, 4 + adj]));
 
     RecordBatch::try_from_iter(vec![("a", arr1), ("b", arr2)]).unwrap()
 }
 
-fn create_execution_results(query: &str) -> ExecutionResultsBatch {
+fn create_execution_results(query: &str, adj: u32) -> ExecutionResultsBatch {
     let duration = Duration::from_secs(1);
-    let batch = create_batch();
+    let batch = create_batch(adj);
     ExecutionResultsBatch::new(query.to_string(), batch, duration)
 }
 
 #[tokio::test]
 async fn single_page() {
     let mut test_app = TestApp::new();
-    let res1 = create_execution_results("SELECT 1");
+    let res1 = create_execution_results("SELECT 1", 0);
     let event1 = AppEvent::ExecutionResultsNextPage(res1);
 
     test_app.handle_app_event(AppEvent::NewExecution).unwrap();
@@ -62,8 +62,8 @@ async fn single_page() {
         "+---+---+",
         "| a | b |",
         "+---+---+",
-        "| 1 | 4 |",
-        "| 2 | 5 |",
+        "| 1 | 3 |",
+        "| 2 | 4 |",
         "+---+---+",
     ];
     assert_batches_eq!(expected, &batches);
@@ -76,7 +76,7 @@ async fn single_page() {
 #[tokio::test]
 async fn multiple_pages() {
     let mut test_app = TestApp::new();
-    let res1 = create_execution_results("SELECT 1");
+    let res1 = create_execution_results("SELECT 1", 0);
     let event1 = AppEvent::ExecutionResultsNextPage(res1);
 
     test_app.handle_app_event(AppEvent::NewExecution).unwrap();
@@ -88,13 +88,62 @@ async fn multiple_pages() {
         assert_eq!(page, 0);
     }
 
-    let res2 = create_execution_results("SELECT 1");
-    let event1 = AppEvent::ExecutionResultsNextPage(res2);
-    test_app.handle_app_event(event1).unwrap();
+    let res2 = create_execution_results("SELECT 1", 1);
+    let event2 = AppEvent::ExecutionResultsNextPage(res2);
+    test_app.handle_app_event(event2).unwrap();
 
     {
         let state = test_app.state();
         let page = state.sql_tab.results_page().unwrap();
         assert_eq!(page, 1);
+    }
+
+    {
+        let state = test_app.state();
+        let batch = state.sql_tab.current_batch();
+        assert!(batch.is_some());
+
+        let batch = batch.unwrap();
+        let batches = vec![batch.clone()];
+        let expected = [
+            "+---+---+",
+            "| a | b |",
+            "+---+---+",
+            "| 2 | 4 |",
+            "| 3 | 5 |",
+            "+---+---+",
+        ];
+        assert_batches_eq!(expected, &batches);
+    }
+
+    let left_key = crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Left,
+        crossterm::event::KeyModifiers::NONE,
+    );
+    let event3 = AppEvent::Key(left_key);
+    test_app.handle_app_event(event3).unwrap();
+
+    {
+        let state = test_app.state();
+        let page = state.sql_tab.results_page().unwrap();
+        assert_eq!(page, 0);
+    }
+
+    {
+        let state = test_app.state();
+        let batch = state.sql_tab.current_batch();
+        assert!(batch.is_some());
+
+        let batch = batch.unwrap();
+        let batches = vec![batch.clone()];
+        let expected = [
+            "+---+---+",
+            "| a | b |",
+            "+---+---+",
+            "| 1 | 3 |",
+            "| 2 | 4 |",
+            "+---+---+",
+        ];
+        assert_batches_eq!(expected, &batches);
     }
 }
