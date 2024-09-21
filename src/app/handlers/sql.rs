@@ -71,6 +71,18 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
         }
         KeyCode::Right => {
             let _event_tx = app.event_tx().clone();
+            if let (Some(p), c) = (
+                app.state().sql_tab.results_page(),
+                app.state().sql_tab.batches_count(),
+            ) {
+                // We don't need to fetch the next batch if moving forward a page and we're not
+                // on the last page since we would have already fetched it.
+                if p < c - 1 {
+                    app.state.sql_tab.next_page();
+                    app.state.sql_tab.refresh_query_results_state();
+                    return;
+                }
+            }
             if let Some(p) = app.state.history_tab.history().last() {
                 let execution = Arc::clone(&app.execution);
                 let sql = p.sql().clone();

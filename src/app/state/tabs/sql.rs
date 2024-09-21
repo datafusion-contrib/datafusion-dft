@@ -20,6 +20,7 @@ use std::time::Duration;
 
 use datafusion::arrow::array::RecordBatch;
 use datafusion::sql::sqlparser::keywords;
+use log::info;
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::palette::tailwind;
 use ratatui::style::{Modifier, Style};
@@ -245,6 +246,14 @@ impl<'app> SQLTabState<'app> {
         match (self.results_page, self.result_batches.as_ref()) {
             (Some(page), Some(batches)) => batches.get(page),
             _ => None,
+        }
+    }
+
+    pub fn batches_count(&self) -> usize {
+        if let Some(batches) = &self.result_batches {
+            batches.len()
+        } else {
+            0
         }
     }
 

@@ -39,6 +39,7 @@ fn create_execution_results(query: &str, adj: u32) -> ExecutionResultsBatch {
     ExecutionResultsBatch::new(query.to_string(), batch, duration)
 }
 
+// Tests that a single page of results is displayed correctly
 #[tokio::test]
 async fn single_page() {
     let mut test_app = TestApp::new();
@@ -73,8 +74,9 @@ async fn single_page() {
     assert_eq!(table_state.borrow().selected(), None);
 }
 
+// Tests that we can paginate through multiple pages and go back to the first page
 #[tokio::test]
-async fn multiple_pages() {
+async fn multiple_pages_forward_and_back() {
     let mut test_app = TestApp::new();
     let res1 = create_execution_results("SELECT 1", 0);
     let event1 = AppEvent::ExecutionResultsNextPage(res1);
@@ -142,6 +144,66 @@ async fn multiple_pages() {
             "+---+---+",
             "| 1 | 3 |",
             "| 2 | 4 |",
+            "+---+---+",
+        ];
+        assert_batches_eq!(expected, &batches);
+    }
+}
+
+// Tests that we can still paginate when we already have the batch because we previously viewed the
+// page
+#[tokio::test]
+async fn multiple_pages_forward_and_back_and_forward() {
+    let mut test_app = TestApp::new();
+    let res1 = create_execution_results("SELECT 1", 0);
+    let event1 = AppEvent::ExecutionResultsNextPage(res1);
+
+    test_app.handle_app_event(AppEvent::NewExecution).unwrap();
+    test_app.handle_app_event(event1).unwrap();
+
+    {
+        let state = test_app.state();
+        let page = state.sql_tab.results_page().unwrap();
+        assert_eq!(page, 0);
+    }
+
+    let res2 = create_execution_results("SELECT 1", 1);
+    let event2 = AppEvent::ExecutionResultsNextPage(res2);
+    test_app.handle_app_event(event2).unwrap();
+
+    let left_key = crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Left,
+        crossterm::event::KeyModifiers::NONE,
+    );
+    let event3 = AppEvent::Key(left_key);
+    test_app.handle_app_event(event3).unwrap();
+
+    let right_key = crossterm::event::KeyEvent::new(
+        crossterm::event::KeyCode::Right,
+        crossterm::event::KeyModifiers::NONE,
+    );
+    let event4 = AppEvent::Key(right_key);
+    test_app.handle_app_event(event4).unwrap();
+
+    {
+        let state = test_app.state();
+        let page = state.sql_tab.results_page().unwrap();
+        assert_eq!(page, 1);
+    }
+
+    {
+        let state = test_app.state();
+        let batch = state.sql_tab.current_batch();
+        assert!(batch.is_some());
+
+        let batch = batch.unwrap();
+        let batches = vec![batch.clone()];
+        let expected = [
+            "+---+---+",
+            "| a | b |",
+            "+---+---+",
+            "| 2 | 4 |",
+            "| 3 | 5 |",
             "+---+---+",
         ];
         assert_batches_eq!(expected, &batches);
