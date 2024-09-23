@@ -62,7 +62,9 @@ pub fn render_query_history(area: Rect, buf: &mut Buffer, app: &App) {
         .title(" Query History ")
         .borders(Borders::ALL);
     let history = app.state.history_tab.history();
+    info!("History: {:?}", history);
     let history_table_state = app.state.history_tab.history_table_state();
+    info!("History Table State: {:?}", history_table_state);
     match (history.is_empty(), history_table_state) {
         (true, _) | (_, None) => {
             let row = Row::new(vec!["Your query history will show here"]);
@@ -85,7 +87,14 @@ pub fn render_query_history(area: Rect, buf: &mut Buffer, app: &App) {
                         Cell::from(q.context().as_str()),
                         Cell::from(q.sql().as_str()),
                         Cell::from(q.execution_time().as_millis().to_string()),
-                        Cell::from(q.scanned_bytes().to_string()),
+                        // Not sure showing scanned_bytes is useful anymore in the context of
+                        // paginated queries.  Hard coding to zero for now but this will need to be
+                        // revisted.  One option I have is removing these type of stats from the
+                        // query history table (so we only show execution time) and then
+                        // _anything_ ExecutionPlan statistics related is shown in the lower pane
+                        // and their is a `analyze` mode that runs the query to completion and
+                        // collects all stats to show in a table next to the query.
+                        Cell::from(0.to_string()),
                     ])
                 })
                 .collect();
@@ -96,8 +105,9 @@ pub fn render_query_history(area: Rect, buf: &mut Buffer, app: &App) {
                 Cell::from("Execution Time(ms)"),
                 Cell::from("Scanned Bytes"),
             ])
-            .bg(tailwind::WHITE)
-            .fg(tailwind::BLACK);
+            .bg(tailwind::ORANGE.c300)
+            .fg(tailwind::BLACK)
+            .bold();
             let table = Table::new(rows, widths).header(header).block(block.clone());
 
             let table = table

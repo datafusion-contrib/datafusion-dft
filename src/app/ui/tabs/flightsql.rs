@@ -54,25 +54,25 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
                 ))
                 .fg(tailwind::WHITE);
                 let block = block.title_bottom(stats).fg(tailwind::ORANGE.c500);
-                let maybe_table = record_batches_to_table(r);
-                match maybe_table {
-                    Ok(table) => {
-                        let table = table
-                            .highlight_style(
-                                Style::default().bg(tailwind::WHITE).fg(tailwind::BLACK),
-                            )
-                            .block(block);
-
-                        let mut s = s.borrow_mut();
-                        StatefulWidget::render(table, area, buf, &mut s);
-                    }
-                    Err(e) => {
-                        let row = Row::new(vec![e.to_string()]);
-                        let widths = vec![Constraint::Percentage(100)];
-                        let table = Table::new(vec![row], widths).block(block);
-                        Widget::render(table, area, buf);
-                    }
-                }
+                // let maybe_table = record_batches_to_table(r);
+                // match maybe_table {
+                //     Ok(table) => {
+                //         let table = table
+                //             .highlight_style(
+                //                 Style::default().bg(tailwind::WHITE).fg(tailwind::BLACK),
+                //             )
+                //             .block(block);
+                //
+                //         let mut s = s.borrow_mut();
+                //         StatefulWidget::render(table, area, buf, &mut s);
+                //     }
+                //     Err(e) => {
+                //         let row = Row::new(vec![e.to_string()]);
+                //         let widths = vec![Constraint::Percentage(100)];
+                //         let table = Table::new(vec![row], widths).block(block);
+                //         Widget::render(table, area, buf);
+                //     }
+                // }
             }
         } else if let Some(e) = q.error() {
             let row = Row::new(vec![e.to_string()]);

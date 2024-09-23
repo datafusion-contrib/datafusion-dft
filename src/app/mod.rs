@@ -23,6 +23,7 @@ pub mod ui;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use crossterm::event as ct;
+use datafusion::arrow::array::RecordBatch;
 use futures::FutureExt;
 use log::{debug, error, info, trace};
 use ratatui::backend::CrosstermBackend;
@@ -32,12 +33,14 @@ use ratatui::crossterm::{
 };
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
 use std::sync::Arc;
+use std::time::Duration;
 use strum::IntoEnumIterator;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 
+use self::app_execution::AppExecution;
 use self::handlers::{app_event_handler, crossterm_event_handler};
 use self::state::tabs::sql::Query;
 use crate::execution::ExecutionContext;
@@ -46,6 +49,64 @@ use crate::execution::ExecutionContext;
 use self::state::tabs::flightsql::FlightSQLQuery;
 
 #[derive(Clone, Debug)]
+pub struct ExecutionError {
+    query: String,
+    error: String,
+    duration: Duration,
+}
+
+#[derive(Clone, Debug)]
+pub struct ExecutionResultsBatch {
+    query: String,
+    batch: RecordBatch,
+    duration: Duration,
+}
+
+impl ExecutionResultsBatch {
+    pub fn new(query: String, batch: RecordBatch, duration: Duration) -> Self {
+        Self {
+            query,
+            batch,
+            duration,
+        }
+    }
+
+    pub fn query(&self) -> &str {
+        &self.query
+    }
+
+    pub fn batch(&self) -> &RecordBatch {
+        &self.batch
+    }
+
+    pub fn duration(&self) -> &Duration {
+        &self.duration
+    }
+}
+
+impl ExecutionError {
+    pub fn new(query: String, error: String, duration: Duration) -> Self {
+        Self {
+            query,
+            error,
+            duration,
+        }
+    }
+
+    pub fn query(&self) -> &str {
+        &self.query
+    }
+
+    pub fn error(&self) -> &str {
+        &self.error
+    }
+
+    pub fn duration(&self) -> &Duration {
+        &self.duration
+    }
+}
+
+#[derive(Debug)]
 pub enum AppEvent {
     Key(event::KeyEvent),
     Error,
@@ -59,7 +120,11 @@ pub enum AppEvent {
     Mouse(event::MouseEvent),
     Resize(u16, u16),
     ExecuteDDL(String),
+    NewExecution,
     QueryResult(Query),
+    ExecutionResultsNextPage(ExecutionResultsBatch),
+    ExecutionResultsPreviousPage,
+    ExecutionResultsError(ExecutionError),
     #[cfg(feature = "flightsql")]
     EstablishFlightSQLConnection,
     #[cfg(feature = "flightsql")]
@@ -68,7 +133,7 @@ pub enum AppEvent {
 
 pub struct App<'app> {
     state: state::AppState<'app>,
-    execution: Arc<ExecutionContext>,
+    execution: Arc<AppExecution>,
     event_tx: UnboundedSender<AppEvent>,
     event_rx: UnboundedReceiver<AppEvent>,
     cancellation_token: CancellationToken,
@@ -80,6 +145,7 @@ impl<'app> App<'app> {
         let (event_tx, event_rx) = mpsc::unbounded_channel();
         let cancellation_token = CancellationToken::new();
         let task = tokio::spawn(async {});
+        let app_execution = Arc::new(AppExecution::new(Arc::new(execution)));
 
         Self {
             state,
@@ -87,7 +153,7 @@ impl<'app> App<'app> {
             event_rx,
             event_tx,
             cancellation_token,
-            execution: Arc::new(execution),
+            execution: app_execution,
         }
     }
 
@@ -99,7 +165,7 @@ impl<'app> App<'app> {
         &mut self.event_rx
     }
 
-    pub fn execution(&self) -> Arc<ExecutionContext> {
+    pub fn execution(&self) -> Arc<AppExecution> {
         Arc::clone(&self.execution)
     }
 
@@ -318,7 +384,7 @@ impl App<'_> {
         loop {
             let event = app.next().await?;
 
-            if let AppEvent::Render = event.clone() {
+            if let AppEvent::Render = &event {
                 terminal.draw(|f| f.render_widget(&app, f.area()))?;
             };
 

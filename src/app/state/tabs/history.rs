@@ -43,6 +43,7 @@ pub struct HistoryQuery {
     sql: String,
     execution_time: Duration,
     execution_stats: Option<ExecutionStats>,
+    _error: Option<String>,
 }
 
 impl HistoryQuery {
@@ -51,12 +52,14 @@ impl HistoryQuery {
         sql: String,
         execution_time: Duration,
         execution_stats: Option<ExecutionStats>,
+        _error: Option<String>,
     ) -> Self {
         Self {
             context,
             sql,
             execution_time,
             execution_stats,
+            _error,
         }
     }
     pub fn sql(&self) -> &String {
@@ -71,13 +74,13 @@ impl HistoryQuery {
         &self.execution_stats
     }
 
-    pub fn scanned_bytes(&self) -> usize {
-        if let Some(stats) = &self.execution_stats {
-            stats.bytes_scanned()
-        } else {
-            0
-        }
-    }
+    // pub fn scanned_bytes(&self) -> usize {
+    //     if let Some(stats) = &self.execution_stats {
+    //         stats.bytes_scanned()
+    //     } else {
+    //         0
+    //     }
+    // }
 
     pub fn context(&self) -> &Context {
         &self.context

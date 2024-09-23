@@ -15,17 +15,13 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::{sync::Arc, time::Instant};
+use std::sync::Arc;
 
-use datafusion::{arrow::array::RecordBatch, physical_plan::execute_stream};
-use log::{error, info};
+use log::info;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use tokio_stream::StreamExt;
 
 use super::App;
-use crate::app::app_execution::AppExecution;
-use crate::app::{handlers::tab_navigation_handler, state::tabs::sql::Query, AppEvent};
-use crate::execution::collect_plan_stats;
+use crate::app::{handlers::tab_navigation_handler, AppEvent};
 
 pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
     match key.code {
@@ -62,18 +58,42 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
         }
 
         KeyCode::Enter => {
-            info!("Run query");
             let sql = app.state.sql_tab.editor().lines().join("");
-            info!("SQL: {}", sql);
-            let app_execution = AppExecution::new(Arc::clone(&app.execution));
+            info!("Running query: {}", sql);
             let _event_tx = app.event_tx().clone();
-            // TODO: Maybe this should be on a separate runtime to prevent blocking main thread /
-            // runtime
-            // TODO: Extract this into function to be used in both normal and editable handler
+            let execution = Arc::clone(&app.execution);
+            // TODO: Extract this into function to be used in both normal and editable handler.
+            // Only useful if we get Ctrl / Cmd + Enter to work in editable mode though.
             tokio::spawn(async move {
                 let sqls: Vec<&str> = sql.split(';').collect();
-                let _ = app_execution.run_sqls(sqls, _event_tx).await;
+                let _ = execution.run_sqls(sqls, _event_tx).await;
             });
+        }
+        KeyCode::Right => {
+            let _event_tx = app.event_tx().clone();
+            if let (Some(p), c) = (
+                app.state().sql_tab.results_page(),
+                app.state().sql_tab.batches_count(),
+            ) {
+                // We don't need to fetch the next batch if moving forward a page and we're not
+                // on the last page since we would have already fetched it.
+                if p < c - 1 {
+                    app.state.sql_tab.next_page();
+                    app.state.sql_tab.refresh_query_results_state();
+                    return;
+                }
+            }
+            if let Some(p) = app.state.history_tab.history().last() {
+                let execution = Arc::clone(&app.execution);
+                let sql = p.sql().clone();
+                tokio::spawn(async move {
+                    execution.next_batch(sql, _event_tx).await;
+                });
+            }
+        }
+        KeyCode::Left => {
+            app.state.sql_tab.previous_page();
+            app.state.sql_tab.refresh_query_results_state();
         }
         _ => {}
     }
@@ -85,54 +105,6 @@ pub fn editable_handler(app: &mut App, key: KeyEvent) {
         (KeyCode::Right, KeyModifiers::ALT) => app.state.sql_tab.next_word(),
         (KeyCode::Backspace, KeyModifiers::ALT) => app.state.sql_tab.delete_word(),
         (KeyCode::Esc, _) => app.state.sql_tab.exit_edit(),
-        (KeyCode::Enter, KeyModifiers::CONTROL) => {
-            let query = app.state.sql_tab.editor().lines().join("");
-            let ctx = app.execution.session_ctx().clone();
-            let _event_tx = app.event_tx();
-            // TODO: Maybe this should be on a separate runtime to prevent blocking main thread /
-            // runtime
-            tokio::spawn(async move {
-                // TODO: Turn this into a match and return the error somehow
-                let start = Instant::now();
-                if let Ok(df) = ctx.sql(&query).await {
-                    let plan = df.create_physical_plan().await;
-                    match plan {
-                        Ok(p) => {
-                            let task_ctx = ctx.task_ctx();
-                            let stream = execute_stream(Arc::clone(&p), task_ctx);
-                            let mut batches: Vec<RecordBatch> = Vec::new();
-                            match stream {
-                                Ok(mut s) => {
-                                    while let Some(b) = s.next().await {
-                                        match b {
-                                            Ok(b) => batches.push(b),
-                                            Err(e) => {
-                                                error!("Error getting RecordBatch: {:?}", e)
-                                            }
-                                        }
-                                    }
-
-                                    let elapsed = start.elapsed();
-                                    let stats = collect_plan_stats(p);
-                                    info!("Got stats: {:?}", stats);
-                                    let query =
-                                        Query::new(query, Some(batches), None, None, elapsed, None);
-                                    let _ = _event_tx.send(AppEvent::QueryResult(query));
-                                }
-                                Err(e) => {
-                                    error!("Error creating RecordBatchStream: {:?}", e)
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            error!("Error creating physical plan: {:?}", e)
-                        }
-                    }
-                } else {
-                    error!("Error creating dataframe")
-                }
-            });
-        }
         _ => app.state.sql_tab.update_editor_content(key),
     }
 }
