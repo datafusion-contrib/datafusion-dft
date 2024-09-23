@@ -269,3 +269,15 @@ The FlightSQL config is where you can define the connection URL for the FlightSQ
 [flight_sql]
 connection_url = "http://localhost:50051"
 ```
+
+#### Editor Config
+
+The editor config is where you can set your preferred editor settings.
+
+Currently only syntax highlighting is supported.  It is experimental because currently the regex that is used to determine keywords only works in simple cases.
+
+```toml
+[editor]
+experimental_syntax_highlighting = true
+```
+

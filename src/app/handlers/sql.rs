@@ -35,7 +35,7 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
         | KeyCode::Char('3')
         | KeyCode::Char('4')
         | KeyCode::Char('5')) => tab_navigation_handler(app, tab),
-        KeyCode::Char('c') => app.state.sql_tab.clear_editor(),
+        KeyCode::Char('c') => app.state.sql_tab.clear_editor(&app.state.config),
         KeyCode::Char('e') => {
             let editor = app.state.sql_tab.editor();
             let lines = editor.lines();

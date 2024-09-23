@@ -26,6 +26,7 @@ use ratatui::widgets::TableState;
 use tui_textarea::TextArea;
 
 use crate::app::state::tabs::sql;
+use crate::config::AppConfig;
 use crate::execution::ExecutionStats;
 
 #[derive(Clone, Debug)]
@@ -111,13 +112,15 @@ pub struct FlightSQLTabState<'app> {
 }
 
 impl<'app> FlightSQLTabState<'app> {
-    pub fn new() -> Self {
+    pub fn new(config: &AppConfig) -> Self {
         let empty_text = vec!["Enter a query here.".to_string()];
         // TODO: Enable vim mode from config?
         let mut textarea = TextArea::new(empty_text);
         textarea.set_style(Style::default().fg(tailwind::WHITE));
-        textarea.set_search_pattern(sql::keyword_regex()).unwrap();
-        textarea.set_search_style(sql::keyword_style());
+        if config.editor.experimental_syntax_highlighting {
+            textarea.set_search_pattern(sql::keyword_regex()).unwrap();
+            textarea.set_search_style(sql::keyword_style());
+        };
         Self {
             editor: textarea,
             editor_editable: false,
@@ -151,11 +154,13 @@ impl<'app> FlightSQLTabState<'app> {
         }
     }
 
-    pub fn clear_editor(&mut self) {
+    pub fn clear_editor(&mut self, config: &AppConfig) {
         let mut textarea = TextArea::new(vec!["".to_string()]);
         textarea.set_style(Style::default().fg(tailwind::WHITE));
-        textarea.set_search_pattern(sql::keyword_regex()).unwrap();
-        textarea.set_search_style(sql::keyword_style());
+        if config.editor.experimental_syntax_highlighting {
+            textarea.set_search_pattern(sql::keyword_regex()).unwrap();
+            textarea.set_search_style(sql::keyword_style());
+        };
         self.editor = textarea;
     }
 
