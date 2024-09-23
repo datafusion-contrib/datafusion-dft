@@ -15,6 +15,27 @@
 // specific language governing permissions and limitations
 // under the License.
 
-mod ddl;
-mod pagination;
-mod quit;
+use datafusion::assert_batches_eq;
+use dft::app::AppEvent;
+
+use crate::TestApp;
+
+#[tokio::test]
+async fn test_create_table_ddl() {
+    let mut test_app = TestApp::new();
+    let ddl = "CREATE TABLE foo (a int) AS VALUES (1), (2), (3);";
+    test_app
+        .handle_app_event(AppEvent::ExecuteDDL(ddl.to_string()))
+        .unwrap();
+    test_app.wait_for_ddl().await;
+    let query = "SELECT * FROM foo;";
+    test_app.run_sqls(query.to_string()).await;
+
+    test_app.wait_for_execution().await;
+    let batch = test_app.current_batch().unwrap();
+
+    let expected = [
+        "+---+", "| a |", "+---+", "| 1 |", "| 2 |", "| 3 |", "+---+",
+    ];
+    assert_batches_eq!(expected, &[batch.clone()]);
+}

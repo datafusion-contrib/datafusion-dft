@@ -138,6 +138,7 @@ pub struct App<'app> {
     event_rx: UnboundedReceiver<AppEvent>,
     cancellation_token: CancellationToken,
     task: JoinHandle<()>,
+    ddl_task: Option<JoinHandle<()>>,
 }
 
 impl<'app> App<'app> {
@@ -145,6 +146,7 @@ impl<'app> App<'app> {
         let (event_tx, event_rx) = mpsc::unbounded_channel();
         let cancellation_token = CancellationToken::new();
         let task = tokio::spawn(async {});
+        // let ddl_task = tokio::spawn(async {});
         let app_execution = Arc::new(AppExecution::new(Arc::new(execution)));
 
         Self {
@@ -154,11 +156,16 @@ impl<'app> App<'app> {
             event_tx,
             cancellation_token,
             execution: app_execution,
+            ddl_task: None,
         }
     }
 
     pub fn event_tx(&self) -> UnboundedSender<AppEvent> {
         self.event_tx.clone()
+    }
+
+    pub fn ddl_task(&mut self) -> &mut Option<JoinHandle<()>> {
+        &mut self.ddl_task
     }
 
     pub fn event_rx(&mut self) -> &mut UnboundedReceiver<AppEvent> {
@@ -179,6 +186,10 @@ impl<'app> App<'app> {
 
     pub fn state(&self) -> &state::AppState<'app> {
         &self.state
+    }
+
+    pub fn state_mut(&mut self) -> &mut state::AppState<'app> {
+        &mut self.state
     }
 
     /// Enter app, optionally setup `crossterm` with UI settings such as alternative screen and
@@ -293,8 +304,10 @@ impl<'app> App<'app> {
         });
     }
 
+    /// Execute DDL from users DDL file
     pub fn execute_ddl(&mut self) {
         if let Some(user_dirs) = directories::UserDirs::new() {
+            // TODO: Move to ~/.config/ddl
             let datafusion_rc_path = user_dirs
                 .home_dir()
                 .join(".datafusion")

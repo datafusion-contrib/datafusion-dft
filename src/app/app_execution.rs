@@ -72,8 +72,8 @@ impl AppExecution {
         for (i, sql) in non_empty_sqls.into_iter().enumerate() {
             info!("Running query {}", i);
             let _sender = sender.clone();
-            let mut query =
-                Query::new(sql.to_string(), None, None, None, Duration::default(), None);
+            // let mut query =
+            // Query::new(sql.to_string(), None, None, None, Duration::default(), None);
             let start = std::time::Instant::now();
             if i == statement_count - 1 {
                 info!("Executing last query and display results");
@@ -130,7 +130,7 @@ impl AppExecution {
                 match self.inner.execute_sql_and_discard_results(sql).await {
                     Ok(_) => {
                         let elapsed = start.elapsed();
-                        query.set_execution_time(elapsed);
+                        // query.set_execution_time(elapsed);
                     }
                     Err(e) => {
                         // We only log failed queries, we don't want to stop the execution of the
@@ -140,7 +140,6 @@ impl AppExecution {
                     }
                 }
             }
-            _sender.send(AppEvent::QueryResult(query))?; // Send the query result to the UI
         }
         Ok(())
     }

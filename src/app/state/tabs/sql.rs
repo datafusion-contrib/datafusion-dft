@@ -24,6 +24,7 @@ use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::palette::tailwind;
 use ratatui::style::{Modifier, Style};
 use ratatui::widgets::TableState;
+use tokio::task::JoinHandle;
 use tui_textarea::TextArea;
 
 use crate::app::ExecutionError;
@@ -134,6 +135,7 @@ pub struct SQLTabState<'app> {
     result_batches: Option<Vec<RecordBatch>>,
     results_page: Option<usize>,
     execution_error: Option<ExecutionError>,
+    execution_task: Option<JoinHandle<()>>,
 }
 
 impl<'app> SQLTabState<'app> {
@@ -154,6 +156,7 @@ impl<'app> SQLTabState<'app> {
             result_batches: None,
             results_page: None,
             execution_error: None,
+            execution_task: None,
         }
     }
 
@@ -287,5 +290,13 @@ impl<'app> SQLTabState<'app> {
                 self.results_page = Some(page - 1);
             }
         }
+    }
+
+    pub fn execution_task(&mut self) -> &mut Option<JoinHandle<()>> {
+        &mut self.execution_task
+    }
+
+    pub fn set_execution_task(&mut self, task: JoinHandle<()>) {
+        self.execution_task = Some(task);
     }
 }
