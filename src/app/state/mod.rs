@@ -86,9 +86,9 @@ impl<'app> AppState<'app> {
     pub fn new(config: AppConfig) -> Self {
         let tabs = Tabs::default();
 
-        let sql_tab_state = SQLTabState::new();
+        let sql_tab_state = SQLTabState::new(&config);
         #[cfg(feature = "flightsql")]
-        let flightsql_tab_state = FlightSQLTabState::new();
+        let flightsql_tab_state = FlightSQLTabState::new(&config);
         let logs_tab_state = LogsTabState::default();
         let history_tab_state = HistoryTabState::default();
 

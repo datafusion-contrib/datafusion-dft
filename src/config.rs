@@ -70,6 +70,7 @@ pub struct AppConfig {
     #[cfg(feature = "flightsql")]
     #[serde(default = "default_flightsql_config")]
     pub flightsql: FlightSQLConfig,
+    pub editor: EditorConfig,
 }
 
 fn default_execution_config() -> ExecutionConfig {
@@ -196,4 +197,9 @@ impl Default for FlightSQLConfig {
 #[cfg(feature = "flightsql")]
 pub fn default_connection_url() -> String {
     "http://localhost:50051".to_string()
+}
+
+#[derive(Debug, Default, Deserialize)]
+pub struct EditorConfig {
+    pub experimental_syntax_highlighting: bool,
 }

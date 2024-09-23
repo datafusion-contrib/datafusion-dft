@@ -65,6 +65,9 @@ Some of the current and planned features are:
   - Save table definitions *and* data
   - Save parquet metadata from remote object stores
 
+### Limitations
+
+Currently `dft` does not display wide result sets well (because the widget library that we use does not support horizontal scrolling - we are working with them to see what we can do about this).  As a result, when working with wide data sets its best to be selective with the columns that you would like to view in the ouput.
   
 ## `dft` CLI
 
@@ -266,3 +269,15 @@ The FlightSQL config is where you can define the connection URL for the FlightSQ
 [flight_sql]
 connection_url = "http://localhost:50051"
 ```
+
+#### Editor Config
+
+The editor config is where you can set your preferred editor settings.
+
+Currently only syntax highlighting is supported.  It is experimental because currently the regex that is used to determine keywords only works in simple cases.
+
+```toml
+[editor]
+experimental_syntax_highlighting = true
+```
+
