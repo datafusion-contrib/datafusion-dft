@@ -33,8 +33,12 @@ async fn main() -> Result<()> {
         env_logger::init();
         let state = state::initialize(cli.config_path());
         let execution = ExecutionContext::try_new(&state.config.execution)?;
+        #[cfg(feature = "flightsql")]
+        execution
+            .create_flightsql_client(state.config.flightsql)
+            .await?;
         let app = CliApp::new(execution);
-        app.execute_files_or_commands(cli.files.clone(), cli.commands.clone())
+        app.execute_files_or_commands(cli.files.clone(), cli.commands.clone(), cli.flightsql)
             .await?;
     }
     // UI mode: running the TUI

@@ -57,6 +57,9 @@ pub struct DftArgs {
 
     #[clap(long, help = "Path to the configuration file")]
     pub config: Option<String>,
+
+    #[clap(long, help = "Use the FlightSQL client defined in your config")]
+    pub flightsql: bool,
 }
 
 impl DftArgs {
