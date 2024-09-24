@@ -42,3 +42,54 @@ async fn test_create_table_ddl() {
     ];
     assert_batches_eq!(expected, &batches);
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_create_table_in_new_schema() {
+    let mut test_app = TestApp::new();
+
+    let create_schema = "CREATE SCHEMA foo;";
+    let create_table = "CREATE TABLE foo.bar AS VALUES (1);";
+    let combined = [create_schema, create_table].join(";");
+    test_app
+        .handle_app_event(AppEvent::ExecuteDDL(combined))
+        .unwrap();
+    test_app.wait_for_ddl().await;
+
+    let sql = "SELECT * FROM foo.bar;";
+    let batches = test_app.execute_sql(sql).await.unwrap();
+
+    let expected = [
+        "+---------+",
+        "| column1 |",
+        "+---------+",
+        "| 1       |",
+        "+---------+",
+    ];
+    assert_batches_eq!(expected, &batches);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_create_table_in_new_catalog() {
+    let mut test_app = TestApp::new();
+
+    let create_catalog = "CREATE DATABASE foo;";
+    let create_schema = "CREATE SCHEMA foo.bar;";
+    let create_table = "CREATE TABLE foo.bar.baz AS VALUES (1);";
+    let combined = [create_catalog, create_schema, create_table].join(";");
+    test_app
+        .handle_app_event(AppEvent::ExecuteDDL(combined))
+        .unwrap();
+    test_app.wait_for_ddl().await;
+
+    let sql = "SELECT * FROM foo.bar.baz;";
+    let batches = test_app.execute_sql(sql).await.unwrap();
+
+    let expected = [
+        "+---------+",
+        "| column1 |",
+        "+---------+",
+        "| 1       |",
+        "+---------+",
+    ];
+    assert_batches_eq!(expected, &batches);
+}
