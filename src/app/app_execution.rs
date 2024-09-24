@@ -61,7 +61,6 @@ impl AppExecution {
     /// Error handling: If an error occurs while executing a query, the error is
     /// logged and execution continues
     pub async fn run_sqls(
-        // &self,
         self: Arc<Self>,
         sqls: Vec<String>,
         sender: UnboundedSender<AppEvent>,
