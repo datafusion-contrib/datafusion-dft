@@ -163,7 +163,7 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                 })
                 .collect();
             let ctx = app.execution.session_ctx().clone();
-            tokio::spawn(async move {
+            let handle = tokio::spawn(async move {
                 for q in queries {
                     info!("Executing DDL: {:?}", q);
                     match ctx.sql(&q).await {
@@ -178,6 +178,7 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                     }
                 }
             });
+            app.ddl_task = Some(handle);
         }
         AppEvent::NewExecution => {
             app.state.sql_tab.reset_execution_results();

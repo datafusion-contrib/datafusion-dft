@@ -16,6 +16,8 @@
 // under the License.
 //
 
+use datafusion::arrow::array::RecordBatch;
+use datafusion::common::Result;
 use dft::{
     app::{state::initialize, App, AppEvent},
     execution::ExecutionContext,
@@ -42,7 +44,8 @@ impl<'app> TestApp<'app> {
         let config_path = tempdir().unwrap();
         let state = initialize(config_path.path().to_path_buf());
         let execution = ExecutionContext::try_new(&state.config.execution).unwrap();
-        let app = App::new(state, execution);
+        let mut app = App::new(state, execution);
+        app.enter(false).unwrap();
         Self { config_path, app }
     }
 
@@ -54,5 +57,16 @@ impl<'app> TestApp<'app> {
     /// Return the app state
     pub fn state(&self) -> &dft::app::state::AppState {
         self.app.state()
+    }
+
+    pub async fn wait_for_ddl(&mut self) {
+        if let Some(handle) = self.app.ddl_task().take() {
+            handle.await.unwrap();
+        }
+    }
+
+    pub async fn execute_sql(&self, sql: &str) -> Result<Vec<RecordBatch>> {
+        let ctx = self.app.execution().session_ctx().clone();
+        ctx.sql(sql).await.unwrap().collect().await
     }
 }

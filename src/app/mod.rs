@@ -42,7 +42,6 @@ use tokio_util::sync::CancellationToken;
 
 use self::app_execution::AppExecution;
 use self::handlers::{app_event_handler, crossterm_event_handler};
-use self::state::tabs::sql::Query;
 use crate::execution::ExecutionContext;
 
 #[cfg(feature = "flightsql")]
@@ -121,7 +120,6 @@ pub enum AppEvent {
     Resize(u16, u16),
     ExecuteDDL(String),
     NewExecution,
-    QueryResult(Query),
     ExecutionResultsNextPage(ExecutionResultsBatch),
     ExecutionResultsPreviousPage,
     ExecutionResultsError(ExecutionError),
@@ -138,6 +136,7 @@ pub struct App<'app> {
     event_rx: UnboundedReceiver<AppEvent>,
     cancellation_token: CancellationToken,
     task: JoinHandle<()>,
+    ddl_task: Option<JoinHandle<()>>,
 }
 
 impl<'app> App<'app> {
@@ -145,6 +144,7 @@ impl<'app> App<'app> {
         let (event_tx, event_rx) = mpsc::unbounded_channel();
         let cancellation_token = CancellationToken::new();
         let task = tokio::spawn(async {});
+        // let ddl_task = tokio::spawn(async {});
         let app_execution = Arc::new(AppExecution::new(Arc::new(execution)));
 
         Self {
@@ -154,11 +154,16 @@ impl<'app> App<'app> {
             event_tx,
             cancellation_token,
             execution: app_execution,
+            ddl_task: None,
         }
     }
 
     pub fn event_tx(&self) -> UnboundedSender<AppEvent> {
         self.event_tx.clone()
+    }
+
+    pub fn ddl_task(&mut self) -> &mut Option<JoinHandle<()>> {
+        &mut self.ddl_task
     }
 
     pub fn event_rx(&mut self) -> &mut UnboundedReceiver<AppEvent> {
@@ -181,6 +186,10 @@ impl<'app> App<'app> {
         &self.state
     }
 
+    pub fn state_mut(&mut self) -> &mut state::AppState<'app> {
+        &mut self.state
+    }
+
     /// Enter app, optionally setup `crossterm` with UI settings such as alternative screen and
     /// mouse capture, then start event loop.
     pub fn enter(&mut self, ui: bool) -> Result<()> {
@@ -194,7 +203,7 @@ impl<'app> App<'app> {
                 ratatui::crossterm::execute!(std::io::stdout(), event::EnableBracketedPaste)?;
             }
         }
-        self.start_event_loop();
+        self.start_app_event_loop();
         Ok(())
     }
 
@@ -293,8 +302,10 @@ impl<'app> App<'app> {
         });
     }
 
+    /// Execute DDL from users DDL file
     pub fn execute_ddl(&mut self) {
         if let Some(user_dirs) = directories::UserDirs::new() {
+            // TODO: Move to ~/.config/ddl
             let datafusion_rc_path = user_dirs
                 .home_dir()
                 .join(".datafusion")
@@ -321,11 +332,6 @@ impl<'app> App<'app> {
         let _ = self.event_tx().send(AppEvent::EstablishFlightSQLConnection);
     }
 
-    /// Dispatch to the appropriate event loop based on the command
-    pub fn start_event_loop(&mut self) {
-        self.start_app_event_loop()
-    }
-
     /// Get the next event from event loop
     pub async fn next(&mut self) -> Result<AppEvent> {
         self.event_rx()
@@ -348,6 +354,20 @@ impl<'app> App<'app> {
             .padding("", "")
             .divider(" ")
             .render(area, buf);
+    }
+
+    pub async fn loop_without_render(&mut self) -> Result<()> {
+        self.enter(true)?;
+        // Main loop for handling events
+        loop {
+            let event = self.next().await?;
+
+            self.handle_app_event(event)?;
+
+            if self.state.should_quit {
+                break Ok(());
+            }
+        }
     }
 }
 
