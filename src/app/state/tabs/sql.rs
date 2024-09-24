@@ -16,8 +16,8 @@
 // under the License.
 
 use core::cell::RefCell;
-use std::time::Duration;
 
+use color_eyre::Result;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::sql::sqlparser::keywords;
 use ratatui::crossterm::event::KeyEvent;
@@ -29,81 +29,6 @@ use tui_textarea::TextArea;
 
 use crate::app::ExecutionError;
 use crate::config::AppConfig;
-use crate::execution::ExecutionStats;
-
-#[derive(Clone, Debug)]
-pub struct Query {
-    sql: String,
-    results: Option<Vec<RecordBatch>>,
-    num_rows: Option<usize>,
-    error: Option<String>,
-    execution_time: Duration,
-    execution_stats: Option<ExecutionStats>,
-}
-
-impl Query {
-    pub fn new(
-        sql: String,
-        results: Option<Vec<RecordBatch>>,
-        num_rows: Option<usize>,
-        error: Option<String>,
-        execution_time: Duration,
-        execution_stats: Option<ExecutionStats>,
-    ) -> Self {
-        Self {
-            sql,
-            results,
-            num_rows,
-            error,
-            execution_time,
-            execution_stats,
-        }
-    }
-
-    pub fn sql(&self) -> &String {
-        &self.sql
-    }
-
-    pub fn execution_time(&self) -> &Duration {
-        &self.execution_time
-    }
-
-    pub fn set_results(&mut self, results: Option<Vec<RecordBatch>>) {
-        self.results = results;
-    }
-
-    pub fn results(&self) -> &Option<Vec<RecordBatch>> {
-        &self.results
-    }
-
-    pub fn set_num_rows(&mut self, num_rows: Option<usize>) {
-        self.num_rows = num_rows;
-    }
-
-    pub fn num_rows(&self) -> &Option<usize> {
-        &self.num_rows
-    }
-
-    pub fn set_error(&mut self, error: Option<String>) {
-        self.error = error;
-    }
-
-    pub fn error(&self) -> &Option<String> {
-        &self.error
-    }
-
-    pub fn set_execution_time(&mut self, elapsed_time: Duration) {
-        self.execution_time = elapsed_time;
-    }
-
-    pub fn execution_stats(&self) -> &Option<ExecutionStats> {
-        &self.execution_stats
-    }
-
-    pub fn set_execution_stats(&mut self, stats: Option<ExecutionStats>) {
-        self.execution_stats = stats;
-    }
-}
 
 pub fn get_keywords() -> Vec<String> {
     keywords::ALL_KEYWORDS
@@ -130,12 +55,11 @@ pub fn keyword_style() -> Style {
 pub struct SQLTabState<'app> {
     editor: TextArea<'app>,
     editor_editable: bool,
-    query: Option<Query>,
     query_results_state: Option<RefCell<TableState>>,
     result_batches: Option<Vec<RecordBatch>>,
     results_page: Option<usize>,
     execution_error: Option<ExecutionError>,
-    execution_task: Option<JoinHandle<()>>,
+    execution_task: Option<JoinHandle<Result<()>>>,
 }
 
 impl<'app> SQLTabState<'app> {
@@ -151,7 +75,6 @@ impl<'app> SQLTabState<'app> {
         Self {
             editor: textarea,
             editor_editable: false,
-            query: None,
             query_results_state: None,
             result_batches: None,
             results_page: None,
@@ -216,14 +139,6 @@ impl<'app> SQLTabState<'app> {
 
     pub fn editor_editable(&self) -> bool {
         self.editor_editable
-    }
-
-    pub fn set_query(&mut self, query: Query) {
-        self.query = Some(query);
-    }
-
-    pub fn query(&self) -> &Option<Query> {
-        &self.query
     }
 
     // TODO: Create Editor struct and move this there
@@ -292,11 +207,11 @@ impl<'app> SQLTabState<'app> {
         }
     }
 
-    pub fn execution_task(&mut self) -> &mut Option<JoinHandle<()>> {
+    pub fn execution_task(&mut self) -> &mut Option<JoinHandle<Result<()>>> {
         &mut self.execution_task
     }
 
-    pub fn set_execution_task(&mut self, task: JoinHandle<()>) {
+    pub fn set_execution_task(&mut self, task: JoinHandle<Result<()>>) {
         self.execution_task = Some(task);
     }
 }

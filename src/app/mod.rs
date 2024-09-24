@@ -42,7 +42,6 @@ use tokio_util::sync::CancellationToken;
 
 use self::app_execution::AppExecution;
 use self::handlers::{app_event_handler, crossterm_event_handler};
-use self::state::tabs::sql::Query;
 use crate::execution::ExecutionContext;
 
 #[cfg(feature = "flightsql")]
@@ -121,7 +120,6 @@ pub enum AppEvent {
     Resize(u16, u16),
     ExecuteDDL(String),
     NewExecution,
-    QueryResult(Query),
     ExecutionResultsNextPage(ExecutionResultsBatch),
     ExecutionResultsPreviousPage,
     ExecutionResultsError(ExecutionError),
@@ -205,7 +203,7 @@ impl<'app> App<'app> {
                 ratatui::crossterm::execute!(std::io::stdout(), event::EnableBracketedPaste)?;
             }
         }
-        self.start_event_loop();
+        self.start_app_event_loop();
         Ok(())
     }
 
@@ -334,11 +332,6 @@ impl<'app> App<'app> {
         let _ = self.event_tx().send(AppEvent::EstablishFlightSQLConnection);
     }
 
-    /// Dispatch to the appropriate event loop based on the command
-    pub fn start_event_loop(&mut self) {
-        self.start_app_event_loop()
-    }
-
     /// Get the next event from event loop
     pub async fn next(&mut self) -> Result<AppEvent> {
         self.event_rx()
@@ -361,6 +354,20 @@ impl<'app> App<'app> {
             .padding("", "")
             .divider(" ")
             .render(area, buf);
+    }
+
+    pub async fn loop_without_render(&mut self) -> Result<()> {
+        self.enter(true)?;
+        // Main loop for handling events
+        loop {
+            let event = self.next().await?;
+
+            self.handle_app_event(event)?;
+
+            if self.state.should_quit {
+                break Ok(());
+            }
+        }
     }
 }
 

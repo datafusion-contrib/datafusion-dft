@@ -62,12 +62,8 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
             info!("Running query: {}", sql);
             let _event_tx = app.event_tx().clone();
             let execution = Arc::clone(&app.execution);
-            // TODO: Extract this into function to be used in both normal and editable handler.
-            // Only useful if we get Ctrl / Cmd + Enter to work in editable mode though.
-            let handle = tokio::spawn(async move {
-                let sqls: Vec<&str> = sql.split(';').collect();
-                let _ = execution.run_sqls(sqls, _event_tx).await;
-            });
+            let sqls: Vec<String> = sql.split(';').map(|s| s.to_string()).collect();
+            let handle = tokio::spawn(execution.run_sqls(sqls, _event_tx));
             app.state.sql_tab.set_execution_task(handle);
         }
         KeyCode::Right => {

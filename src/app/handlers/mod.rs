@@ -163,21 +163,16 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                 })
                 .collect();
             let ctx = app.execution.session_ctx().clone();
-            println!("Queries: {:?}", queries);
             let handle = tokio::spawn(async move {
-                println!("In task");
                 for q in queries {
                     info!("Executing DDL: {:?}", q);
-                    println!("Executing DDL: {:?}", q);
                     match ctx.sql(&q).await {
                         Ok(df) => {
                             if df.collect().await.is_ok() {
-                                println!("Successful DDL");
                                 info!("Successful DDL");
                             }
                         }
                         Err(e) => {
-                            println!("Error executing DDL {:?}: {:?}", q, e);
                             error!("Error executing DDL {:?}: {:?}", q, e);
                         }
                     }

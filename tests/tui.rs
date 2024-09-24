@@ -17,6 +17,7 @@
 //
 
 use datafusion::arrow::array::RecordBatch;
+use datafusion::common::Result;
 use dft::{
     app::{state::initialize, App, AppEvent},
     execution::ExecutionContext,
@@ -43,7 +44,8 @@ impl<'app> TestApp<'app> {
         let config_path = tempdir().unwrap();
         let state = initialize(config_path.path().to_path_buf());
         let execution = ExecutionContext::try_new(&state.config.execution).unwrap();
-        let app = App::new(state, execution);
+        let mut app = App::new(state, execution);
+        app.enter(false).unwrap();
         Self { config_path, app }
     }
 
@@ -63,21 +65,8 @@ impl<'app> TestApp<'app> {
         }
     }
 
-    pub async fn wait_for_execution(&mut self) {
-        if let Some(handle) = self.app.state_mut().sql_tab.execution_task().take() {
-            handle.await.unwrap();
-        }
-    }
-
-    /// Run SQLs
-    pub async fn run_sqls(&mut self, sql: String) {
-        let exec = self.app.execution();
-        let _tx = self.app.event_tx().clone();
-        let sqls = sql.split(';').collect();
-        exec.run_sqls(sqls, _tx).await.unwrap();
-    }
-
-    pub fn current_batch(&self) -> Option<&RecordBatch> {
-        self.app.state().sql_tab.current_batch()
+    pub async fn execute_sql(&self, sql: &str) -> Result<Vec<RecordBatch>> {
+        let ctx = self.app.execution().session_ctx().clone();
+        ctx.sql(sql).await.unwrap().collect().await
     }
 }

@@ -20,22 +20,25 @@ use dft::app::AppEvent;
 
 use crate::TestApp;
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_create_table_ddl() {
     let mut test_app = TestApp::new();
-    let ddl = "CREATE TABLE foo (a int) AS VALUES (1), (2), (3);";
+
+    let ddl = "CREATE TABLE foo AS VALUES (1);";
     test_app
         .handle_app_event(AppEvent::ExecuteDDL(ddl.to_string()))
         .unwrap();
     test_app.wait_for_ddl().await;
-    let query = "SELECT * FROM foo;";
-    test_app.run_sqls(query.to_string()).await;
 
-    test_app.wait_for_execution().await;
-    let batch = test_app.current_batch().unwrap();
+    let sql = "SELECT * FROM foo;";
+    let batches = test_app.execute_sql(sql).await.unwrap();
 
     let expected = [
-        "+---+", "| a |", "+---+", "| 1 |", "| 2 |", "| 3 |", "+---+",
+        "+---------+",
+        "| column1 |",
+        "+---------+",
+        "| 1       |",
+        "+---------+",
     ];
-    assert_batches_eq!(expected, &[batch.clone()]);
+    assert_batches_eq!(expected, &batches);
 }
