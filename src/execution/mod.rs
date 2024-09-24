@@ -23,6 +23,8 @@ use std::sync::Arc;
 
 pub use stats::{collect_plan_stats, ExecutionStats};
 
+use crate::config::ExecutionConfig;
+use crate::extensions::{enabled_extensions, DftSessionStateBuilder};
 use color_eyre::eyre::Result;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::ExecutionPlan;
@@ -31,12 +33,9 @@ use datafusion::sql::parser::Statement;
 use tokio_stream::StreamExt;
 #[cfg(feature = "flightsql")]
 use {
-    arrow_flight::sql::client::FlightSqlServiceClient, tokio::sync::Mutex,
-    tonic::transport::Channel,
+    crate::config::FlightSQLConfig, arrow_flight::sql::client::FlightSqlServiceClient,
+    tokio::sync::Mutex, tonic::transport::Channel,
 };
-
-use crate::config::{ExecutionConfig, FlightSQLConfig};
-use crate::extensions::{enabled_extensions, DftSessionStateBuilder};
 
 /// Structure for executing queries either locally or remotely (via FlightSQL)
 ///
