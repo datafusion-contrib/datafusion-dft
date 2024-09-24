@@ -42,7 +42,7 @@ impl CliApp {
         Self { execution }
     }
 
-    /// Execute the provide sql, which was passed as an argument from CLI.
+    /// Execute the provided sql, which was passed as an argument from CLI.
     ///
     /// Optionally, use the FlightSQL client for execution.
     pub async fn execute_files_or_commands(
@@ -54,7 +54,7 @@ impl CliApp {
         #[cfg(not(feature = "flightsql"))]
         match (files.is_empty(), commands.is_empty(), flightsql) {
             (_, _, true) => Err(eyre!(
-                "FLightSQL feature isn't enabled. Reinstall with `--features=flightsql`"
+                "FLightSQL feature isn't enabled. Reinstall `dft` with `--features=flightsql`"
             )),
             (true, true, _) => Err(eyre!("No files or commands provided to execute")),
             (false, true, _) => self.execute_files(files).await,
