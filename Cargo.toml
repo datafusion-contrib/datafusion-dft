@@ -26,6 +26,7 @@ deltalake = { version = "0.19.0", features = ["datafusion"], optional = true }
 directories = "5.0.1"
 env_logger = "0.11.5"
 futures = "0.3.30"
+http = "0.2.9"
 itertools = "0.13.0"
 lazy_static = "1.4.0"
 log = "0.4.22"
@@ -44,9 +45,14 @@ url = { version = "2.5.2", optional = true }
 
 [dev-dependencies]
 assert_cmd = "2.0.16"
+http-body = "0.4.5"
 insta = { version = "1.40.0", features = ["yaml"] }
+pin-project-lite = "0.2.14"
 predicates = "3.1.2"
 tempfile = "3.2.0"
+tokio-stream = { version = "0.1.15", features = ["net"] }
+tower = "0.4.13"
+uuid = "1.10.0"
 
 [features]
 deltalake = ["dep:deltalake"]
