@@ -17,7 +17,7 @@
 
 //! Tests for datafusion-function-json integration
 
-use crate::TestExecution;
+use crate::extension_cases::TestExecution;
 
 static TEST_TABLE: &str = r#"
 CREATE TABLE test_table (

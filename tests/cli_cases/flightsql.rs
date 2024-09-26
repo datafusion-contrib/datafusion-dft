@@ -15,11 +15,33 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use crate::common::fixture::{FlightSqlServiceImpl, TestFixture};
+use assert_cmd::Command;
+
+use crate::{
+    cli_cases::contains_str,
+    common::fixture::{FlightSqlServiceImpl, TestFixture},
+};
 
 #[tokio::test]
-pub async fn test_begin_end_transaction() {
+pub async fn test_execute() {
     let test_server = FlightSqlServiceImpl::new();
     let fixture = TestFixture::new(test_server.service()).await;
     let channel = fixture.channel().await;
+
+    let expected = r##"
++---------------------+
+| Int64(1) + Int64(2) |
++---------------------+
+| 3                   |
++---------------------+
+    "##;
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT 1 + 2;")
+        .arg("--flightsql")
+        .assert()
+        .success();
+
+    assert.stdout(contains_str(expected));
 }

@@ -20,7 +20,7 @@
 use assert_cmd::Command;
 use std::path::PathBuf;
 
-use crate::{assert_output_contains, contains_str, sql_in_file};
+use super::{assert_output_contains, contains_str, sql_in_file};
 
 #[test]
 fn test_help() {
