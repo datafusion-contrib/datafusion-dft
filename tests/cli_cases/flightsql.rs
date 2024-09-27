@@ -16,17 +16,31 @@
 // under the License.
 
 use assert_cmd::Command;
+use dft::test_utils::fixture::{FlightSqlServiceImpl, TestFixture};
 
-use crate::{
-    cli_cases::contains_str,
-    common::fixture::{FlightSqlServiceImpl, TestFixture},
-};
+use crate::cli_cases::contains_str;
+
+#[tokio::test]
+pub async fn test_execute_with_no_flightsql_server() {
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT 1 + 2;")
+        .arg("--flightsql")
+        .assert()
+        .failure();
+
+    assert.stderr(contains_str("Error creating channel for FlightSQL client"));
+}
 
 #[tokio::test]
 pub async fn test_execute() {
     let test_server = FlightSqlServiceImpl::new();
-    let fixture = TestFixture::new(test_server.service()).await;
-    let channel = fixture.channel().await;
+    // let ts = TestFlightServer::new();
+    println!("Created test server");
+    let fixture = TestFixture::new(test_server.service(), "localhost:50051").await;
+    println!("Created test fixture");
+    // let channel = fixture.channel().await;
 
     let expected = r##"
 +---------------------+

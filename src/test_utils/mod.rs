@@ -15,9 +15,5 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#[cfg(feature = "flightsql")]
 pub mod fixture;
-#[cfg(feature = "flightsql")]
-pub mod flight_server;
-#[cfg(feature = "flightsql")]
 pub mod trailers_layer;

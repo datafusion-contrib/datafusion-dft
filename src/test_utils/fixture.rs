@@ -19,16 +19,19 @@
 //
 // Ref: https://github.com/apache/arrow-rs/blob/a65e14a5c48d52bc8ab19b56e696a47567328056/arrow-flight/tests/common/fixture.rs
 
-use crate::common::trailers_layer::TrailersLayer;
+use crate::test_utils::trailers_layer::TrailersLayer;
 use arrow_flight::decode::FlightRecordBatchStream;
 use arrow_flight::flight_service_server::{FlightService, FlightServiceServer};
 use arrow_flight::sql::server::{FlightSqlService, PeekableFlightDataStream};
 use arrow_flight::sql::{
     ActionBeginTransactionRequest, ActionBeginTransactionResult, ActionEndTransactionRequest,
-    SqlInfo,
+    CommandStatementQuery, SqlInfo,
 };
-use arrow_flight::Action;
+use arrow_flight::{Action, FlightDescriptor, FlightInfo};
 use datafusion::arrow::array::RecordBatch;
+use datafusion::execution::context::SessionContext;
+use datafusion::sql::parser::DFParser;
+use datafusion::sql::sqlparser::ast::Statement;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -37,20 +40,21 @@ use tokio::net::TcpListener;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tonic::transport::{Channel, Uri};
-use tonic::{Request, Status};
+use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct FlightSqlServiceImpl {
     transactions: Arc<Mutex<HashMap<String, ()>>>,
-    ingested_batches: Arc<Mutex<Vec<RecordBatch>>>,
+    context: SessionContext,
 }
 
 impl FlightSqlServiceImpl {
     pub fn new() -> Self {
+        let context = SessionContext::new();
         Self {
+            context,
             transactions: Arc::new(Mutex::new(HashMap::new())),
-            ingested_batches: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -87,6 +91,28 @@ impl FlightSqlService for FlightSqlServiceImpl {
         })
     }
 
+    async fn get_flight_info_statement(
+        &self,
+        query: CommandStatementQuery,
+        _request: Request<FlightDescriptor>,
+    ) -> Result<Response<FlightInfo>, Status> {
+        let CommandStatementQuery { query, .. } = query;
+        let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
+        let statements = DFParser::parse_sql_with_dialect(&query, &dialect).unwrap();
+        // For testing purposes, we only support a single statement
+        assert_eq!(statements.len(), 1, "Only single statements are supported");
+        let statement = statements[0].clone();
+        let logical_plan = self
+            .context
+            .state()
+            .statement_to_plan(statement)
+            .await
+            .unwrap();
+
+        println!("GOT REQUEST FOR FLIGHT INFO");
+        Err(Status::unimplemented("Not implemented"))
+    }
+
     async fn do_action_end_transaction(
         &self,
         query: ActionEndTransactionRequest,
@@ -107,21 +133,6 @@ impl FlightSqlService for FlightSqlServiceImpl {
     }
 
     async fn register_sql_info(&self, _id: i32, _result: &SqlInfo) {}
-
-    // async fn do_put_statement_ingest(
-    //     &self,
-    //     _ticket: CommandStatementIngest,
-    //     request: Request<PeekableFlightDataStream>,
-    // ) -> Result<i64, Status> {
-    //     let batches: Vec<RecordBatch> = FlightRecordBatchStream::new_from_flight_data(
-    //         request.into_inner().map_err(|e| e.into()),
-    //     )
-    //     .try_collect()
-    //     .await?;
-    //     let affected_rows = batches.iter().map(|batch| batch.num_rows() as i64).sum();
-    //     *self.ingested_batches.lock().await.as_mut() = batches;
-    //     Ok(affected_rows)
-    // }
 }
 
 /// All tests must complete within this many seconds or else the test server is shutdown
@@ -142,9 +153,9 @@ pub struct TestFixture {
 impl TestFixture {
     /// create a new test fixture from the server
     #[allow(dead_code)]
-    pub async fn new<T: FlightService>(test_server: FlightServiceServer<T>) -> Self {
+    pub async fn new<T: FlightService>(test_server: FlightServiceServer<T>, addr: &str) -> Self {
         // let OS choose a free port
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let listener = TcpListener::bind(addr).await.unwrap();
         let addr = listener.local_addr().unwrap();
 
         println!("Listening on {addr}");
