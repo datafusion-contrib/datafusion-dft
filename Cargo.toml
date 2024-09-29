@@ -55,12 +55,12 @@ insta = { version = "1.40.0", features = ["yaml"] }
 predicates = "3.1.2"
 tempfile = "3.2.0"
 
+# When addding a new feature, also add it to the features tested list in CI (`.github/workflows/rust.yml`)
 [features]
 deltalake = ["dep:deltalake"]
 flightsql = ["dep:arrow-flight", "dep:tonic"]
 s3 = ["object_store/aws", "url"]
 functions-json = ["dep:datafusion-functions-json"]
-url = ["dep:url"]
 
 [[bin]]
 name = "dft"

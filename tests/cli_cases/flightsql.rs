@@ -20,7 +20,7 @@ use std::time::Duration;
 use assert_cmd::Command;
 use dft::test_utils::fixture::{FlightSqlServiceImpl, TestFixture};
 
-use crate::cli_cases::contains_str;
+use crate::cli_cases::{contains_str, sql_in_file};
 
 #[tokio::test]
 pub async fn test_execute_with_no_flightsql_server() {
@@ -55,6 +55,103 @@ pub async fn test_execute() {
     .unwrap();
 
     let expected = r##"
++---------------------+
+| Int64(1) + Int64(2) |
++---------------------+
+| 3                   |
++---------------------+
+    "##;
+    assert.stdout(contains_str(expected));
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_execute_multiple_commands() {
+    let test_server = FlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("--flightsql")
+            .arg("-c")
+            .arg("SELECT 1 + 1;")
+            .arg("-c")
+            .arg("SELECT 1 + 2;")
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r##"
++---------------------+
+| Int64(1) + Int64(1) |
++---------------------+
+| 2                   |
++---------------------+
++---------------------+
+| Int64(1) + Int64(2) |
++---------------------+
+| 3                   |
++---------------------+
+    "##;
+    assert.stdout(contains_str(expected));
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_command_in_file() {
+    let test_server = FlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+    let file = sql_in_file("SELECT 1 + 1");
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("--flightsql")
+            .arg("-f")
+            .arg(file.path())
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+    let expected = r##"
++---------------------+
+| Int64(1) + Int64(1) |
++---------------------+
+| 2                   |
++---------------------+
+    "##;
+    assert.stdout(contains_str(expected));
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_command_multiple_files() {
+    let test_server = FlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+    let file1 = sql_in_file("SELECT 1 + 1");
+    let file2 = sql_in_file("SELECT 1 + 2");
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("--flightsql")
+            .arg("-f")
+            .arg(file1.path())
+            .arg("-f")
+            .arg(file2.path())
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+    let expected = r##"
++---------------------+
+| Int64(1) + Int64(1) |
++---------------------+
+| 2                   |
++---------------------+
 +---------------------+
 | Int64(1) + Int64(2) |
 +---------------------+

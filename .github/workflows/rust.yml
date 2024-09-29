@@ -46,9 +46,14 @@ jobs:
           rustup default ${{ matrix.rust }}
           rustup component add rustfmt
       # No tests yet
-      - name: Run tests
+      - name: Run tests (ex-FlightSQL)
         run: |
-          cargo test --all-features
+          # All features except FlightSQL which requires being run on a single thread for determinism
+          cargo test --features=deltalake,s3,functions-json
+      - name: Run FlightSQL tests
+        run: |
+          # All features except FlightSQL which requires being run on a single thread for determinism
+          cargo test --features=flightsql -- --test-threads=1
   fmt:
     name: Rust formatting
     runs-on: ubuntu-latest
