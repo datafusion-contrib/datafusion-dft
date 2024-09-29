@@ -15,6 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use std::time::Duration;
+
 use assert_cmd::Command;
 use dft::test_utils::fixture::{FlightSqlServiceImpl, TestFixture};
 
@@ -22,10 +24,11 @@ use crate::cli_cases::contains_str;
 
 #[tokio::test]
 pub async fn test_execute_with_no_flightsql_server() {
+    let _ = env_logger::builder().is_test(true).try_init();
     let assert = Command::cargo_bin("dft")
         .unwrap()
         .arg("-c")
-        .arg("SELECT 1 + 2;")
+        .arg("SELECT 1 + 3;")
         .arg("--flightsql")
         .assert()
         .failure();
@@ -36,11 +39,20 @@ pub async fn test_execute_with_no_flightsql_server() {
 #[tokio::test]
 pub async fn test_execute() {
     let test_server = FlightSqlServiceImpl::new();
-    // let ts = TestFlightServer::new();
-    println!("Created test server");
-    let fixture = TestFixture::new(test_server.service(), "localhost:50051").await;
-    println!("Created test fixture");
-    // let channel = fixture.channel().await;
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1 + 2;")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
 
     let expected = r##"
 +---------------------+
@@ -49,13 +61,6 @@ pub async fn test_execute() {
 | 3                   |
 +---------------------+
     "##;
-    let assert = Command::cargo_bin("dft")
-        .unwrap()
-        .arg("-c")
-        .arg("SELECT 1 + 2;")
-        .arg("--flightsql")
-        .assert()
-        .success();
-
     assert.stdout(contains_str(expected));
+    fixture.shutdown_and_wait().await;
 }

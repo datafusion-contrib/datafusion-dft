@@ -1555,6 +1555,7 @@ dependencies = [
  "object_store",
  "pin-project-lite",
  "predicates",
+ "prost",
  "ratatui",
  "serde",
  "strum",

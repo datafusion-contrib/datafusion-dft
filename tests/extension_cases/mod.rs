@@ -49,6 +49,7 @@ impl TestExecution {
     }
 
     /// Run the setup SQL query, discarding the result
+    #[allow(dead_code)]
     pub async fn with_setup(self, sql: &str) -> Self {
         debug!("Running setup query: {sql}");
         let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
@@ -70,6 +71,7 @@ impl TestExecution {
     }
 
     /// run the specified SQL query, returning the result as a Vec of [`RecordBatch`]
+    #[allow(dead_code)]
     pub async fn run(&mut self, sql: &str) -> Result<Vec<RecordBatch>> {
         debug!("Running query: {sql}");
         self.execution
@@ -82,12 +84,14 @@ impl TestExecution {
 
     /// Runs the specified SQL query, returning the result as a Vec<String>
     /// suitable for comparison with insta
+    #[allow(dead_code)]
     pub async fn run_and_format(&mut self, sql: &str) -> Vec<String> {
         format_results(&self.run(sql).await.expect("Error running query"))
     }
 }
 
 /// Formats the record batches into a Vec<String> suitable for comparison with insta
+#[allow(dead_code)]
 fn format_results(results: &[RecordBatch]) -> Vec<String> {
     let formatted = pretty_format_batches(results).unwrap().to_string();
 

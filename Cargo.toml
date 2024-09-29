@@ -34,6 +34,7 @@ lazy_static = "1.4.0"
 log = "0.4.22"
 object_store = { version = "0.10.2", features = ["aws"], optional = true }
 pin-project-lite = {version = "0.2.14" }
+prost = "0.12.3"
 ratatui = "0.28.0"
 serde = { version = "1.0.197", features = ["derive"] }
 strum = "0.26.2"
@@ -60,15 +61,10 @@ flightsql = ["dep:arrow-flight", "dep:tonic"]
 s3 = ["object_store/aws", "url"]
 functions-json = ["dep:datafusion-functions-json"]
 url = ["dep:url"]
-flightsql-test-server = ["dep:arrow-flight", "dep:ctrlc", "dep:tonic"]
 
 [[bin]]
 name = "dft"
 path = "src/main.rs"
-
-[[bin]]
-name = "flightsql-test-server"
-path = "src/bin/test_flightsql_server.rs"
 
 [lints.clippy]
 clone_on_ref_ptr = "deny"

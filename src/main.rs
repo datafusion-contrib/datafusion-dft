@@ -34,10 +34,12 @@ async fn main() -> Result<()> {
         let state = state::initialize(cli.config_path());
         let execution = ExecutionContext::try_new(&state.config.execution)?;
         #[cfg(feature = "flightsql")]
-        if cli.flightsql {
-            execution
-                .create_flightsql_client(state.config.flightsql)
-                .await?;
+        {
+            if cli.flightsql {
+                execution
+                    .create_flightsql_client(state.config.flightsql)
+                    .await?;
+            }
         }
         let app = CliApp::new(execution);
         app.execute_files_or_commands(cli.files.clone(), cli.commands.clone(), cli.flightsql)
