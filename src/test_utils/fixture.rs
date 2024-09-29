@@ -15,7 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-// This file was copied from the official arrow-rs repo.
+// This file was originally copied from the official arrow-rs repo, but subsequent modifications
+// have been made.
 //
 // Ref: https://github.com/apache/arrow-rs/blob/a65e14a5c48d52bc8ab19b56e696a47567328056/arrow-flight/tests/common/fixture.rs
 
