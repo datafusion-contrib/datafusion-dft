@@ -55,7 +55,7 @@ jobs:
           # Single thread needed because we spin up a server that listens on port and we need each
           # test to only be run against the server spun up in that test.  With parallelism tests 
           # can connec to server in different test which breaks determinism.
-          cargo test --features=flightsql -- --test-threads=1
+          cargo test --features=flightsql cli_cases::flightsql -- --test-threads=1
   fmt:
     name: Rust formatting
     runs-on: ubuntu-latest
