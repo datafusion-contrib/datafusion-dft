@@ -120,6 +120,7 @@ pub enum AppEvent {
     Resize(u16, u16),
     ExecuteDDL(String),
     NewExecution,
+    NewFlightSQLExecution,
     ExecutionResultsNextPage(ExecutionResultsBatch),
     ExecutionResultsPreviousPage,
     ExecutionResultsError(ExecutionError),

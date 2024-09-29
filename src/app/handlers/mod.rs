@@ -28,11 +28,7 @@ use crate::app::state::tabs::history::Context;
 use crate::app::ExecutionResultsBatch;
 
 #[cfg(feature = "flightsql")]
-use arrow_flight::sql::client::FlightSqlServiceClient;
-#[cfg(feature = "flightsql")]
 use std::sync::Arc;
-#[cfg(feature = "flightsql")]
-use tonic::transport::Channel;
 
 use super::App;
 use crate::app::ui::SelectedTab;
@@ -224,29 +220,18 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
             app.state.history_tab.add_to_history(history_query);
             app.state.history_tab.refresh_history_table_state()
         }
-        // #[cfg(feature = "flightsql")]
-        // AppEvent::EstablishFlightSQLConnection => {
-        //     let url = app.state.config.flightsql.connection_url.clone();
-        //     info!("Connection to FlightSQL host: {}", url);
-        //     let url: &'static str = Box::leak(url.into_boxed_str());
-        //     let execution = Arc::clone(&app.execution);
-        //     tokio::spawn(async move {
-        //         let client = execution.flightsql_client();
-        //         let maybe_channel = Channel::from_static(url).connect().await;
-        //         info!("Created channel");
-        //         match maybe_channel {
-        //             Ok(channel) => {
-        //                 let flightsql_client = FlightSqlServiceClient::new(channel);
-        //                 let mut locked_client = client.lock().await;
-        //                 *locked_client = Some(flightsql_client);
-        //                 info!("Connected to FlightSQL host");
-        //             }
-        //             Err(e) => {
-        //                 info!("Error creating channel for FlightSQL: {:?}", e);
-        //             }
-        //         }
-        //     });
-        // }
+        #[cfg(feature = "flightsql")]
+        AppEvent::EstablishFlightSQLConnection => {
+            let execution = Arc::clone(&app.execution);
+            let flightsql_config = app.state.config.flightsql.clone();
+            tokio::spawn(async move {
+                if let Err(e) = execution.create_flightsql_client(flightsql_config).await {
+                    error!("Error creating FlightSQL client: {:?}", e);
+                } else {
+                    info!("Created FlightSQL client");
+                }
+            });
+        }
         _ => {
             match app.state.tabs.selected {
                 SelectedTab::SQL => sql::app_event_handler(app, event),

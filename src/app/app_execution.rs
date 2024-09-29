@@ -29,6 +29,12 @@ use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Mutex;
 
+#[cfg(feature = "flightsql")]
+use {
+    crate::config::FlightSQLConfig, arrow_flight::sql::client::FlightSqlServiceClient,
+    tonic::transport::Channel,
+};
+
 /// Handles executing queries for the TUI application, formatting results
 /// and sending them to the UI.
 pub struct AppExecution {
@@ -54,8 +60,8 @@ impl AppExecution {
         *s = Some(stream)
     }
 
-    /// Run the sequence of SQL queries, sending the results as [`AppEvent::QueryResult`] via the sender.
-    ///
+    /// Run the sequence of SQL queries, sending the results as
+    /// [`AppEvent::ExecutionResultsBatch`].
     /// All queries except the last one will have their results discarded.
     ///
     /// Error handling: If an error occurs while executing a query, the error is
@@ -141,6 +147,32 @@ impl AppExecution {
         Ok(())
     }
 
+    pub async fn run_flightsqls(
+        self: Arc<Self>,
+        sqls: Vec<String>,
+        sender: UnboundedSender<AppEvent>,
+    ) -> Result<()> {
+        info!("Running sqls: {:?}", sqls);
+        let non_empty_sqls: Vec<String> = sqls.into_iter().filter(|s| !s.is_empty()).collect();
+        let statement_count = non_empty_sqls.len();
+        for (i, sql) in non_empty_sqls.into_iter().enumerate() {
+            let _sender = sender.clone();
+            let start = std::time::Instant::now();
+            if i == statement_count - 1 {
+                info!("Executing last query and display results");
+                sender.send(AppEvent::NewFlightSQLExecution)?;
+                if let Some(ref mut client) = *self.flightsql_client().lock().await {
+                    match client.execute(sql, None).await {
+                        Ok(flight_info) => {}
+                        Err(e) => {}
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     pub async fn next_batch(&self, sql: String, sender: UnboundedSender<AppEvent>) {
         let mut stream = self.result_stream.lock().await;
         if let Some(s) = stream.as_mut() {
@@ -162,5 +194,15 @@ impl AppExecution {
                 }
             }
         }
+    }
+
+    #[cfg(feature = "flightsql")]
+    pub async fn create_flightsql_client(&self, config: FlightSQLConfig) -> Result<()> {
+        self.inner.create_flightsql_client(config).await
+    }
+
+    #[cfg(feature = "flightsql")]
+    pub fn flightsql_client(&self) -> &Mutex<Option<FlightSqlServiceClient<Channel>>> {
+        self.inner.flightsql_client()
     }
 }

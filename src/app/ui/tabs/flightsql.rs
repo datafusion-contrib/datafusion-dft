@@ -20,7 +20,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{palette::tailwind, Style, Stylize},
     text::Span,
-    widgets::{Block, Borders, Paragraph, Row, StatefulWidget, Table, Widget},
+    widgets::{block::Title, Block, Borders, Paragraph, Row, StatefulWidget, Table, Widget},
 };
 
 use crate::app::ui::convert::record_batches_to_table;
@@ -43,49 +43,105 @@ pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
 }
 
 pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
-    let block = Block::default().title(" Results ").borders(Borders::ALL);
-    if let Some(q) = app.state.flightsql_tab.query() {
-        if let Some(r) = q.results() {
-            if let Some(s) = app.state.flightsql_tab.query_results_state() {
-                let stats = Span::from(format!(
-                    " {} rows in {}ms ",
-                    q.num_rows().unwrap_or(0),
-                    q.execution_time().as_millis()
-                ))
-                .fg(tailwind::WHITE);
-                let block = block.title_bottom(stats).fg(tailwind::ORANGE.c500);
-                // let maybe_table = record_batches_to_table(r);
-                // match maybe_table {
-                //     Ok(table) => {
-                //         let table = table
-                //             .highlight_style(
-                //                 Style::default().bg(tailwind::WHITE).fg(tailwind::BLACK),
-                //             )
-                //             .block(block);
-                //
-                //         let mut s = s.borrow_mut();
-                //         StatefulWidget::render(table, area, buf, &mut s);
-                //     }
-                //     Err(e) => {
-                //         let row = Row::new(vec![e.to_string()]);
-                //         let widths = vec![Constraint::Percentage(100)];
-                //         let table = Table::new(vec![row], widths).block(block);
-                //         Widget::render(table, area, buf);
-                //     }
-                // }
+    let flightsql_tab = &app.state.flightsql_tab;
+    match (
+        flightsql_tab.current_page(),
+        flightsql_tab.current_page_results(),
+        flightsql_tab.query_results_state(),
+        flightsql_tab.execution_error(),
+    ) {
+        (Some(page), Some(batch), Some(s), None) => {
+            let block = Block::default()
+                .title(" Results ")
+                .borders(Borders::ALL)
+                .title(Title::from(format!(" Page {page} ")).alignment(Alignment::Right));
+            let batches = vec![batch];
+            let maybe_table = record_batches_to_table(&batches);
+
+            let block = block.title_bottom("Stats").fg(tailwind::ORANGE.c500);
+            match maybe_table {
+                Ok(table) => {
+                    let table = table
+                        .highlight_style(Style::default().bg(tailwind::WHITE).fg(tailwind::BLACK))
+                        .block(block);
+
+                    let mut s = s.borrow_mut();
+                    StatefulWidget::render(table, area, buf, &mut s);
+                }
+                Err(e) => {
+                    let row = Row::new(vec![e.to_string()]);
+                    let widths = vec![Constraint::Percentage(100)];
+                    let table = Table::new(vec![row], widths).block(block);
+                    Widget::render(table, area, buf);
+                }
             }
-        } else if let Some(e) = q.error() {
-            let row = Row::new(vec![e.to_string()]);
+        }
+        (None, None, None, Some(e)) => {
+            let dur = e.duration().as_millis();
+            let block = Block::default()
+                .title(" Results ")
+                .borders(Borders::ALL)
+                .title(Title::from(" Page ").alignment(Alignment::Right))
+                .title_bottom(format!(" {}ms ", dur));
+            let row = Row::new(vec![e.error().to_string()]);
             let widths = vec![Constraint::Percentage(100)];
             let table = Table::new(vec![row], widths).block(block);
             Widget::render(table, area, buf);
         }
-    } else {
-        let row = Row::new(vec!["Run a query to generate results"]);
-        let widths = vec![Constraint::Percentage(100)];
-        let table = Table::new(vec![row], widths).block(block);
-        Widget::render(table, area, buf);
+        _ => {
+            let block = Block::default()
+                .title(" Results ")
+                .borders(Borders::ALL)
+                .title(Title::from(" Page ").alignment(Alignment::Right));
+            let row = Row::new(vec!["Run a query to generate results"]);
+            let widths = vec![Constraint::Percentage(100)];
+            let table = Table::new(vec![row], widths).block(block);
+            Widget::render(table, area, buf);
+        }
     }
+    // let block = Block::default().title(" Results ").borders(Borders::ALL);
+    // if let Some(q) = app.state.flightsql_tab.query() {
+    //     if let Some(r) = q.results() {
+    //         if let Some(s) = app.state.flightsql_tab.query_results_state() {
+    //             let stats = Span::from(format!(
+    //                 " {} rows in {}ms ",
+    //                 q.num_rows().unwrap_or(0),
+    //                 q.execution_time().as_millis()
+    //             ))
+    //             .fg(tailwind::WHITE);
+    //             let block = block.title_bottom(stats).fg(tailwind::ORANGE.c500);
+    //             // let maybe_table = record_batches_to_table(r);
+    //             // match maybe_table {
+    //             //     Ok(table) => {
+    //             //         let table = table
+    //             //             .highlight_style(
+    //             //                 Style::default().bg(tailwind::WHITE).fg(tailwind::BLACK),
+    //             //             )
+    //             //             .block(block);
+    //             //
+    //             //         let mut s = s.borrow_mut();
+    //             //         StatefulWidget::render(table, area, buf, &mut s);
+    //             //     }
+    //             //     Err(e) => {
+    //             //         let row = Row::new(vec![e.to_string()]);
+    //             //         let widths = vec![Constraint::Percentage(100)];
+    //             //         let table = Table::new(vec![row], widths).block(block);
+    //             //         Widget::render(table, area, buf);
+    //             //     }
+    //             // }
+    //         }
+    //     } else if let Some(e) = q.error() {
+    //         let row = Row::new(vec![e.to_string()]);
+    //         let widths = vec![Constraint::Percentage(100)];
+    //         let table = Table::new(vec![row], widths).block(block);
+    //         Widget::render(table, area, buf);
+    //     }
+    // } else {
+    //     let row = Row::new(vec!["Run a query to generate results"]);
+    //     let widths = vec![Constraint::Percentage(100)];
+    //     let table = Table::new(vec![row], widths).block(block);
+    //     Widget::render(table, area, buf);
+    // }
 }
 
 pub fn render_sql_help(area: Rect, buf: &mut Buffer, app: &App) {
