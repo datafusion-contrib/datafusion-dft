@@ -18,14 +18,18 @@
 
 use crate::execution::ExecutionContext;
 use color_eyre::eyre::eyre;
+use color_eyre::Result;
+use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::util::pretty::pretty_format_batches;
-use datafusion::execution::SendableRecordBatchStream;
 use datafusion::sql::parser::DFParser;
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 use log::info;
+use std::error::Error;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
+#[cfg(feature = "flightsql")]
+use tonic::IntoRequest;
 
 /// Encapsulates the command line interface
 pub struct CliApp {
@@ -38,16 +42,35 @@ impl CliApp {
         Self { execution }
     }
 
+    /// Execute the provided sql, which was passed as an argument from CLI.
+    ///
+    /// Optionally, use the FlightSQL client for execution.
     pub async fn execute_files_or_commands(
         &self,
         files: Vec<PathBuf>,
         commands: Vec<String>,
+        flightsql: bool,
     ) -> color_eyre::Result<()> {
-        match (files.is_empty(), commands.is_empty()) {
-            (true, true) => Err(eyre!("No files or commands provided to execute")),
-            (false, true) => self.execute_files(files).await,
-            (true, false) => self.execute_commands(commands).await,
-            (false, false) => Err(eyre!(
+        #[cfg(not(feature = "flightsql"))]
+        match (files.is_empty(), commands.is_empty(), flightsql) {
+            (_, _, true) => Err(eyre!(
+                "FLightSQL feature isn't enabled. Reinstall `dft` with `--features=flightsql`"
+            )),
+            (true, true, _) => Err(eyre!("No files or commands provided to execute")),
+            (false, true, _) => self.execute_files(files).await,
+            (true, false, _) => self.execute_commands(commands).await,
+            (false, false, _) => Err(eyre!(
+                "Cannot execute both files and commands at the same time"
+            )),
+        }
+        #[cfg(feature = "flightsql")]
+        match (files.is_empty(), commands.is_empty(), flightsql) {
+            (true, true, _) => Err(eyre!("No files or commands provided to execute")),
+            (false, true, true) => self.flightsql_execute_files(files).await,
+            (false, true, false) => self.execute_files(files).await,
+            (true, false, true) => self.flightsql_execute_commands(commands).await,
+            (true, false, false) => self.execute_commands(commands).await,
+            (false, false, _) => Err(eyre!(
                 "Cannot execute both files and commands at the same time"
             )),
         }
@@ -61,10 +84,51 @@ impl CliApp {
 
         Ok(())
     }
+
+    #[cfg(feature = "flightsql")]
+    async fn flightsql_execute_files(&self, files: Vec<PathBuf>) -> color_eyre::Result<()> {
+        info!("Executing files: {:?}", files);
+        for file in files {
+            let file = std::fs::read_to_string(file)?;
+            self.exec_from_flightsql(file).await?;
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "flightsql")]
+    async fn exec_from_flightsql(&self, sql: String) -> color_eyre::Result<()> {
+        let client = self.execution.flightsql_client();
+        let mut guard = client.lock().await;
+        if let Some(client) = guard.as_mut() {
+            let flight_info = client.execute(sql, None).await?;
+            for endpoint in flight_info.endpoint {
+                if let Some(ticket) = endpoint.ticket {
+                    let stream = client.do_get(ticket.into_request()).await?;
+                    self.print_any_stream(stream).await;
+                }
+            }
+        } else {
+            println!("No FlightSQL client configured.  Add one in `~/.config/dft/config.toml`");
+        }
+
+        Ok(())
+    }
+
     async fn execute_commands(&self, commands: Vec<String>) -> color_eyre::Result<()> {
         info!("Executing commands: {:?}", commands);
         for command in commands {
             self.exec_from_string(&command).await?
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "flightsql")]
+    async fn flightsql_execute_commands(&self, commands: Vec<String>) -> color_eyre::Result<()> {
+        info!("Executing commands: {:?}", commands);
+        for command in commands {
+            self.exec_from_flightsql(command).await?
         }
 
         Ok(())
@@ -75,7 +139,7 @@ impl CliApp {
         let statements = DFParser::parse_sql_with_dialect(sql, &dialect)?;
         for statement in statements {
             let stream = self.execution.execute_statement(statement).await?;
-            self.print_stream(stream).await;
+            self.print_any_stream(stream).await;
         }
         Ok(())
     }
@@ -122,12 +186,15 @@ impl CliApp {
     /// executes a sql statement and prints the result to stdout
     pub async fn execute_and_print_sql(&self, sql: &str) -> color_eyre::Result<()> {
         let stream = self.execution.execute_sql(sql).await?;
-        self.print_stream(stream).await;
+        self.print_any_stream(stream).await;
         Ok(())
     }
 
-    /// Prints the stream to stdout
-    async fn print_stream(&self, mut stream: SendableRecordBatchStream) {
+    async fn print_any_stream<S, E>(&self, mut stream: S)
+    where
+        S: Stream<Item = Result<RecordBatch, E>> + Unpin,
+        E: Error,
+    {
         while let Some(maybe_batch) = stream.next().await {
             match maybe_batch {
                 Ok(batch) => match pretty_format_batches(&[batch]) {

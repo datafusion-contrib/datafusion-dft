@@ -5,3 +5,4 @@ pub mod config;
 pub mod execution;
 pub mod extensions;
 pub mod telemetry;
+pub mod test_utils;

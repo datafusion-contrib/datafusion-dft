@@ -18,7 +18,7 @@
 use datafusion::assert_batches_eq;
 use dft::app::AppEvent;
 
-use crate::TestApp;
+use crate::tui_cases::TestApp;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_create_table_ddl() {

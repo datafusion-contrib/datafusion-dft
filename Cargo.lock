@@ -1529,12 +1529,16 @@ dependencies = [
  "directories",
  "env_logger",
  "futures",
+ "http 0.2.12",
+ "http-body 0.4.6",
  "insta",
  "itertools 0.13.0",
  "lazy_static",
  "log",
  "object_store",
+ "pin-project-lite",
  "predicates",
+ "prost",
  "ratatui",
  "serde",
  "strum",
@@ -1544,9 +1548,11 @@ dependencies = [
  "tokio-util",
  "toml",
  "tonic",
+ "tower",
  "tui-logger",
  "tui-textarea",
  "url",
+ "uuid",
 ]
 
 [[package]]

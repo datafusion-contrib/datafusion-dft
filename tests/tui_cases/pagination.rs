@@ -24,7 +24,7 @@ use datafusion::arrow::array::{ArrayRef, RecordBatch, UInt32Array};
 use datafusion::assert_batches_eq;
 use dft::app::{AppEvent, ExecutionResultsBatch};
 
-use crate::TestApp;
+use crate::tui_cases::TestApp;
 
 fn create_batch(adj: u32) -> RecordBatch {
     let arr1: ArrayRef = Arc::new(UInt32Array::from(vec![1 + adj, 2 + adj]));

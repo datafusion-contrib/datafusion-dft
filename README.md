@@ -88,6 +88,9 @@ $ dft -f query.sql
 $ dft -c "SELECT 1+2"
 ```
 
+#### FlightSQL
+
+Both of the commands above support the `--flightsql` parameter to run the SQL with your configured FlightSQL client.
 
 ## User Guide
 

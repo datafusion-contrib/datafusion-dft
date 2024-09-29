@@ -23,6 +23,8 @@ use std::sync::Arc;
 
 pub use stats::{collect_plan_stats, ExecutionStats};
 
+use crate::config::ExecutionConfig;
+use crate::extensions::{enabled_extensions, DftSessionStateBuilder};
 use color_eyre::eyre::Result;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::ExecutionPlan;
@@ -31,12 +33,9 @@ use datafusion::sql::parser::Statement;
 use tokio_stream::StreamExt;
 #[cfg(feature = "flightsql")]
 use {
-    arrow_flight::sql::client::FlightSqlServiceClient, tokio::sync::Mutex,
-    tonic::transport::Channel,
+    crate::config::FlightSQLConfig, arrow_flight::sql::client::FlightSqlServiceClient,
+    tokio::sync::Mutex, tonic::transport::Channel,
 };
-
-use crate::config::ExecutionConfig;
-use crate::extensions::{enabled_extensions, DftSessionStateBuilder};
 
 /// Structure for executing queries either locally or remotely (via FlightSQL)
 ///
@@ -151,5 +150,26 @@ impl ExecutionContext {
             .await?
             .execute_stream()
             .await
+    }
+
+    /// Create FlightSQL client from users FlightSQL config
+    #[cfg(feature = "flightsql")]
+    pub async fn create_flightsql_client(&self, config: FlightSQLConfig) -> Result<()> {
+        use color_eyre::eyre::eyre;
+
+        let url = Box::leak(config.connection_url.into_boxed_str());
+        let channel = Channel::from_static(url).connect().await;
+        match channel {
+            Ok(c) => {
+                let client = FlightSqlServiceClient::new(c);
+                let mut guard = self.flightsql_client.lock().await;
+                *guard = Some(client);
+                Ok(())
+            }
+            Err(e) => Err(eyre!(
+                "Error creating channel for FlightSQL client: {:?}",
+                e
+            )),
+        }
     }
 }
