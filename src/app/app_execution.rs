@@ -19,6 +19,8 @@
 
 use crate::app::{AppEvent, ExecutionError, ExecutionResultsBatch};
 use crate::execution::ExecutionContext;
+use arrow_flight::decode::FlightRecordBatchStream;
+use arrow_flight::Ticket;
 use color_eyre::eyre::Result;
 use datafusion::execution::context::SessionContext;
 use datafusion::execution::SendableRecordBatchStream;
@@ -28,6 +30,8 @@ use log::{error, info};
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Mutex;
+use tokio_stream::StreamMap;
+use tonic::IntoRequest;
 
 #[cfg(feature = "flightsql")]
 use {
@@ -37,9 +41,12 @@ use {
 
 /// Handles executing queries for the TUI application, formatting results
 /// and sending them to the UI.
+///
+/// TODO: I think we want to store the SQL associated with a stream
 pub struct AppExecution {
     inner: Arc<ExecutionContext>,
     result_stream: Arc<Mutex<Option<SendableRecordBatchStream>>>,
+    flightsql_result_stream: Arc<Mutex<Option<StreamMap<String, FlightRecordBatchStream>>>>,
 }
 
 impl AppExecution {
@@ -48,6 +55,7 @@ impl AppExecution {
         Self {
             inner,
             result_stream: Arc::new(Mutex::new(None)),
+            flightsql_result_stream: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -58,6 +66,23 @@ impl AppExecution {
     pub async fn set_result_stream(&self, stream: SendableRecordBatchStream) {
         let mut s = self.result_stream.lock().await;
         *s = Some(stream)
+    }
+
+    pub async fn set_flightsql_result_stream(
+        &self,
+        ticket: Ticket,
+        stream: FlightRecordBatchStream,
+    ) {
+        let mut s = self.flightsql_result_stream.lock().await;
+        if let Some(ref mut streams) = *s {
+            streams.insert(ticket.to_string(), stream);
+        } else {
+            let mut map: StreamMap<String, FlightRecordBatchStream> = StreamMap::new();
+            let t = ticket.to_string();
+            info!("Adding {t} to FlightSQL streams");
+            map.insert(ticket.to_string(), stream);
+            *s = Some(map);
+        }
     }
 
     /// Run the sequence of SQL queries, sending the results as
@@ -157,13 +182,60 @@ impl AppExecution {
         let statement_count = non_empty_sqls.len();
         for (i, sql) in non_empty_sqls.into_iter().enumerate() {
             let _sender = sender.clone();
-            let start = std::time::Instant::now();
             if i == statement_count - 1 {
                 info!("Executing last query and display results");
                 sender.send(AppEvent::NewFlightSQLExecution)?;
                 if let Some(ref mut client) = *self.flightsql_client().lock().await {
-                    match client.execute(sql, None).await {
-                        Ok(flight_info) => {}
+                    let start = std::time::Instant::now();
+                    match client.execute(sql.clone(), None).await {
+                        Ok(flight_info) => {
+                            for endpoint in flight_info.endpoint {
+                                if let Some(ticket) = endpoint.ticket {
+                                    match client.do_get(ticket.clone().into_request()).await {
+                                        Ok(stream) => {
+                                            self.set_flightsql_result_stream(ticket, stream);
+                                            if let Some(streams) =
+                                                self.flightsql_result_stream.lock().await.as_mut()
+                                            {
+                                                match streams.next().await {
+                                                    Some((ticket, Ok(batch))) => {
+                                                        info!("Received batch for {ticket}");
+                                                        let duration = start.elapsed();
+                                                        let results = ExecutionResultsBatch {
+                                                            batch,
+                                                            duration,
+                                                            query: sql.to_string(),
+                                                        };
+                                                        sender.send(
+                                                            AppEvent::FlightSQLExecutionResultsNextBatch(
+                                                                results,
+                                                            ),
+                                                        )?;
+                                                    }
+                                                    Some((ticket, Err(e))) => {
+                                                        error!(
+                                                            "Error executing stream for ticket {ticket}: {:?}",
+                                                            e
+                                                        );
+                                                        let elapsed = start.elapsed();
+                                                        let e = ExecutionError {
+                                                            query: sql.to_string(),
+                                                            error: e.to_string(),
+                                                            duration: elapsed,
+                                                        };
+                                                        sender.send(
+                                                            AppEvent::FlightSQLExecutionResultsError(e),
+                                                        )?;
+                                                    }
+                                                    None => {}
+                                                }
+                                            }
+                                        }
+                                        Err(e) => {}
+                                    }
+                                }
+                            }
+                        }
                         Err(e) => {}
                     }
                 }

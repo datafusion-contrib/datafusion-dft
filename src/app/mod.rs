@@ -122,8 +122,11 @@ pub enum AppEvent {
     NewExecution,
     NewFlightSQLExecution,
     ExecutionResultsNextPage(ExecutionResultsBatch),
+    FlightSQLExecutionResultsNextBatch(ExecutionResultsBatch),
     ExecutionResultsPreviousPage,
+    FlightSQLExecutionResultsPreviousPage,
     ExecutionResultsError(ExecutionError),
+    FlightSQLExecutionResultsError(ExecutionError),
     #[cfg(feature = "flightsql")]
     EstablishFlightSQLConnection,
     #[cfg(feature = "flightsql")]
