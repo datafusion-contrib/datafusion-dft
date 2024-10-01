@@ -23,7 +23,7 @@ use ratatui::{
     widgets::{block::Title, Block, Borders, Paragraph, Row, StatefulWidget, Table, Widget},
 };
 
-use crate::app::ui::convert::record_batches_to_table;
+use crate::app::ui::convert::{record_batch_to_table, record_batches_to_table};
 use crate::app::App;
 
 pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
@@ -55,8 +55,7 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
                 .title(" Results ")
                 .borders(Borders::ALL)
                 .title(Title::from(format!(" Page {page} ")).alignment(Alignment::Right));
-            let batches = vec![batch];
-            let maybe_table = record_batches_to_table(&batches);
+            let maybe_table = record_batch_to_table(&batch);
 
             let block = block.title_bottom("Stats").fg(tailwind::ORANGE.c500);
             match maybe_table {

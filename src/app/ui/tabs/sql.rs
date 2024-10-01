@@ -48,7 +48,7 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
     let sql_tab = &app.state.sql_tab;
     match (
         sql_tab.current_batch(),
-        sql_tab.results_page(),
+        sql_tab.current_page(),
         sql_tab.query_results_state(),
         sql_tab.execution_error(),
     ) {

@@ -51,7 +51,7 @@ async fn single_page() {
 
     let state = test_app.state();
 
-    let page = state.sql_tab.results_page().unwrap();
+    let page = state.sql_tab.current_page().unwrap();
     assert_eq!(page, 0);
 
     let batch = state.sql_tab.current_batch();
@@ -86,7 +86,7 @@ async fn multiple_pages_forward_and_back() {
 
     {
         let state = test_app.state();
-        let page = state.sql_tab.results_page().unwrap();
+        let page = state.sql_tab.current_page().unwrap();
         assert_eq!(page, 0);
     }
 
@@ -96,7 +96,7 @@ async fn multiple_pages_forward_and_back() {
 
     {
         let state = test_app.state();
-        let page = state.sql_tab.results_page().unwrap();
+        let page = state.sql_tab.current_page().unwrap();
         assert_eq!(page, 1);
     }
 
@@ -127,7 +127,7 @@ async fn multiple_pages_forward_and_back() {
 
     {
         let state = test_app.state();
-        let page = state.sql_tab.results_page().unwrap();
+        let page = state.sql_tab.current_page().unwrap();
         assert_eq!(page, 0);
     }
 
@@ -163,7 +163,7 @@ async fn multiple_pages_forward_and_back_and_forward() {
 
     {
         let state = test_app.state();
-        let page = state.sql_tab.results_page().unwrap();
+        let page = state.sql_tab.current_page().unwrap();
         assert_eq!(page, 0);
     }
 
@@ -187,7 +187,7 @@ async fn multiple_pages_forward_and_back_and_forward() {
 
     {
         let state = test_app.state();
-        let page = state.sql_tab.results_page().unwrap();
+        let page = state.sql_tab.current_page().unwrap();
         assert_eq!(page, 1);
     }
 
