@@ -1,7 +1,7 @@
 # dft
 
 `dft` provides two interfaces to the [DataFusion](https://github.com/apache/arrow-datafusion) query execution engine:
-1. Text User Interface (TUI): An extensible terminal based data analysis tool that allows users to query and join data from disparate data sources.
+1. Text User Interface (TUI): An IDE for DataFusion developers and users that provides a local database experience with utilities to analyze / benchmark queries.
 2. Command Line Interface (CLI): Scriptable engine for executing queries from files.
 
 `dft` is inspired by  [`datafusion-cli`], but has some differences:
