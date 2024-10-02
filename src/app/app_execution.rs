@@ -19,8 +19,6 @@
 
 use crate::app::{AppEvent, ExecutionError, ExecutionResultsBatch};
 use crate::execution::ExecutionContext;
-use arrow_flight::decode::FlightRecordBatchStream;
-use arrow_flight::Ticket;
 use color_eyre::eyre::Result;
 use datafusion::execution::context::SessionContext;
 use datafusion::execution::SendableRecordBatchStream;
@@ -31,12 +29,12 @@ use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Mutex;
 use tokio_stream::StreamMap;
-use tonic::IntoRequest;
 
 #[cfg(feature = "flightsql")]
 use {
-    crate::config::FlightSQLConfig, arrow_flight::sql::client::FlightSqlServiceClient,
-    tonic::transport::Channel,
+    crate::config::FlightSQLConfig, arrow_flight::decode::FlightRecordBatchStream,
+    arrow_flight::sql::client::FlightSqlServiceClient, arrow_flight::Ticket,
+    tonic::transport::Channel, tonic::IntoRequest,
 };
 
 /// Handles executing queries for the TUI application, formatting results
@@ -46,6 +44,7 @@ use {
 pub struct AppExecution {
     inner: Arc<ExecutionContext>,
     result_stream: Arc<Mutex<Option<SendableRecordBatchStream>>>,
+    #[cfg(feature = "flightsql")]
     flightsql_result_stream: Arc<Mutex<Option<StreamMap<String, FlightRecordBatchStream>>>>,
 }
 
@@ -55,6 +54,7 @@ impl AppExecution {
         Self {
             inner,
             result_stream: Arc::new(Mutex::new(None)),
+            #[cfg(feature = "flightsql")]
             flightsql_result_stream: Arc::new(Mutex::new(None)),
         }
     }
@@ -68,6 +68,7 @@ impl AppExecution {
         *s = Some(stream)
     }
 
+    #[cfg(feature = "flightsql")]
     pub async fn set_flightsql_result_stream(
         &self,
         ticket: Ticket,
@@ -172,6 +173,7 @@ impl AppExecution {
         Ok(())
     }
 
+    #[cfg(feature = "flightsql")]
     pub async fn run_flightsqls(
         self: Arc<Self>,
         sqls: Vec<String>,

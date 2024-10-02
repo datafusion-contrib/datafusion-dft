@@ -20,8 +20,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use color_eyre::Result;
-use datafusion::arrow::array::RecordBatch;
-use datafusion::arrow::datatypes::{Field, Schema};
+use datafusion::arrow::{
+    array::{RecordBatch, UInt32Array},
+    compute::{concat_batches, take_record_batch},
+    datatypes::{Field, Schema},
+};
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::palette::tailwind;
 use ratatui::style::Style;
@@ -245,10 +248,7 @@ impl<'app> FlightSQLTabState<'app> {
 
     pub fn current_page_results(&self) -> Option<RecordBatch> {
         match (self.current_page, self.result_batches.as_ref()) {
-            (Some(page), Some(batches)) => {
-                let batch = get_current_page_result_batch(page, batches);
-                Some(batch)
-            }
+            (Some(page), Some(batches)) => get_current_page_result_batch(page, batches),
             _ => Some(RecordBatch::new_empty(Arc::new(Schema::empty()))),
         }
     }
@@ -262,28 +262,73 @@ impl<'app> FlightSQLTabState<'app> {
     pub fn previous_page(&mut self) {}
 }
 
-fn get_batch_idxs_for_offset(offset: usize, batch_sizes: &[usize]) -> (usize, Option<usize>) {
-    let mut start_idx = 0;
-    let mut end_idx = None;
-    let mut current_offset = offset;
-    for (idx, size) in batch_sizes.iter().enumerate() {
-        if current_offset < *size {
-            end_idx = Some(idx);
-            break;
-        }
-        current_offset -= size;
-        start_idx = idx + 1;
-    }
-    (start_idx, end_idx)
-}
-
-fn get_current_page_result_batch(offset: usize, batches: &[RecordBatch]) -> RecordBatch {
-    let batch_sizes: Vec<usize> = batches.iter().map(|b| b.num_rows()).collect();
-
-    // if let Some(first_batch) = batches.first() {
-    // } else {
-    //     RecordBatch::new_empty(Arc::new(Schema::empty()))
+/// The purpose of this function is to return the start and end batches, as well as the row indices
+/// from each to get `num` records starting from `offset` from a slice of batches that have size
+/// `batch_sizes`.  The result of this is expected to be passed to
+/// `arrow_select::take::take_record_batch` to get the records from each batch and then
+/// `arrow_select::concat::concat_batches` to combine them into a single record batch.  This is
+/// useful for paginating a slice of record batches.
+///
+/// The return tuple has the structure:
+///
+/// ((start_batch, start_index, end_index), (end_batch, start_index, end_index))
+///
+/// Some examples
+/// compute_batch_idxs_and_rows_for_offset(0, 100, &[200]) -> ((0, 0), (0, 100))
+/// compute_batch_idxs_and_rows_for_offset(0, 200, &[200]) -> ((0, 0), (0, 200))
+/// compute_batch_idxs_and_rows_for_offset(0, 250, &[200, 100]) -> ((0, 0), (0, 200))
+fn compute_batch_idxs_and_rows_for_offset(
+    offset: usize,
+    num: usize,
+    batch_sizes: &[usize],
+) -> ((usize, usize, usize), (usize, usize, usize)) {
+    // let start = 0;
+    // for (i, rows) in batch_sizes.iter().enumerate() {
+    //     if offset < *rows {
+    //         return (start, None);
+    //     }
     // }
 }
 
-mod tests {}
+fn get_current_page_result_batch(
+    offset: usize,
+    num: usize,
+    batches: &[RecordBatch],
+) -> Option<RecordBatch> {
+    let batch_sizes: Vec<usize> = batches.iter().map(|b| b.num_rows()).collect();
+    match batch_sizes.len() {
+        0 => None,
+        1 => Some(batches[0].clone()),
+        _ => {
+            let (
+                (start_batch, start_batch_start_idx, start_batch_end_idx),
+                (end_batch, end_batch_start_idx, end_batch_end_idx),
+            ) = compute_batch_idxs_and_rows_for_offset(offset, num, &batch_sizes);
+            let start_indices = UInt32Array::from_iter_values(
+                (start_batch_start_idx as u32)..(start_batch_end_idx as u32),
+            );
+            let end_indices = UInt32Array::from_iter_values(
+                (end_batch_start_idx as u32)..(end_batch_end_idx as u32),
+            );
+            let start_records = take_record_batch(&batches[start_batch], &start_indices).unwrap();
+            let end_records = take_record_batch(&batches[end_batch], &end_indices).unwrap();
+            let res =
+                concat_batches(&start_records.schema(), &[start_records, end_records]).unwrap();
+            Some(res)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::app::state::tabs::flightsql::compute_batch_idxs_and_rows_for_offset;
+
+    #[test]
+    fn test_compute_batch_idxs_for_offset_no_batches() {
+        // let batch_sizes = vec![];
+
+        // let (start, end) = compute_batch_idxs_for_offset(0, &batch_sizes);
+        // assert_eq!(start, 4);
+        // assert_eq!(end, None);
+    }
+}
