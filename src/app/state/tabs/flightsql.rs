@@ -25,7 +25,7 @@ use datafusion::arrow::{
     datatypes::Schema,
     error::ArrowError,
 };
-use log::error;
+use log::{error, info};
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::palette::tailwind;
 use ratatui::style::Style;
@@ -167,13 +167,17 @@ impl<'app> FlightSQLTabState<'app> {
     pub fn current_page_results(&self) -> Option<RecordBatch> {
         match (self.current_page, self.result_batches.as_ref()) {
             (Some(page), Some(batches)) => {
-                let row_count: usize = batches.iter().map(|b| b.num_rows()).sum();
-                // let mut builder = BooleanBuilder::with_capacity(row_count);
-                let indices = if row_count < PAGE_SIZE {
-                    UInt32Array::from_iter_values(0_u32..(row_count as u32))
+                let total_rows: usize = batches.iter().map(|b| b.num_rows()).sum();
+                let indices = if total_rows < PAGE_SIZE {
+                    UInt32Array::from_iter_values(0_u32..(total_rows as u32))
                 } else {
                     let start = page * PAGE_SIZE;
-                    UInt32Array::from_iter_values((start as u32)..((start + PAGE_SIZE) as u32))
+                    let remaining = total_rows - start;
+                    // On the last page there could be less than PAGE_SIZE results to view
+                    let page_records = remaining.min(PAGE_SIZE);
+                    let end = (start as u32) + (page_records as u32);
+                    info!("Current page start({start}) end({end})");
+                    UInt32Array::from_iter_values((start as u32)..end)
                 };
                 match take_record_batches(batches, &indices) {
                     Ok(batch) => Some(batch),
@@ -192,14 +196,37 @@ impl<'app> FlightSQLTabState<'app> {
     }
 
     pub fn next_page(&mut self) {
-        if let Some(page) = self.current_page {
-            self.current_page = Some(page + 1);
-        } else {
-            self.current_page = Some(0);
-        }
+        self.change_page(
+            |page, max_pages| {
+                if page < max_pages {
+                    page + 1
+                } else {
+                    page
+                }
+            },
+        );
     }
 
-    pub fn previous_page(&mut self) {}
+    pub fn previous_page(&mut self) {
+        self.change_page(|page, _| if page > 0 { page - 1 } else { 0 });
+    }
+
+    fn change_page<F>(&mut self, change_fn: F)
+    where
+        F: Fn(usize, usize) -> usize,
+    {
+        match (self.current_page.as_mut(), self.result_batches.as_ref()) {
+            (Some(page), Some(batches)) => {
+                let total_rows: usize = batches.iter().map(|b| b.num_rows()).sum();
+                let max_pages = total_rows / PAGE_SIZE;
+                *page = change_fn(*page, max_pages);
+            }
+            (None, Some(_)) => self.current_page = Some(0),
+            _ => {
+                error!("Got change page request with no batches")
+            }
+        }
+    }
 }
 
 fn take_record_batches(

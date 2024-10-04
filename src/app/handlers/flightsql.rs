@@ -16,15 +16,10 @@
 // under the License.
 
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 
-use datafusion::arrow::array::RecordBatch;
-use log::{error, info};
+use log::info;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use tokio_stream::StreamExt;
-use tonic::IntoRequest;
 
-// use crate::app::state::tabs::flightsql::FlightSQLQuery;
 use crate::app::{handlers::tab_navigation_handler, AppEvent};
 
 use super::App;
@@ -102,11 +97,6 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) {
             true => editable_handler(app, key),
             false => normal_mode_handler(app, key),
         },
-        // AppEvent::FlightSQLQueryResult(r) => {
-        //     info!("Query results: {:?}", r);
-        //     // app.state.flightsql_tab.set_query(r);
-        //     app.state.flightsql_tab.refresh_query_results_state();
-        // }
         AppEvent::Error => {}
         _ => {}
     };
