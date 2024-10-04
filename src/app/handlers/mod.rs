@@ -206,6 +206,21 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
             app.state.history_tab.add_to_history(history_query);
             app.state.history_tab.refresh_history_table_state();
         }
+        AppEvent::FlightSQLExecutionResultsNextBatch(r) => {
+            let ExecutionResultsBatch {
+                query,
+                duration,
+                batch,
+            } = r;
+            info!("Adding batch to flightsql tab");
+            app.state.flightsql_tab.add_batch(batch);
+            app.state.flightsql_tab.next_page();
+            app.state.flightsql_tab.refresh_query_results_state();
+            let history_query =
+                HistoryQuery::new(Context::FlightSQL, query.to_string(), duration, None, None);
+            app.state.history_tab.add_to_history(history_query);
+            app.state.history_tab.refresh_history_table_state();
+        }
         // #[cfg(feature = "flightsql")]
         // AppEvent::FlightSQLQueryResult(r) => {
         //     // app.state.flightsql_tab.set_query(r.clone());

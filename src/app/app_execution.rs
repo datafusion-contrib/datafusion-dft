@@ -195,7 +195,7 @@ impl AppExecution {
                                 if let Some(ticket) = endpoint.ticket {
                                     match client.do_get(ticket.clone().into_request()).await {
                                         Ok(stream) => {
-                                            self.set_flightsql_result_stream(ticket, stream);
+                                            self.set_flightsql_result_stream(ticket, stream).await;
                                             if let Some(streams) =
                                                 self.flightsql_result_stream.lock().await.as_mut()
                                             {

@@ -17,14 +17,15 @@
 
 use core::cell::RefCell;
 use std::sync::Arc;
-use std::time::Duration;
 
 use color_eyre::Result;
 use datafusion::arrow::{
-    array::{RecordBatch, UInt32Array},
-    compute::{concat_batches, take_record_batch},
-    datatypes::{Field, Schema},
+    array::{Array, BooleanBuilder, RecordBatch, UInt32Array},
+    compute::take_record_batch,
+    datatypes::Schema,
+    error::ArrowError,
 };
+use log::error;
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::palette::tailwind;
 use ratatui::style::Style;
@@ -35,81 +36,8 @@ use tui_textarea::TextArea;
 use crate::app::state::tabs::sql;
 use crate::app::ExecutionError;
 use crate::config::AppConfig;
-use crate::execution::ExecutionStats;
 
-// #[derive(Clone, Debug)]
-// pub struct FlightSQLQuery {
-//     sql: String,
-//     results: Option<Vec<RecordBatch>>,
-//     num_rows: Option<usize>,
-//     error: Option<String>,
-//     execution_time: Duration,
-//     execution_stats: Option<ExecutionStats>,
-// }
-//
-// impl FlightSQLQuery {
-//     pub fn new(
-//         sql: String,
-//         results: Option<Vec<RecordBatch>>,
-//         num_rows: Option<usize>,
-//         error: Option<String>,
-//         execution_time: Duration,
-//         execution_stats: Option<ExecutionStats>,
-//     ) -> Self {
-//         Self {
-//             sql,
-//             results,
-//             num_rows,
-//             error,
-//             execution_time,
-//             execution_stats,
-//         }
-//     }
-//
-//     pub fn sql(&self) -> &String {
-//         &self.sql
-//     }
-//
-//     pub fn set_results(&mut self, results: Option<Vec<RecordBatch>>) {
-//         self.results = results;
-//     }
-//
-//     pub fn results(&self) -> &Option<Vec<RecordBatch>> {
-//         &self.results
-//     }
-//
-//     pub fn set_num_rows(&mut self, num_rows: Option<usize>) {
-//         self.num_rows = num_rows;
-//     }
-//
-//     pub fn num_rows(&self) -> &Option<usize> {
-//         &self.num_rows
-//     }
-//
-//     pub fn set_error(&mut self, error: Option<String>) {
-//         self.error = error;
-//     }
-//
-//     pub fn error(&self) -> &Option<String> {
-//         &self.error
-//     }
-//
-//     pub fn set_execution_time(&mut self, execution_time: Duration) {
-//         self.execution_time = execution_time;
-//     }
-//
-//     pub fn execution_time(&self) -> &Duration {
-//         &self.execution_time
-//     }
-//
-//     pub fn execution_stats(&self) -> &Option<ExecutionStats> {
-//         &self.execution_stats
-//     }
-//
-//     pub fn set_execution_stats(&mut self, stats: Option<ExecutionStats>) {
-//         self.execution_stats = stats;
-//     }
-// }
+const PAGE_SIZE: usize = 100;
 
 #[derive(Debug, Default)]
 pub struct FlightSQLTabState<'app> {
@@ -118,7 +46,6 @@ pub struct FlightSQLTabState<'app> {
     query_results_state: Option<RefCell<TableState>>,
     result_batches: Option<Vec<RecordBatch>>,
     current_page: Option<usize>,
-    current_offset: Option<usize>,
     execution_error: Option<ExecutionError>,
     execution_task: Option<JoinHandle<Result<()>>>,
 }
@@ -140,7 +67,6 @@ impl<'app> FlightSQLTabState<'app> {
             result_batches: None,
             execution_task: None,
             current_page: None,
-            current_offset: None,
             execution_error: None,
         }
     }
@@ -196,14 +122,6 @@ impl<'app> FlightSQLTabState<'app> {
         self.editor_editable
     }
 
-    // pub fn set_query(&mut self, query: FlightSQLQuery) {
-    //     self.query = Some(query);
-    // }
-
-    // pub fn query(&self) -> &Option<FlightSQLQuery> {
-    //     &self.query
-    // }
-
     // TODO: Create Editor struct and move this there
     pub fn next_word(&mut self) {
         self.editor
@@ -248,7 +166,23 @@ impl<'app> FlightSQLTabState<'app> {
 
     pub fn current_page_results(&self) -> Option<RecordBatch> {
         match (self.current_page, self.result_batches.as_ref()) {
-            (Some(page), Some(batches)) => get_current_page_result_batch(page, batches),
+            (Some(page), Some(batches)) => {
+                let row_count: usize = batches.iter().map(|b| b.num_rows()).sum();
+                // let mut builder = BooleanBuilder::with_capacity(row_count);
+                let indices = if row_count < PAGE_SIZE {
+                    UInt32Array::from_iter_values(0_u32..(row_count as u32))
+                } else {
+                    let start = page * PAGE_SIZE;
+                    UInt32Array::from_iter_values((start as u32)..((start + PAGE_SIZE) as u32))
+                };
+                match take_record_batches(batches, &indices) {
+                    Ok(batch) => Some(batch),
+                    Err(err) => {
+                        error!("Error getting record batch: {}", err);
+                        None
+                    }
+                }
+            }
             _ => Some(RecordBatch::new_empty(Arc::new(Schema::empty()))),
         }
     }
@@ -257,78 +191,25 @@ impl<'app> FlightSQLTabState<'app> {
         None
     }
 
-    pub fn next_page(&mut self) {}
+    pub fn next_page(&mut self) {
+        if let Some(page) = self.current_page {
+            self.current_page = Some(page + 1);
+        } else {
+            self.current_page = Some(0);
+        }
+    }
 
     pub fn previous_page(&mut self) {}
 }
 
-/// The purpose of this function is to return the start and end batches, as well as the row indices
-/// from each to get `num` records starting from `offset` from a slice of batches that have size
-/// `batch_sizes`.  The result of this is expected to be passed to
-/// `arrow_select::take::take_record_batch` to get the records from each batch and then
-/// `arrow_select::concat::concat_batches` to combine them into a single record batch.  This is
-/// useful for paginating a slice of record batches.
-///
-/// The return tuple has the structure:
-///
-/// ((start_batch, start_index, end_index), (end_batch, start_index, end_index))
-///
-/// Some examples
-/// compute_batch_idxs_and_rows_for_offset(0, 100, &[200]) -> ((0, 0), (0, 100))
-/// compute_batch_idxs_and_rows_for_offset(0, 200, &[200]) -> ((0, 0), (0, 200))
-/// compute_batch_idxs_and_rows_for_offset(0, 250, &[200, 100]) -> ((0, 0), (0, 200))
-fn compute_batch_idxs_and_rows_for_offset(
-    offset: usize,
-    num: usize,
-    batch_sizes: &[usize],
-) -> ((usize, usize, usize), (usize, usize, usize)) {
-    // let start = 0;
-    // for (i, rows) in batch_sizes.iter().enumerate() {
-    //     if offset < *rows {
-    //         return (start, None);
-    //     }
-    // }
-}
-
-fn get_current_page_result_batch(
-    offset: usize,
-    num: usize,
+fn take_record_batches(
     batches: &[RecordBatch],
-) -> Option<RecordBatch> {
-    let batch_sizes: Vec<usize> = batches.iter().map(|b| b.num_rows()).collect();
-    match batch_sizes.len() {
-        0 => None,
-        1 => Some(batches[0].clone()),
-        _ => {
-            let (
-                (start_batch, start_batch_start_idx, start_batch_end_idx),
-                (end_batch, end_batch_start_idx, end_batch_end_idx),
-            ) = compute_batch_idxs_and_rows_for_offset(offset, num, &batch_sizes);
-            let start_indices = UInt32Array::from_iter_values(
-                (start_batch_start_idx as u32)..(start_batch_end_idx as u32),
-            );
-            let end_indices = UInt32Array::from_iter_values(
-                (end_batch_start_idx as u32)..(end_batch_end_idx as u32),
-            );
-            let start_records = take_record_batch(&batches[start_batch], &start_indices).unwrap();
-            let end_records = take_record_batch(&batches[end_batch], &end_indices).unwrap();
-            let res =
-                concat_batches(&start_records.schema(), &[start_records, end_records]).unwrap();
-            Some(res)
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::app::state::tabs::flightsql::compute_batch_idxs_and_rows_for_offset;
-
-    #[test]
-    fn test_compute_batch_idxs_for_offset_no_batches() {
-        // let batch_sizes = vec![];
-
-        // let (start, end) = compute_batch_idxs_for_offset(0, &batch_sizes);
-        // assert_eq!(start, 4);
-        // assert_eq!(end, None);
+    indices: &dyn Array,
+) -> Result<RecordBatch, ArrowError> {
+    match batches.len() {
+        0 => Ok(RecordBatch::new_empty(Arc::new(Schema::empty()))),
+        1 => take_record_batch(&batches[0], indices),
+        // For now we just get the first batch
+        _ => take_record_batch(&batches[0], indices),
     }
 }
