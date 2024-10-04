@@ -16,6 +16,8 @@
 // under the License.
 
 mod ddl;
+#[cfg(feature = "flightsql")]
+mod flightsql_pagination;
 mod pagination;
 mod quit;
 
