@@ -42,6 +42,7 @@ use tokio_util::sync::CancellationToken;
 
 use self::app_execution::AppExecution;
 use self::handlers::{app_event_handler, crossterm_event_handler};
+use crate::config::load_ddl;
 use crate::execution::ExecutionContext;
 
 #[derive(Clone, Debug)]
@@ -311,27 +312,8 @@ impl<'app> App<'app> {
 
     /// Execute DDL from users DDL file
     pub fn execute_ddl(&mut self) {
-        if let Some(user_dirs) = directories::UserDirs::new() {
-            // TODO: Move to ~/.config/ddl
-            let datafusion_rc_path = user_dirs
-                .home_dir()
-                .join(".datafusion")
-                .join(".datafusionrc");
-            let maybe_ddl = std::fs::read_to_string(datafusion_rc_path);
-            let ddl = match maybe_ddl {
-                Ok(ddl) => {
-                    info!("DDL: {:?}", ddl);
-                    ddl
-                }
-                Err(err) => {
-                    error!("Error reading DDL: {:?}", err);
-                    return;
-                }
-            };
-            let _ = self.event_tx().send(AppEvent::ExecuteDDL(ddl));
-        } else {
-            error!("No user directories found");
-        }
+        let ddl = load_ddl().unwrap_or_default();
+        let _ = self.event_tx().send(AppEvent::ExecuteDDL(ddl));
     }
 
     #[cfg(feature = "flightsql")]

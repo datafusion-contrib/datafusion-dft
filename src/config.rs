@@ -17,7 +17,7 @@
 
 //! Configuration management handling
 
-use std::path::PathBuf;
+use std::{io::Write, path::PathBuf};
 
 use directories::{ProjectDirs, UserDirs};
 use lazy_static::lazy_static;
@@ -84,7 +84,30 @@ pub fn load_ddl() -> Option<String> {
     }
 }
 
-pub fn save_ddl() {}
+pub fn save_ddl(ddl: String) {
+    if let Some(user_dirs) = directories::UserDirs::new() {
+        // TODO: Move to ~/.config/ddl or config defined location
+        let datafusion_rc_path = user_dirs
+            .home_dir()
+            .join(".datafusion")
+            .join(".datafusionrc");
+        match std::fs::File::create(datafusion_rc_path) {
+            Ok(mut f) => match f.write_all(ddl.as_bytes()) {
+                Ok(_) => {
+                    info!("Saved DDL file");
+                }
+                Err(e) => {
+                    error!("Error writing DDL file: {e}");
+                }
+            },
+            Err(e) => {
+                error!("Error creating or opening DDL file: {e}");
+            }
+        }
+    } else {
+        info!("No user directories found");
+    }
+}
 
 #[derive(Debug, Default, Deserialize)]
 pub struct AppConfig {

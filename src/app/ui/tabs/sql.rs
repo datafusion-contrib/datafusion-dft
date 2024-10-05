@@ -109,16 +109,33 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
 
 pub fn render_sql_help(area: Rect, buf: &mut Buffer, app: &App) {
     let block = Block::default();
-    let help = if app.state.sql_tab.editor_editable() {
-        vec!["'Esc' to exit edit mode"]
-    } else {
-        vec![
-            "'e' to edit",
-            "'c' to clear editor",
-            "'n' for Normal mode",
-            "'d' for DDL mode",
-            "'Enter' to run query",
-        ]
+
+    let help = match app.state.sql_tab.mode() {
+        SQLTabMode::Normal => {
+            if app.state.sql_tab.editor_editable() {
+                vec!["'Esc' to exit edit mode"]
+            } else {
+                vec![
+                    "'e' to edit",
+                    "'c' to clear editor",
+                    "'d' for DDL mode",
+                    "'Enter' to run query",
+                ]
+            }
+        }
+        SQLTabMode::DDL => {
+            if app.state.sql_tab.editor_editable() {
+                vec!["'Esc' to exit edit mode"]
+            } else {
+                vec![
+                    "'e' to edit",
+                    "'c' to clear editor",
+                    "'n' for Normal mode",
+                    "'s' to save DDL",
+                    "'Enter' to run DDL",
+                ]
+            }
+        }
     };
 
     let help_text = help.join(" | ");

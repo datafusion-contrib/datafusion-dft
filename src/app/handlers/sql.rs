@@ -17,11 +17,14 @@
 
 use std::sync::Arc;
 
-use log::info;
+use log::{error, info};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::App;
-use crate::app::{handlers::tab_navigation_handler, state::tabs::sql::SQLTabMode, AppEvent};
+use crate::{
+    app::{handlers::tab_navigation_handler, state::tabs::sql::SQLTabMode, AppEvent},
+    config::{load_ddl, save_ddl},
+};
 
 pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
     match key.code {
@@ -44,6 +47,13 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
         }
         KeyCode::Char('d') => app.state.sql_tab.set_mode(SQLTabMode::DDL),
         KeyCode::Char('n') => app.state.sql_tab.set_mode(SQLTabMode::Normal),
+        KeyCode::Char('s') => {
+            if *app.state.sql_tab.mode() == SQLTabMode::DDL {
+                let textarea = app.state.sql_tab.active_editor_cloned();
+                let ddl = textarea.lines().join("\n");
+                save_ddl(ddl)
+            }
+        }
         KeyCode::Down => {
             if let Some(s) = app.state.sql_tab.query_results_state() {
                 info!("Select next");
@@ -59,15 +69,24 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
             }
         }
 
-        KeyCode::Enter => {
-            let sql = app.state.sql_tab.editor().lines().join("");
-            info!("Running query: {}", sql);
-            let _event_tx = app.event_tx().clone();
-            let execution = Arc::clone(&app.execution);
-            let sqls: Vec<String> = sql.split(';').map(|s| s.to_string()).collect();
-            let handle = tokio::spawn(execution.run_sqls(sqls, _event_tx));
-            app.state.sql_tab.set_execution_task(handle);
-        }
+        KeyCode::Enter => match app.state.sql_tab.mode() {
+            SQLTabMode::Normal => {
+                let sql = app.state.sql_tab.editor().lines().join("");
+                info!("Running query: {}", sql);
+                let _event_tx = app.event_tx().clone();
+                let execution = Arc::clone(&app.execution);
+                let sqls: Vec<String> = sql.split(';').map(|s| s.to_string()).collect();
+                let handle = tokio::spawn(execution.run_sqls(sqls, _event_tx));
+                app.state.sql_tab.set_execution_task(handle);
+            }
+            SQLTabMode::DDL => {
+                let _event_tx = app.event_tx().clone();
+                let ddl = load_ddl().unwrap_or_default();
+                if let Err(e) = _event_tx.send(AppEvent::ExecuteDDL(ddl)) {
+                    error!("Error sending ExecuteDDL event: {:?}", e);
+                }
+            }
+        },
         KeyCode::Right => {
             let _event_tx = app.event_tx().clone();
             if let (Some(p), c) = (
