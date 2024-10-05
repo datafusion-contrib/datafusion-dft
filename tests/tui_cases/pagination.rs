@@ -44,7 +44,7 @@ fn create_execution_results(query: &str, adj: u32) -> ExecutionResultsBatch {
 async fn single_page() {
     let mut test_app = TestApp::new();
     let res1 = create_execution_results("SELECT 1", 0);
-    let event1 = AppEvent::ExecutionResultsNextPage(res1);
+    let event1 = AppEvent::ExecutionResultsNextBatch(res1);
 
     test_app.handle_app_event(AppEvent::NewExecution).unwrap();
     test_app.handle_app_event(event1).unwrap();
@@ -79,7 +79,7 @@ async fn single_page() {
 async fn multiple_pages_forward_and_back() {
     let mut test_app = TestApp::new();
     let res1 = create_execution_results("SELECT 1", 0);
-    let event1 = AppEvent::ExecutionResultsNextPage(res1);
+    let event1 = AppEvent::ExecutionResultsNextBatch(res1);
 
     test_app.handle_app_event(AppEvent::NewExecution).unwrap();
     test_app.handle_app_event(event1).unwrap();
@@ -91,7 +91,7 @@ async fn multiple_pages_forward_and_back() {
     }
 
     let res2 = create_execution_results("SELECT 1", 1);
-    let event2 = AppEvent::ExecutionResultsNextPage(res2);
+    let event2 = AppEvent::ExecutionResultsNextBatch(res2);
     test_app.handle_app_event(event2).unwrap();
 
     {
@@ -156,7 +156,7 @@ async fn multiple_pages_forward_and_back() {
 async fn multiple_pages_forward_and_back_and_forward() {
     let mut test_app = TestApp::new();
     let res1 = create_execution_results("SELECT 1", 0);
-    let event1 = AppEvent::ExecutionResultsNextPage(res1);
+    let event1 = AppEvent::ExecutionResultsNextBatch(res1);
 
     test_app.handle_app_event(AppEvent::NewExecution).unwrap();
     test_app.handle_app_event(event1).unwrap();
@@ -168,7 +168,7 @@ async fn multiple_pages_forward_and_back_and_forward() {
     }
 
     let res2 = create_execution_results("SELECT 1", 1);
-    let event2 = AppEvent::ExecutionResultsNextPage(res2);
+    let event2 = AppEvent::ExecutionResultsNextBatch(res2);
     test_app.handle_app_event(event2).unwrap();
 
     let left_key = crossterm::event::KeyEvent::new(

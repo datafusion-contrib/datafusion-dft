@@ -86,6 +86,12 @@ impl AppExecution {
         }
     }
 
+    #[cfg(feature = "flightsql")]
+    pub async fn reset_flightsql_result_stream(&self) {
+        let mut s = self.flightsql_result_stream.lock().await;
+        *s = None;
+    }
+
     /// Run the sequence of SQL queries, sending the results as
     /// [`AppEvent::ExecutionResultsBatch`].
     /// All queries except the last one will have their results discarded.
@@ -125,7 +131,7 @@ impl AppExecution {
                                                 batch: b,
                                                 duration,
                                             };
-                                            sender.send(AppEvent::ExecutionResultsNextPage(
+                                            sender.send(AppEvent::ExecutionResultsNextBatch(
                                                 results,
                                             ))?;
                                         }
@@ -180,13 +186,14 @@ impl AppExecution {
         sender: UnboundedSender<AppEvent>,
     ) -> Result<()> {
         info!("Running sqls: {:?}", sqls);
+        self.reset_flightsql_result_stream().await;
         let non_empty_sqls: Vec<String> = sqls.into_iter().filter(|s| !s.is_empty()).collect();
         let statement_count = non_empty_sqls.len();
         for (i, sql) in non_empty_sqls.into_iter().enumerate() {
             let _sender = sender.clone();
             if i == statement_count - 1 {
                 info!("Executing last query and display results");
-                sender.send(AppEvent::NewFlightSQLExecution)?;
+                sender.send(AppEvent::FlightSQLNewExecution)?;
                 if let Some(ref mut client) = *self.flightsql_client().lock().await {
                     let start = std::time::Instant::now();
                     match client.execute(sql.clone(), None).await {
@@ -233,12 +240,30 @@ impl AppExecution {
                                                 }
                                             }
                                         }
-                                        Err(e) => {}
+                                        Err(e) => {
+                                            error!("Error creating result stream: {:?}", e);
+                                            let elapsed = start.elapsed();
+                                            let e = ExecutionError {
+                                                query: sql.to_string(),
+                                                error: e.to_string(),
+                                                duration: elapsed,
+                                            };
+                                            sender.send(AppEvent::ExecutionResultsError(e))?;
+                                        }
                                     }
                                 }
                             }
                         }
-                        Err(e) => {}
+                        Err(e) => {
+                            error!("Error getting flight info: {:?}", e);
+                            let elapsed = start.elapsed();
+                            let e = ExecutionError {
+                                query: sql.to_string(),
+                                error: e.to_string(),
+                                duration: elapsed,
+                            };
+                            sender.send(AppEvent::FlightSQLExecutionResultsError(e))?;
+                        }
                     }
                 }
             }
@@ -260,7 +285,7 @@ impl AppExecution {
                             batch: b,
                             duration,
                         };
-                        let _ = sender.send(AppEvent::ExecutionResultsNextPage(results));
+                        let _ = sender.send(AppEvent::ExecutionResultsNextBatch(results));
                     }
                     Err(e) => {
                         error!("Error getting RecordBatch: {:?}", e);

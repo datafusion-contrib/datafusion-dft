@@ -49,8 +49,20 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
         flightsql_tab.current_page_results(),
         flightsql_tab.query_results_state(),
         flightsql_tab.execution_error(),
+        flightsql_tab.in_progress(),
     ) {
-        (Some(page), Some(batch), Some(s), None) => {
+        (_, _, _, _, true) => {
+            let block = Block::default()
+                .title(" Results ")
+                .borders(Borders::ALL)
+                .title(Title::from(" Page ").alignment(Alignment::Right));
+            let row = Row::new(vec!["Executing query..."]);
+            let widths = vec![Constraint::Percentage(100)];
+            let table = Table::new(vec![row], widths).block(block);
+            Widget::render(table, area, buf);
+        }
+
+        (Some(page), Some(batch), Some(s), None, false) => {
             let block = Block::default()
                 .title(" Results ")
                 .borders(Borders::ALL)
@@ -75,7 +87,7 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
                 }
             }
         }
-        (None, None, None, Some(e)) => {
+        (None, None, None, Some(e), false) => {
             let dur = e.duration().as_millis();
             let block = Block::default()
                 .title(" Results ")

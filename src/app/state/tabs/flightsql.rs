@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 use color_eyre::Result;
 use datafusion::arrow::{
-    array::{Array, BooleanBuilder, RecordBatch, UInt32Array},
+    array::{Array, RecordBatch, UInt32Array},
     compute::take_record_batch,
     datatypes::Schema,
     error::ArrowError,
@@ -46,6 +46,7 @@ pub struct FlightSQLTabState<'app> {
     query_results_state: Option<RefCell<TableState>>,
     result_batches: Option<Vec<RecordBatch>>,
     current_page: Option<usize>,
+    execute_in_progress: bool,
     execution_error: Option<ExecutionError>,
     execution_task: Option<JoinHandle<Result<()>>>,
 }
@@ -67,6 +68,7 @@ impl<'app> FlightSQLTabState<'app> {
             result_batches: None,
             execution_task: None,
             current_page: None,
+            execute_in_progress: false,
             execution_error: None,
         }
     }
@@ -154,10 +156,20 @@ impl<'app> FlightSQLTabState<'app> {
     }
 
     pub fn reset_execution_results(&mut self) {
+        info!("Resetting execution results");
         self.result_batches = None;
         self.current_page = None;
         self.execution_error = None;
+        self.execute_in_progress = true;
         self.refresh_query_results_state();
+    }
+
+    pub fn in_progress(&self) -> bool {
+        self.execute_in_progress
+    }
+
+    pub fn set_in_progress(&mut self, in_progress: bool) {
+        self.execute_in_progress = in_progress;
     }
 
     pub fn current_page(&self) -> Option<usize> {

@@ -17,25 +17,26 @@
 
 //! Tests for the TUI (e.g. user application with keyboard commands)
 
-use std::sync::Arc;
 use std::time::Duration;
 
-use datafusion::arrow::array::{ArrayRef, RecordBatch, UInt32Array};
+use datafusion::arrow::array::RecordBatch;
 use datafusion::assert_batches_eq;
+use datafusion::execution::context::SessionContext;
 use dft::app::{AppEvent, ExecutionResultsBatch};
+use itertools::Itertools;
 
 use crate::tui_cases::TestApp;
 
-fn create_batch(adj: u32) -> RecordBatch {
-    let arr1: ArrayRef = Arc::new(UInt32Array::from(vec![1 + adj, 2 + adj]));
-    let arr2: ArrayRef = Arc::new(UInt32Array::from(vec![3 + adj, 4 + adj]));
-
-    RecordBatch::try_from_iter(vec![("a", arr1), ("b", arr2)]).unwrap()
+async fn create_batch(sql: &str) -> RecordBatch {
+    let ctx = SessionContext::new();
+    let df = ctx.sql(sql).await.unwrap();
+    let batches = df.collect().await.unwrap();
+    batches[0].clone()
 }
 
-fn create_execution_results(query: &str, adj: u32) -> ExecutionResultsBatch {
+async fn create_execution_results(query: &str) -> ExecutionResultsBatch {
     let duration = Duration::from_secs(1);
-    let batch = create_batch(adj);
+    let batch = create_batch(query).await;
     ExecutionResultsBatch::new(query.to_string(), batch, duration)
 }
 
@@ -43,110 +44,105 @@ fn create_execution_results(query: &str, adj: u32) -> ExecutionResultsBatch {
 #[tokio::test]
 async fn single_page() {
     let mut test_app = TestApp::new();
-    let res1 = create_execution_results("SELECT 1", 0);
-    let event1 = AppEvent::ExecutionResultsNextPage(res1);
 
-    test_app.handle_app_event(AppEvent::NewExecution).unwrap();
+    test_app
+        .handle_app_event(AppEvent::FlightSQLNewExecution)
+        .unwrap();
+    let res1 = create_execution_results("SELECT 1").await;
+    let event1 = AppEvent::FlightSQLExecutionResultsNextBatch(res1);
     test_app.handle_app_event(event1).unwrap();
 
     let state = test_app.state();
 
-    let page = state.sql_tab.current_page().unwrap();
+    let page = state.flightsql_tab.current_page().unwrap();
     assert_eq!(page, 0);
 
-    let batch = state.sql_tab.current_batch();
+    let batch = state.flightsql_tab.current_page_results();
     assert!(batch.is_some());
 
     let batch = batch.unwrap();
     let batches = vec![batch.clone()];
     let expected = [
-        "+---+---+",
-        "| a | b |",
-        "+---+---+",
-        "| 1 | 3 |",
-        "| 2 | 4 |",
-        "+---+---+",
+        "+----------+",
+        "| Int64(1) |",
+        "+----------+",
+        "| 1        |",
+        "+----------+",
     ];
     assert_batches_eq!(expected, &batches);
-    let table_state = state.sql_tab.query_results_state();
+    let table_state = state.flightsql_tab.query_results_state();
     assert!(table_state.is_some());
     let table_state = table_state.as_ref().unwrap();
     assert_eq!(table_state.borrow().selected(), None);
+}
+
+fn create_values_query(num: usize) -> String {
+    let base = "SELECT * FROM VALUES";
+    let vals = (0..num).map(|i| format!("({i})")).join(",");
+    format!("{base} {vals}")
 }
 
 // Tests that we can paginate through multiple pages and go back to the first page
 #[tokio::test]
 async fn multiple_pages_forward_and_back() {
     let mut test_app = TestApp::new();
-    let res1 = create_execution_results("SELECT 1", 0);
-    let event1 = AppEvent::ExecutionResultsNextPage(res1);
+    let query = create_values_query(101);
+    let res1 = create_execution_results(&query).await;
+    let event1 = AppEvent::FlightSQLExecutionResultsNextBatch(res1);
 
-    test_app.handle_app_event(AppEvent::NewExecution).unwrap();
+    test_app
+        .handle_app_event(AppEvent::FlightSQLNewExecution)
+        .unwrap();
     test_app.handle_app_event(event1).unwrap();
 
     {
         let state = test_app.state();
-        let page = state.sql_tab.current_page().unwrap();
+        let page = state.flightsql_tab.current_page().unwrap();
         assert_eq!(page, 0);
     }
 
-    let res2 = create_execution_results("SELECT 1", 1);
-    let event2 = AppEvent::ExecutionResultsNextPage(res2);
+    let event2 = AppEvent::FlightSQLExecutionResultsNextPage;
     test_app.handle_app_event(event2).unwrap();
 
     {
         let state = test_app.state();
-        let page = state.sql_tab.current_page().unwrap();
+        let page = state.flightsql_tab.current_page().unwrap();
         assert_eq!(page, 1);
     }
 
     {
         let state = test_app.state();
-        let batch = state.sql_tab.current_batch();
+        let batch = state.flightsql_tab.current_page_results();
         assert!(batch.is_some());
 
         let batch = batch.unwrap();
         let batches = vec![batch.clone()];
         let expected = [
-            "+---+---+",
-            "| a | b |",
-            "+---+---+",
-            "| 2 | 4 |",
-            "| 3 | 5 |",
-            "+---+---+",
+            "+---------+",
+            "| column1 |",
+            "+---------+",
+            "| 100     |",
+            "+---------+",
         ];
         assert_batches_eq!(expected, &batches);
     }
 
-    let left_key = crossterm::event::KeyEvent::new(
-        crossterm::event::KeyCode::Left,
-        crossterm::event::KeyModifiers::NONE,
-    );
-    let event3 = AppEvent::Key(left_key);
+    let event3 = AppEvent::FlightSQLExecutionResultsPreviousPage;
     test_app.handle_app_event(event3).unwrap();
 
     {
         let state = test_app.state();
-        let page = state.sql_tab.current_page().unwrap();
+        let page = state.flightsql_tab.current_page().unwrap();
         assert_eq!(page, 0);
     }
 
     {
         let state = test_app.state();
-        let batch = state.sql_tab.current_batch();
+        let batch = state.flightsql_tab.current_page_results();
         assert!(batch.is_some());
 
         let batch = batch.unwrap();
-        let batches = vec![batch.clone()];
-        let expected = [
-            "+---+---+",
-            "| a | b |",
-            "+---+---+",
-            "| 1 | 3 |",
-            "| 2 | 4 |",
-            "+---+---+",
-        ];
-        assert_batches_eq!(expected, &batches);
+        assert_eq!(batch.num_rows(), 100);
     }
 }
 
@@ -155,56 +151,49 @@ async fn multiple_pages_forward_and_back() {
 #[tokio::test]
 async fn multiple_pages_forward_and_back_and_forward() {
     let mut test_app = TestApp::new();
-    let res1 = create_execution_results("SELECT 1", 0);
-    let event1 = AppEvent::ExecutionResultsNextPage(res1);
+    let query = create_values_query(101);
+    let res1 = create_execution_results(&query).await;
+    let event1 = AppEvent::FlightSQLExecutionResultsNextBatch(res1);
 
-    test_app.handle_app_event(AppEvent::NewExecution).unwrap();
+    test_app
+        .handle_app_event(AppEvent::FlightSQLNewExecution)
+        .unwrap();
     test_app.handle_app_event(event1).unwrap();
 
     {
         let state = test_app.state();
-        let page = state.sql_tab.current_page().unwrap();
+        let page = state.flightsql_tab.current_page().unwrap();
         assert_eq!(page, 0);
     }
 
-    let res2 = create_execution_results("SELECT 1", 1);
-    let event2 = AppEvent::ExecutionResultsNextPage(res2);
+    let event2 = AppEvent::FlightSQLExecutionResultsNextPage;
     test_app.handle_app_event(event2).unwrap();
 
-    let left_key = crossterm::event::KeyEvent::new(
-        crossterm::event::KeyCode::Left,
-        crossterm::event::KeyModifiers::NONE,
-    );
-    let event3 = AppEvent::Key(left_key);
+    let event3 = AppEvent::FlightSQLExecutionResultsPreviousPage;
     test_app.handle_app_event(event3).unwrap();
 
-    let right_key = crossterm::event::KeyEvent::new(
-        crossterm::event::KeyCode::Right,
-        crossterm::event::KeyModifiers::NONE,
-    );
-    let event4 = AppEvent::Key(right_key);
+    let event4 = AppEvent::FlightSQLExecutionResultsNextPage;
     test_app.handle_app_event(event4).unwrap();
 
     {
         let state = test_app.state();
-        let page = state.sql_tab.current_page().unwrap();
+        let page = state.flightsql_tab.current_page().unwrap();
         assert_eq!(page, 1);
     }
 
     {
         let state = test_app.state();
-        let batch = state.sql_tab.current_batch();
+        let batch = state.flightsql_tab.current_page_results();
         assert!(batch.is_some());
 
         let batch = batch.unwrap();
         let batches = vec![batch.clone()];
         let expected = [
-            "+---+---+",
-            "| a | b |",
-            "+---+---+",
-            "| 2 | 4 |",
-            "| 3 | 5 |",
-            "+---+---+",
+            "+---------+",
+            "| column1 |",
+            "+---------+",
+            "| 100     |",
+            "+---------+",
         ];
         assert_batches_eq!(expected, &batches);
     }

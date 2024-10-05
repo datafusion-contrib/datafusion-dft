@@ -119,18 +119,24 @@ pub enum AppEvent {
     Mouse(event::MouseEvent),
     Resize(u16, u16),
     ExecuteDDL(String),
+    // Query Execution
     NewExecution,
-    NewFlightSQLExecution,
-    ExecutionResultsNextPage(ExecutionResultsBatch),
-    FlightSQLExecutionResultsNextBatch(ExecutionResultsBatch),
+    ExecutionResultsNextBatch(ExecutionResultsBatch),
     ExecutionResultsPreviousPage,
-    FlightSQLExecutionResultsPreviousPage,
     ExecutionResultsError(ExecutionError),
-    FlightSQLExecutionResultsError(ExecutionError),
+    // FlightSQL
     #[cfg(feature = "flightsql")]
-    EstablishFlightSQLConnection,
-    // #[cfg(feature = "flightsql")]
-    // FlightSQLQueryResult(FlightSQLQuery),
+    FlightSQLEstablishConnection,
+    #[cfg(feature = "flightsql")]
+    FlightSQLNewExecution,
+    #[cfg(feature = "flightsql")]
+    FlightSQLExecutionResultsNextBatch(ExecutionResultsBatch),
+    #[cfg(feature = "flightsql")]
+    FlightSQLExecutionResultsNextPage,
+    #[cfg(feature = "flightsql")]
+    FlightSQLExecutionResultsPreviousPage,
+    #[cfg(feature = "flightsql")]
+    FlightSQLExecutionResultsError(ExecutionError),
 }
 
 pub struct App<'app> {
@@ -333,7 +339,7 @@ impl<'app> App<'app> {
 
     #[cfg(feature = "flightsql")]
     pub fn establish_flightsql_connection(&self) {
-        let _ = self.event_tx().send(AppEvent::EstablishFlightSQLConnection);
+        let _ = self.event_tx().send(AppEvent::FlightSQLEstablishConnection);
     }
 
     /// Get the next event from event loop

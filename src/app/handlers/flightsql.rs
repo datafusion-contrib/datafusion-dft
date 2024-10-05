@@ -17,7 +17,7 @@
 
 use std::sync::Arc;
 
-use log::info;
+use log::{error, info};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::{handlers::tab_navigation_handler, AppEvent};
@@ -72,10 +72,16 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
             app.state.flightsql_tab.set_execution_task(handle);
         }
         KeyCode::Right => {
-            app.state.flightsql_tab.next_page();
+            let _event_tx = app.event_tx();
+            if let Err(e) = _event_tx.send(AppEvent::FlightSQLExecutionResultsNextPage) {
+                error!("Error going to next FlightSQL results page: {e}");
+            }
         }
         KeyCode::Left => {
-            app.state.flightsql_tab.previous_page();
+            let _event_tx = app.event_tx();
+            if let Err(e) = _event_tx.send(AppEvent::FlightSQLExecutionResultsPreviousPage) {
+                error!("Error going to previous FlightSQL results page: {e}");
+            }
         }
         _ => {}
     }

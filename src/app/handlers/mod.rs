@@ -180,7 +180,7 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
             app.state.sql_tab.reset_execution_results();
         }
         #[cfg(feature = "flightsql")]
-        AppEvent::NewFlightSQLExecution => {
+        AppEvent::FlightSQLNewExecution => {
             app.state.flightsql_tab.reset_execution_results();
         }
         AppEvent::ExecutionResultsError(e) => {
@@ -196,7 +196,7 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
             app.state.history_tab.add_to_history(history_query);
             app.state.history_tab.refresh_history_table_state();
         }
-        AppEvent::ExecutionResultsNextPage(r) => {
+        AppEvent::ExecutionResultsNextBatch(r) => {
             let ExecutionResultsBatch {
                 query,
                 duration,
@@ -217,6 +217,7 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                 batch,
             } = r;
             info!("Adding batch to flightsql tab");
+            app.state.flightsql_tab.set_in_progress(false);
             app.state.flightsql_tab.add_batch(batch);
             app.state.flightsql_tab.next_page();
             app.state.flightsql_tab.refresh_query_results_state();
@@ -226,7 +227,7 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
             app.state.history_tab.refresh_history_table_state();
         }
         #[cfg(feature = "flightsql")]
-        AppEvent::EstablishFlightSQLConnection => {
+        AppEvent::FlightSQLEstablishConnection => {
             let execution = Arc::clone(&app.execution);
             let flightsql_config = app.state.config.flightsql.clone();
             tokio::spawn(async move {
@@ -236,6 +237,14 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                     info!("Created FlightSQL client");
                 }
             });
+        }
+        #[cfg(feature = "flightsql")]
+        AppEvent::FlightSQLExecutionResultsNextPage => {
+            app.state.flightsql_tab.next_page();
+        }
+        #[cfg(feature = "flightsql")]
+        AppEvent::FlightSQLExecutionResultsPreviousPage => {
+            app.state.flightsql_tab.previous_page();
         }
         _ => {
             match app.state.tabs.selected {
