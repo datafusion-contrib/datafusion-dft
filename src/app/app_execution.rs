@@ -28,6 +28,7 @@ use log::{error, info};
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Mutex;
+#[cfg(feature = "flightsql")]
 use tokio_stream::StreamMap;
 
 #[cfg(feature = "flightsql")]

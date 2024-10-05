@@ -210,6 +210,7 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
             app.state.history_tab.add_to_history(history_query);
             app.state.history_tab.refresh_history_table_state();
         }
+        #[cfg(feature = "flightsql")]
         AppEvent::FlightSQLExecutionResultsNextBatch(r) => {
             let ExecutionResultsBatch {
                 query,
