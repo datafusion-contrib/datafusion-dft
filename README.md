@@ -192,10 +192,39 @@ This would make the tables `users`, `transactions`, `listings`, and the view  `u
 
 ### Key Mappings
 
-The interface is split into several tabs so that relevant information can be viewed and controlled in a clean and organized manner. When not writing a SQL query keys can be entered to navigate and control the interface.
+The interface is split into several tabs and modes so that relevant information can be viewed and controlled in a clean and organized manner. When not writing a SQL query keys can be entered to navigate and control the interface.
 
-- SQL & FlightSQL Editor: where queries are entered and results can be viewed.  Drawing inspiration from vim there are multiple modes.
-  - Normal mode
+#### SQL Tab
+
+Editor for executing SQL with local DataFusion `SessionContext`.
+
+- Normal mode
+    - Not editable
+        - `q` => quit datafusion-tui
+        - `e` => start editing SQL Editor in Edit mode
+        - `c` => clear contents of SQL Editor
+        - `Enter` => execute query
+        - Enter the tab number in brackets after a tabs name to navigate to that tab
+        - If query results are longer or wider than screen, you can use arrow keys to scroll
+    - Editable
+        - Character keys to write queries
+        - Backspace / tab / enter work same as normal
+        - `esc` to exit Edit mode and go back to Normal mode
+- DDL mode
+    - Not editable
+        - `l` => load `~/.datafusion/.datafusionrc` into editor (TODO)
+        - `r` => rerun `~/.datafusion/.datafusionrc` (TODO)
+        - `w` => write editor contents to `~/.datafusion/.datafusionrc` (TODO)
+    - Editable
+        - Character keys to write queries
+        - Backspace / tab / enter work same as normal
+        - `esc` to exit Edit mode and go back to Normal mode
+
+#### FlightSQL Tab
+
+Same interface as SQL tab but sends SQL queries to FlightSQL server.
+
+- Normal mode
     - `q` => quit datafusion-tui
     - `e` => start editing SQL Editor in Edit mode
     - `c` => clear contents of SQL Editor
@@ -206,10 +235,13 @@ The interface is split into several tabs so that relevant information can be vie
     - Character keys to write queries
     - Backspace / tab / enter work same as normal
     - `esc` to exit Edit mode and go back to Normal mode
-  - Rc mode
-    - `l` => load `~/.datafusion/.datafusionrc` into editor (TODO)
-    - `r` => rerun `~/.datafusion/.datafusionrc` (TODO)
-    - `w` => write editor contents to `~/.datafusion/.datafusionrc` (TODO)
+
+#### History Tab
+
+TODO
+
+#### Logs Tab
+
   - Logging mode (coming from [tui_logger](https://docs.rs/tui-logger/latest/tui_logger/index.html))
     - `h` => Toggles target selector widget hidden/visible
     - `f` => Toggle focus on the selected target only
