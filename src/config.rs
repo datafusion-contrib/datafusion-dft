@@ -17,10 +17,11 @@
 
 //! Configuration management handling
 
-use std::path::PathBuf;
+use std::{io::Write, path::PathBuf};
 
 use directories::{ProjectDirs, UserDirs};
 use lazy_static::lazy_static;
+use log::{error, info};
 use serde::Deserialize;
 
 #[cfg(feature = "s3")]
@@ -56,6 +57,55 @@ pub fn get_data_dir() -> PathBuf {
         data_dir
     } else {
         project_directory()
+    }
+}
+
+pub fn load_ddl() -> Option<String> {
+    if let Some(user_dirs) = directories::UserDirs::new() {
+        // TODO: Move to ~/.config/ddl
+        let datafusion_rc_path = user_dirs
+            .home_dir()
+            .join(".datafusion")
+            .join(".datafusionrc");
+        let maybe_ddl = std::fs::read_to_string(datafusion_rc_path);
+        match maybe_ddl {
+            Ok(ddl) => {
+                info!("DDL: {:?}", ddl);
+                Some(ddl)
+            }
+            Err(err) => {
+                error!("Error reading DDL: {:?}", err);
+                None
+            }
+        }
+    } else {
+        info!("No user directories found");
+        None
+    }
+}
+
+pub fn save_ddl(ddl: String) {
+    if let Some(user_dirs) = directories::UserDirs::new() {
+        // TODO: Move to ~/.config/ddl or config defined location
+        let datafusion_rc_path = user_dirs
+            .home_dir()
+            .join(".datafusion")
+            .join(".datafusionrc");
+        match std::fs::File::create(datafusion_rc_path) {
+            Ok(mut f) => match f.write_all(ddl.as_bytes()) {
+                Ok(_) => {
+                    info!("Saved DDL file");
+                }
+                Err(e) => {
+                    error!("Error writing DDL file: {e}");
+                }
+            },
+            Err(e) => {
+                error!("Error creating or opening DDL file: {e}");
+            }
+        }
+    } else {
+        info!("No user directories found");
     }
 }
 
