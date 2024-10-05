@@ -51,7 +51,7 @@ jobs:
           # All features except FlightSQL which requires being run on a single thread for determinism
           cargo test --features=deltalake,s3,functions-json
   test-flightsql:
-    name: Test Workspace on AMD64 Rust ${{ matrix.rust }}
+    name: Test FlightSQL on AMD64 Rust ${{ matrix.rust }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
