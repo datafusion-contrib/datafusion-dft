@@ -16,15 +16,10 @@
 // under the License.
 
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 
-use datafusion::arrow::array::RecordBatch;
 use log::{error, info};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use tokio_stream::StreamExt;
-use tonic::IntoRequest;
 
-use crate::app::state::tabs::flightsql::FlightSQLQuery;
 use crate::app::{handlers::tab_navigation_handler, AppEvent};
 
 use super::App;
@@ -66,74 +61,28 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
             }
         }
 
-        // KeyCode::Enter => {
-        //     info!("Run FS query");
-        //     let sql = app.state.flightsql_tab.editor().lines().join("");
-        //     info!("SQL: {}", sql);
-        //     let execution = Arc::clone(&app.execution);
-        //     let _event_tx = app.event_tx();
-        //     tokio::spawn(async move {
-        //         let client = execution.flightsql_client();
-        //         let mut query =
-        //             FlightSQLQuery::new(sql.clone(), None, None, None, Duration::default(), None);
-        //         let start = Instant::now();
-        //         if let Some(ref mut c) = *client.lock().await {
-        //             info!("Sending query");
-        //             match c.execute(sql, None).await {
-        //                 Ok(flight_info) => {
-        //                     for endpoint in flight_info.endpoint {
-        //                         if let Some(ticket) = endpoint.ticket {
-        //                             match c.do_get(ticket.into_request()).await {
-        //                                 Ok(mut stream) => {
-        //                                     let mut batches: Vec<RecordBatch> = Vec::new();
-        //                                     // temporarily only show the first batch to avoid
-        //                                     // buffering massive result sets. Eventually there should
-        //                                     // be some sort of paging logic
-        //                                     // see https://github.com/datafusion-contrib/datafusion-tui/pull/133#discussion_r1756680874
-        //                                     // while let Some(maybe_batch) = stream.next().await {
-        //                                     if let Some(maybe_batch) = stream.next().await {
-        //                                         match maybe_batch {
-        //                                             Ok(batch) => {
-        //                                                 info!("Batch rows: {}", batch.num_rows());
-        //                                                 batches.push(batch);
-        //                                             }
-        //                                             Err(e) => {
-        //                                                 error!("Error getting batch: {:?}", e);
-        //                                                 let elapsed = start.elapsed();
-        //                                                 query.set_error(Some(e.to_string()));
-        //                                                 query.set_execution_time(elapsed);
-        //                                             }
-        //                                         }
-        //                                     }
-        //                                     let elapsed = start.elapsed();
-        //                                     let rows: usize =
-        //                                         batches.iter().map(|r| r.num_rows()).sum();
-        //                                     query.set_results(Some(batches));
-        //                                     query.set_num_rows(Some(rows));
-        //                                     query.set_execution_time(elapsed);
-        //                                 }
-        //                                 Err(e) => {
-        //                                     error!("Error getting response: {:?}", e);
-        //                                     let elapsed = start.elapsed();
-        //                                     query.set_error(Some(e.to_string()));
-        //                                     query.set_execution_time(elapsed);
-        //                                 }
-        //                             }
-        //                         }
-        //                     }
-        //                 }
-        //                 Err(e) => {
-        //                     error!("Error getting response: {:?}", e);
-        //                     let elapsed = start.elapsed();
-        //                     query.set_error(Some(e.to_string()));
-        //                     query.set_execution_time(elapsed);
-        //                 }
-        //             }
-        //         }
-        //
-        //         let _ = _event_tx.send(AppEvent::FlightSQLQueryResult(query));
-        //     });
-        // }
+        KeyCode::Enter => {
+            info!("Executing FlightSQL query");
+            let sql = app.state.flightsql_tab.editor().lines().join("");
+            info!("SQL: {}", sql);
+            let sqls: Vec<String> = sql.split(';').map(|s| s.to_string()).collect();
+            let execution = Arc::clone(&app.execution);
+            let _event_tx = app.event_tx();
+            let handle = tokio::spawn(execution.run_flightsqls(sqls, _event_tx));
+            app.state.flightsql_tab.set_execution_task(handle);
+        }
+        KeyCode::Right => {
+            let _event_tx = app.event_tx();
+            if let Err(e) = _event_tx.send(AppEvent::FlightSQLExecutionResultsNextPage) {
+                error!("Error going to next FlightSQL results page: {e}");
+            }
+        }
+        KeyCode::Left => {
+            let _event_tx = app.event_tx();
+            if let Err(e) = _event_tx.send(AppEvent::FlightSQLExecutionResultsPreviousPage) {
+                error!("Error going to previous FlightSQL results page: {e}");
+            }
+        }
         _ => {}
     }
 }
@@ -154,11 +103,6 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) {
             true => editable_handler(app, key),
             false => normal_mode_handler(app, key),
         },
-        AppEvent::FlightSQLQueryResult(r) => {
-            info!("Query results: {:?}", r);
-            app.state.flightsql_tab.set_query(r);
-            app.state.flightsql_tab.refresh_query_results_state();
-        }
         AppEvent::Error => {}
         _ => {}
     };

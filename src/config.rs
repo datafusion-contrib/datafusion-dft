@@ -179,7 +179,7 @@ fn default_paste() -> bool {
 }
 
 #[cfg(feature = "flightsql")]
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct FlightSQLConfig {
     #[serde(default = "default_connection_url")]
     pub connection_url: String,

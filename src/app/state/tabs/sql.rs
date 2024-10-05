@@ -57,7 +57,7 @@ pub struct SQLTabState<'app> {
     editor_editable: bool,
     query_results_state: Option<RefCell<TableState>>,
     result_batches: Option<Vec<RecordBatch>>,
-    results_page: Option<usize>,
+    current_page: Option<usize>,
     execution_error: Option<ExecutionError>,
     execution_task: Option<JoinHandle<Result<()>>>,
 }
@@ -77,7 +77,7 @@ impl<'app> SQLTabState<'app> {
             editor_editable: false,
             query_results_state: None,
             result_batches: None,
-            results_page: None,
+            current_page: None,
             execution_error: None,
             execution_task: None,
         }
@@ -93,7 +93,7 @@ impl<'app> SQLTabState<'app> {
 
     pub fn reset_execution_results(&mut self) {
         self.result_batches = None;
-        self.results_page = None;
+        self.current_page = None;
         self.execution_error = None;
         self.refresh_query_results_state();
     }
@@ -165,7 +165,7 @@ impl<'app> SQLTabState<'app> {
     }
 
     pub fn current_batch(&self) -> Option<&RecordBatch> {
-        match (self.results_page, self.result_batches.as_ref()) {
+        match (self.current_page, self.result_batches.as_ref()) {
             (Some(page), Some(batches)) => batches.get(page),
             _ => None,
         }
@@ -187,22 +187,22 @@ impl<'app> SQLTabState<'app> {
         self.execution_error = Some(error);
     }
 
-    pub fn results_page(&self) -> Option<usize> {
-        self.results_page
+    pub fn current_page(&self) -> Option<usize> {
+        self.current_page
     }
 
     pub fn next_page(&mut self) {
-        if let Some(page) = self.results_page {
-            self.results_page = Some(page + 1);
+        if let Some(page) = self.current_page {
+            self.current_page = Some(page + 1);
         } else {
-            self.results_page = Some(0);
+            self.current_page = Some(0);
         }
     }
 
     pub fn previous_page(&mut self) {
-        if let Some(page) = self.results_page {
+        if let Some(page) = self.current_page {
             if page > 0 {
-                self.results_page = Some(page - 1);
+                self.current_page = Some(page - 1);
             }
         }
     }

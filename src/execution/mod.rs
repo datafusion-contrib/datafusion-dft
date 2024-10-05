@@ -156,8 +156,10 @@ impl ExecutionContext {
     #[cfg(feature = "flightsql")]
     pub async fn create_flightsql_client(&self, config: FlightSQLConfig) -> Result<()> {
         use color_eyre::eyre::eyre;
+        use log::info;
 
         let url = Box::leak(config.connection_url.into_boxed_str());
+        info!("Connecting to FlightSQL host: {}", url);
         let channel = Channel::from_static(url).connect().await;
         match channel {
             Ok(c) => {

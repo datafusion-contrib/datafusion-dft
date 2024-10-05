@@ -69,7 +69,7 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
         KeyCode::Right => {
             let _event_tx = app.event_tx().clone();
             if let (Some(p), c) = (
-                app.state().sql_tab.results_page(),
+                app.state().sql_tab.current_page(),
                 app.state().sql_tab.batches_count(),
             ) {
                 // We don't need to fetch the next batch if moving forward a page and we're not

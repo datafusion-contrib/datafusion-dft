@@ -165,6 +165,28 @@ pub fn empty_results_table<'frame>() -> Table<'frame> {
     Table::new(value_row, width).header(header_row)
 }
 
+pub fn record_batch_to_table<'frame, 'results>(
+    batch: &'results RecordBatch,
+) -> Result<Table<'frame>>
+where
+    // The results come from sql_tab state which persists until the next query is run which is
+    // longer than a frame lifetime.
+    'results: 'frame,
+{
+    if batch.num_rows() == 0 {
+        Ok(empty_results_table())
+    } else {
+        let header_cells = record_batch_to_table_header_cells(batch);
+        let header_row = Row::from_iter(header_cells).bold();
+        let batch_row_cells = record_batch_to_table_row_cells(batch)?;
+        let rows: Vec<Row> = batch_row_cells.into_iter().map(Row::from_iter).collect();
+        let column_count = batch.num_columns() + 1;
+        let widths = (0..column_count).map(|_| Constraint::Fill(1));
+        let block = Block::default().borders(Borders::all());
+        Ok(Table::new(rows, widths).header(header_row).block(block))
+    }
+}
+
 pub fn record_batches_to_table<'frame, 'results>(
     record_batches: &'results [&RecordBatch],
 ) -> Result<Table<'frame>>

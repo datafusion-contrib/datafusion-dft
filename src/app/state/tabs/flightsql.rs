@@ -16,99 +16,39 @@
 // under the License.
 
 use core::cell::RefCell;
-use std::time::Duration;
+use std::sync::Arc;
 
-use datafusion::arrow::array::RecordBatch;
+use color_eyre::Result;
+use datafusion::arrow::{
+    array::{Array, RecordBatch, UInt32Array},
+    compute::take_record_batch,
+    datatypes::Schema,
+    error::ArrowError,
+};
+use log::{error, info};
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::palette::tailwind;
 use ratatui::style::Style;
 use ratatui::widgets::TableState;
+use tokio::task::JoinHandle;
 use tui_textarea::TextArea;
 
 use crate::app::state::tabs::sql;
+use crate::app::ExecutionError;
 use crate::config::AppConfig;
-use crate::execution::ExecutionStats;
 
-#[derive(Clone, Debug)]
-pub struct FlightSQLQuery {
-    sql: String,
-    results: Option<Vec<RecordBatch>>,
-    num_rows: Option<usize>,
-    error: Option<String>,
-    execution_time: Duration,
-    execution_stats: Option<ExecutionStats>,
-}
-
-impl FlightSQLQuery {
-    pub fn new(
-        sql: String,
-        results: Option<Vec<RecordBatch>>,
-        num_rows: Option<usize>,
-        error: Option<String>,
-        execution_time: Duration,
-        execution_stats: Option<ExecutionStats>,
-    ) -> Self {
-        Self {
-            sql,
-            results,
-            num_rows,
-            error,
-            execution_time,
-            execution_stats,
-        }
-    }
-
-    pub fn sql(&self) -> &String {
-        &self.sql
-    }
-
-    pub fn set_results(&mut self, results: Option<Vec<RecordBatch>>) {
-        self.results = results;
-    }
-
-    pub fn results(&self) -> &Option<Vec<RecordBatch>> {
-        &self.results
-    }
-
-    pub fn set_num_rows(&mut self, num_rows: Option<usize>) {
-        self.num_rows = num_rows;
-    }
-
-    pub fn num_rows(&self) -> &Option<usize> {
-        &self.num_rows
-    }
-
-    pub fn set_error(&mut self, error: Option<String>) {
-        self.error = error;
-    }
-
-    pub fn error(&self) -> &Option<String> {
-        &self.error
-    }
-
-    pub fn set_execution_time(&mut self, execution_time: Duration) {
-        self.execution_time = execution_time;
-    }
-
-    pub fn execution_time(&self) -> &Duration {
-        &self.execution_time
-    }
-
-    pub fn execution_stats(&self) -> &Option<ExecutionStats> {
-        &self.execution_stats
-    }
-
-    pub fn set_execution_stats(&mut self, stats: Option<ExecutionStats>) {
-        self.execution_stats = stats;
-    }
-}
+const PAGE_SIZE: usize = 100;
 
 #[derive(Debug, Default)]
 pub struct FlightSQLTabState<'app> {
     editor: TextArea<'app>,
     editor_editable: bool,
-    query: Option<FlightSQLQuery>,
     query_results_state: Option<RefCell<TableState>>,
+    result_batches: Option<Vec<RecordBatch>>,
+    current_page: Option<usize>,
+    execute_in_progress: bool,
+    execution_error: Option<ExecutionError>,
+    execution_task: Option<JoinHandle<Result<()>>>,
 }
 
 impl<'app> FlightSQLTabState<'app> {
@@ -124,8 +64,12 @@ impl<'app> FlightSQLTabState<'app> {
         Self {
             editor: textarea,
             editor_editable: false,
-            query: None,
             query_results_state: None,
+            result_batches: None,
+            execution_task: None,
+            current_page: None,
+            execute_in_progress: false,
+            execution_error: None,
         }
     }
 
@@ -180,14 +124,6 @@ impl<'app> FlightSQLTabState<'app> {
         self.editor_editable
     }
 
-    pub fn set_query(&mut self, query: FlightSQLQuery) {
-        self.query = Some(query);
-    }
-
-    pub fn query(&self) -> &Option<FlightSQLQuery> {
-        &self.query
-    }
-
     // TODO: Create Editor struct and move this there
     pub fn next_word(&mut self) {
         self.editor
@@ -201,5 +137,118 @@ impl<'app> FlightSQLTabState<'app> {
 
     pub fn delete_word(&mut self) {
         self.editor.delete_word();
+    }
+
+    pub fn execution_task(&mut self) -> &mut Option<JoinHandle<Result<()>>> {
+        &mut self.execution_task
+    }
+
+    pub fn set_execution_task(&mut self, task: JoinHandle<Result<()>>) {
+        self.execution_task = Some(task);
+    }
+
+    pub fn add_batch(&mut self, batch: RecordBatch) {
+        if let Some(batches) = self.result_batches.as_mut() {
+            batches.push(batch);
+        } else {
+            self.result_batches = Some(vec![batch]);
+        }
+    }
+
+    pub fn reset_execution_results(&mut self) {
+        info!("Resetting execution results");
+        self.result_batches = None;
+        self.current_page = None;
+        self.execution_error = None;
+        self.execute_in_progress = true;
+        self.refresh_query_results_state();
+    }
+
+    pub fn in_progress(&self) -> bool {
+        self.execute_in_progress
+    }
+
+    pub fn set_in_progress(&mut self, in_progress: bool) {
+        self.execute_in_progress = in_progress;
+    }
+
+    pub fn current_page(&self) -> Option<usize> {
+        self.current_page
+    }
+
+    pub fn current_page_results(&self) -> Option<RecordBatch> {
+        match (self.current_page, self.result_batches.as_ref()) {
+            (Some(page), Some(batches)) => {
+                let total_rows: usize = batches.iter().map(|b| b.num_rows()).sum();
+                let indices = if total_rows < PAGE_SIZE {
+                    UInt32Array::from_iter_values(0_u32..(total_rows as u32))
+                } else {
+                    let start = page * PAGE_SIZE;
+                    let remaining = total_rows - start;
+                    // On the last page there could be less than PAGE_SIZE results to view
+                    let page_records = remaining.min(PAGE_SIZE);
+                    let end = (start as u32) + (page_records as u32);
+                    info!("Current page start({start}) end({end})");
+                    UInt32Array::from_iter_values((start as u32)..end)
+                };
+                match take_record_batches(batches, &indices) {
+                    Ok(batch) => Some(batch),
+                    Err(err) => {
+                        error!("Error getting record batch: {}", err);
+                        None
+                    }
+                }
+            }
+            _ => Some(RecordBatch::new_empty(Arc::new(Schema::empty()))),
+        }
+    }
+
+    pub fn execution_error(&self) -> Option<ExecutionError> {
+        None
+    }
+
+    pub fn next_page(&mut self) {
+        self.change_page(
+            |page, max_pages| {
+                if page < max_pages {
+                    page + 1
+                } else {
+                    page
+                }
+            },
+        );
+    }
+
+    pub fn previous_page(&mut self) {
+        self.change_page(|page, _| if page > 0 { page - 1 } else { 0 });
+    }
+
+    fn change_page<F>(&mut self, change_fn: F)
+    where
+        F: Fn(usize, usize) -> usize,
+    {
+        match (self.current_page.as_mut(), self.result_batches.as_ref()) {
+            (Some(page), Some(batches)) => {
+                let total_rows: usize = batches.iter().map(|b| b.num_rows()).sum();
+                let max_pages = total_rows / PAGE_SIZE;
+                *page = change_fn(*page, max_pages);
+            }
+            (None, Some(_)) => self.current_page = Some(0),
+            _ => {
+                error!("Got change page request with no batches")
+            }
+        }
+    }
+}
+
+fn take_record_batches(
+    batches: &[RecordBatch],
+    indices: &dyn Array,
+) -> Result<RecordBatch, ArrowError> {
+    match batches.len() {
+        0 => Ok(RecordBatch::new_empty(Arc::new(Schema::empty()))),
+        1 => take_record_batch(&batches[0], indices),
+        // For now we just get the first batch
+        _ => take_record_batch(&batches[0], indices),
     }
 }
