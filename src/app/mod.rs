@@ -44,9 +44,6 @@ use self::app_execution::AppExecution;
 use self::handlers::{app_event_handler, crossterm_event_handler};
 use crate::execution::ExecutionContext;
 
-// #[cfg(feature = "flightsql")]
-// use self::state::tabs::flightsql::FlightSQLQuery;
-
 #[derive(Clone, Debug)]
 pub struct ExecutionError {
     query: String,
