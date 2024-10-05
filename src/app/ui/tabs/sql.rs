@@ -23,21 +23,25 @@ use ratatui::{
     widgets::{block::Title, Block, Borders, Paragraph, Row, StatefulWidget, Table, Widget},
 };
 
-use crate::app::ui::convert::record_batches_to_table;
 use crate::app::App;
+use crate::app::{state::tabs::sql::SQLTabMode, ui::convert::record_batches_to_table};
 
 pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
+    let sql_tab = &app.state.sql_tab;
     let border_color = if app.state.sql_tab.editor_editable() {
         tailwind::ORANGE.c500
     } else {
         tailwind::WHITE
     };
     let title = Span::from(" Editor ").fg(tailwind::WHITE);
+    let mode_text = format!(" {:?} ", sql_tab.mode());
+    let mode = Title::from(mode_text.as_str()).alignment(Alignment::Right);
     let block = Block::default()
         .title(title)
+        .title(mode)
         .borders(Borders::ALL)
         .fg(border_color);
-    let mut editor = app.state.sql_tab.editor();
+    let mut editor = app.state.sql_tab.active_editor_cloned();
     editor.set_style(Style::default().fg(tailwind::WHITE));
     editor.set_block(block);
     editor.render(area, buf)
@@ -108,7 +112,13 @@ pub fn render_sql_help(area: Rect, buf: &mut Buffer, app: &App) {
     let help = if app.state.sql_tab.editor_editable() {
         vec!["'Esc' to exit edit mode"]
     } else {
-        vec!["'e' to edit", "'c' to clear editor", "'Enter' to run query"]
+        vec![
+            "'e' to edit",
+            "'c' to clear editor",
+            "'n' for Normal mode",
+            "'d' for DDL mode",
+            "'Enter' to run query",
+        ]
     };
 
     let help_text = help.join(" | ");
@@ -119,14 +129,29 @@ pub fn render_sql_help(area: Rect, buf: &mut Buffer, app: &App) {
 }
 
 pub fn render_sql(area: Rect, buf: &mut Buffer, app: &App) {
-    let constraints = vec![
-        Constraint::Fill(1),
-        Constraint::Fill(1),
-        Constraint::Length(1),
-    ];
-    let [editor_area, results_area, help_area] =
-        Layout::new(Direction::Vertical, constraints).areas(area);
-    render_sql_editor(editor_area, buf, app);
-    render_sql_results(results_area, buf, app);
-    render_sql_help(help_area, buf, app);
+    let mode = app.state.sql_tab.mode();
+
+    match mode {
+        SQLTabMode::Normal => {
+            let constraints = vec![
+                Constraint::Fill(1),
+                Constraint::Fill(1),
+                Constraint::Length(1),
+            ];
+            let [editor_area, results_area, help_area] =
+                Layout::new(Direction::Vertical, constraints).areas(area);
+
+            render_sql_editor(editor_area, buf, app);
+            render_sql_results(results_area, buf, app);
+            render_sql_help(help_area, buf, app);
+        }
+        SQLTabMode::DDL => {
+            let constraints = vec![Constraint::Fill(1), Constraint::Length(1)];
+            let [editor_area, help_area] =
+                Layout::new(Direction::Vertical, constraints).areas(area);
+
+            render_sql_editor(editor_area, buf, app);
+            render_sql_help(help_area, buf, app);
+        }
+    };
 }

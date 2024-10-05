@@ -28,7 +28,7 @@ use tokio::task::JoinHandle;
 use tui_textarea::TextArea;
 
 use crate::app::ExecutionError;
-use crate::config::AppConfig;
+use crate::config::{load_ddl, AppConfig};
 
 pub fn get_keywords() -> Vec<String> {
     keywords::ALL_KEYWORDS
@@ -51,15 +51,25 @@ pub fn keyword_style() -> Style {
         .add_modifier(Modifier::BOLD)
 }
 
+#[derive(Debug, Default, PartialEq)]
+pub enum SQLTabMode {
+    #[default]
+    Normal,
+    DDL,
+}
+
 #[derive(Debug, Default)]
 pub struct SQLTabState<'app> {
     editor: TextArea<'app>,
     editor_editable: bool,
+    ddl_editor: TextArea<'app>,
+    ddl_editor_editable: bool,
     query_results_state: Option<RefCell<TableState>>,
     result_batches: Option<Vec<RecordBatch>>,
     current_page: Option<usize>,
     execution_error: Option<ExecutionError>,
     execution_task: Option<JoinHandle<Result<()>>>,
+    mode: SQLTabMode,
 }
 
 impl<'app> SQLTabState<'app> {
@@ -68,18 +78,29 @@ impl<'app> SQLTabState<'app> {
         // TODO: Enable vim mode from config?
         let mut textarea = TextArea::new(empty_text);
         textarea.set_style(Style::default().fg(tailwind::WHITE));
+
+        let ddl = load_ddl().unwrap_or_default();
+        let lines = ddl.lines().map(|l| l.to_string()).collect();
+
+        let mut ddl_textarea = TextArea::new(lines);
+        ddl_textarea.set_style(Style::default().fg(tailwind::WHITE));
         if config.editor.experimental_syntax_highlighting {
             textarea.set_search_pattern(keyword_regex()).unwrap();
             textarea.set_search_style(keyword_style());
+            ddl_textarea.set_search_pattern(keyword_regex()).unwrap();
+            ddl_textarea.set_search_style(keyword_style());
         };
         Self {
             editor: textarea,
             editor_editable: false,
+            ddl_editor: ddl_textarea,
+            ddl_editor_editable: false,
             query_results_state: None,
             result_batches: None,
             current_page: None,
             execution_error: None,
             execution_task: None,
+            mode: SQLTabMode::default(),
         }
     }
 
@@ -104,6 +125,17 @@ impl<'app> SQLTabState<'app> {
         self.editor.clone()
     }
 
+    pub fn ddl_editor(&self) -> TextArea {
+        self.ddl_editor.clone()
+    }
+
+    pub fn active_editor_cloned(&self) -> TextArea {
+        match self.mode {
+            SQLTabMode::Normal => self.editor.clone(),
+            SQLTabMode::DDL => self.ddl_editor.clone(),
+        }
+    }
+
     pub fn clear_placeholder(&mut self) {
         let default = "Enter a query here.";
         let lines = self.editor.lines();
@@ -126,34 +158,64 @@ impl<'app> SQLTabState<'app> {
     }
 
     pub fn update_editor_content(&mut self, key: KeyEvent) {
-        self.editor.input(key);
+        match self.mode {
+            SQLTabMode::Normal => self.editor.input(key),
+            SQLTabMode::DDL => self.ddl_editor.input(key),
+        };
     }
 
     pub fn edit(&mut self) {
-        self.editor_editable = true;
+        match self.mode {
+            SQLTabMode::Normal => self.editor_editable = true,
+            SQLTabMode::DDL => self.ddl_editor_editable = true,
+        };
     }
 
     pub fn exit_edit(&mut self) {
-        self.editor_editable = false;
+        match self.mode {
+            SQLTabMode::Normal => self.editor_editable = false,
+            SQLTabMode::DDL => self.ddl_editor_editable = false,
+        };
     }
 
     pub fn editor_editable(&self) -> bool {
-        self.editor_editable
+        match self.mode {
+            SQLTabMode::Normal => self.editor_editable,
+            SQLTabMode::DDL => self.ddl_editor_editable,
+        }
+    }
+
+    pub fn editable(&self) -> bool {
+        self.editor_editable || self.ddl_editor_editable
     }
 
     // TODO: Create Editor struct and move this there
     pub fn next_word(&mut self) {
-        self.editor
-            .move_cursor(tui_textarea::CursorMove::WordForward)
+        match self.mode {
+            SQLTabMode::Normal => self
+                .editor
+                .move_cursor(tui_textarea::CursorMove::WordForward),
+            SQLTabMode::DDL => self
+                .ddl_editor
+                .move_cursor(tui_textarea::CursorMove::WordForward),
+        }
     }
 
     // TODO: Create Editor struct and move this there
     pub fn previous_word(&mut self) {
-        self.editor.move_cursor(tui_textarea::CursorMove::WordBack)
+        match self.mode {
+            SQLTabMode::Normal => self.editor.move_cursor(tui_textarea::CursorMove::WordBack),
+            SQLTabMode::DDL => self
+                .ddl_editor
+                .move_cursor(tui_textarea::CursorMove::WordBack),
+        }
     }
 
     pub fn delete_word(&mut self) {
-        self.editor.delete_word();
+        match self.mode {
+            SQLTabMode::Normal => self.editor.delete_word(),
+            SQLTabMode::DDL => self.ddl_editor.delete_word(),
+        };
     }
 
     pub fn add_batch(&mut self, batch: RecordBatch) {
@@ -213,5 +275,13 @@ impl<'app> SQLTabState<'app> {
 
     pub fn set_execution_task(&mut self, task: JoinHandle<Result<()>>) {
         self.execution_task = Some(task);
+    }
+
+    pub fn mode(&self) -> &SQLTabMode {
+        &self.mode
+    }
+
+    pub fn set_mode(&mut self, mode: SQLTabMode) {
+        self.mode = mode
     }
 }

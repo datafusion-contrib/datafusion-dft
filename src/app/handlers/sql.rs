@@ -21,7 +21,7 @@ use log::info;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::App;
-use crate::app::{handlers::tab_navigation_handler, AppEvent};
+use crate::app::{handlers::tab_navigation_handler, state::tabs::sql::SQLTabMode, AppEvent};
 
 pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
     match key.code {
@@ -42,6 +42,8 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
             }
             app.state.sql_tab.edit();
         }
+        KeyCode::Char('d') => app.state.sql_tab.set_mode(SQLTabMode::DDL),
+        KeyCode::Char('n') => app.state.sql_tab.set_mode(SQLTabMode::Normal),
         KeyCode::Down => {
             if let Some(s) = app.state.sql_tab.query_results_state() {
                 info!("Select next");
@@ -108,7 +110,7 @@ pub fn editable_handler(app: &mut App, key: KeyEvent) {
 
 pub fn app_event_handler(app: &mut App, event: AppEvent) {
     match event {
-        AppEvent::Key(key) => match app.state.sql_tab.editor_editable() {
+        AppEvent::Key(key) => match app.state.sql_tab.editable() {
             true => editable_handler(app, key),
             false => normal_mode_handler(app, key),
         },

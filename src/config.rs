@@ -21,6 +21,7 @@ use std::path::PathBuf;
 
 use directories::{ProjectDirs, UserDirs};
 use lazy_static::lazy_static;
+use log::{error, info};
 use serde::Deserialize;
 
 #[cfg(feature = "s3")]
@@ -58,6 +59,32 @@ pub fn get_data_dir() -> PathBuf {
         project_directory()
     }
 }
+
+pub fn load_ddl() -> Option<String> {
+    if let Some(user_dirs) = directories::UserDirs::new() {
+        // TODO: Move to ~/.config/ddl
+        let datafusion_rc_path = user_dirs
+            .home_dir()
+            .join(".datafusion")
+            .join(".datafusionrc");
+        let maybe_ddl = std::fs::read_to_string(datafusion_rc_path);
+        match maybe_ddl {
+            Ok(ddl) => {
+                info!("DDL: {:?}", ddl);
+                Some(ddl)
+            }
+            Err(err) => {
+                error!("Error reading DDL: {:?}", err);
+                None
+            }
+        }
+    } else {
+        info!("No user directories found");
+        None
+    }
+}
+
+pub fn save_ddl() {}
 
 #[derive(Debug, Default, Deserialize)]
 pub struct AppConfig {

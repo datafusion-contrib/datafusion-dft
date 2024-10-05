@@ -62,9 +62,7 @@ pub fn render_query_history(area: Rect, buf: &mut Buffer, app: &App) {
         .title(" Query History ")
         .borders(Borders::ALL);
     let history = app.state.history_tab.history();
-    info!("History: {:?}", history);
     let history_table_state = app.state.history_tab.history_table_state();
-    info!("History Table State: {:?}", history_table_state);
     match (history.is_empty(), history_table_state) {
         (true, _) | (_, None) => {
             let row = Row::new(vec!["Your query history will show here"]);

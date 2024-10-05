@@ -82,9 +82,9 @@ impl SelectedTab {
             }
             Self::History => {
                 #[cfg(feature = "flightsql")]
-                let title = Span::from("HISTORY (3)");
+                let title = Span::from("HISTORY (3)").bold();
                 #[cfg(not(feature = "flightsql"))]
-                let title = Span::from("HISTORY (2)");
+                let title = Span::from("HISTORY (2)").bold();
                 Line::from_iter(vec![padding.clone(), title, padding.clone()])
                     .fg(tailwind::SLATE.c200)
                     .bg(self.bg())
