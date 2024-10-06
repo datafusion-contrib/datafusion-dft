@@ -92,6 +92,10 @@ $ dft -c "SELECT 1+2"
 
 Both of the commands above support the `--flightsql` parameter to run the SQL with your configured FlightSQL client.
 
+#### DDL
+
+The CLI can also run your configured DDL prior to executing the query by adding the `--ddl` parameter.
+
 ## User Guide
 
 ### Installation
