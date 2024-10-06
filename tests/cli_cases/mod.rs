@@ -16,6 +16,7 @@
 // under the License.
 
 mod basic;
+mod config;
 #[cfg(feature = "flightsql")]
 mod flightsql;
 
