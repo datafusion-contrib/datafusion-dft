@@ -19,8 +19,11 @@
 //!
 
 mod stats;
+use std::io::Write;
+use std::path::PathBuf;
 use std::sync::Arc;
 
+use log::{error, info};
 pub use stats::{collect_plan_stats, ExecutionStats};
 
 use crate::config::ExecutionConfig;
@@ -52,6 +55,7 @@ use {
 /// Thus it is important (eventually) not depend on the code in the app crate
 pub struct ExecutionContext {
     session_ctx: SessionContext,
+    ddl_path: Option<PathBuf>,
     #[cfg(feature = "flightsql")]
     flightsql_client: Mutex<Option<FlightSqlServiceClient<Channel>>>,
 }
@@ -82,6 +86,7 @@ impl ExecutionContext {
 
         Ok(Self {
             session_ctx,
+            ddl_path: config.ddl_path.as_ref().map(PathBuf::from),
             #[cfg(feature = "flightsql")]
             flightsql_client: Mutex::new(None),
         })
@@ -174,4 +179,52 @@ impl ExecutionContext {
             )),
         }
     }
+
+    pub fn load_ddl(&self) -> Option<String> {
+        info!("Loading DDL from: {:?}", &self.ddl_path);
+        if let Some(ddl_path) = &self.ddl_path {
+            if ddl_path.exists() {
+                let maybe_ddl = std::fs::read_to_string(ddl_path);
+                match maybe_ddl {
+                    Ok(ddl) => {
+                        info!("DDL: {:?}", ddl);
+                        Some(ddl)
+                    }
+                    Err(err) => {
+                        error!("Error reading DDL: {:?}", err);
+                        None
+                    }
+                }
+            } else {
+                info!("DDL path ({:?}) does not exist", ddl_path);
+                None
+            }
+        } else {
+            info!("No DDL file configured");
+            None
+        }
+    }
+
+    pub fn save_ddl(&self, ddl: String) {
+        info!("Loading DDL from: {:?}", &self.ddl_path);
+        if let Some(ddl_path) = &self.ddl_path {
+            match std::fs::File::create(ddl_path) {
+                Ok(mut f) => match f.write_all(ddl.as_bytes()) {
+                    Ok(_) => {
+                        info!("Saved DDL file")
+                    }
+                    Err(e) => {
+                        error!("Error writing DDL file: {e}")
+                    }
+                },
+                Err(e) => {
+                    error!("Error creating or opening DDL file: {e}")
+                }
+            }
+        } else {
+            info!("No DDL file configured");
+        }
+    }
 }
+
+pub fn load_ddl_file() {}

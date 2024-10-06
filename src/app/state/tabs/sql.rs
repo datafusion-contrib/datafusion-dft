@@ -28,7 +28,7 @@ use tokio::task::JoinHandle;
 use tui_textarea::TextArea;
 
 use crate::app::ExecutionError;
-use crate::config::{load_ddl, AppConfig};
+use crate::config::AppConfig;
 
 pub fn get_keywords() -> Vec<String> {
     keywords::ALL_KEYWORDS
@@ -79,10 +79,8 @@ impl<'app> SQLTabState<'app> {
         let mut textarea = TextArea::new(empty_text);
         textarea.set_style(Style::default().fg(tailwind::WHITE));
 
-        let ddl = load_ddl().unwrap_or_default();
-        let lines = ddl.lines().map(|l| l.to_string()).collect();
-
-        let mut ddl_textarea = TextArea::new(lines);
+        let ddl_empty_text = vec!["Write your DDL here.".to_string()];
+        let mut ddl_textarea = TextArea::new(ddl_empty_text);
         ddl_textarea.set_style(Style::default().fg(tailwind::WHITE));
         if config.editor.experimental_syntax_highlighting {
             textarea.set_search_pattern(keyword_regex()).unwrap();
@@ -162,6 +160,12 @@ impl<'app> SQLTabState<'app> {
             SQLTabMode::Normal => self.editor.input(key),
             SQLTabMode::DDL => self.ddl_editor.input(key),
         };
+    }
+
+    pub fn add_ddl_to_editor(&mut self, ddl: String) {
+        self.ddl_editor.delete_line_by_end();
+        self.ddl_editor.set_yank_text(ddl);
+        self.ddl_editor.paste();
     }
 
     pub fn edit(&mut self) {

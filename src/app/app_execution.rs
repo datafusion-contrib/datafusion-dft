@@ -305,4 +305,12 @@ impl AppExecution {
     pub fn flightsql_client(&self) -> &Mutex<Option<FlightSqlServiceClient<Channel>>> {
         self.inner.flightsql_client()
     }
+
+    pub fn load_ddl(&self) -> Option<String> {
+        self.inner.load_ddl()
+    }
+
+    pub fn save_ddl(&self, ddl: String) {
+        self.inner.save_ddl(ddl)
+    }
 }
