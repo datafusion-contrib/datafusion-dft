@@ -60,54 +60,54 @@ pub fn get_data_dir() -> PathBuf {
     }
 }
 
-pub fn load_ddl() -> Option<String> {
-    if let Some(user_dirs) = directories::UserDirs::new() {
-        // TODO: Move to ~/.config/ddl
-        let datafusion_rc_path = user_dirs
-            .home_dir()
-            .join(".datafusion")
-            .join(".datafusionrc");
-        let maybe_ddl = std::fs::read_to_string(datafusion_rc_path);
-        match maybe_ddl {
-            Ok(ddl) => {
-                info!("DDL: {:?}", ddl);
-                Some(ddl)
-            }
-            Err(err) => {
-                error!("Error reading DDL: {:?}", err);
-                None
-            }
-        }
-    } else {
-        info!("No user directories found");
-        None
-    }
-}
+// pub fn load_ddl() -> Option<String> {
+//     if let Some(user_dirs) = directories::UserDirs::new() {
+//         // TODO: Move to ~/.config/ddl
+//         let datafusion_rc_path = user_dirs
+//             .home_dir()
+//             .join(".datafusion")
+//             .join(".datafusionrc");
+//         let maybe_ddl = std::fs::read_to_string(datafusion_rc_path);
+//         match maybe_ddl {
+//             Ok(ddl) => {
+//                 info!("DDL: {:?}", ddl);
+//                 Some(ddl)
+//             }
+//             Err(err) => {
+//                 error!("Error reading DDL: {:?}", err);
+//                 None
+//             }
+//         }
+//     } else {
+//         info!("No user directories found");
+//         None
+//     }
+// }
 
-pub fn save_ddl(ddl: String) {
-    if let Some(user_dirs) = directories::UserDirs::new() {
-        // TODO: Move to ~/.config/ddl or config defined location
-        let datafusion_rc_path = user_dirs
-            .home_dir()
-            .join(".datafusion")
-            .join(".datafusionrc");
-        match std::fs::File::create(datafusion_rc_path) {
-            Ok(mut f) => match f.write_all(ddl.as_bytes()) {
-                Ok(_) => {
-                    info!("Saved DDL file");
-                }
-                Err(e) => {
-                    error!("Error writing DDL file: {e}");
-                }
-            },
-            Err(e) => {
-                error!("Error creating or opening DDL file: {e}");
-            }
-        }
-    } else {
-        info!("No user directories found");
-    }
-}
+// pub fn save_ddl(ddl: String) {
+//     if let Some(user_dirs) = directories::UserDirs::new() {
+//         // TODO: Move to ~/.config/ddl or config defined location
+//         let datafusion_rc_path = user_dirs
+//             .home_dir()
+//             .join(".datafusion")
+//             .join(".datafusionrc");
+//         match std::fs::File::create(datafusion_rc_path) {
+//             Ok(mut f) => match f.write_all(ddl.as_bytes()) {
+//                 Ok(_) => {
+//                     info!("Saved DDL file");
+//                 }
+//                 Err(e) => {
+//                     error!("Error writing DDL file: {e}");
+//                 }
+//             },
+//             Err(e) => {
+//                 error!("Error creating or opening DDL file: {e}");
+//             }
+//         }
+//     } else {
+//         info!("No user directories found");
+//     }
+// }
 
 #[derive(Debug, Default, Deserialize)]
 pub struct AppConfig {
@@ -210,6 +210,22 @@ pub struct ObjectStoreConfig {
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct ExecutionConfig {
     pub object_store: Option<ObjectStoreConfig>,
+    #[serde(default = "default_ddl_path")]
+    pub ddl_path: Option<PathBuf>,
+}
+
+fn default_ddl_path() -> Option<PathBuf> {
+    info!("Creating default ExecutionConfig");
+    if let Some(user_dirs) = directories::UserDirs::new() {
+        let ddl_path = user_dirs
+            .home_dir()
+            .join(".config")
+            .join("dft")
+            .join("ddl.sql");
+        Some(ddl_path)
+    } else {
+        None
+    }
 }
 
 #[derive(Debug, Default, Deserialize)]
