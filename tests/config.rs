@@ -31,7 +31,7 @@ pub struct TestConfigBuilder {
 }
 
 impl TestConfigBuilder {
-    pub fn build(&self, name: &str) -> TestConfig {
+    pub fn build(self, name: &str) -> TestConfig {
         let tempdir = tempdir().unwrap();
         let path = tempdir.path().join(name);
         let mut file = std::fs::File::create(path.clone()).unwrap();
@@ -40,9 +40,10 @@ impl TestConfigBuilder {
         TestConfig { dir: tempdir, path }
     }
 
-    pub fn with_ddl_path(&mut self, ddl_path: PathBuf) {
+    pub fn with_ddl_path(&mut self, ddl_path: PathBuf) -> &mut Self {
         self.config_text.push_str("[execution]\n");
         let param = format!("ddl_path = '{}'", ddl_path.display());
         self.config_text.push_str(&param);
+        self
     }
 }
