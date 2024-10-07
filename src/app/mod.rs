@@ -42,7 +42,6 @@ use tokio_util::sync::CancellationToken;
 
 use self::app_execution::AppExecution;
 use self::handlers::{app_event_handler, crossterm_event_handler};
-use crate::config::load_ddl;
 use crate::execution::ExecutionContext;
 
 #[derive(Clone, Debug)]
@@ -312,7 +311,11 @@ impl<'app> App<'app> {
 
     /// Execute DDL from users DDL file
     pub fn execute_ddl(&mut self) {
-        let ddl = load_ddl().unwrap_or_default();
+        let ddl = self.execution.load_ddl().unwrap_or_default();
+        info!("DDL: {:?}", ddl);
+        if !ddl.is_empty() {
+            self.state.sql_tab.add_ddl_to_editor(ddl.clone());
+        }
         let _ = self.event_tx().send(AppEvent::ExecuteDDL(ddl));
     }
 

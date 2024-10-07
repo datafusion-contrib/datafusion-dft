@@ -42,8 +42,13 @@ async fn main() -> Result<()> {
             }
         }
         let app = CliApp::new(execution);
-        app.execute_files_or_commands(cli.files.clone(), cli.commands.clone(), cli.flightsql)
-            .await?;
+        app.execute_files_or_commands(
+            cli.files.clone(),
+            cli.commands.clone(),
+            cli.flightsql,
+            cli.ddl,
+        )
+        .await?;
     }
     // UI mode: running the TUI
     else {

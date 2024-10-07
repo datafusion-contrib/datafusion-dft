@@ -60,6 +60,9 @@ pub struct DftArgs {
 
     #[clap(long, help = "Use the FlightSQL client defined in your config")]
     pub flightsql: bool,
+
+    #[clap(long, help = "Run DDL prior to executing")]
+    pub ddl: bool,
 }
 
 impl DftArgs {

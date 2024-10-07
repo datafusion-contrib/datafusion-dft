@@ -60,7 +60,7 @@ Some of the current and planned features are:
   - Deltalake
   - Iceberg (TODO)
   - Hudi (TODO)
-- Preloading DDL from `~/.datafusion/.datafusionrc` for local database available on startup
+- Preloading DDL from `~/.config/dft/ddl.sql` (or a user defined path) for local database available on startup
 - "Catalog File" support - see [#122](https://github.com/datafusion-contrib/datafusion-tui/issues/122)
   - Save table definitions *and* data
   - Save parquet metadata from remote object stores
@@ -91,6 +91,10 @@ $ dft -c "SELECT 1+2"
 #### FlightSQL
 
 Both of the commands above support the `--flightsql` parameter to run the SQL with your configured FlightSQL client.
+
+#### DDL
+
+The CLI can also run your configured DDL prior to executing the query by adding the `--ddl` parameter.
 
 ## User Guide
 
@@ -262,7 +266,7 @@ The `dft` configuration is stored in `~/.config/dft/config.toml`.  All configura
 
 #### Execution Config
 
-The execution config is where you can define the `ObjectStore`s that you want to use in your queries.  For example, if you have an S3 bucket you want to query you could define it like so:
+The execution config is where you can define query execution properties.  You can configure the `ObjectStore`s that you want to use in your queries and path of a DDL file that you want to run on startup.  For example, if you have an S3 bucket you want to query you could define it like so:
 
 ```toml
 [[execution.object_store.s3]]
@@ -273,6 +277,13 @@ aws_access_key_id = "MY_ACCESS_KEY"
 aws_secret = "MY SECRET"
 aws_session_token = "MY_SESSION"
 aws_allow_http = false
+```
+
+And define a custom DDL path like so (the default is `~/.config/dft/ddl.sql`).
+
+```toml
+[execution]
+ddl_path = "/path/to/my/ddl.sql"
 ```
 
 Multiple `ObjectStore`s can be defined in the config file. In the future datafusion `SessionContext` and `SessionState` options can be configured here.

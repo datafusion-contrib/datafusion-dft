@@ -50,6 +50,7 @@ impl CliApp {
         files: Vec<PathBuf>,
         commands: Vec<String>,
         flightsql: bool,
+        ddl: bool,
     ) -> color_eyre::Result<()> {
         #[cfg(not(feature = "flightsql"))]
         match (files.is_empty(), commands.is_empty(), flightsql) {
@@ -57,8 +58,8 @@ impl CliApp {
                 "FLightSQL feature isn't enabled. Reinstall `dft` with `--features=flightsql`"
             )),
             (true, true, _) => Err(eyre!("No files or commands provided to execute")),
-            (false, true, _) => self.execute_files(files).await,
-            (true, false, _) => self.execute_commands(commands).await,
+            (false, true, _) => self.execute_files(files, ddl).await,
+            (true, false, _) => self.execute_commands(commands, ddl).await,
             (false, false, _) => Err(eyre!(
                 "Cannot execute both files and commands at the same time"
             )),
@@ -67,17 +68,26 @@ impl CliApp {
         match (files.is_empty(), commands.is_empty(), flightsql) {
             (true, true, _) => Err(eyre!("No files or commands provided to execute")),
             (false, true, true) => self.flightsql_execute_files(files).await,
-            (false, true, false) => self.execute_files(files).await,
+            (false, true, false) => self.execute_files(files, ddl).await,
             (true, false, true) => self.flightsql_execute_commands(commands).await,
-            (true, false, false) => self.execute_commands(commands).await,
+            (true, false, false) => self.execute_commands(commands, ddl).await,
             (false, false, _) => Err(eyre!(
                 "Cannot execute both files and commands at the same time"
             )),
         }
     }
 
-    async fn execute_files(&self, files: Vec<PathBuf>) -> color_eyre::Result<()> {
+    async fn execute_files(&self, files: Vec<PathBuf>, run_ddl: bool) -> color_eyre::Result<()> {
         info!("Executing files: {:?}", files);
+        if run_ddl {
+            let ddl = self.execution.load_ddl();
+            if let Some(ddl) = ddl {
+                info!("Executing DDL");
+                self.exec_from_string(&ddl).await?;
+            } else {
+                info!("No DDL to execute");
+            }
+        }
         for file in files {
             self.exec_from_file(&file).await?
         }
@@ -115,8 +125,21 @@ impl CliApp {
         Ok(())
     }
 
-    async fn execute_commands(&self, commands: Vec<String>) -> color_eyre::Result<()> {
+    async fn execute_commands(
+        &self,
+        commands: Vec<String>,
+        run_ddl: bool,
+    ) -> color_eyre::Result<()> {
         info!("Executing commands: {:?}", commands);
+        if run_ddl {
+            let ddl = self.execution.load_ddl();
+            if let Some(ddl) = ddl {
+                info!("Executing DDL");
+                self.exec_from_string(&ddl).await?;
+            } else {
+                info!("No DDL to execute");
+            }
+        }
         for command in commands {
             self.exec_from_string(&command).await?
         }
