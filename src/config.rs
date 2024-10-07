@@ -71,6 +71,7 @@ pub struct AppConfig {
     #[cfg(feature = "flightsql")]
     #[serde(default = "default_flightsql_config")]
     pub flightsql: FlightSQLConfig,
+    #[serde(default = "default_editor_config")]
     pub editor: EditorConfig,
 }
 
@@ -219,4 +220,8 @@ pub fn default_connection_url() -> String {
 #[derive(Debug, Default, Deserialize)]
 pub struct EditorConfig {
     pub experimental_syntax_highlighting: bool,
+}
+
+fn default_editor_config() -> EditorConfig {
+    EditorConfig::default()
 }
