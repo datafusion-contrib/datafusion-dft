@@ -249,7 +249,6 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
         }
         #[cfg(feature = "flightsql")]
         AppEvent::FlightSQLExecutionResultsError(e) => {
-            info!("Setting error in flightsql tab");
             app.state.flightsql_tab.set_in_progress(false);
             app.state.flightsql_tab.set_execution_error(e.clone());
             let history_query = HistoryQuery::new(
