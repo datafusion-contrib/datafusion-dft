@@ -288,4 +288,11 @@ impl<'app> SQLTabState<'app> {
     pub fn set_mode(&mut self, mode: SQLTabMode) {
         self.mode = mode
     }
+
+    pub fn sql(&self) -> String {
+        match self.mode {
+            SQLTabMode::Normal => self.editor.lines().join("\n"),
+            SQLTabMode::DDL => self.ddl_editor.lines().join("\n"),
+        }
+    }
 }

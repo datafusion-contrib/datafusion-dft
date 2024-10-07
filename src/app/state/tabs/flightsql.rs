@@ -176,6 +176,14 @@ impl<'app> FlightSQLTabState<'app> {
         self.current_page
     }
 
+    pub fn execution_error(&self) -> &Option<ExecutionError> {
+        &self.execution_error
+    }
+
+    pub fn set_execution_error(&mut self, error: ExecutionError) {
+        self.execution_error = Some(error);
+    }
+
     pub fn current_page_results(&self) -> Option<RecordBatch> {
         match (self.current_page, self.result_batches.as_ref()) {
             (Some(page), Some(batches)) => {
@@ -201,10 +209,6 @@ impl<'app> FlightSQLTabState<'app> {
             }
             _ => Some(RecordBatch::new_empty(Arc::new(Schema::empty()))),
         }
-    }
-
-    pub fn execution_error(&self) -> Option<ExecutionError> {
-        None
     }
 
     pub fn next_page(&mut self) {
@@ -238,6 +242,10 @@ impl<'app> FlightSQLTabState<'app> {
                 error!("Got change page request with no batches")
             }
         }
+    }
+
+    pub fn sql(&self) -> String {
+        self.editor.lines().join("\n")
     }
 }
 

@@ -247,6 +247,22 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
         AppEvent::FlightSQLExecutionResultsPreviousPage => {
             app.state.flightsql_tab.previous_page();
         }
+        #[cfg(feature = "flightsql")]
+        AppEvent::FlightSQLExecutionResultsError(e) => {
+            info!("Setting error in flightsql tab");
+            app.state.flightsql_tab.set_in_progress(false);
+            app.state.flightsql_tab.set_execution_error(e.clone());
+            let history_query = HistoryQuery::new(
+                Context::FlightSQL,
+                e.query().to_string(),
+                *e.duration(),
+                None,
+                Some(e.error().to_string()),
+            );
+            info!("Adding to history: {:?}", history_query);
+            app.state.history_tab.add_to_history(history_query);
+            app.state.history_tab.refresh_history_table_state();
+        }
         _ => {
             match app.state.tabs.selected {
                 SelectedTab::SQL => sql::app_event_handler(app, event),

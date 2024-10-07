@@ -87,7 +87,7 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
                 }
             }
         }
-        (None, None, None, Some(e), false) => {
+        (_, _, _, Some(e), _) => {
             let dur = e.duration().as_millis();
             let block = Block::default()
                 .title(" Results ")

@@ -68,7 +68,7 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
 
         KeyCode::Enter => match app.state.sql_tab.mode() {
             SQLTabMode::Normal => {
-                let sql = app.state.sql_tab.editor().lines().join("");
+                let sql = app.state.sql_tab.sql();
                 info!("Running query: {}", sql);
                 let _event_tx = app.event_tx().clone();
                 let execution = Arc::clone(&app.execution);
