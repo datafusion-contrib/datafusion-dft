@@ -63,7 +63,7 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
 
         KeyCode::Enter => {
             info!("Executing FlightSQL query");
-            let sql = app.state.flightsql_tab.editor().lines().join("");
+            let sql = app.state.flightsql_tab.sql();
             info!("SQL: {}", sql);
             let sqls: Vec<String> = sql.split(';').map(|s| s.to_string()).collect();
             let execution = Arc::clone(&app.execution);

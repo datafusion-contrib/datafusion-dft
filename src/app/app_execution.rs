@@ -249,7 +249,9 @@ impl AppExecution {
                                                 error: e.to_string(),
                                                 duration: elapsed,
                                             };
-                                            sender.send(AppEvent::ExecutionResultsError(e))?;
+                                            sender.send(
+                                                AppEvent::FlightSQLExecutionResultsError(e),
+                                            )?;
                                         }
                                     }
                                 }
