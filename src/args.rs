@@ -62,7 +62,7 @@ pub struct DftArgs {
     pub flightsql: bool,
 
     #[clap(long, help = "Run DDL prior to executing")]
-    pub ddl: bool,
+    pub run_ddl: bool,
 }
 
 impl DftArgs {

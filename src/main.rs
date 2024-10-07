@@ -46,7 +46,7 @@ async fn main() -> Result<()> {
             cli.files.clone(),
             cli.commands.clone(),
             cli.flightsql,
-            cli.ddl,
+            cli.run_ddl,
         )
         .await?;
     }
