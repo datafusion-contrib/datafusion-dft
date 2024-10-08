@@ -20,7 +20,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{palette::tailwind, Style, Stylize},
     text::Span,
-    widgets::{block::Title, Block, Borders, Paragraph, Row, StatefulWidget, Table, Widget},
+    widgets::{block::Title, Block, Borders, Paragraph, Row, StatefulWidget, Table, Widget, Wrap},
 };
 
 use crate::app::App;
@@ -89,10 +89,10 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
                 .borders(Borders::ALL)
                 .title(Title::from(" Page ").alignment(Alignment::Right))
                 .title_bottom(format!(" {}ms ", dur));
-            let row = Row::new(vec![e.error().to_string()]);
-            let widths = vec![Constraint::Percentage(100)];
-            let table = Table::new(vec![row], widths).block(block);
-            Widget::render(table, area, buf);
+            let p = Paragraph::new(e.error().to_string())
+                .block(block)
+                .wrap(Wrap { trim: true });
+            Widget::render(p, area, buf);
         }
         _ => {
             let block = Block::default()
