@@ -341,7 +341,7 @@ impl<'app> App<'app> {
     }
 
     fn render_tabs(&self, area: Rect, buf: &mut Buffer) {
-        let titles = ui::SelectedTab::iter().map(|t| ui::SelectedTab::title(t, &self));
+        let titles = ui::SelectedTab::iter().map(|t| ui::SelectedTab::title(t, self));
         let highlight_style = (Color::default(), tailwind::ORANGE.c500);
         let selected_tab_index = self.state.tabs.selected as usize;
         Tabs::new(titles)
@@ -350,6 +350,18 @@ impl<'app> App<'app> {
             .padding("", "")
             .divider(" ")
             .render(area, buf);
+    }
+
+    pub async fn loop_without_render(&mut self) -> Result<()> {
+        self.enter(false)?;
+        // Main loop for handling events
+        loop {
+            let event = self.next().await?;
+            self.handle_app_event(event)?;
+            if self.state.should_quit {
+                break Ok(());
+            }
+        }
     }
 }
 
