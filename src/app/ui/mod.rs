@@ -42,7 +42,7 @@ pub enum SelectedTab {
 }
 
 impl SelectedTab {
-    pub fn title(self) -> Line<'static> {
+    pub fn title(self, _app: &App) -> Line<'static> {
         let padding = Span::from("  ");
         match self {
             SelectedTab::SQL => {
@@ -53,7 +53,9 @@ impl SelectedTab {
             }
             #[cfg(feature = "flightsql")]
             Self::FlightSQL => {
-                let title = Span::from("FlightSQL (2)").bold();
+                let status = _app.state.flightsql_tab.connection_status().tab_display();
+                let title_text = format!("FlightSQL{status} (2)");
+                let title = Span::from(title_text).bold();
                 Line::from_iter(vec![padding.clone(), title, padding.clone()])
                     .fg(tailwind::SLATE.c200)
                     .bg(self.bg())

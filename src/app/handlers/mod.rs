@@ -24,6 +24,8 @@ use log::{error, info, trace};
 use ratatui::crossterm::event::{self, KeyCode, KeyEvent};
 use tui_logger::TuiWidgetEvent;
 
+#[cfg(feature = "flightsql")]
+use crate::app::state::tabs::flightsql::FlightSQLConnectionStatus;
 use crate::app::state::tabs::history::Context;
 use crate::app::ExecutionResultsBatch;
 
@@ -231,13 +233,32 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
         AppEvent::FlightSQLEstablishConnection => {
             let execution = Arc::clone(&app.execution);
             let flightsql_config = app.state.config.flightsql.clone();
+            let _event_tx = app.event_tx.clone();
             tokio::spawn(async move {
                 if let Err(e) = execution.create_flightsql_client(flightsql_config).await {
                     error!("Error creating FlightSQL client: {:?}", e);
+                    if let Err(e) = _event_tx.send(AppEvent::FlightSQLFailedToConnect) {
+                        error!("Error sending FlightSQLFailedToConnect message: {e}");
+                    }
                 } else {
                     info!("Created FlightSQL client");
+                    if let Err(e) = _event_tx.send(AppEvent::FlightSQLStartConnectionMonitor) {
+                        error!("Error sending FlightSQLStartConnectionMonitor message: {e}");
+                    }
                 }
             });
+        }
+        #[cfg(feature = "flightsql")]
+        AppEvent::FlightSQLStartConnectionMonitor => {
+            app.state
+                .flightsql_tab
+                .set_connection_status(FlightSQLConnectionStatus::Connected);
+        }
+        #[cfg(feature = "flightsql")]
+        AppEvent::FlightSQLFailedToConnect => {
+            app.state
+                .flightsql_tab
+                .set_connection_status(FlightSQLConnectionStatus::FailedToConnect);
         }
         #[cfg(feature = "flightsql")]
         AppEvent::FlightSQLExecutionResultsNextPage => {
