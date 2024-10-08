@@ -40,6 +40,26 @@ use crate::config::AppConfig;
 const PAGE_SIZE: usize = 100;
 
 #[derive(Debug, Default)]
+pub enum FlightSQLConnectionStatus {
+    #[default]
+    EstablishingConnection,
+    Connected,
+    FailedToConnect,
+    Disconnected,
+}
+
+impl FlightSQLConnectionStatus {
+    pub fn tab_display(&self) -> String {
+        match self {
+            FlightSQLConnectionStatus::EstablishingConnection => " [Connecting...]".to_string(),
+            FlightSQLConnectionStatus::Connected => "".to_string(),
+            FlightSQLConnectionStatus::FailedToConnect => " [Failed to connect]".to_string(),
+            FlightSQLConnectionStatus::Disconnected => " [Disconnected]".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Default)]
 pub struct FlightSQLTabState<'app> {
     editor: TextArea<'app>,
     editor_editable: bool,
@@ -49,6 +69,7 @@ pub struct FlightSQLTabState<'app> {
     execute_in_progress: bool,
     execution_error: Option<ExecutionError>,
     execution_task: Option<JoinHandle<Result<()>>>,
+    connection_status: FlightSQLConnectionStatus,
 }
 
 impl<'app> FlightSQLTabState<'app> {
@@ -70,6 +91,7 @@ impl<'app> FlightSQLTabState<'app> {
             current_page: None,
             execute_in_progress: false,
             execution_error: None,
+            connection_status: FlightSQLConnectionStatus::default(),
         }
     }
 
@@ -85,6 +107,14 @@ impl<'app> FlightSQLTabState<'app> {
         // TODO: Figure out how to do this without clone. Probably need logic in handler to make
         // updates to the Widget and then pass a ref
         self.editor.clone()
+    }
+
+    pub fn connection_status(&self) -> &FlightSQLConnectionStatus {
+        &self.connection_status
+    }
+
+    pub fn set_connection_status(&mut self, status: FlightSQLConnectionStatus) {
+        self.connection_status = status;
     }
 
     pub fn clear_placeholder(&mut self) {
