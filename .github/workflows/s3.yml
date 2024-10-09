@@ -1,0 +1,35 @@
+name: LocalStack Test
+on: [ push, pull_request ]
+
+jobs:
+  localstack-action-test:
+    name: 'Test LocalStack GitHub Action'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Start LocalStack
+        uses: LocalStack/setup-localstack@v0.2.3
+        with:
+          image-tag: 'latest'
+          install-awslocal: 'true'
+          configuration: DEBUG=1
+          use-pro: 'true'
+          state-backend: cloud-pods
+          state-action: load
+          state-name: my-cloud-pod
+
+      - name: Run Tests against LocalStack
+        run: |
+          awslocal s3 mb s3://test
+          awslocal s3 ls
+          echo "Test Execution complete!"
+
+      - name: Save LocalStack State
+        uses: LocalStack/setup-localstack@v0.2.3
+        with:
+          state-backend: local
+          state-action: save
+          state-name: my-ls-state-artifact
+        env:
+          WORKFLOW_ID: ${{ env.MY_GOLDEN_LS_STATE }}
