@@ -14,10 +14,6 @@ jobs:
           image-tag: 'latest'
           install-awslocal: 'true'
           configuration: DEBUG=1
-          use-pro: 'true'
-          state-backend: cloud-pods
-          state-action: load
-          state-name: my-cloud-pod
 
       - name: Run Tests against LocalStack
         run: |
@@ -27,9 +23,3 @@ jobs:
 
       - name: Save LocalStack State
         uses: LocalStack/setup-localstack@v0.2.3
-        with:
-          state-backend: local
-          state-action: save
-          state-name: my-ls-state-artifact
-        env:
-          WORKFLOW_ID: ${{ env.MY_GOLDEN_LS_STATE }}
