@@ -20,7 +20,7 @@ on: [push, pull_request]
 
 jobs:
   fmt:
-    name: Rust formatting
+    name: Format
     runs-on: ubuntu-latest
     strategy:
       matrix:
