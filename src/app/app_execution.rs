@@ -20,6 +20,7 @@
 use crate::app::{AppEvent, ExecutionError, ExecutionResultsBatch};
 use crate::execution::ExecutionContext;
 use color_eyre::eyre::Result;
+#[allow(unused_imports)] // No idea why this is being picked up as unused when I use it twice.
 use datafusion::arrow::error::ArrowError;
 use datafusion::execution::context::SessionContext;
 use datafusion::execution::SendableRecordBatchStream;
