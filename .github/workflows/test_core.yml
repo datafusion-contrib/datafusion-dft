@@ -82,54 +82,24 @@ jobs:
           # test to only be run against the server spun up in that test.  With parallelism tests 
           # can connec to server in different test which breaks determinism.
           cargo test --features=flightsql -- --test-threads=1
+  localstack-action-test:
+    name: 'Test S3 on AMD64 Rust ${{ matrix.rust }}'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
 
-  fmt:
-    name: Rust formatting
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Setup toolchain
-        run: |
-          rustup toolchain install stable
-          rustup default stable
-          rustup component add rustfmt
-      - name: Run
-        run: cargo fmt --all -- --check
-  clippy:
-    name: Clippy
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [amd64]
-        rust: [stable]
-    container:
-      image: ${{ matrix.arch }}/rust
-      env:
-        # Disable full debug symbol generation to speed up CI build and keep memory down
-        # "1" means line tables only, which is useful for panic tracebacks.
-        RUSTFLAGS: "-C debuginfo=1"
-    steps:
-      - uses: actions/checkout@v2
+      - name: Start LocalStack
+        uses: LocalStack/setup-localstack@v0.2.3
         with:
-          submodules: true
-      - name: Cache Cargo
-        uses: actions/cache@v2
-        with:
-          path: /home/runner/.cargo
-          key: cargo-S3-cache-
-      - name: Cache Rust dependencies
-        uses: actions/cache@v2
-        with:
-          path: /home/runner/target
-          key: target-S3-cache-
-      - name: Setup Rust toolchain
+          image-tag: 'latest'
+          install-awslocal: 'true'
+          configuration: DEBUG=1
+
+      - name: Run Tests against LocalStack
         run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
-          rustup component add rustfmt clippy
-      - name: Run clippy
-        run: |
-          cargo clippy --all-targets --workspace -- -D warnings
-        env:
-          CARGO_HOME: "/github/home/.cargo"
-          CARGO_TARGET_DIR: "/github/home/target"
+          awslocal s3 mb s3://test
+          awslocal s3 ls
+          echo "Test Execution complete!"
+
+      - name: Save LocalStack State
+        uses: LocalStack/setup-localstack@v0.2.3

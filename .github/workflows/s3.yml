@@ -1,25 +1,5 @@
-name: LocalStack Test
+name: S3 Integration
 on: [ push, pull_request ]
 
 jobs:
-  localstack-action-test:
-    name: 'Test LocalStack GitHub Action'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Start LocalStack
-        uses: LocalStack/setup-localstack@v0.2.3
-        with:
-          image-tag: 'latest'
-          install-awslocal: 'true'
-          configuration: DEBUG=1
-
-      - name: Run Tests against LocalStack
-        run: |
-          awslocal s3 mb s3://test
-          awslocal s3 ls
-          echo "Test Execution complete!"
-
-      - name: Save LocalStack State
-        uses: LocalStack/setup-localstack@v0.2.3
+  
