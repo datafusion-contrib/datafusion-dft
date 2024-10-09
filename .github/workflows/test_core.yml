@@ -20,7 +20,7 @@ on: [push, pull_request]
 
 jobs:
   test:
-    name: Test Workspace on AMD64 Rust ${{ matrix.rust }}
+    name: Workspace
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -51,7 +51,7 @@ jobs:
           # All features except FlightSQL which requires being run on a single thread for determinism
           cargo test --features=deltalake,s3,functions-json
   test-flightsql:
-    name: Test FlightSQL
+    name: FlightSQL
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -83,7 +83,7 @@ jobs:
           # can connec to server in different test which breaks determinism.
           cargo test --features=flightsql -- --test-threads=1
   localstack-action-test:
-    name: 'Test S3 on AMD64 Rust ${{ matrix.rust }}'
+    name: S3
     runs-on: ubuntu-latest
     strategy:
       matrix:
