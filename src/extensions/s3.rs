@@ -51,7 +51,7 @@ impl Extension for AwsS3Extension {
         for s3_config in s3_configs {
             match s3_config.to_object_store() {
                 Ok(object_store) => {
-                    info!("Created object store");
+                    info!("Created object store: {}", object_store);
                     if let Some(object_store_url) = s3_config.object_store_url() {
                         info!("Endpoint exists");
                         if let Ok(parsed_endpoint) = Url::parse(object_store_url) {
