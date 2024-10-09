@@ -1,5 +1,0 @@
-name: S3 Integration
-on: [ push, pull_request ]
-
-jobs:
-  
