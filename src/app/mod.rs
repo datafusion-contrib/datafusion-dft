@@ -137,7 +137,7 @@ pub enum AppEvent {
     #[cfg(feature = "flightsql")]
     FlightSQLFailedToConnect,
     #[cfg(feature = "flightsql")]
-    FlightSQLStartConnectionMonitor,
+    FlightSQLConnected,
 }
 
 pub struct App<'app> {

@@ -242,14 +242,14 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                     }
                 } else {
                     info!("Created FlightSQL client");
-                    if let Err(e) = _event_tx.send(AppEvent::FlightSQLStartConnectionMonitor) {
+                    if let Err(e) = _event_tx.send(AppEvent::FlightSQLConnected) {
                         error!("Error sending FlightSQLStartConnectionMonitor message: {e}");
                     }
                 }
             });
         }
         #[cfg(feature = "flightsql")]
-        AppEvent::FlightSQLStartConnectionMonitor => {
+        AppEvent::FlightSQLConnected => {
             app.state
                 .flightsql_tab
                 .set_connection_status(FlightSQLConnectionStatus::Connected);
@@ -270,6 +270,12 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
         }
         #[cfg(feature = "flightsql")]
         AppEvent::FlightSQLExecutionResultsError(e) => {
+            let err_str = e.error().to_string();
+            if err_str.contains("Error connecting to Flight server") {
+                app.state
+                    .flightsql_tab
+                    .set_connection_status(FlightSQLConnectionStatus::Disconnected);
+            }
             app.state.flightsql_tab.set_in_progress(false);
             app.state.flightsql_tab.set_execution_error(e.clone());
             let history_query = HistoryQuery::new(
