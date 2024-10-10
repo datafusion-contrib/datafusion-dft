@@ -16,6 +16,7 @@
 // under the License.
 //! [`CliApp`]: Command Line User Interface
 
+use crate::args::DftArgs;
 use crate::execution::ExecutionContext;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
@@ -35,49 +36,57 @@ use tonic::IntoRequest;
 pub struct CliApp {
     /// Execution context for running queries
     execution: ExecutionContext,
+    args: DftArgs,
 }
 
 impl CliApp {
-    pub fn new(execution: ExecutionContext) -> Self {
-        Self { execution }
+    pub fn new(execution: ExecutionContext, args: DftArgs) -> Self {
+        Self { execution, args }
     }
 
     /// Execute the provided sql, which was passed as an argument from CLI.
     ///
     /// Optionally, use the FlightSQL client for execution.
-    pub async fn execute_files_or_commands(
-        &self,
-        files: Vec<PathBuf>,
-        commands: Vec<String>,
-        flightsql: bool,
-        ddl: bool,
-    ) -> color_eyre::Result<()> {
+    pub async fn execute_files_or_commands(&self) -> color_eyre::Result<()> {
         #[cfg(not(feature = "flightsql"))]
         match (files.is_empty(), commands.is_empty(), flightsql) {
             (_, _, true) => Err(eyre!(
                 "FLightSQL feature isn't enabled. Reinstall `dft` with `--features=flightsql`"
             )),
             (true, true, _) => Err(eyre!("No files or commands provided to execute")),
-            (false, true, _) => self.execute_files(files, ddl).await,
-            (true, false, _) => self.execute_commands(commands, ddl).await,
+            (false, true, _) => self.execute_files(self.args.files, self.args.ddl).await,
+            (true, false, _) => {
+                self.execute_commands(self.args.commands, self.args.ddl)
+                    .await
+            }
             (false, false, _) => Err(eyre!(
                 "Cannot execute both files and commands at the same time"
             )),
         }
         #[cfg(feature = "flightsql")]
-        match (files.is_empty(), commands.is_empty(), flightsql) {
+        match (
+            self.args.files.is_empty(),
+            self.args.commands.is_empty(),
+            self.args.flightsql,
+        ) {
             (true, true, _) => Err(eyre!("No files or commands provided to execute")),
-            (false, true, true) => self.flightsql_execute_files(files).await,
-            (false, true, false) => self.execute_files(files, ddl).await,
-            (true, false, true) => self.flightsql_execute_commands(commands).await,
-            (true, false, false) => self.execute_commands(commands, ddl).await,
+            (false, true, true) => self.flightsql_execute_files(&self.args.files).await,
+            (false, true, false) => {
+                self.execute_files(&self.args.files, self.args.run_ddl)
+                    .await
+            }
+            (true, false, true) => self.flightsql_execute_commands(&self.args.commands).await,
+            (true, false, false) => {
+                self.execute_commands(&self.args.commands, self.args.run_ddl)
+                    .await
+            }
             (false, false, _) => Err(eyre!(
                 "Cannot execute both files and commands at the same time"
             )),
         }
     }
 
-    async fn execute_files(&self, files: Vec<PathBuf>, run_ddl: bool) -> color_eyre::Result<()> {
+    async fn execute_files(&self, files: &[PathBuf], run_ddl: bool) -> color_eyre::Result<()> {
         info!("Executing files: {:?}", files);
         if run_ddl {
             let ddl = self.execution.load_ddl();
@@ -89,14 +98,14 @@ impl CliApp {
             }
         }
         for file in files {
-            self.exec_from_file(&file).await?
+            self.exec_from_file(file).await?
         }
 
         Ok(())
     }
 
     #[cfg(feature = "flightsql")]
-    async fn flightsql_execute_files(&self, files: Vec<PathBuf>) -> color_eyre::Result<()> {
+    async fn flightsql_execute_files(&self, files: &[PathBuf]) -> color_eyre::Result<()> {
         info!("Executing files: {:?}", files);
         for file in files {
             let file = std::fs::read_to_string(file)?;
@@ -125,11 +134,7 @@ impl CliApp {
         Ok(())
     }
 
-    async fn execute_commands(
-        &self,
-        commands: Vec<String>,
-        run_ddl: bool,
-    ) -> color_eyre::Result<()> {
+    async fn execute_commands(&self, commands: &[String], run_ddl: bool) -> color_eyre::Result<()> {
         info!("Executing commands: {:?}", commands);
         if run_ddl {
             let ddl = self.execution.load_ddl();
@@ -141,17 +146,17 @@ impl CliApp {
             }
         }
         for command in commands {
-            self.exec_from_string(&command).await?
+            self.exec_from_string(command).await?
         }
 
         Ok(())
     }
 
     #[cfg(feature = "flightsql")]
-    async fn flightsql_execute_commands(&self, commands: Vec<String>) -> color_eyre::Result<()> {
+    async fn flightsql_execute_commands(&self, commands: &[String]) -> color_eyre::Result<()> {
         info!("Executing commands: {:?}", commands);
         for command in commands {
-            self.exec_from_flightsql(command).await?
+            self.exec_from_flightsql(command.to_string()).await?
         }
 
         Ok(())
