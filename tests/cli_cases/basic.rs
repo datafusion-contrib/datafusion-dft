@@ -311,3 +311,17 @@ fn test_multiple_sql_in_multiple_args2() {
 
     assert.stdout(contains_str(expected));
 }
+
+#[test]
+fn test_time() {
+    let expected = r##"Query executed in"##;
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT 1 + 2")
+        .arg("--time")
+        .assert()
+        .success();
+
+    assert.stdout(contains_str(expected));
+}
