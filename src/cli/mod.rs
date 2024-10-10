@@ -127,11 +127,22 @@ impl CliApp {
         let client = self.execution.flightsql_client();
         let mut guard = client.lock().await;
         if let Some(client) = guard.as_mut() {
+            let start = if self.args.time {
+                Some(std::time::Instant::now())
+            } else {
+                None
+            };
             let flight_info = client.execute(sql, None).await?;
             for endpoint in flight_info.endpoint {
                 if let Some(ticket) = endpoint.ticket {
                     let stream = client.do_get(ticket.into_request()).await?;
-                    self.print_any_stream(stream).await;
+                    if let Some(start) = start {
+                        self.exec_stream(stream).await;
+                        let elapsed = start.elapsed();
+                        println!("Query executed in {:?}", elapsed);
+                    } else {
+                        self.print_any_stream(stream).await;
+                    }
                 }
             }
         } else {
