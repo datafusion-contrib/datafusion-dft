@@ -17,8 +17,12 @@
 
 //! Tests for extensions (stored in the `extension_cases` directory)
 
+#[cfg(feature = "flightsql")]
+mod flightsql;
 #[cfg(feature = "functions-json")]
 mod functions_json;
+#[cfg(feature = "s3")]
+mod s3;
 
 use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::util::pretty::pretty_format_batches;

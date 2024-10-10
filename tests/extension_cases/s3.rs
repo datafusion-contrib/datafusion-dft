@@ -19,9 +19,7 @@ use std::io::Write;
 
 use assert_cmd::Command;
 
-use crate::config::TestConfigBuilder;
-
-use super::contains_str;
+use crate::{cli_cases::contains_str, config::TestConfigBuilder};
 
 #[test]
 fn test_s3_basic() {

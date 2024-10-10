@@ -81,8 +81,8 @@ jobs:
           # Single thread needed because we spin up a server that listens on port and we need each
           # test to only be run against the server spun up in that test.  With parallelism tests 
           # can connec to server in different test which breaks determinism.
-          cargo test --features=flightsql -- --test-threads=1
-  localstack-action-test:
+          cargo test --features=flightsql extension_cases::flightsql -- --test-threads=1
+  test-s3:
     name: S3
     runs-on: ubuntu-latest
     strategy:
@@ -106,4 +106,4 @@ jobs:
           echo "Test Execution complete!"
       - name: Run S3 tests
         run: |
-          cargo test --features=s3 cli_cases::s3
+          cargo test --features=s3 extension_cases::s3
