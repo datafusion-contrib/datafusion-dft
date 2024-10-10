@@ -17,7 +17,7 @@
 
 //! [`AppExecution`]: Handles executing queries for the TUI application.
 
-use crate::app::{AppEvent, ExecutionError, ExecutionResultsBatch};
+use crate::tui::{AppEvent, ExecutionError, ExecutionResultsBatch};
 use crate::execution::ExecutionContext;
 use color_eyre::eyre::Result;
 #[allow(unused_imports)] // No idea why this is being picked up as unused when I use it twice.

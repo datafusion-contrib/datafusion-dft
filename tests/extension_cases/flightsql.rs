@@ -18,7 +18,7 @@
 use std::time::Duration;
 
 use assert_cmd::Command;
-use dft::test_utils::fixture::{FlightSqlServiceImpl, TestFixture};
+use dft::test_utils::fixture::{TestFixture, TestFlightSqlServiceImpl};
 
 use crate::cli_cases::{contains_str, sql_in_file};
 
@@ -38,7 +38,7 @@ pub async fn test_execute_with_no_flightsql_server() {
 
 #[tokio::test]
 pub async fn test_execute() {
-    let test_server = FlightSqlServiceImpl::new();
+    let test_server = TestFlightSqlServiceImpl::new();
     let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
 
     let assert = tokio::task::spawn_blocking(|| {
@@ -67,7 +67,7 @@ pub async fn test_execute() {
 
 #[tokio::test]
 pub async fn test_execute_multiple_commands() {
-    let test_server = FlightSqlServiceImpl::new();
+    let test_server = TestFlightSqlServiceImpl::new();
     let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
 
     let assert = tokio::task::spawn_blocking(|| {
@@ -102,7 +102,7 @@ pub async fn test_execute_multiple_commands() {
 
 #[tokio::test]
 pub async fn test_command_in_file() {
-    let test_server = FlightSqlServiceImpl::new();
+    let test_server = TestFlightSqlServiceImpl::new();
     let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
     let file = sql_in_file("SELECT 1 + 1");
     let assert = tokio::task::spawn_blocking(move || {
@@ -129,7 +129,7 @@ pub async fn test_command_in_file() {
 
 #[tokio::test]
 pub async fn test_command_multiple_files() {
-    let test_server = FlightSqlServiceImpl::new();
+    let test_server = TestFlightSqlServiceImpl::new();
     let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
     let file1 = sql_in_file("SELECT 1 + 1");
     let file2 = sql_in_file("SELECT 1 + 2");
@@ -164,7 +164,7 @@ pub async fn test_command_multiple_files() {
 
 #[tokio::test]
 pub async fn test_time_command() {
-    let test_server = FlightSqlServiceImpl::new();
+    let test_server = TestFlightSqlServiceImpl::new();
     let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
     let assert = tokio::task::spawn_blocking(move || {
         Command::cargo_bin("dft")
@@ -185,7 +185,7 @@ pub async fn test_time_command() {
 
 #[tokio::test]
 pub async fn test_time_files() {
-    let test_server = FlightSqlServiceImpl::new();
+    let test_server = TestFlightSqlServiceImpl::new();
     let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
     let file1 = sql_in_file("SELECT 1 + 1");
     let assert = tokio::task::spawn_blocking(move || {

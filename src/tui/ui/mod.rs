@@ -21,7 +21,7 @@ pub mod tabs;
 use ratatui::{prelude::*, style::palette::tailwind};
 use strum::{Display, EnumIter, FromRepr};
 
-use crate::app::App;
+use crate::tui::App;
 
 use self::tabs::{context, history, logs, sql};
 

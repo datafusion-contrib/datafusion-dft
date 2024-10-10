@@ -17,7 +17,7 @@
 
 use ratatui::crossterm::event::KeyCode;
 
-use crate::app::{handlers::tab_navigation_handler, AppEvent};
+use crate::tui::{handlers::tab_navigation_handler, AppEvent};
 
 use super::App;
 

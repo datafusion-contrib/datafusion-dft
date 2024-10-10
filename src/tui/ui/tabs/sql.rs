@@ -23,8 +23,8 @@ use ratatui::{
     widgets::{block::Title, Block, Borders, Paragraph, Row, StatefulWidget, Table, Widget, Wrap},
 };
 
-use crate::app::App;
-use crate::app::{state::tabs::sql::SQLTabMode, ui::convert::record_batches_to_table};
+use crate::tui::App;
+use crate::tui::{state::tabs::sql::SQLTabMode, ui::convert::record_batches_to_table};
 
 pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
     let sql_tab = &app.state.sql_tab;

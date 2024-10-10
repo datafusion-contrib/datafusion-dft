@@ -23,7 +23,7 @@ use ratatui::{
 };
 use tui_logger::TuiLoggerSmartWidget;
 
-use crate::app::App;
+use crate::tui::App;
 
 fn render_smart_widget(area: Rect, buf: &mut Buffer, app: &App) {
     let logs = TuiLoggerSmartWidget::default()
