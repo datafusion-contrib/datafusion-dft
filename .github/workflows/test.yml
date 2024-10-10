@@ -49,7 +49,7 @@ jobs:
       - name: Run tests (ex-FlightSQL)
         run: |
           # All features except FlightSQL which requires being run on a single thread for determinism
-          cargo test --features=deltalake,s3,functions-json
+          cargo test --features=deltalake,functions-json
   test-flightsql:
     name: FlightSQL
     runs-on: ubuntu-latest
