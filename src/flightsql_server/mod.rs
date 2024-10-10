@@ -15,11 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-// This file was originally copied from the official arrow-rs repo, but subsequent modifications
-// have been made.
-//
-// Ref: https://github.com/apache/arrow-rs/blob/a65e14a5c48d52bc8ab19b56e696a47567328056/arrow-flight/tests/common/fixture.rs
-
 use crate::test_utils::trailers_layer::TrailersLayer;
 use arrow_flight::encode::FlightDataEncoderBuilder;
 use arrow_flight::error::FlightError;
@@ -31,6 +26,7 @@ use datafusion::execution::context::SessionContext;
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::sql::parser::DFParser;
 use futures::{StreamExt, TryStreamExt};
+use log::info;
 use prost::Message;
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -44,12 +40,12 @@ use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
 #[derive(Clone)]
-pub struct TestFlightSqlServiceImpl {
+pub struct FlightSqlServiceImpl {
     requests: Arc<Mutex<HashMap<Uuid, LogicalPlan>>>,
     context: SessionContext,
 }
 
-impl TestFlightSqlServiceImpl {
+impl FlightSqlServiceImpl {
     pub fn new() -> Self {
         let context = SessionContext::new();
         let requests = HashMap::new();
@@ -67,26 +63,25 @@ impl TestFlightSqlServiceImpl {
     }
 }
 
-impl Default for TestFlightSqlServiceImpl {
+impl Default for FlightSqlServiceImpl {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[tonic::async_trait]
-impl FlightSqlService for TestFlightSqlServiceImpl {
-    type FlightService = TestFlightSqlServiceImpl;
+impl FlightSqlService for FlightSqlServiceImpl {
+    type FlightService = FlightSqlServiceImpl;
 
     async fn get_flight_info_statement(
         &self,
         query: CommandStatementQuery,
         _request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
+        info!("get_flight_info_statement");
         let CommandStatementQuery { query, .. } = query;
         let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
         let statements = DFParser::parse_sql_with_dialect(&query, &dialect).unwrap();
-        // For testing purposes, we only support a single statement
-        assert_eq!(statements.len(), 1, "Only single statements are supported");
         let statement = statements[0].clone();
         let logical_plan = self
             .context
@@ -128,6 +123,7 @@ impl FlightSqlService for TestFlightSqlServiceImpl {
         request: Request<Ticket>,
         _message: Any,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
+        info!("do_get_fallback");
         let ticket = request.into_inner();
         let bytes = ticket.ticket.to_vec();
         let query = TicketStatementQuery::decode(bytes.as_slice()).unwrap();
@@ -162,11 +158,10 @@ impl FlightSqlService for TestFlightSqlServiceImpl {
     async fn register_sql_info(&self, _id: i32, _result: &SqlInfo) {}
 }
 
-/// All tests must complete within this many seconds or else the test server is shutdown
-const DEFAULT_TIMEOUT_SECONDS: u64 = 30;
+const DEFAULT_TIMEOUT_SECONDS: u64 = 60;
 
-/// Creates and manages a running TestServer with a background task
-pub struct TestFixture {
+/// Creates and manages a running FlightSqlServer with a background task
+pub struct FlightSqlApp {
     /// channel to send shutdown command
     shutdown: Option<tokio::sync::oneshot::Sender<()>>,
 
@@ -177,10 +172,13 @@ pub struct TestFixture {
     handle: Option<JoinHandle<Result<(), tonic::transport::Error>>>,
 }
 
-impl TestFixture {
-    /// create a new test fixture from the server
+impl FlightSqlApp {
+    /// create a new app for the flightsql server
     #[allow(dead_code)]
-    pub async fn new<T: FlightService>(test_server: FlightServiceServer<T>, addr: &str) -> Self {
+    pub async fn new<T: FlightService>(
+        flightsql_server: FlightServiceServer<T>,
+        addr: &str,
+    ) -> Self {
         // let OS choose a free port
         let listener = TcpListener::bind(addr).await.unwrap();
         let addr = listener.local_addr().unwrap();
@@ -197,7 +195,7 @@ impl TestFixture {
         let serve_future = tonic::transport::Server::builder()
             .timeout(server_timeout)
             .layer(TrailersLayer)
-            .add_service(test_server)
+            .add_service(flightsql_server)
             .serve_with_incoming_shutdown(
                 tokio_stream::wrappers::TcpListenerStream::new(listener),
                 shutdown_future,
@@ -226,7 +224,6 @@ impl TestFixture {
     }
 
     /// Stops the test server and waits for the server to shutdown
-    #[allow(dead_code)]
     pub async fn shutdown_and_wait(mut self) {
         if let Some(shutdown) = self.shutdown.take() {
             shutdown.send(()).expect("server quit early");
@@ -238,18 +235,29 @@ impl TestFixture {
                 .expect("Server Error found at shutdown");
         }
     }
-}
 
-impl Drop for TestFixture {
-    fn drop(&mut self) {
-        let now = std::time::Instant::now();
-        if let Some(shutdown) = self.shutdown.take() {
-            println!("TestFixture shutting down at {:?}", now);
-            shutdown.send(()).ok();
-        }
-        if self.handle.is_some() {
-            // tests should properly clean up TestFixture
-            println!("TestFixture::Drop called prior to `shutdown_and_wait`");
+    pub async fn run(self) {
+        if let Some(handle) = self.handle {
+            handle
+                .await
+                .expect("Unable to run server task")
+                .expect("Server Error found at shutdown");
+        } else {
+            panic!("Server task not found");
         }
     }
 }
+
+// impl Drop for FlightSqlApp {
+//     fn drop(&mut self) {
+//         let now = std::time::Instant::now();
+//         if let Some(shutdown) = self.shutdown.take() {
+//             println!("TestFixture shutting down at {:?}", now);
+//             shutdown.send(()).ok();
+//         }
+//         if self.handle.is_some() {
+//             // tests should properly clean up TestFixture
+//             println!("TestFixture::Drop called prior to `shutdown_and_wait`");
+//         }
+//     }
+// }

@@ -3,6 +3,8 @@ pub mod cli;
 pub mod config;
 pub mod execution;
 pub mod extensions;
+#[cfg(feature = "flightsql")]
+pub mod flightsql_server;
 pub mod telemetry;
 pub mod test_utils;
 pub mod tui;

@@ -17,11 +17,14 @@
 
 use clap::Parser;
 use color_eyre::Result;
-use dft::tui::{state, App};
 use dft::args::DftArgs;
 use dft::cli::CliApp;
 use dft::execution::ExecutionContext;
+use dft::flightsql_server::{FlightSqlApp, FlightSqlServiceImpl};
 use dft::telemetry;
+use dft::tui::{state, App};
+
+const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1:50051";
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -43,6 +46,20 @@ async fn main() -> Result<()> {
         }
         let app = CliApp::new(execution, cli);
         app.execute_files_or_commands().await?;
+    } else if cli.serve {
+        #[cfg(feature = "flightsql")]
+        {
+            env_logger::init();
+            println!("Starting FlightSQL server on {}", DEFAULT_SERVER_ADDRESS);
+            let server = FlightSqlServiceImpl::new();
+            let app = FlightSqlApp::new(server.service(), DEFAULT_SERVER_ADDRESS).await;
+            app.run().await;
+        }
+
+        #[cfg(not(feature = "flightsql"))]
+        {
+            panic!("FlightSQL feature is not enabled");
+        }
     }
     // UI mode: running the TUI
     else {
