@@ -25,16 +25,16 @@ use ratatui::crossterm::event::{self, KeyCode, KeyEvent};
 use tui_logger::TuiWidgetEvent;
 
 #[cfg(feature = "flightsql")]
-use crate::app::state::tabs::flightsql::FlightSQLConnectionStatus;
-use crate::app::state::tabs::history::Context;
-use crate::app::ExecutionResultsBatch;
+use crate::tui::state::tabs::flightsql::FlightSQLConnectionStatus;
+use crate::tui::state::tabs::history::Context;
+use crate::tui::ExecutionResultsBatch;
 
 #[cfg(feature = "flightsql")]
 use std::sync::Arc;
 
 use super::App;
-use crate::app::ui::SelectedTab;
-use crate::app::{state::tabs::history::HistoryQuery, AppEvent};
+use crate::tui::ui::SelectedTab;
+use crate::tui::{state::tabs::history::HistoryQuery, AppEvent};
 
 pub fn crossterm_event_handler(event: event::Event) -> Option<AppEvent> {
     match event {

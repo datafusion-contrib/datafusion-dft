@@ -21,7 +21,7 @@ use ratatui::{
     widgets::{Block, Borders, List, Widget},
 };
 
-use crate::app::App;
+use crate::tui::App;
 
 pub fn render_physical_optimizers(area: Rect, buf: &mut Buffer, app: &App) {
     let block = Block::default()

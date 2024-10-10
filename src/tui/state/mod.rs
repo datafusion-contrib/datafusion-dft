@@ -17,15 +17,15 @@
 
 pub mod tabs;
 
-use crate::app::state::tabs::sql::SQLTabState;
-use crate::app::ui::SelectedTab;
+use crate::tui::state::tabs::sql::SQLTabState;
+use crate::tui::ui::SelectedTab;
 use log::{debug, error, info};
 use std::path::PathBuf;
 
 use self::tabs::{history::HistoryTabState, logs::LogsTabState};
 
 #[cfg(feature = "flightsql")]
-use crate::app::state::tabs::flightsql::FlightSQLTabState;
+use crate::tui::state::tabs::flightsql::FlightSQLTabState;
 use crate::config::AppConfig;
 
 #[derive(Debug)]

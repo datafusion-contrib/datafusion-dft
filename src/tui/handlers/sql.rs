@@ -21,7 +21,7 @@ use log::{error, info};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::App;
-use crate::app::{handlers::tab_navigation_handler, state::tabs::sql::SQLTabMode, AppEvent};
+use crate::tui::{handlers::tab_navigation_handler, state::tabs::sql::SQLTabMode, AppEvent};
 
 pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
     match key.code {

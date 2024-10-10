@@ -17,9 +17,9 @@
 
 //! Tests for the TUI (e.g. user application with keyboard commands)
 
-use dft::app::state::initialize;
-use dft::app::{App, AppEvent};
 use dft::execution::ExecutionContext;
+use dft::tui::state::initialize;
+use dft::tui::{App, AppEvent};
 use ratatui::crossterm::event;
 use tempfile::{tempdir, TempDir};
 
@@ -115,7 +115,7 @@ impl<'app> TestApp<'app> {
     }
 
     /// Return the app state
-    pub fn state(&self) -> &dft::app::state::AppState {
+    pub fn state(&self) -> &dft::tui::state::AppState {
         self.app.state()
     }
 }

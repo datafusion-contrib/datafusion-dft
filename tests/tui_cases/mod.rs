@@ -24,8 +24,8 @@ mod quit;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::common::Result;
 use dft::{
-    app::{state::initialize, App, AppEvent},
     execution::ExecutionContext,
+    tui::{state::initialize, App, AppEvent},
 };
 use tempfile::{tempdir, TempDir};
 
@@ -60,7 +60,7 @@ impl<'app> TestApp<'app> {
     }
 
     /// Return the app state
-    pub fn state(&self) -> &dft::app::state::AppState {
+    pub fn state(&self) -> &dft::tui::state::AppState {
         self.app.state()
     }
 

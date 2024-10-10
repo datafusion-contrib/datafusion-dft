@@ -17,7 +17,7 @@
 
 use clap::Parser;
 use color_eyre::Result;
-use dft::app::{state, App};
+use dft::tui::{state, App};
 use dft::args::DftArgs;
 use dft::cli::CliApp;
 use dft::execution::ExecutionContext;

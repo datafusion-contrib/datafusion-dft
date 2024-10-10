@@ -22,7 +22,7 @@ use std::time::Duration;
 
 use datafusion::arrow::array::{ArrayRef, RecordBatch, UInt32Array};
 use datafusion::assert_batches_eq;
-use dft::app::{AppEvent, ExecutionResultsBatch};
+use dft::tui::{AppEvent, ExecutionResultsBatch};
 
 use crate::tui_cases::TestApp;
 

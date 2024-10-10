@@ -27,7 +27,7 @@ use ratatui::widgets::TableState;
 use tokio::task::JoinHandle;
 use tui_textarea::TextArea;
 
-use crate::app::ExecutionError;
+use crate::tui::ExecutionError;
 use crate::config::AppConfig;
 
 pub fn get_keywords() -> Vec<String> {
