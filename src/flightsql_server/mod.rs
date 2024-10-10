@@ -26,7 +26,7 @@ use datafusion::execution::context::SessionContext;
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::sql::parser::DFParser;
 use futures::{StreamExt, TryStreamExt};
-use log::info;
+use log::{debug, info};
 use prost::Message;
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -76,25 +76,29 @@ impl FlightSqlService for FlightSqlServiceImpl {
     async fn get_flight_info_statement(
         &self,
         query: CommandStatementQuery,
-        _request: Request<FlightDescriptor>,
+        request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
-        info!("get_flight_info_statement");
+        info!("get_flight_info_statement query: {:?}", query);
+        debug!("get_flight_info_statement request: {:?}", request);
         let CommandStatementQuery { query, .. } = query;
         let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
         let statements = DFParser::parse_sql_with_dialect(&query, &dialect).unwrap();
         let statement = statements[0].clone();
+        let start = std::time::Instant::now();
         let logical_plan = self
             .context
             .state()
             .statement_to_plan(statement)
             .await
             .unwrap();
+        debug!("logical planning took: {:?}", start.elapsed());
         let schema = logical_plan.schema();
 
         let uuid = uuid::Uuid::new_v4();
         let ticket = TicketStatementQuery {
             statement_handle: uuid.to_string().into(),
         };
+        info!("ticket handle: {:?}", ticket.statement_handle);
         let mut bytes: Vec<u8> = Vec::new();
         ticket.encode(&mut bytes).unwrap();
 
@@ -103,6 +107,7 @@ impl FlightSqlService for FlightSqlServiceImpl {
             .unwrap()
             .with_endpoint(FlightEndpoint::new().with_ticket(Ticket::new(bytes)))
             .with_descriptor(FlightDescriptor::new_cmd(query));
+        debug!("flight info: {:?}", info);
 
         let mut guard = self.requests.lock().unwrap();
         guard.insert(uuid, logical_plan);
