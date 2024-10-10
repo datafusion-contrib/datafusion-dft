@@ -24,6 +24,7 @@ use dft::execution::ExecutionContext;
 use dft::flightsql_server::{FlightSqlApp, FlightSqlServiceImpl};
 use dft::telemetry;
 use dft::tui::{state, App};
+use log::info;
 
 const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1:50051";
 
@@ -51,7 +52,7 @@ async fn main() -> Result<()> {
         #[cfg(feature = "flightsql")]
         {
             env_logger::init();
-            println!("Starting FlightSQL server on {}", DEFAULT_SERVER_ADDRESS);
+            info!("Starting FlightSQL server on {}", DEFAULT_SERVER_ADDRESS);
             let server = FlightSqlServiceImpl::new();
             let app = FlightSqlApp::new(server.service(), DEFAULT_SERVER_ADDRESS).await;
             app.run().await;
