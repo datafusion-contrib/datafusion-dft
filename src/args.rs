@@ -63,6 +63,9 @@ pub struct DftArgs {
 
     #[clap(long, help = "Run DDL prior to executing")]
     pub run_ddl: bool,
+
+    #[clap(long, short, help = "Only show how long the query took to run")]
+    pub time: bool,
 }
 
 impl DftArgs {
