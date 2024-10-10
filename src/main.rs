@@ -20,6 +20,7 @@ use color_eyre::Result;
 use dft::args::DftArgs;
 use dft::cli::CliApp;
 use dft::execution::ExecutionContext;
+#[cfg(feature = "flightsql")]
 use dft::flightsql_server::{FlightSqlApp, FlightSqlServiceImpl};
 use dft::telemetry;
 use dft::tui::{state, App};
