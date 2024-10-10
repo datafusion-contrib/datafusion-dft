@@ -39,7 +39,7 @@ fn test_s3_basic() {
         "s3://test",
         "http://localhost:4566",
         "LSIAQAAAAAAVNCBMPNSG",
-        "55555w9DzBwqsTAUORb5PqMDQN2cYPUqBoJ55555",
+        "5555555555555555555555555555555555555555",
         true,
     );
     let config = config_builder.build("my_config.toml");
