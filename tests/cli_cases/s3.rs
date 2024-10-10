@@ -35,8 +35,8 @@ fn test_s3_basic() {
     config_builder.with_ddl_path(ddl_path);
     config_builder.with_s3_object_store(
         "s3",
-        "public",
-        "test://public",
+        "test",
+        "s3://test",
         "http://localhost:4566",
         "LSIAQAAAAAAVNCBMPNSG",
         "55555w9DzBwqsTAUORb5PqMDQN2cYPUqBoJ55555",

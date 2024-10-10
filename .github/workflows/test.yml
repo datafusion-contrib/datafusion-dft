@@ -102,7 +102,7 @@ jobs:
       - name: Run Tests against LocalStack
         run: |
           awslocal s3 mb s3://test
-          awslocal s3 put-object --bucket test --key aggregate_test_100.csv --body data/aggregate_test_100.csv
+          awslocal s3 mv data/aggregate_test_100.csv s3://test/
           echo "Test Execution complete!"
       - name: Run S3 tests
         run: |
