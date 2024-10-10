@@ -49,14 +49,21 @@ impl CliApp {
     /// Optionally, use the FlightSQL client for execution.
     pub async fn execute_files_or_commands(&self) -> color_eyre::Result<()> {
         #[cfg(not(feature = "flightsql"))]
-        match (files.is_empty(), commands.is_empty(), flightsql) {
+        match (
+            self.args.files.is_empty(),
+            self.args.commands.is_empty(),
+            self.args.flightsql,
+        ) {
             (_, _, true) => Err(eyre!(
                 "FLightSQL feature isn't enabled. Reinstall `dft` with `--features=flightsql`"
             )),
             (true, true, _) => Err(eyre!("No files or commands provided to execute")),
-            (false, true, _) => self.execute_files(self.args.files, self.args.ddl).await,
+            (false, true, _) => {
+                self.execute_files(&self.args.files, self.args.run_ddl)
+                    .await
+            }
             (true, false, _) => {
-                self.execute_commands(self.args.commands, self.args.ddl)
+                self.execute_commands(&self.args.commands, self.args.run_ddl)
                     .await
             }
             (false, false, _) => Err(eyre!(
@@ -165,9 +172,20 @@ impl CliApp {
     async fn exec_from_string(&self, sql: &str) -> color_eyre::Result<()> {
         let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
         let statements = DFParser::parse_sql_with_dialect(sql, &dialect)?;
+        let start = if self.args.time {
+            Some(std::time::Instant::now())
+        } else {
+            None
+        };
         for statement in statements {
             let stream = self.execution.execute_statement(statement).await?;
-            self.print_any_stream(stream).await;
+            if let Some(start) = start {
+                self.exec_stream(stream).await;
+                let elapsed = start.elapsed();
+                println!("Query executed in {:?}", elapsed);
+            } else {
+                self.print_any_stream(stream).await;
+            }
         }
         Ok(())
     }
@@ -216,6 +234,22 @@ impl CliApp {
         let stream = self.execution.execute_sql(sql).await?;
         self.print_any_stream(stream).await;
         Ok(())
+    }
+
+    async fn exec_stream<S, E>(&self, mut stream: S)
+    where
+        S: Stream<Item = Result<RecordBatch, E>> + Unpin,
+        E: Error,
+    {
+        while let Some(maybe_batch) = stream.next().await {
+            match maybe_batch {
+                Ok(_) => {}
+                Err(e) => {
+                    println!("Error executing SQL: {e}");
+                    break;
+                }
+            }
+        }
     }
 
     async fn print_any_stream<S, E>(&self, mut stream: S)
