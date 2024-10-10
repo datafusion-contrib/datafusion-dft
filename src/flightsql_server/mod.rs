@@ -26,7 +26,7 @@ use datafusion::execution::context::SessionContext;
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::sql::parser::DFParser;
 use futures::{StreamExt, TryStreamExt};
-use log::{debug, info};
+use log::{debug, error, info};
 use prost::Message;
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -82,37 +82,51 @@ impl FlightSqlService for FlightSqlServiceImpl {
         debug!("get_flight_info_statement request: {:?}", request);
         let CommandStatementQuery { query, .. } = query;
         let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
-        let statements = DFParser::parse_sql_with_dialect(&query, &dialect).unwrap();
-        let statement = statements[0].clone();
-        let start = std::time::Instant::now();
-        let logical_plan = self
-            .context
-            .state()
-            .statement_to_plan(statement)
-            .await
-            .unwrap();
-        debug!("logical planning took: {:?}", start.elapsed());
-        let schema = logical_plan.schema();
+        match DFParser::parse_sql_with_dialect(&query, &dialect) {
+            Ok(statements) => {
+                let statement = statements[0].clone();
+                let start = std::time::Instant::now();
+                match self.context.state().statement_to_plan(statement).await {
+                    Ok(logical_plan) => {
+                        debug!("logical planning took: {:?}", start.elapsed());
+                        let schema = logical_plan.schema();
 
-        let uuid = uuid::Uuid::new_v4();
-        let ticket = TicketStatementQuery {
-            statement_handle: uuid.to_string().into(),
-        };
-        info!("ticket handle: {:?}", ticket.statement_handle);
-        let mut bytes: Vec<u8> = Vec::new();
-        ticket.encode(&mut bytes).unwrap();
+                        let uuid = uuid::Uuid::new_v4();
+                        let ticket = TicketStatementQuery {
+                            statement_handle: uuid.to_string().into(),
+                        };
+                        info!("ticket handle: {:?}", ticket.statement_handle);
+                        let mut bytes: Vec<u8> = Vec::new();
+                        if ticket.encode(&mut bytes).is_ok() {
+                            let info = FlightInfo::new()
+                                .try_with_schema(schema.as_arrow())
+                                .unwrap()
+                                .with_endpoint(
+                                    FlightEndpoint::new().with_ticket(Ticket::new(bytes)),
+                                )
+                                .with_descriptor(FlightDescriptor::new_cmd(query));
+                            debug!("flight info: {:?}", info);
 
-        let info = FlightInfo::new()
-            .try_with_schema(schema.as_arrow())
-            .unwrap()
-            .with_endpoint(FlightEndpoint::new().with_ticket(Ticket::new(bytes)))
-            .with_descriptor(FlightDescriptor::new_cmd(query));
-        debug!("flight info: {:?}", info);
+                            let mut guard = self.requests.lock().unwrap();
+                            guard.insert(uuid, logical_plan);
 
-        let mut guard = self.requests.lock().unwrap();
-        guard.insert(uuid, logical_plan);
-
-        Ok(Response::new(info))
+                            Ok(Response::new(info))
+                        } else {
+                            error!("Error encoding ticket");
+                            Err(Status::internal("Error encoding ticket"))
+                        }
+                    }
+                    Err(e) => {
+                        error!("Error planning SQL query: {:?}", e);
+                        return Err(Status::internal("Error planning SQL query"));
+                    }
+                }
+            }
+            Err(e) => {
+                error!("Error parsing SQL query: {:?}", e);
+                return Err(Status::internal("Error parsing SQL query"));
+            }
+        }
     }
 
     async fn do_get_statement(
@@ -131,32 +145,39 @@ impl FlightSqlService for FlightSqlServiceImpl {
         info!("do_get_fallback");
         let ticket = request.into_inner();
         let bytes = ticket.ticket.to_vec();
-        let query = TicketStatementQuery::decode(bytes.as_slice()).unwrap();
-        let handle = query.statement_handle.clone();
-        let s = String::from_utf8(handle.to_vec()).unwrap();
-        let id = Uuid::from_str(&s).unwrap();
+        match TicketStatementQuery::decode(bytes.as_slice()) {
+            Ok(query) => {
+                let handle = query.statement_handle.clone();
+                let s = String::from_utf8(handle.to_vec()).unwrap();
+                let id = Uuid::from_str(&s).unwrap();
 
-        // Limit the scope of the lock
-        let maybe_plan = {
-            let guard = self.requests.lock().unwrap();
-            guard.get(&id).cloned()
-        };
-        if let Some(plan) = maybe_plan {
-            let df = self.context.execute_logical_plan(plan).await.unwrap();
-            let stream = df
-                .execute_stream()
-                .await
-                .unwrap()
-                .map_err(|e| FlightError::ExternalError(Box::new(e)));
-            let builder = FlightDataEncoderBuilder::new();
-            let flight_data_stream = builder.build(stream);
-            let b = flight_data_stream
-                .map_err(|_| Status::internal("Hi"))
-                .boxed();
-            let res = Response::new(b);
-            Ok(res)
-        } else {
-            Err(Status::unimplemented("Not implemented"))
+                // Limit the scope of the lock
+                let maybe_plan = {
+                    let guard = self.requests.lock().unwrap();
+                    guard.get(&id).cloned()
+                };
+                if let Some(plan) = maybe_plan {
+                    let df = self.context.execute_logical_plan(plan).await.unwrap();
+                    let stream = df
+                        .execute_stream()
+                        .await
+                        .unwrap()
+                        .map_err(|e| FlightError::ExternalError(Box::new(e)));
+                    let builder = FlightDataEncoderBuilder::new();
+                    let flight_data_stream = builder.build(stream);
+                    let b = flight_data_stream
+                        .map_err(|_| Status::internal("Hi"))
+                        .boxed();
+                    let res = Response::new(b);
+                    Ok(res)
+                } else {
+                    Err(Status::unimplemented("Not implemented"))
+                }
+            }
+            Err(e) => {
+                error!("Error decoding ticket: {:?}", e);
+                Err(Status::internal("Error decoding ticket"))
+            }
         }
     }
 
