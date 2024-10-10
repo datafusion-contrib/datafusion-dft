@@ -107,7 +107,9 @@ impl FlightSqlService for FlightSqlServiceImpl {
                                 .with_descriptor(FlightDescriptor::new_cmd(query));
                             debug!("flight info: {:?}", info);
 
-                            let mut guard = self.requests.lock().unwrap();
+                            let mut guard = self.requests.lock().map_err(|_| {
+                                Status::internal("Failed to acquire lock on requests")
+                            })?;
                             guard.insert(uuid, logical_plan);
 
                             Ok(Response::new(info))
@@ -140,38 +142,66 @@ impl FlightSqlService for FlightSqlServiceImpl {
     async fn do_get_fallback(
         &self,
         request: Request<Ticket>,
-        _message: Any,
+        message: Any,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
-        info!("do_get_fallback");
+        info!("do_get_fallback request: {:?}", request);
+        debug!("do_get_fallback message: {:?}", message);
         let ticket = request.into_inner();
         let bytes = ticket.ticket.to_vec();
         match TicketStatementQuery::decode(bytes.as_slice()) {
             Ok(query) => {
                 let handle = query.statement_handle.clone();
-                let s = String::from_utf8(handle.to_vec()).unwrap();
-                let id = Uuid::from_str(&s).unwrap();
-
-                // Limit the scope of the lock
-                let maybe_plan = {
-                    let guard = self.requests.lock().unwrap();
-                    guard.get(&id).cloned()
-                };
-                if let Some(plan) = maybe_plan {
-                    let df = self.context.execute_logical_plan(plan).await.unwrap();
-                    let stream = df
-                        .execute_stream()
-                        .await
-                        .unwrap()
-                        .map_err(|e| FlightError::ExternalError(Box::new(e)));
-                    let builder = FlightDataEncoderBuilder::new();
-                    let flight_data_stream = builder.build(stream);
-                    let b = flight_data_stream
-                        .map_err(|_| Status::internal("Hi"))
-                        .boxed();
-                    let res = Response::new(b);
-                    Ok(res)
-                } else {
-                    Err(Status::unimplemented("Not implemented"))
+                match String::from_utf8(handle.to_vec()) {
+                    Ok(s) => {
+                        match Uuid::from_str(&s) {
+                            Ok(id) => {
+                                info!("getting plan for id: {:?}", id);
+                                // Limit the scope of the lock
+                                let maybe_plan = {
+                                    let guard = self.requests.lock().map_err(|_| {
+                                        Status::internal("Failed to acquire lock on requests")
+                                    })?;
+                                    guard.get(&id).cloned()
+                                };
+                                if let Some(plan) = maybe_plan {
+                                    match self.context.execute_logical_plan(plan).await {
+                                        Ok(df) => {
+                                            let stream = df
+                                                .execute_stream()
+                                                .await
+                                                .map_err(|_| {
+                                                    Status::internal("Error executing plan")
+                                                })?
+                                                .map_err(|e| {
+                                                    FlightError::ExternalError(Box::new(e))
+                                                });
+                                            let builder = FlightDataEncoderBuilder::new();
+                                            let flight_data_stream = builder.build(stream);
+                                            let b = flight_data_stream
+                                                .map_err(|_| Status::internal("Hi"))
+                                                .boxed();
+                                            let res = Response::new(b);
+                                            Ok(res)
+                                        }
+                                        Err(e) => {
+                                            error!("Error executing plan: {:?}", e);
+                                            Err(Status::internal("Error executing plan"))
+                                        }
+                                    }
+                                } else {
+                                    Err(Status::internal("Plan not found for id"))
+                                }
+                            }
+                            Err(e) => {
+                                error!("Error decoding handle to uuid: {:?}", e);
+                                Err(Status::internal("Error decoding handle to uuid"))
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!("Error decoding handle to utf8: {:?}", e);
+                        Err(Status::internal("Error decoding handle to utf8"))
+                    }
                 }
             }
             Err(e) => {
