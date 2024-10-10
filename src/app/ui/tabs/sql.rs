@@ -119,6 +119,7 @@ pub fn render_sql_help(area: Rect, buf: &mut Buffer, app: &App) {
                     "'e' to edit",
                     "'c' to clear editor",
                     "'d' for DDL mode",
+                    "'q' to exit app",
                     "'Enter' to run query",
                 ]
             }
