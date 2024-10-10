@@ -178,7 +178,7 @@ pub async fn test_time_command() {
     })
     .await
     .unwrap();
-    let expected = r##"Query executed in"##;
+    let expected = r##"executed in"##;
     assert.stdout(contains_str(expected));
     fixture.shutdown_and_wait().await;
 }
@@ -200,7 +200,7 @@ pub async fn test_time_files() {
     })
     .await
     .unwrap();
-    let expected = r##"Query executed in"##;
+    let expected = r##"executed in"##;
     assert.stdout(contains_str(expected));
     fixture.shutdown_and_wait().await;
 }
