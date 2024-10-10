@@ -69,7 +69,7 @@ jobs:
           rustup component add rustfmt clippy
       - name: Run clippy
         run: |
-          cargo clippy --all-targets --workspace -- -D warnings
+          cargo clippy --all-features --workspace -- -D warnings
         env:
           CARGO_HOME: "/github/home/.cargo"
           CARGO_TARGET_DIR: "/github/home/target"
