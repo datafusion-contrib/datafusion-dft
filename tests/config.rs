@@ -47,6 +47,8 @@ impl TestConfigBuilder {
         self.config_text.push_str(&param);
         self
     }
+
+    #[cfg(feature = "s3")]
     #[allow(clippy::too_many_arguments)]
     pub fn with_s3_object_store(
         &mut self,

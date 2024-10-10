@@ -16,6 +16,7 @@
 // under the License.
 //! [`CliApp`]: Command Line User Interface
 
+use crate::args::DftArgs;
 use crate::execution::ExecutionContext;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
@@ -25,8 +26,6 @@ use datafusion::sql::parser::DFParser;
 use futures::{Stream, StreamExt};
 use log::info;
 use std::error::Error;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 #[cfg(feature = "flightsql")]
 use tonic::IntoRequest;
@@ -35,49 +34,64 @@ use tonic::IntoRequest;
 pub struct CliApp {
     /// Execution context for running queries
     execution: ExecutionContext,
+    args: DftArgs,
 }
 
 impl CliApp {
-    pub fn new(execution: ExecutionContext) -> Self {
-        Self { execution }
+    pub fn new(execution: ExecutionContext, args: DftArgs) -> Self {
+        Self { execution, args }
     }
 
     /// Execute the provided sql, which was passed as an argument from CLI.
     ///
     /// Optionally, use the FlightSQL client for execution.
-    pub async fn execute_files_or_commands(
-        &self,
-        files: Vec<PathBuf>,
-        commands: Vec<String>,
-        flightsql: bool,
-        ddl: bool,
-    ) -> color_eyre::Result<()> {
+    pub async fn execute_files_or_commands(&self) -> color_eyre::Result<()> {
         #[cfg(not(feature = "flightsql"))]
-        match (files.is_empty(), commands.is_empty(), flightsql) {
+        match (
+            self.args.files.is_empty(),
+            self.args.commands.is_empty(),
+            self.args.flightsql,
+        ) {
             (_, _, true) => Err(eyre!(
                 "FLightSQL feature isn't enabled. Reinstall `dft` with `--features=flightsql`"
             )),
             (true, true, _) => Err(eyre!("No files or commands provided to execute")),
-            (false, true, _) => self.execute_files(files, ddl).await,
-            (true, false, _) => self.execute_commands(commands, ddl).await,
+            (false, true, _) => {
+                self.execute_files(&self.args.files, self.args.run_ddl)
+                    .await
+            }
+            (true, false, _) => {
+                self.execute_commands(&self.args.commands, self.args.run_ddl)
+                    .await
+            }
             (false, false, _) => Err(eyre!(
                 "Cannot execute both files and commands at the same time"
             )),
         }
         #[cfg(feature = "flightsql")]
-        match (files.is_empty(), commands.is_empty(), flightsql) {
+        match (
+            self.args.files.is_empty(),
+            self.args.commands.is_empty(),
+            self.args.flightsql,
+        ) {
             (true, true, _) => Err(eyre!("No files or commands provided to execute")),
-            (false, true, true) => self.flightsql_execute_files(files).await,
-            (false, true, false) => self.execute_files(files, ddl).await,
-            (true, false, true) => self.flightsql_execute_commands(commands).await,
-            (true, false, false) => self.execute_commands(commands, ddl).await,
+            (false, true, true) => self.flightsql_execute_files(&self.args.files).await,
+            (false, true, false) => {
+                self.execute_files(&self.args.files, self.args.run_ddl)
+                    .await
+            }
+            (true, false, true) => self.flightsql_execute_commands(&self.args.commands).await,
+            (true, false, false) => {
+                self.execute_commands(&self.args.commands, self.args.run_ddl)
+                    .await
+            }
             (false, false, _) => Err(eyre!(
                 "Cannot execute both files and commands at the same time"
             )),
         }
     }
 
-    async fn execute_files(&self, files: Vec<PathBuf>, run_ddl: bool) -> color_eyre::Result<()> {
+    async fn execute_files(&self, files: &[PathBuf], run_ddl: bool) -> color_eyre::Result<()> {
         info!("Executing files: {:?}", files);
         if run_ddl {
             let ddl = self.execution.load_ddl();
@@ -89,33 +103,44 @@ impl CliApp {
             }
         }
         for file in files {
-            self.exec_from_file(&file).await?
+            self.exec_from_file(file).await?
         }
 
         Ok(())
     }
 
     #[cfg(feature = "flightsql")]
-    async fn flightsql_execute_files(&self, files: Vec<PathBuf>) -> color_eyre::Result<()> {
+    async fn flightsql_execute_files(&self, files: &[PathBuf]) -> color_eyre::Result<()> {
         info!("Executing files: {:?}", files);
-        for file in files {
+        for (i, file) in files.iter().enumerate() {
             let file = std::fs::read_to_string(file)?;
-            self.exec_from_flightsql(file).await?;
+            self.exec_from_flightsql(file, i).await?;
         }
 
         Ok(())
     }
 
     #[cfg(feature = "flightsql")]
-    async fn exec_from_flightsql(&self, sql: String) -> color_eyre::Result<()> {
+    async fn exec_from_flightsql(&self, sql: String, i: usize) -> color_eyre::Result<()> {
         let client = self.execution.flightsql_client();
         let mut guard = client.lock().await;
         if let Some(client) = guard.as_mut() {
+            let start = if self.args.time {
+                Some(std::time::Instant::now())
+            } else {
+                None
+            };
             let flight_info = client.execute(sql, None).await?;
             for endpoint in flight_info.endpoint {
                 if let Some(ticket) = endpoint.ticket {
                     let stream = client.do_get(ticket.into_request()).await?;
-                    self.print_any_stream(stream).await;
+                    if let Some(start) = start {
+                        self.exec_stream(stream).await;
+                        let elapsed = start.elapsed();
+                        println!("Query {i} executed in {:?}", elapsed);
+                    } else {
+                        self.print_any_stream(stream).await;
+                    }
                 }
             }
         } else {
@@ -125,11 +150,7 @@ impl CliApp {
         Ok(())
     }
 
-    async fn execute_commands(
-        &self,
-        commands: Vec<String>,
-        run_ddl: bool,
-    ) -> color_eyre::Result<()> {
+    async fn execute_commands(&self, commands: &[String], run_ddl: bool) -> color_eyre::Result<()> {
         info!("Executing commands: {:?}", commands);
         if run_ddl {
             let ddl = self.execution.load_ddl();
@@ -141,17 +162,17 @@ impl CliApp {
             }
         }
         for command in commands {
-            self.exec_from_string(&command).await?
+            self.exec_from_string(command).await?
         }
 
         Ok(())
     }
 
     #[cfg(feature = "flightsql")]
-    async fn flightsql_execute_commands(&self, commands: Vec<String>) -> color_eyre::Result<()> {
+    async fn flightsql_execute_commands(&self, commands: &[String]) -> color_eyre::Result<()> {
         info!("Executing commands: {:?}", commands);
-        for command in commands {
-            self.exec_from_flightsql(command).await?
+        for (i, command) in commands.iter().enumerate() {
+            self.exec_from_flightsql(command.to_string(), i).await?
         }
 
         Ok(())
@@ -160,9 +181,20 @@ impl CliApp {
     async fn exec_from_string(&self, sql: &str) -> color_eyre::Result<()> {
         let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
         let statements = DFParser::parse_sql_with_dialect(sql, &dialect)?;
-        for statement in statements {
+        let start = if self.args.time {
+            Some(std::time::Instant::now())
+        } else {
+            None
+        };
+        for (i, statement) in statements.into_iter().enumerate() {
             let stream = self.execution.execute_statement(statement).await?;
-            self.print_any_stream(stream).await;
+            if let Some(start) = start {
+                self.exec_stream(stream).await;
+                let elapsed = start.elapsed();
+                println!("Query {i} executed in {:?}", elapsed);
+            } else {
+                self.print_any_stream(stream).await;
+            }
         }
         Ok(())
     }
@@ -170,38 +202,9 @@ impl CliApp {
     /// run and execute SQL statements and commands from a file, against a context
     /// with the given print options
     pub async fn exec_from_file(&self, file: &Path) -> color_eyre::Result<()> {
-        let file = File::open(file)?;
-        let reader = BufReader::new(file);
+        let string = std::fs::read_to_string(file)?;
 
-        let mut query = String::new();
-
-        for line in reader.lines() {
-            let line = line?;
-            if line.starts_with("#!") {
-                continue;
-            }
-            if line.starts_with("--") {
-                continue;
-            }
-
-            let line = line.trim_end();
-            query.push_str(line);
-            // if we found the end of a query, run it
-            if line.ends_with(';') {
-                // TODO: if the query errors, should we keep trying to execute
-                // the other queries in the file? That is what datafusion-cli does...
-                self.execute_and_print_sql(&query).await?;
-                query.clear();
-            } else {
-                query.push('\n');
-            }
-        }
-
-        // run the last line(s) in file if the last statement doesn't contain ‘;’
-        // ignore if it only consists of '\n'
-        if query.contains(|c| c != '\n') {
-            self.execute_and_print_sql(&query).await?;
-        }
+        self.exec_from_string(&string).await?;
 
         Ok(())
     }
@@ -211,6 +214,22 @@ impl CliApp {
         let stream = self.execution.execute_sql(sql).await?;
         self.print_any_stream(stream).await;
         Ok(())
+    }
+
+    async fn exec_stream<S, E>(&self, mut stream: S)
+    where
+        S: Stream<Item = Result<RecordBatch, E>> + Unpin,
+        E: Error,
+    {
+        while let Some(maybe_batch) = stream.next().await {
+            match maybe_batch {
+                Ok(_) => {}
+                Err(e) => {
+                    println!("Error executing SQL: {e}");
+                    break;
+                }
+            }
+        }
     }
 
     async fn print_any_stream<S, E>(&self, mut stream: S)

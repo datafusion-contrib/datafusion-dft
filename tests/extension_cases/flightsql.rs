@@ -161,3 +161,46 @@ pub async fn test_command_multiple_files() {
     assert.stdout(contains_str(expected));
     fixture.shutdown_and_wait().await;
 }
+
+#[tokio::test]
+pub async fn test_time_command() {
+    let test_server = FlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("--flightsql")
+            .arg("-c")
+            .arg("SELECT 1 + 1")
+            .arg("--time")
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+    let expected = r##"executed in"##;
+    assert.stdout(contains_str(expected));
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_time_files() {
+    let test_server = FlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+    let file1 = sql_in_file("SELECT 1 + 1");
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("--flightsql")
+            .arg("-f")
+            .arg(file1.path())
+            .arg("--time")
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+    let expected = r##"executed in"##;
+    assert.stdout(contains_str(expected));
+    fixture.shutdown_and_wait().await;
+}
