@@ -117,7 +117,12 @@ pub fn render_sql_help(area: Rect, buf: &mut Buffer, app: &App) {
     let help = if app.state.flightsql_tab.editor_editable() {
         vec!["'Esc' to exit edit mode"]
     } else {
-        vec!["'e' to edit", "'c' to clear editor", "'Enter' to run query"]
+        vec![
+            "'e' to edit",
+            "'c' to clear editor",
+            "'q' to exit app",
+            "'Enter' to run query",
+        ]
     };
 
     let help_text = help.join(" | ");
