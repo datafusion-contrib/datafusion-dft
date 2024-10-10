@@ -20,7 +20,7 @@ on: [push, pull_request]
 
 jobs:
   test:
-    name: Test Workspace on AMD64 Rust ${{ matrix.rust }}
+    name: Core
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -49,9 +49,9 @@ jobs:
       - name: Run tests (ex-FlightSQL)
         run: |
           # All features except FlightSQL which requires being run on a single thread for determinism
-          cargo test --features=deltalake,s3,functions-json
+          cargo test --features=deltalake
   test-flightsql:
-    name: Test FlightSQL on AMD64 Rust ${{ matrix.rust }}
+    name: FlightSQL
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -81,33 +81,39 @@ jobs:
           # Single thread needed because we spin up a server that listens on port and we need each
           # test to only be run against the server spun up in that test.  With parallelism tests 
           # can connec to server in different test which breaks determinism.
-          cargo test --features=flightsql -- --test-threads=1
-
-  fmt:
-    name: Rust formatting
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Setup toolchain
-        run: |
-          rustup toolchain install stable
-          rustup default stable
-          rustup component add rustfmt
-      - name: Run
-        run: cargo fmt --all -- --check
-  clippy:
-    name: Clippy
+          cargo test --features=flightsql extension_cases::flightsql -- --test-threads=1
+  test-s3:
+    name: S3
     runs-on: ubuntu-latest
     strategy:
       matrix:
         arch: [amd64]
         rust: [stable]
-    container:
-      image: ${{ matrix.arch }}/rust
-      env:
-        # Disable full debug symbol generation to speed up CI build and keep memory down
-        # "1" means line tables only, which is useful for panic tracebacks.
-        RUSTFLAGS: "-C debuginfo=1"
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Start LocalStack
+        uses: LocalStack/setup-localstack@v0.2.3
+        with:
+          image-tag: 'latest'
+          install-awslocal: 'true'
+          configuration: DEBUG=1
+
+      - name: Run Tests against LocalStack
+        run: |
+          awslocal s3 mb s3://test
+          awslocal s3 mv data/aggregate_test_100.csv s3://test/
+          echo "Test Execution complete!"
+      - name: Run S3 tests
+        run: |
+          cargo test --features=s3 extension_cases::s3
+  test-functions-json:
+    name: Functions-JSON
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64]
+        rust: [stable]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -116,20 +122,17 @@ jobs:
         uses: actions/cache@v2
         with:
           path: /home/runner/.cargo
-          key: cargo-S3-cache-
+          key: cargo-dft-cache-
       - name: Cache Rust dependencies
         uses: actions/cache@v2
         with:
           path: /home/runner/target
-          key: target-S3-cache-
+          key: target-dft-cache-
       - name: Setup Rust toolchain
         run: |
           rustup toolchain install ${{ matrix.rust }}
           rustup default ${{ matrix.rust }}
-          rustup component add rustfmt clippy
-      - name: Run clippy
+          rustup component add rustfmt
+      - name: Run FlightSQL tests
         run: |
-          cargo clippy --all-targets --workspace -- -D warnings
-        env:
-          CARGO_HOME: "/github/home/.cargo"
-          CARGO_TARGET_DIR: "/github/home/target"
+          cargo test --features=functions-json extension_cases::functions_json

@@ -17,8 +17,6 @@
 
 mod basic;
 mod config;
-#[cfg(feature = "flightsql")]
-mod flightsql;
 
 use assert_cmd::Command;
 use predicates::str::ContainsPredicate;

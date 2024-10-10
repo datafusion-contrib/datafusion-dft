@@ -19,6 +19,7 @@ use std::{io::Write, path::PathBuf};
 
 use tempfile::{tempdir, TempDir};
 
+#[derive(Debug)]
 pub struct TestConfig {
     #[allow(dead_code)]
     dir: TempDir,
@@ -42,8 +43,35 @@ impl TestConfigBuilder {
 
     pub fn with_ddl_path(&mut self, ddl_path: PathBuf) -> &mut Self {
         self.config_text.push_str("[execution]\n");
-        let param = format!("ddl_path = '{}'", ddl_path.display());
+        let param = format!("ddl_path = '{}'\n", ddl_path.display());
         self.config_text.push_str(&param);
+        self
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_s3_object_store(
+        &mut self,
+        store: &str,
+        bucket_name: &str,
+        object_store_url: &str,
+        endpoint: &str,
+        access_key: &str,
+        secret_key: &str,
+        allow_http: bool,
+    ) -> &mut Self {
+        self.config_text
+            .push_str(&format!("[[execution.object_store.{}]]\n", store));
+        self.config_text
+            .push_str(&format!("bucket_name = '{}'\n", bucket_name));
+        self.config_text
+            .push_str(&format!("object_store_url = '{}'\n", object_store_url));
+        self.config_text
+            .push_str(&format!("aws_endpoint = '{}'\n", endpoint));
+        self.config_text
+            .push_str(&format!("aws_access_key_id = '{}'\n", access_key));
+        self.config_text
+            .push_str(&format!("aws_secret_access_key = '{}'\n", secret_key));
+        self.config_text
+            .push_str(&format!("aws_allow_http = {}\n", allow_http));
         self
     }
 }
