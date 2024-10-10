@@ -19,6 +19,8 @@ mod basic;
 mod config;
 #[cfg(feature = "flightsql")]
 mod flightsql;
+#[cfg(feature = "s3")]
+mod s3;
 
 use assert_cmd::Command;
 use predicates::str::ContainsPredicate;

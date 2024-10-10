@@ -82,3 +82,28 @@ jobs:
           # test to only be run against the server spun up in that test.  With parallelism tests 
           # can connec to server in different test which breaks determinism.
           cargo test --features=flightsql -- --test-threads=1
+  localstack-action-test:
+    name: S3
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64]
+        rust: [stable]
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Start LocalStack
+        uses: LocalStack/setup-localstack@v0.2.3
+        with:
+          image-tag: 'latest'
+          install-awslocal: 'true'
+          configuration: DEBUG=1
+
+      - name: Run Tests against LocalStack
+        run: |
+          awslocal s3 mb s3://test
+          awslocal s3 put-object --bucket test --key aggregate_test_100.csv --body data/aggregate_test_100.csv
+          echo "Test Execution complete!"
+      - name: Run S3 tests
+        run: |
+          cargo test --features=s3 cli_cases::s3
