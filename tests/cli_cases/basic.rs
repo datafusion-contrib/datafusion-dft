@@ -313,8 +313,8 @@ fn test_multiple_sql_in_multiple_args2() {
 }
 
 #[test]
-fn test_time() {
-    let expected = r##"Query executed in"##;
+fn test_time_command() {
+    let expected = r##"executed in"##;
     let assert = Command::cargo_bin("dft")
         .unwrap()
         .arg("-c")
@@ -324,4 +324,24 @@ fn test_time() {
         .success();
 
     assert.stdout(contains_str(expected));
+}
+
+#[test]
+fn test_time_files() {
+    let file = sql_in_file(
+        r#"
+SELECT 1 + 1;
+    "#,
+    );
+
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-f")
+        .arg(file.path())
+        .arg("--time")
+        .assert()
+        .success();
+
+    let expected_err = "executed in";
+    assert.code(0).stdout(contains_str(expected_err));
 }

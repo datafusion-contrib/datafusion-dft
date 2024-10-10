@@ -26,8 +26,6 @@ use datafusion::sql::parser::DFParser;
 use futures::{Stream, StreamExt};
 use log::info;
 use std::error::Error;
-use std::fs::File;
-use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 #[cfg(feature = "flightsql")]
 use tonic::IntoRequest;
@@ -114,16 +112,16 @@ impl CliApp {
     #[cfg(feature = "flightsql")]
     async fn flightsql_execute_files(&self, files: &[PathBuf]) -> color_eyre::Result<()> {
         info!("Executing files: {:?}", files);
-        for file in files {
+        for (i, file) in files.iter().enumerate() {
             let file = std::fs::read_to_string(file)?;
-            self.exec_from_flightsql(file).await?;
+            self.exec_from_flightsql(file, i).await?;
         }
 
         Ok(())
     }
 
     #[cfg(feature = "flightsql")]
-    async fn exec_from_flightsql(&self, sql: String) -> color_eyre::Result<()> {
+    async fn exec_from_flightsql(&self, sql: String, i: usize) -> color_eyre::Result<()> {
         let client = self.execution.flightsql_client();
         let mut guard = client.lock().await;
         if let Some(client) = guard.as_mut() {
@@ -139,7 +137,7 @@ impl CliApp {
                     if let Some(start) = start {
                         self.exec_stream(stream).await;
                         let elapsed = start.elapsed();
-                        println!("Query executed in {:?}", elapsed);
+                        println!("Query {i} executed in {:?}", elapsed);
                     } else {
                         self.print_any_stream(stream).await;
                     }
@@ -173,8 +171,8 @@ impl CliApp {
     #[cfg(feature = "flightsql")]
     async fn flightsql_execute_commands(&self, commands: &[String]) -> color_eyre::Result<()> {
         info!("Executing commands: {:?}", commands);
-        for command in commands {
-            self.exec_from_flightsql(command.to_string()).await?
+        for (i, command) in commands.iter().enumerate() {
+            self.exec_from_flightsql(command.to_string(), i).await?
         }
 
         Ok(())
@@ -188,12 +186,12 @@ impl CliApp {
         } else {
             None
         };
-        for statement in statements {
+        for (i, statement) in statements.into_iter().enumerate() {
             let stream = self.execution.execute_statement(statement).await?;
             if let Some(start) = start {
                 self.exec_stream(stream).await;
                 let elapsed = start.elapsed();
-                println!("Query executed in {:?}", elapsed);
+                println!("Query {i} executed in {:?}", elapsed);
             } else {
                 self.print_any_stream(stream).await;
             }
@@ -204,38 +202,9 @@ impl CliApp {
     /// run and execute SQL statements and commands from a file, against a context
     /// with the given print options
     pub async fn exec_from_file(&self, file: &Path) -> color_eyre::Result<()> {
-        let file = File::open(file)?;
-        let reader = BufReader::new(file);
+        let string = std::fs::read_to_string(file)?;
 
-        let mut query = String::new();
-
-        for line in reader.lines() {
-            let line = line?;
-            if line.starts_with("#!") {
-                continue;
-            }
-            if line.starts_with("--") {
-                continue;
-            }
-
-            let line = line.trim_end();
-            query.push_str(line);
-            // if we found the end of a query, run it
-            if line.ends_with(';') {
-                // TODO: if the query errors, should we keep trying to execute
-                // the other queries in the file? That is what datafusion-cli does...
-                self.execute_and_print_sql(&query).await?;
-                query.clear();
-            } else {
-                query.push('\n');
-            }
-        }
-
-        // run the last line(s) in file if the last statement doesn't contain ‘;’
-        // ignore if it only consists of '\n'
-        if query.contains(|c| c != '\n') {
-            self.execute_and_print_sql(&query).await?;
-        }
+        self.exec_from_string(&string).await?;
 
         Ok(())
     }
