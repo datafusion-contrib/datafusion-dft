@@ -19,7 +19,7 @@ use clap::Parser;
 use color_eyre::Result;
 use dft::args::DftArgs;
 use dft::cli::CliApp;
-use dft::execution::ExecutionContext;
+use dft::execution::{AppExecution, ExecutionContext};
 #[cfg(feature = "flightsql")]
 use dft::flightsql_server::{FlightSqlApp, FlightSqlServiceImpl};
 use dft::telemetry;
@@ -37,25 +37,29 @@ async fn main() -> Result<()> {
         // use env_logger to setup logging for CLI
         env_logger::init();
         let state = state::initialize(cli.config_path());
-        let execution = ExecutionContext::try_new(&state.config.execution)?;
+        let execution_ctx = ExecutionContext::try_new(&state.config.execution)?;
+        let app_execution = AppExecution::new(execution_ctx);
         #[cfg(feature = "flightsql")]
         {
             if cli.flightsql {
-                execution
+                app_execution
                     .create_flightsql_client(state.config.flightsql)
                     .await?;
             }
         }
-        let app = CliApp::new(execution, cli);
+        let app = CliApp::new(app_execution, cli);
         app.execute_files_or_commands().await?;
     } else if cli.serve {
         #[cfg(feature = "flightsql")]
         {
             env_logger::init();
             info!("Starting FlightSQL server on {}", DEFAULT_SERVER_ADDRESS);
-            let server = FlightSqlServiceImpl::new();
+            let state = state::initialize(cli.config_path());
+            let execution_ctx = ExecutionContext::try_new(&state.config.execution)?;
+            let app_execution = AppExecution::new(execution_ctx);
+            let server = FlightSqlServiceImpl::new(app_execution);
             let app = FlightSqlApp::new(server.service(), DEFAULT_SERVER_ADDRESS).await;
-            app.run().await;
+            app.run_app().await;
         }
 
         #[cfg(not(feature = "flightsql"))]
@@ -68,8 +72,9 @@ async fn main() -> Result<()> {
         // use alternate logging for TUI
         telemetry::initialize_logs()?;
         let state = state::initialize(cli.config_path());
-        let execution = ExecutionContext::try_new(&state.config.execution)?;
-        let app = App::new(state, execution);
+        let execution_ctx = ExecutionContext::try_new(&state.config.execution)?;
+        let app_execution = AppExecution::new(execution_ctx);
+        let app = App::new(state, app_execution);
         app.run_app().await?;
     }
 

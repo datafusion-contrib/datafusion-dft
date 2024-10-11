@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use crate::execution::{AppExecution, ExecutionContext};
 use crate::test_utils::trailers_layer::TrailersLayer;
 use arrow_flight::encode::FlightDataEncoderBuilder;
 use arrow_flight::error::FlightError;
@@ -22,7 +23,6 @@ use arrow_flight::flight_service_server::{FlightService, FlightServiceServer};
 use arrow_flight::sql::server::FlightSqlService;
 use arrow_flight::sql::{Any, CommandStatementQuery, SqlInfo, TicketStatementQuery};
 use arrow_flight::{FlightDescriptor, FlightEndpoint, FlightInfo, Ticket};
-use datafusion::execution::context::SessionContext;
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::sql::parser::DFParser;
 use futures::{StreamExt, TryStreamExt};
@@ -35,22 +35,20 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
-use tonic::transport::{Channel, Uri};
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct FlightSqlServiceImpl {
     requests: Arc<Mutex<HashMap<Uuid, LogicalPlan>>>,
-    context: SessionContext,
+    execution: ExecutionContext,
 }
 
 impl FlightSqlServiceImpl {
-    pub fn new() -> Self {
-        let context = SessionContext::new();
+    pub fn new(execution: AppExecution) -> Self {
         let requests = HashMap::new();
         Self {
-            context,
+            execution: execution.execution_ctx().clone(),
             requests: Arc::new(Mutex::new(requests)),
         }
     }
@@ -60,12 +58,6 @@ impl FlightSqlServiceImpl {
     pub fn service(&self) -> FlightServiceServer<Self> {
         // wrap up tonic goop
         FlightServiceServer::new(self.clone())
-    }
-}
-
-impl Default for FlightSqlServiceImpl {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
@@ -86,7 +78,13 @@ impl FlightSqlService for FlightSqlServiceImpl {
             Ok(statements) => {
                 let statement = statements[0].clone();
                 let start = std::time::Instant::now();
-                match self.context.state().statement_to_plan(statement).await {
+                match self
+                    .execution
+                    .session_ctx()
+                    .state()
+                    .statement_to_plan(statement)
+                    .await
+                {
                     Ok(logical_plan) => {
                         debug!("logical planning took: {:?}", start.elapsed());
                         let schema = logical_plan.schema();
@@ -95,7 +93,7 @@ impl FlightSqlService for FlightSqlServiceImpl {
                         let ticket = TicketStatementQuery {
                             statement_handle: uuid.to_string().into(),
                         };
-                        info!("ticket handle: {:?}", ticket.statement_handle);
+                        info!("created ticket handle: {:?}", ticket.statement_handle);
                         let mut bytes: Vec<u8> = Vec::new();
                         if ticket.encode(&mut bytes).is_ok() {
                             let info = FlightInfo::new()
@@ -164,7 +162,12 @@ impl FlightSqlService for FlightSqlServiceImpl {
                                     guard.get(&id).cloned()
                                 };
                                 if let Some(plan) = maybe_plan {
-                                    match self.context.execute_logical_plan(plan).await {
+                                    match self
+                                        .execution
+                                        .session_ctx()
+                                        .execute_logical_plan(plan)
+                                        .await
+                                    {
                                         Ok(df) => {
                                             let stream = df
                                                 .execute_stream()
@@ -184,7 +187,7 @@ impl FlightSqlService for FlightSqlServiceImpl {
                                             Ok(res)
                                         }
                                         Err(e) => {
-                                            error!("Error executing plan: {:?}", e);
+                                            error!("error executing plan: {:?}", e);
                                             Err(Status::internal("Error executing plan"))
                                         }
                                     }
@@ -193,13 +196,13 @@ impl FlightSqlService for FlightSqlServiceImpl {
                                 }
                             }
                             Err(e) => {
-                                error!("Error decoding handle to uuid: {:?}", e);
+                                error!("error decoding handle to uuid: {:?}", e);
                                 Err(Status::internal("Error decoding handle to uuid"))
                             }
                         }
                     }
                     Err(e) => {
-                        error!("Error decoding handle to utf8: {:?}", e);
+                        error!("error decoding handle to utf8: {:?}", e);
                         Err(Status::internal("Error decoding handle to utf8"))
                     }
                 }
@@ -267,17 +270,15 @@ impl FlightSqlApp {
         }
     }
 
-    /// Return a [`Channel`] connected to the TestServer
-    #[allow(dead_code)]
-    pub async fn channel(&self) -> Channel {
-        let url = format!("http://{}", self.addr);
-        let uri: Uri = url.parse().expect("Valid URI");
-        Channel::builder(uri)
-            .timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECONDS))
-            .connect()
-            .await
-            .expect("error connecting to server")
-    }
+    // pub async fn channel(&self) -> Channel {
+    //     let url = format!("http://{}", self.addr);
+    //     let uri: Uri = url.parse().expect("Valid URI");
+    //     Channel::builder(uri)
+    //         .timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECONDS))
+    //         .connect()
+    //         .await
+    //         .expect("error connecting to server")
+    // }
 
     /// Stops the test server and waits for the server to shutdown
     pub async fn shutdown_and_wait(mut self) {
@@ -292,7 +293,7 @@ impl FlightSqlApp {
         }
     }
 
-    pub async fn run(self) {
+    pub async fn run_app(self) {
         if let Some(handle) = self.handle {
             handle
                 .await

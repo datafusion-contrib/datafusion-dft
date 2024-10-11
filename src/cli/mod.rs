@@ -17,7 +17,7 @@
 //! [`CliApp`]: Command Line User Interface
 
 use crate::args::DftArgs;
-use crate::execution::ExecutionContext;
+use crate::execution::AppExecution;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use datafusion::arrow::array::RecordBatch;
@@ -33,13 +33,16 @@ use tonic::IntoRequest;
 /// Encapsulates the command line interface
 pub struct CliApp {
     /// Execution context for running queries
-    execution: ExecutionContext,
+    app_execution: AppExecution,
     args: DftArgs,
 }
 
 impl CliApp {
-    pub fn new(execution: ExecutionContext, args: DftArgs) -> Self {
-        Self { execution, args }
+    pub fn new(app_execution: AppExecution, args: DftArgs) -> Self {
+        Self {
+            app_execution,
+            args,
+        }
     }
 
     /// Execute the provided sql, which was passed as an argument from CLI.
@@ -94,7 +97,7 @@ impl CliApp {
     async fn execute_files(&self, files: &[PathBuf], run_ddl: bool) -> color_eyre::Result<()> {
         info!("Executing files: {:?}", files);
         if run_ddl {
-            let ddl = self.execution.load_ddl();
+            let ddl = self.app_execution.execution_ctx().load_ddl();
             if let Some(ddl) = ddl {
                 info!("Executing DDL");
                 self.exec_from_string(&ddl).await?;
@@ -122,7 +125,7 @@ impl CliApp {
 
     #[cfg(feature = "flightsql")]
     async fn exec_from_flightsql(&self, sql: String, i: usize) -> color_eyre::Result<()> {
-        let client = self.execution.flightsql_client();
+        let client = self.app_execution.flightsql_client();
         let mut guard = client.lock().await;
         if let Some(client) = guard.as_mut() {
             let start = if self.args.time {
@@ -153,7 +156,7 @@ impl CliApp {
     async fn execute_commands(&self, commands: &[String], run_ddl: bool) -> color_eyre::Result<()> {
         info!("Executing commands: {:?}", commands);
         if run_ddl {
-            let ddl = self.execution.load_ddl();
+            let ddl = self.app_execution.execution_ctx().load_ddl();
             if let Some(ddl) = ddl {
                 info!("Executing DDL");
                 self.exec_from_string(&ddl).await?;
@@ -187,7 +190,11 @@ impl CliApp {
             None
         };
         for (i, statement) in statements.into_iter().enumerate() {
-            let stream = self.execution.execute_statement(statement).await?;
+            let stream = self
+                .app_execution
+                .execution_ctx()
+                .execute_statement(statement)
+                .await?;
             if let Some(start) = start {
                 self.exec_stream(stream).await;
                 let elapsed = start.elapsed();
@@ -211,7 +218,7 @@ impl CliApp {
 
     /// executes a sql statement and prints the result to stdout
     pub async fn execute_and_print_sql(&self, sql: &str) -> color_eyre::Result<()> {
-        let stream = self.execution.execute_sql(sql).await?;
+        let stream = self.app_execution.execution_ctx().execute_sql(sql).await?;
         self.print_any_stream(stream).await;
         Ok(())
     }

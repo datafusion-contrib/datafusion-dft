@@ -24,7 +24,7 @@ mod quit;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::common::Result;
 use dft::{
-    execution::ExecutionContext,
+    execution::{AppExecution, ExecutionContext},
     tui::{state::initialize, App, AppEvent},
 };
 use tempfile::{tempdir, TempDir};
@@ -48,8 +48,9 @@ impl<'app> TestApp<'app> {
     fn new() -> Self {
         let config_path = tempdir().unwrap();
         let state = initialize(config_path.path().to_path_buf());
-        let execution = ExecutionContext::try_new(&state.config.execution).unwrap();
-        let mut app = App::new(state, execution);
+        let execution_ctx = ExecutionContext::try_new(&state.config.execution).unwrap();
+        let app_execution = AppExecution::new(execution_ctx);
+        let mut app = App::new(state, app_execution);
         app.enter(false).unwrap();
         Self { config_path, app }
     }

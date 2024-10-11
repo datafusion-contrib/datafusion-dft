@@ -17,8 +17,8 @@
 
 //! [`AppExecution`]: Handles executing queries for the TUI application.
 
+use crate::execution::AppExecution;
 use crate::tui::{AppEvent, ExecutionError, ExecutionResultsBatch};
-use crate::execution::ExecutionContext;
 use color_eyre::eyre::Result;
 #[allow(unused_imports)] // No idea why this is being picked up as unused when I use it twice.
 use datafusion::arrow::error::ArrowError;
@@ -44,16 +44,16 @@ use {
 /// and sending them to the UI.
 ///
 /// TODO: I think we want to store the SQL associated with a stream
-pub struct AppExecution {
-    inner: Arc<ExecutionContext>,
+pub struct TuiExecution {
+    inner: Arc<AppExecution>,
     result_stream: Arc<Mutex<Option<SendableRecordBatchStream>>>,
     #[cfg(feature = "flightsql")]
     flightsql_result_stream: Arc<Mutex<Option<StreamMap<String, FlightRecordBatchStream>>>>,
 }
 
-impl AppExecution {
+impl TuiExecution {
     /// Create a new instance of [`AppExecution`].
-    pub fn new(inner: Arc<ExecutionContext>) -> Self {
+    pub fn new(inner: Arc<AppExecution>) -> Self {
         Self {
             inner,
             result_stream: Arc::new(Mutex::new(None)),
@@ -119,7 +119,7 @@ impl AppExecution {
             if i == statement_count - 1 {
                 info!("Executing last query and display results");
                 sender.send(AppEvent::NewExecution)?;
-                match self.inner.create_physical_plan(&sql).await {
+                match self.inner.execution_ctx().create_physical_plan(&sql).await {
                     Ok(plan) => match execute_stream(plan, self.inner.session_ctx().task_ctx()) {
                         Ok(stream) => {
                             self.set_result_stream(stream).await;
@@ -168,7 +168,12 @@ impl AppExecution {
                     }
                 }
             } else {
-                match self.inner.execute_sql_and_discard_results(&sql).await {
+                match self
+                    .inner
+                    .execution_ctx()
+                    .execute_sql_and_discard_results(&sql)
+                    .await
+                {
                     Ok(_) => {}
                     Err(e) => {
                         // We only log failed queries, we don't want to stop the execution of the
@@ -344,10 +349,10 @@ impl AppExecution {
     }
 
     pub fn load_ddl(&self) -> Option<String> {
-        self.inner.load_ddl()
+        self.inner.execution_ctx().load_ddl()
     }
 
     pub fn save_ddl(&self, ddl: String) {
-        self.inner.save_ddl(ddl)
+        self.inner.execution_ctx().save_ddl(ddl)
     }
 }

@@ -40,9 +40,9 @@ use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 
-use self::app_execution::AppExecution;
+use self::app_execution::TuiExecution;
 use self::handlers::{app_event_handler, crossterm_event_handler};
-use crate::execution::ExecutionContext;
+use crate::execution::AppExecution;
 
 #[derive(Clone, Debug)]
 pub struct ExecutionError {
@@ -142,7 +142,7 @@ pub enum AppEvent {
 
 pub struct App<'app> {
     state: state::AppState<'app>,
-    execution: Arc<AppExecution>,
+    execution: Arc<TuiExecution>,
     event_tx: UnboundedSender<AppEvent>,
     event_rx: UnboundedReceiver<AppEvent>,
     cancellation_token: CancellationToken,
@@ -151,12 +151,12 @@ pub struct App<'app> {
 }
 
 impl<'app> App<'app> {
-    pub fn new(state: state::AppState<'app>, execution: ExecutionContext) -> Self {
+    pub fn new(state: state::AppState<'app>, execution: AppExecution) -> Self {
         let (event_tx, event_rx) = mpsc::unbounded_channel();
         let cancellation_token = CancellationToken::new();
         let task = tokio::spawn(async {});
         // let ddl_task = tokio::spawn(async {});
-        let app_execution = Arc::new(AppExecution::new(Arc::new(execution)));
+        let app_execution = Arc::new(TuiExecution::new(Arc::new(execution)));
 
         Self {
             state,
@@ -181,7 +181,7 @@ impl<'app> App<'app> {
         &mut self.event_rx
     }
 
-    pub fn execution(&self) -> Arc<AppExecution> {
+    pub fn execution(&self) -> Arc<TuiExecution> {
         Arc::clone(&self.execution)
     }
 
