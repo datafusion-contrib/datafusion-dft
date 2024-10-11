@@ -17,5 +17,5 @@
 
 #[cfg(feature = "flightsql")]
 pub mod fixture;
-#[cfg(feature = "flightsql")]
+#[cfg(any(feature = "flightsql", feature = "experimental-flightsql-server"))]
 pub mod trailers_layer;
