@@ -56,6 +56,9 @@ async fn main() -> Result<()> {
             info!("Starting FlightSQL server on {}", DEFAULT_SERVER_ADDRESS);
             let state = state::initialize(cli.config_path());
             let execution_ctx = ExecutionContext::try_new(&state.config.execution)?;
+            if cli.run_ddl {
+                execution_ctx.execute_ddl().await;
+            }
             let app_execution = AppExecution::new(execution_ctx);
             let server = FlightSqlServiceImpl::new(app_execution);
             let app = FlightSqlApp::new(server.service(), DEFAULT_SERVER_ADDRESS).await;

@@ -58,6 +58,7 @@ tempfile = "3.2.0"
 [features]
 deltalake = ["dep:deltalake"]
 flightsql = ["dep:arrow-flight", "dep:tonic"]
+experimental-flightsql-server = ["dep:arrow-flight", "dep:tonic"]
 s3 = ["object_store/aws", "url"]
 functions-json = ["dep:datafusion-functions-json"]
 

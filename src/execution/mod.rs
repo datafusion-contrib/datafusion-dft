@@ -16,7 +16,6 @@
 // under the License.
 
 //! [`ExecutionContext`]: DataFusion based execution context for running SQL queries
-//!
 
 mod stats;
 use std::io::Write;
@@ -200,6 +199,7 @@ impl ExecutionContext {
             .await
     }
 
+    /// Load DDL from configured DDL path
     pub fn load_ddl(&self) -> Option<String> {
         info!("Loading DDL from: {:?}", &self.ddl_path);
         if let Some(ddl_path) = &self.ddl_path {
@@ -225,6 +225,7 @@ impl ExecutionContext {
         }
     }
 
+    /// Save DDL to configured DDL path
     pub fn save_ddl(&self, ddl: String) {
         info!("Loading DDL from: {:?}", &self.ddl_path);
         if let Some(ddl_path) = &self.ddl_path {
@@ -243,6 +244,28 @@ impl ExecutionContext {
             }
         } else {
             info!("No DDL file configured");
+        }
+    }
+
+    /// Execute DDL statements sequentially
+    pub async fn execute_ddl(&self) {
+        match self.load_ddl() {
+            Some(ddl) => {
+                let ddl_statements = ddl.split(';').collect::<Vec<&str>>();
+                for statement in ddl_statements {
+                    match self.execute_sql_and_discard_results(statement).await {
+                        Ok(_) => {
+                            info!("DDL statement executed");
+                        }
+                        Err(e) => {
+                            error!("Error executing DDL statement: {e}");
+                        }
+                    }
+                }
+            }
+            None => {
+                info!("No DDL to execute");
+            }
         }
     }
 }
