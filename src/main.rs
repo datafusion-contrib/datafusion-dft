@@ -20,13 +20,13 @@ use color_eyre::Result;
 use dft::args::DftArgs;
 use dft::cli::CliApp;
 use dft::execution::{AppExecution, ExecutionContext};
-#[cfg(feature = "flightsql")]
-use dft::flightsql_server::{FlightSqlApp, FlightSqlServiceImpl};
 use dft::telemetry;
 use dft::tui::{state, App};
-use log::info;
-
-const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1:50051";
+#[cfg(feature = "experimental-flightsql-server")]
+use {
+    dft::flightsql_server::{FlightSqlApp, FlightSqlServiceImpl},
+    log::info,
+};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -50,8 +50,9 @@ async fn main() -> Result<()> {
         let app = CliApp::new(app_execution, cli);
         app.execute_files_or_commands().await?;
     } else if cli.serve {
-        #[cfg(feature = "flightsql")]
+        #[cfg(feature = "experimental-flightsql-server")]
         {
+            const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1:50051";
             env_logger::init();
             info!("Starting FlightSQL server on {}", DEFAULT_SERVER_ADDRESS);
             let state = state::initialize(cli.config_path());
