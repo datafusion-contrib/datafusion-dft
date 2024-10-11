@@ -33,9 +33,9 @@ use ratatui::widgets::TableState;
 use tokio::task::JoinHandle;
 use tui_textarea::TextArea;
 
-use crate::app::state::tabs::sql;
-use crate::app::ExecutionError;
 use crate::config::AppConfig;
+use crate::tui::state::tabs::sql;
+use crate::tui::ExecutionError;
 
 const PAGE_SIZE: usize = 100;
 

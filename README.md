@@ -1,8 +1,10 @@
 # dft
 
-`dft` provides two interfaces to the [DataFusion](https://github.com/apache/arrow-datafusion) query execution engine:
+`dft` provides two client interfaces to the [DataFusion](https://github.com/apache/arrow-datafusion) query execution engine:
 1. Text User Interface (TUI): An IDE for DataFusion developers and users that provides a local database experience with utilities to analyze / benchmark queries.
 2. Command Line Interface (CLI): Scriptable engine for executing queries from files.
+
+Additionally, it provides a FlightSQL server implementation leveraging the same execution engine behind the TUI and CLI.  This allows users to iterate quickly develop a database and then seamlessly deploy it.
 
 `dft` is inspired by  [`datafusion-cli`], but has some differences:
 1. `dft` TUI focuses on more complete and interactive experience for users.
@@ -95,6 +97,13 @@ Both of the commands above support the `--flightsql` parameter to run the SQL wi
 #### DDL
 
 The CLI can also run your configured DDL prior to executing the query by adding the `--ddl` parameter.
+
+
+## `dft` FlightSQL Server
+
+The `dft` FlightSQL server (feature flag `experimental-flightsql-server`) is a Flight service that can be used to execute SQL queries against DataFusion.  The server is started by running `dft --serve` and can optionally run your configured DDL with the `--run-ddl` parameter.
+
+This feature is experimental and does not currently implement all FlightSQL endpoints.  Endpoints will be added in tandem with adding more features to the FlightSQL clients within the TUI and CLI.
 
 ## User Guide
 

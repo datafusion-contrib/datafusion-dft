@@ -23,7 +23,7 @@ use ratatui::{
     widgets::{Block, Borders, Cell, Paragraph, Row, StatefulWidget, Table, Widget},
 };
 
-use crate::app::App;
+use crate::tui::App;
 
 fn render_query_placeholder(area: Rect, buf: &mut Buffer) {
     let block = Block::default()

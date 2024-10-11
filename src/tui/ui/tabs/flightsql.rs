@@ -23,8 +23,8 @@ use ratatui::{
     widgets::{block::Title, Block, Borders, Paragraph, Row, StatefulWidget, Table, Widget, Wrap},
 };
 
-use crate::app::ui::convert::record_batch_to_table;
-use crate::app::App;
+use crate::tui::ui::convert::record_batch_to_table;
+use crate::tui::App;
 
 pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
     let border_color = if app.state.flightsql_tab.editor_editable() {

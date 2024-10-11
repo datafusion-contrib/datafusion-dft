@@ -20,7 +20,7 @@ use std::sync::Arc;
 use log::{error, info};
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::app::{handlers::tab_navigation_handler, AppEvent};
+use crate::tui::{handlers::tab_navigation_handler, AppEvent};
 
 use super::App;
 

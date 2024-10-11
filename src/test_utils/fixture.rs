@@ -44,12 +44,12 @@ use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
 #[derive(Clone)]
-pub struct FlightSqlServiceImpl {
+pub struct TestFlightSqlServiceImpl {
     requests: Arc<Mutex<HashMap<Uuid, LogicalPlan>>>,
     context: SessionContext,
 }
 
-impl FlightSqlServiceImpl {
+impl TestFlightSqlServiceImpl {
     pub fn new() -> Self {
         let context = SessionContext::new();
         let requests = HashMap::new();
@@ -67,15 +67,15 @@ impl FlightSqlServiceImpl {
     }
 }
 
-impl Default for FlightSqlServiceImpl {
+impl Default for TestFlightSqlServiceImpl {
     fn default() -> Self {
         Self::new()
     }
 }
 
 #[tonic::async_trait]
-impl FlightSqlService for FlightSqlServiceImpl {
-    type FlightService = FlightSqlServiceImpl;
+impl FlightSqlService for TestFlightSqlServiceImpl {
+    type FlightService = TestFlightSqlServiceImpl;
 
     async fn get_flight_info_statement(
         &self,
