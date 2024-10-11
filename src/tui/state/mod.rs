@@ -24,9 +24,9 @@ use std::path::PathBuf;
 
 use self::tabs::{history::HistoryTabState, logs::LogsTabState};
 
+use crate::config::AppConfig;
 #[cfg(feature = "flightsql")]
 use crate::tui::state::tabs::flightsql::FlightSQLTabState;
-use crate::config::AppConfig;
 
 #[derive(Debug)]
 pub struct Tabs {
