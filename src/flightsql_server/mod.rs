@@ -280,7 +280,7 @@ impl FlightSqlApp {
     //         .expect("error connecting to server")
     // }
 
-    /// Stops the test server and waits for the server to shutdown
+    /// Stops the server and waits for the server to shutdown
     pub async fn shutdown_and_wait(mut self) {
         if let Some(shutdown) = self.shutdown.take() {
             shutdown.send(()).expect("server quit early");
@@ -304,17 +304,3 @@ impl FlightSqlApp {
         }
     }
 }
-
-// impl Drop for FlightSqlApp {
-//     fn drop(&mut self) {
-//         let now = std::time::Instant::now();
-//         if let Some(shutdown) = self.shutdown.take() {
-//             println!("TestFixture shutting down at {:?}", now);
-//             shutdown.send(()).ok();
-//         }
-//         if self.handle.is_some() {
-//             // tests should properly clean up TestFixture
-//             println!("TestFixture::Drop called prior to `shutdown_and_wait`");
-//         }
-//     }
-// }
