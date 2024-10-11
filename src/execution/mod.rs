@@ -39,6 +39,8 @@ use {
     tokio::sync::Mutex, tonic::transport::Channel,
 };
 
+/// Provides all core execution functionality for execution queries from either a local
+/// `SessionContext` or a remote `FlightSQL` service
 pub struct AppExecution {
     context: ExecutionContext,
     #[cfg(feature = "flightsql")]
@@ -91,11 +93,11 @@ impl AppExecution {
     }
 }
 
-/// Structure for executing queries either locally or remotely (via FlightSQL)
+/// Structure for executing queries either locally
 ///
 /// This context includes both:
 ///
-/// 1. The configuration of a [`SessionContext`] with  various extensions enabled
+/// 1. The configuration of a [`SessionContext`] with various extensions enabled
 ///
 /// 2. The code for running SQL queries
 ///
@@ -269,5 +271,3 @@ impl ExecutionContext {
         }
     }
 }
-
-pub fn load_ddl_file() {}
