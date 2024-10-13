@@ -28,6 +28,7 @@ env_logger = "0.11.5"
 futures = "0.3.30"
 http = "0.2.9"
 http-body = {version = "0.4.5" }
+hudi = { features = ["datafusion"], optional = true, git = "https://github.com/apache/hudi-rs", rev = "2e1913234edbea4af2eeb47a0d2d94b3193bfc34" }
 itertools = "0.13.0"
 lazy_static = "1.4.0"
 log = "0.4.22"
@@ -57,6 +58,7 @@ tempfile = "3.2.0"
 # When addding a new feature, also add it to the features tested list in CI (`.github/workflows/rust.yml`)
 [features]
 deltalake = ["dep:deltalake"]
+hudi = ["dep:hudi"]
 flightsql = ["dep:arrow-flight", "dep:tonic"]
 experimental-flightsql-server = ["dep:arrow-flight", "dep:tonic"]
 s3 = ["object_store/aws", "url"]
