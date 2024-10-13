@@ -21,23 +21,36 @@ mod stats;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 use log::{error, info};
 pub use stats::{collect_plan_stats, ExecutionStats};
 
 use crate::config::ExecutionConfig;
 use crate::extensions::{enabled_extensions, DftSessionStateBuilder};
-use color_eyre::eyre::Result;
+use color_eyre::eyre::{self, Result};
 use datafusion::execution::SendableRecordBatchStream;
-use datafusion::physical_plan::ExecutionPlan;
+use datafusion::physical_plan::{execute_stream, ExecutionPlan};
 use datafusion::prelude::*;
-use datafusion::sql::parser::Statement;
+use datafusion::sql::parser::{DFParser, Statement};
 use tokio_stream::StreamExt;
 #[cfg(feature = "flightsql")]
 use {
     crate::config::FlightSQLConfig, arrow_flight::sql::client::FlightSqlServiceClient,
     tokio::sync::Mutex, tonic::transport::Channel,
 };
+
+// Container for benchmark statistics for a single location execution
+//
+// Note: It would be nice if we could split out planning and optimization for both logical and
+// physical planning but its not obvious from the DataFusion APIs how to do that.
+#[derive(Debug)]
+pub struct LocalBenchmarkStats {
+    logical_planning_duration: Duration,
+    physical_planning_duration: Duration,
+    execution_duration: Duration,
+    total_duration: Duration,
+}
 
 /// Provides all core execution functionality for execution queries from either a local
 /// `SessionContext` or a remote `FlightSQL` service
@@ -108,6 +121,7 @@ impl AppExecution {
 /// Thus it is important (eventually) not depend on the code in the app crate
 #[derive(Clone)]
 pub struct ExecutionContext {
+    config: ExecutionConfig,
     session_ctx: SessionContext,
     ddl_path: Option<PathBuf>,
 }
@@ -137,9 +151,14 @@ impl ExecutionContext {
         }
 
         Ok(Self {
+            config: config.clone(),
             session_ctx,
             ddl_path: config.ddl_path.as_ref().map(PathBuf::from),
         })
+    }
+
+    pub fn config(&self) -> &ExecutionConfig {
+        &self.config
     }
 
     pub fn create_tables(&mut self) -> Result<()> {
@@ -268,6 +287,56 @@ impl ExecutionContext {
             None => {
                 info!("No DDL to execute");
             }
+        }
+    }
+
+    /// Benchmark the provided query.  Currently, on a single statement can be benchmarked
+    pub async fn benchmark_query(&self, query: &str) -> Result<Vec<LocalBenchmarkStats>> {
+        if let Some(iterations) = self.config().benchmark_iterations {
+            info!("Benchmarking query with {} iterations", iterations);
+            let mut benchmark_stats: Vec<LocalBenchmarkStats> = Vec::with_capacity(iterations);
+            let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
+            let statements = DFParser::parse_sql_with_dialect(query, &dialect)?;
+            if statements.len() == 1 {
+                for _ in 0..iterations {
+                    let start = std::time::Instant::now();
+                    let statement = statements[0].clone();
+                    let logical_planning_start = std::time::Instant::now();
+                    let logical_plan = self
+                        .session_ctx()
+                        .state()
+                        .statement_to_plan(statement)
+                        .await?;
+                    let logical_planning_duration = logical_planning_start.elapsed();
+                    let physical_planning_start = std::time::Instant::now();
+                    let physical_plan = self
+                        .session_ctx()
+                        .state()
+                        .create_physical_plan(&logical_plan)
+                        .await?;
+                    let physical_planning_duration = physical_planning_start.elapsed();
+                    let task_ctx = self.session_ctx().task_ctx();
+                    let mut stream = execute_stream(physical_plan, task_ctx)?;
+                    let execution_start = std::time::Instant::now();
+                    while stream.next().await.is_some() {}
+                    let execution_duration = execution_start.elapsed();
+                    let total_duration = start.elapsed();
+                    let stats = LocalBenchmarkStats {
+                        logical_planning_duration,
+                        physical_planning_duration,
+                        execution_duration,
+                        total_duration,
+                    };
+                    benchmark_stats.push(stats);
+                }
+            } else {
+                return Err(eyre::eyre!("Only a single statement can be benchmarked"));
+            }
+
+            Ok(benchmark_stats)
+        } else {
+            info!("No benchmark iterations configured");
+            Ok(Vec::new())
         }
     }
 }

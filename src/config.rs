@@ -164,6 +164,8 @@ pub struct ExecutionConfig {
     pub object_store: Option<ObjectStoreConfig>,
     #[serde(default = "default_ddl_path")]
     pub ddl_path: Option<PathBuf>,
+    #[serde(default = "default_benchmark_iterations")]
+    pub benchmark_iterations: Option<usize>,
 }
 
 fn default_ddl_path() -> Option<PathBuf> {
@@ -178,6 +180,10 @@ fn default_ddl_path() -> Option<PathBuf> {
     } else {
         None
     }
+}
+
+fn default_benchmark_iterations() -> Option<usize> {
+    Some(10)
 }
 
 #[derive(Debug, Default, Deserialize)]

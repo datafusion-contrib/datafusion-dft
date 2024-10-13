@@ -69,6 +69,9 @@ pub struct DftArgs {
 
     #[clap(long, help = "Start a FlightSQL server")]
     pub serve: bool,
+
+    #[clap(long, short, help = "Benchmark the provided query")]
+    pub bench: bool,
 }
 
 impl DftArgs {
