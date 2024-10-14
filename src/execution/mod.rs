@@ -23,7 +23,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use log::{error, info};
+use log::{debug, error, info};
 pub use stats::{collect_plan_stats, ExecutionStats};
 
 use crate::config::ExecutionConfig;
@@ -320,7 +320,12 @@ impl ExecutionContext {
                 match maybe_ddl {
                     Ok(ddl) => {
                         info!("DDL: {:?}", ddl);
-                        Some(ddl)
+                        let filtered_ddl = ddl
+                            .lines()
+                            .filter(|l| !l.starts_with("--") && !l.trim().is_empty())
+                            .map(|l| l.to_string())
+                            .collect::<String>();
+                        Some(filtered_ddl)
                     }
                     Err(err) => {
                         error!("Error reading DDL: {:?}", err);
@@ -365,6 +370,10 @@ impl ExecutionContext {
             Some(ddl) => {
                 let ddl_statements = ddl.split(';').collect::<Vec<&str>>();
                 for statement in ddl_statements {
+                    if statement.trim().is_empty() {
+                        continue;
+                    }
+                    debug!("Executing DDL statement: {:?}", statement);
                     match self.execute_sql_and_discard_results(statement).await {
                         Ok(_) => {
                             info!("DDL statement executed");

@@ -50,13 +50,7 @@ impl CliApp {
     /// Optionally, use the FlightSQL client for execution.
     pub async fn execute_files_or_commands(&self) -> color_eyre::Result<()> {
         if self.args.run_ddl {
-            let ddl = self.app_execution.execution_ctx().load_ddl();
-            if let Some(ddl) = ddl {
-                info!("Executing DDL");
-                self.exec_from_string(&ddl).await?;
-            } else {
-                info!("No DDL to execute");
-            }
+            self.app_execution.execution_ctx().execute_ddl().await;
         }
 
         #[cfg(not(feature = "flightsql"))]
