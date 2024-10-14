@@ -21,6 +21,8 @@
 mod flightsql;
 #[cfg(feature = "functions-json")]
 mod functions_json;
+#[cfg(feature = "hudi")]
+mod hudi;
 #[cfg(feature = "s3")]
 mod s3;
 
@@ -53,7 +55,6 @@ impl TestExecution {
     }
 
     /// Run the setup SQL query, discarding the result
-    #[allow(dead_code)]
     pub async fn with_setup(self, sql: &str) -> Self {
         debug!("Running setup query: {sql}");
         let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
@@ -88,7 +89,6 @@ impl TestExecution {
 
     /// Runs the specified SQL query, returning the result as a Vec<String>
     /// suitable for comparison with insta
-    #[allow(dead_code)]
     pub async fn run_and_format(&mut self, sql: &str) -> Vec<String> {
         format_results(&self.run(sql).await.expect("Error running query"))
     }
