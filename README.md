@@ -63,6 +63,7 @@ Some of the current and planned features are:
   - Iceberg (TODO)
   - Hudi (TODO)
 - Preloading DDL from `~/.config/dft/ddl.sql` (or a user defined path) for local database available on startup
+- Benchmarking local and FlightSQL queries with breakdown of query execution time
 - "Catalog File" support - see [#122](https://github.com/datafusion-contrib/datafusion-tui/issues/122)
   - Save table definitions *and* data
   - Save parquet metadata from remote object stores
@@ -98,6 +99,8 @@ Both of the commands above support the `--flightsql` parameter to run the SQL wi
 
 The CLI can also run your configured DDL prior to executing the query by adding the `--ddl` parameter.
 
+#### Benchmarking
+You can benchmark queries by adding the `--bench` parameter.  This will run the query a configurable number of times and output a breakdown of the queries execution time with summary statistics for each component of the query (logical planning, physical planning, execution time, and total time).  Currently only local queries can be benchmarked but benchmarking of FlightSQL queries is planned.
 
 ## `dft` FlightSQL Server
 
@@ -296,6 +299,13 @@ ddl_path = "/path/to/my/ddl.sql"
 ```
 
 Multiple `ObjectStore`s can be defined in the config file. In the future datafusion `SessionContext` and `SessionState` options can be configured here.
+
+Set the number of iterations for benchmarking queries (10 is the default).
+
+```toml
+[execution]
+benchmark_iterations = 10
+```
 
 #### Display Config
 
