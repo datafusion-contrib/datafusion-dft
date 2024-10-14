@@ -14,13 +14,13 @@ default-run = "dft"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-arrow-flight = { version = "52.2.0", features = ["flight-sql-experimental"] , optional = true }
+arrow-flight = { version = "53.0.0", features = ["flight-sql-experimental"] , optional = true }
 async-trait = "0.1.80"
 clap = { version = "4.5.1", features = ["derive"] }
 color-eyre = "0.6.3"
 crossterm = { version = "0.28.1", features = ["event-stream"] }
-datafusion = "41.0.0"
-datafusion-common = "41.0.0"
+datafusion = "42.0.0"
+datafusion-common = "42.0.0"
 datafusion-functions-json = { version = "0.41.0", optional = true }
 deltalake = { version = "0.19.0", features = ["datafusion"], optional = true }
 directories = "5.0.1"
@@ -28,7 +28,7 @@ env_logger = "0.11.5"
 futures = "0.3.30"
 http = "0.2.9"
 http-body = {version = "0.4.5" }
-hudi = { features = ["datafusion"], optional = true, git = "https://github.com/apache/hudi-rs", rev = "2e1913234edbea4af2eeb47a0d2d94b3193bfc34" }
+hudi = { features = ["datafusion"], optional = true, git = "https://github.com/apache/hudi-rs", rev = "abb3e635a28af229ba1e872fd6005c381e2b7ded" }
 itertools = "0.13.0"
 lazy_static = "1.4.0"
 log = "0.4.22"

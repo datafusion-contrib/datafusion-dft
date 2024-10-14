@@ -37,6 +37,6 @@ impl Extension for HudiExtension {
         _config: &ExecutionConfig,
         builder: DftSessionStateBuilder,
     ) -> datafusion_common::Result<DftSessionStateBuilder> {
-        Ok(builder.with_table_factory("HUDITABLE", Arc::new(HudiTableFactory {})))
+        Ok(builder.with_table_factory("HUDI", Arc::new(HudiTableFactory {})))
     }
 }
