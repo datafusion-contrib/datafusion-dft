@@ -17,15 +17,16 @@
 
 //! [`ExecutionContext`]: DataFusion based execution context for running SQL queries
 
+mod benchmarks;
 mod stats;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
 
 use log::{debug, error, info};
 pub use stats::{collect_plan_stats, ExecutionStats};
 
+use self::benchmarks::LocalBenchmarkStats;
 use crate::config::ExecutionConfig;
 use crate::extensions::{enabled_extensions, DftSessionStateBuilder};
 use color_eyre::eyre::{self, Result};
@@ -34,121 +35,20 @@ use datafusion::physical_plan::{execute_stream, ExecutionPlan};
 use datafusion::prelude::*;
 use datafusion::sql::parser::{DFParser, Statement};
 use tokio_stream::StreamExt;
+
 #[cfg(feature = "flightsql")]
 use {
     crate::config::FlightSQLConfig, arrow_flight::sql::client::FlightSqlServiceClient,
     tokio::sync::Mutex, tonic::transport::Channel,
 };
 
-/// Duration summary statistics
-#[derive(Debug)]
-pub struct DurationsSummary {
-    pub min: Duration,
-    pub max: Duration,
-    pub mean: Duration,
-    pub median: Duration,
-    pub percent_of_total: f64,
-}
-
-impl std::fmt::Display for DurationsSummary {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Min: {:?}", self.min)?;
-        writeln!(f, "Max: {:?}", self.max)?;
-        writeln!(f, "Median: {:?}", self.median)?;
-        writeln!(f, "Mean: {:?} ({:.2}%)", self.mean, self.percent_of_total)
-    }
-}
-
-/// Contains stats for all runs of a benchmarked query and provides methods for aggregating
-#[derive(Debug, Default)]
-pub struct BenchmarkStats {
-    query: String,
-    runs: usize,
-    logical_planning_durations: Vec<Duration>,
-    physical_planning_durations: Vec<Duration>,
-    execution_durations: Vec<Duration>,
-    total_durations: Vec<Duration>,
-}
-
-impl BenchmarkStats {
-    fn new(
-        query: String,
-        logical_planning_durations: Vec<Duration>,
-        physical_planning_durations: Vec<Duration>,
-        execution_durations: Vec<Duration>,
-        total_durations: Vec<Duration>,
-    ) -> Self {
-        let runs = logical_planning_durations.len();
-        Self {
-            query,
-            runs,
-            logical_planning_durations,
-            physical_planning_durations,
-            execution_durations,
-            total_durations,
-        }
-    }
-
-    fn summarize(&self, durations: &[Duration]) -> DurationsSummary {
-        let mut sorted = durations.to_vec();
-        sorted.sort();
-        let len = sorted.len();
-        let min = *sorted.first().unwrap();
-        let max = *sorted.last().unwrap();
-        let mean = sorted.iter().sum::<Duration>() / len as u32;
-        let median = sorted[len / 2];
-        let this_total = durations.iter().map(|d| d.as_nanos()).sum::<u128>();
-        let total_duration = self
-            .total_durations
-            .iter()
-            .map(|d| d.as_nanos())
-            .sum::<u128>();
-        let percent_of_total = (this_total as f64 / total_duration as f64) * 100.0;
-        // let percent_of_total =
-        //     (this_total.as_nanos() as f64 / total_duration.as_nanos() as f64) * 100.0;
-        DurationsSummary {
-            min,
-            max,
-            mean,
-            median,
-            percent_of_total,
-        }
-    }
-}
-
-impl std::fmt::Display for BenchmarkStats {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f)?;
-        writeln!(f, "----------------------------")?;
-        writeln!(f, "Benchmark Stats ({} runs)", self.runs)?;
-        writeln!(f, "----------------------------")?;
-        writeln!(f, "{}", self.query)?;
-        writeln!(f, "----------------------------")?;
-
-        let logical_planning_summary = self.summarize(&self.logical_planning_durations);
-        writeln!(f, "Logical Planning")?;
-        writeln!(f, "{}", logical_planning_summary)?;
-
-        let physical_planning_summary = self.summarize(&self.physical_planning_durations);
-        writeln!(f, "Physical Planning")?;
-        writeln!(f, "{}", physical_planning_summary)?;
-
-        let execution_summary = self.summarize(&self.execution_durations);
-        writeln!(f, "Execution")?;
-        writeln!(f, "{}", execution_summary)?;
-
-        let total_summary = self.summarize(&self.total_durations);
-        writeln!(f, "Total")?;
-        writeln!(f, "{}", total_summary)
-    }
-}
-
 /// Provides all core execution functionality for execution queries from either a local
 /// `SessionContext` or a remote `FlightSQL` service
 pub struct AppExecution {
     context: ExecutionContext,
     #[cfg(feature = "flightsql")]
-    flightsql_client: Mutex<Option<FlightSqlServiceClient<Channel>>>,
+    flightsql_context: FlightSQLContext,
+    // flightsql_client: Mutex<Option<FlightSqlServiceClient<Channel>>>,
 }
 
 impl AppExecution {
@@ -156,7 +56,8 @@ impl AppExecution {
         Self {
             context,
             #[cfg(feature = "flightsql")]
-            flightsql_client: Mutex::new(None),
+            flightsql_context: FlightSQLContext::new(),
+            // flightsql_client: Mutex::new(None),
         }
     }
 
@@ -170,7 +71,7 @@ impl AppExecution {
 
     #[cfg(feature = "flightsql")]
     pub fn flightsql_client(&self) -> &Mutex<Option<FlightSqlServiceClient<Channel>>> {
-        &self.flightsql_client
+        self.flightsql_context.client()
     }
 
     /// Create FlightSQL client from users FlightSQL config
@@ -185,7 +86,7 @@ impl AppExecution {
         match channel {
             Ok(c) => {
                 let client = FlightSqlServiceClient::new(c);
-                let mut guard = self.flightsql_client.lock().await;
+                let mut guard = self.flightsql_context.client().lock().await;
                 *guard = Some(client);
                 Ok(())
             }
@@ -197,7 +98,7 @@ impl AppExecution {
     }
 }
 
-/// Structure for executing queries either locally
+/// Structure for executing queries locally
 ///
 /// This context includes both:
 ///
@@ -391,7 +292,7 @@ impl ExecutionContext {
     }
 
     /// Benchmark the provided query.  Currently, on a single statement can be benchmarked
-    pub async fn benchmark_query(&self, query: &str) -> Result<BenchmarkStats> {
+    pub async fn benchmark_query(&self, query: &str) -> Result<LocalBenchmarkStats> {
         let iterations = self.config.benchmark_iterations;
         info!("Benchmarking query with {} iterations", iterations);
         let mut logical_planning_durations = Vec::with_capacity(iterations);
@@ -431,12 +332,28 @@ impl ExecutionContext {
             return Err(eyre::eyre!("Only a single statement can be benchmarked"));
         }
 
-        Ok(BenchmarkStats::new(
+        Ok(LocalBenchmarkStats::new(
             query.to_string(),
             logical_planning_durations,
             physical_planning_durations,
             execution_durations,
             total_durations,
         ))
+    }
+}
+
+struct FlightSQLContext {
+    flightsql_client: Mutex<Option<FlightSqlServiceClient<Channel>>>,
+}
+
+impl FlightSQLContext {
+    fn new() -> Self {
+        Self {
+            flightsql_client: Mutex::new(None),
+        }
+    }
+
+    fn client(&self) -> &Mutex<Option<FlightSqlServiceClient<Channel>>> {
+        &self.flightsql_client
     }
 }
