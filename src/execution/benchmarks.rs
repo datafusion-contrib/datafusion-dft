@@ -119,3 +119,12 @@ impl std::fmt::Display for LocalBenchmarkStats {
         writeln!(f, "{}", total_summary)
     }
 }
+
+pub struct FlightSQLBenchmarkStats {
+    query: String,
+    runs: usize,
+    get_flight_info_durations: Vec<Duration>,
+    time_to_first_byte_durations: Vec<Duration>,
+    do_get_durations: Vec<Duration>,
+    total_durations: Vec<Duration>,
+}

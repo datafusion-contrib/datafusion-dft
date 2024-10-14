@@ -26,8 +26,8 @@ use std::sync::Arc;
 use log::{debug, error, info};
 pub use stats::{collect_plan_stats, ExecutionStats};
 
-use self::benchmarks::LocalBenchmarkStats;
-use crate::config::ExecutionConfig;
+use self::benchmarks::{FlightSQLBenchmarkStats, LocalBenchmarkStats};
+use crate::config::{AppConfig, ExecutionConfig};
 use crate::extensions::{enabled_extensions, DftSessionStateBuilder};
 use color_eyre::eyre::{self, Result};
 use datafusion::execution::SendableRecordBatchStream;
@@ -56,9 +56,18 @@ impl AppExecution {
         Self {
             context,
             #[cfg(feature = "flightsql")]
-            flightsql_context: FlightSQLContext::new(),
+            flightsql_context: FlightSQLContext::default(),
             // flightsql_client: Mutex::new(None),
         }
+    }
+
+    pub fn try_new_from_config(config: AppConfig) -> Result<Self> {
+        let context = ExecutionContext::try_new(&config.execution)?;
+        let flightsql_context = FlightSQLContext::new(config.flightsql);
+        Ok(Self {
+            context,
+            flightsql_context,
+        })
     }
 
     pub fn execution_ctx(&self) -> &ExecutionContext {
@@ -74,28 +83,38 @@ impl AppExecution {
         self.flightsql_context.client()
     }
 
-    /// Create FlightSQL client from users FlightSQL config
     #[cfg(feature = "flightsql")]
-    pub async fn create_flightsql_client(&self, config: FlightSQLConfig) -> Result<()> {
-        use color_eyre::eyre::eyre;
-        use log::info;
-
-        let url = Box::leak(config.connection_url.into_boxed_str());
-        info!("Connecting to FlightSQL host: {}", url);
-        let channel = Channel::from_static(url).connect().await;
-        match channel {
-            Ok(c) => {
-                let client = FlightSqlServiceClient::new(c);
-                let mut guard = self.flightsql_context.client().lock().await;
-                *guard = Some(client);
-                Ok(())
-            }
-            Err(e) => Err(eyre!(
-                "Error creating channel for FlightSQL client: {:?}",
-                e
-            )),
-        }
+    pub fn flightsql_ctx(&self) -> &FlightSQLContext {
+        &self.flightsql_context
     }
+
+    #[cfg(feature = "flightsql")]
+    pub fn with_flightsql_ctx(&mut self, flightsql_ctx: FlightSQLContext) {
+        self.flightsql_context = flightsql_ctx;
+    }
+
+    // Create FlightSQL client from users FlightSQL config
+    // #[cfg(feature = "flightsql")]
+    // pub async fn create_flightsql_client(&self, config: FlightSQLConfig) -> Result<()> {
+    //     use color_eyre::eyre::eyre;
+    //     use log::info;
+    //
+    //     let url = Box::leak(config.connection_url.into_boxed_str());
+    //     info!("Connecting to FlightSQL host: {}", url);
+    //     let channel = Channel::from_static(url).connect().await;
+    //     match channel {
+    //         Ok(c) => {
+    //             let client = FlightSqlServiceClient::new(c);
+    //             let mut guard = self.flightsql_context.client().lock().await;
+    //             *guard = Some(client);
+    //             Ok(())
+    //         }
+    //         Err(e) => Err(eyre!(
+    //             "Error creating channel for FlightSQL client: {:?}",
+    //             e
+    //         )),
+    //     }
+    // }
 }
 
 /// Structure for executing queries locally
@@ -342,13 +361,16 @@ impl ExecutionContext {
     }
 }
 
-struct FlightSQLContext {
+#[derive(Default)]
+pub struct FlightSQLContext {
+    config: FlightSQLConfig,
     flightsql_client: Mutex<Option<FlightSqlServiceClient<Channel>>>,
 }
 
 impl FlightSQLContext {
-    fn new() -> Self {
+    pub fn new(config: FlightSQLConfig) -> Self {
         Self {
+            config,
             flightsql_client: Mutex::new(None),
         }
     }
@@ -356,4 +378,27 @@ impl FlightSQLContext {
     fn client(&self) -> &Mutex<Option<FlightSqlServiceClient<Channel>>> {
         &self.flightsql_client
     }
+
+    /// Create FlightSQL client from users FlightSQL config
+    pub async fn create_client(&self) -> Result<()> {
+        let url = Box::leak(self.config.connection_url.clone().into_boxed_str());
+        info!("Connecting to FlightSQL host: {}", url);
+        let channel = Channel::from_static(url).connect().await;
+        match channel {
+            Ok(c) => {
+                let client = FlightSqlServiceClient::new(c);
+                let mut guard = self.flightsql_client.lock().await;
+                *guard = Some(client);
+                Ok(())
+            }
+            Err(e) => Err(eyre::eyre!(
+                "Error creating channel for FlightSQL client: {:?}",
+                e
+            )),
+        }
+    }
+
+    // fn benchmark_query(&self, query: &str) -> Result<FlightSQLBenchmarkStats> {
+    //     let iterations = self.config.benchmark_iterations;
+    // }
 }

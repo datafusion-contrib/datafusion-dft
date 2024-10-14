@@ -19,6 +19,8 @@ use clap::Parser;
 use color_eyre::Result;
 use dft::args::DftArgs;
 use dft::cli::CliApp;
+#[cfg(feature = "flightsql")]
+use dft::execution::FlightSQLContext;
 use dft::execution::{AppExecution, ExecutionContext};
 use dft::telemetry;
 use dft::tui::{state, App};
@@ -38,13 +40,13 @@ async fn main() -> Result<()> {
         env_logger::init();
         let state = state::initialize(cli.config_path());
         let execution_ctx = ExecutionContext::try_new(&state.config.execution)?;
-        let app_execution = AppExecution::new(execution_ctx);
+        let mut app_execution = AppExecution::new(execution_ctx);
         #[cfg(feature = "flightsql")]
         {
             if cli.flightsql {
-                app_execution
-                    .create_flightsql_client(state.config.flightsql)
-                    .await?;
+                let flightsql_ctx = FlightSQLContext::new(state.config.flightsql.clone());
+                flightsql_ctx.create_client().await?;
+                app_execution.with_flightsql_ctx(flightsql_ctx);
             }
         }
         let app = CliApp::new(app_execution, cli);
@@ -76,8 +78,8 @@ async fn main() -> Result<()> {
         // use alternate logging for TUI
         telemetry::initialize_logs()?;
         let state = state::initialize(cli.config_path());
-        let execution_ctx = ExecutionContext::try_new(&state.config.execution)?;
-        let app_execution = AppExecution::new(execution_ctx);
+        // let execution_ctx = ExecutionContext::try_new(&state.config.execution)?;
+        let app_execution = AppExecution::try_new_from_config(state.config.clone())?;
         let app = App::new(state, app_execution);
         app.run_app().await?;
     }

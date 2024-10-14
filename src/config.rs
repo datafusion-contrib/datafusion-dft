@@ -60,7 +60,7 @@ pub fn get_data_dir() -> PathBuf {
     }
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 pub struct AppConfig {
     #[serde(default = "default_execution_config")]
     pub execution: ExecutionConfig,
@@ -92,7 +92,7 @@ fn default_flightsql_config() -> FlightSQLConfig {
     FlightSQLConfig::default()
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct DisplayConfig {
     #[serde(default = "default_frame_rate")]
     pub frame_rate: f64,
@@ -196,7 +196,7 @@ impl Default for ExecutionConfig {
     }
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 pub struct InteractionConfig {
     #[serde(default = "default_mouse")]
     pub mouse: bool,
@@ -217,6 +217,8 @@ fn default_paste() -> bool {
 pub struct FlightSQLConfig {
     #[serde(default = "default_connection_url")]
     pub connection_url: String,
+    #[serde(default = "default_benchmark_iterations")]
+    pub benchmark_iterations: usize,
 }
 
 #[cfg(feature = "flightsql")]
@@ -224,6 +226,7 @@ impl Default for FlightSQLConfig {
     fn default() -> Self {
         Self {
             connection_url: default_connection_url(),
+            benchmark_iterations: default_benchmark_iterations(),
         }
     }
 }
@@ -233,7 +236,7 @@ pub fn default_connection_url() -> String {
     "http://localhost:50051".to_string()
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 pub struct EditorConfig {
     pub experimental_syntax_highlighting: bool,
 }

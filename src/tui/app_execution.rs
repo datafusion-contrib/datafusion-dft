@@ -339,8 +339,8 @@ impl TuiExecution {
     }
 
     #[cfg(feature = "flightsql")]
-    pub async fn create_flightsql_client(&self, config: FlightSQLConfig) -> Result<()> {
-        self.inner.create_flightsql_client(config).await
+    pub async fn create_flightsql_client(&self) -> Result<()> {
+        self.inner.flightsql_ctx().create_client().await
     }
 
     #[cfg(feature = "flightsql")]
