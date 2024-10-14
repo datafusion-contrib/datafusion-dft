@@ -73,16 +73,16 @@ fn test_custom_config_multiple_ddl() {
         .arg(config.path)
         .arg("--run-ddl")
         .arg("-c")
-        .arg("SHOW TABLES")
+        .arg("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
         .assert()
         .success();
 
-    let expected = r##"
-+---------------+--------------------+-------------+------------+
-| table_catalog | table_schema       | table_name  | table_type |
-+---------------+--------------------+-------------+------------+
-| datafusion    | public             | y           | BASE TABLE |
-| datafusion    | public             | x           | BASE TABLE |
+    let expected = r##"+------------+
+| table_name |
++------------+
+| x          |
+| y          |
++------------+
 "##;
 
     assert.stdout(contains_str(expected));
