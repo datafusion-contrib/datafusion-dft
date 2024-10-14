@@ -74,9 +74,6 @@ impl DftSessionStateBuilder {
     /// Create a new builder
     pub fn new() -> Self {
         let session_config = SessionConfig::default().with_information_schema(true);
-        // TODO why is batch size 1?
-        // .with_batch_size(100)
-        // .with_information_schema(true);
 
         Self {
             session_config,
