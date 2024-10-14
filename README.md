@@ -190,9 +190,9 @@ select * from foo where json_get(attributes, 'bar')::string='ham'
 
 ### Getting Started
 
-To have the best experience with `dft` it is highly recommended to define all of your DDL in `~/.datafusion/.datafusionrc` so that any tables you wish to query are available at startup.  Additionally, now that DataFusion supports `CREATE VIEW` via sql you can also make a `VIEW` based on these tables.
+To have the best experience with `dft` it is highly recommended to define all of your DDL in `~/.config/ddl.sql` so that any tables you wish to query are available at startup.  Additionally, now that DataFusion supports `CREATE VIEW` via sql you can also make a `VIEW` based on these tables.
 
-For example, your `~/.datafusion/.datafusionrc` file could look like the following:
+For example, your DDL file could look like the following:
 
 ```
 CREATE EXTERNAL TABLE users STORED AS NDJSON LOCATION 's3://bucket/users';
@@ -228,9 +228,9 @@ Editor for executing SQL with local DataFusion `SessionContext`.
         - `esc` to exit Edit mode and go back to Normal mode
 - DDL mode
     - Not editable
-        - `l` => load `~/.datafusion/.datafusionrc` into editor (TODO)
-        - `r` => rerun `~/.datafusion/.datafusionrc` (TODO)
-        - `w` => write editor contents to `~/.datafusion/.datafusionrc` (TODO)
+        - `l` => load configured DDL file into editor
+        - `enter` => rerun configured DDL file
+        - `s` => write editor contents to configured DDL file
     - Editable
         - Character keys to write queries
         - Backspace / tab / enter work same as normal
