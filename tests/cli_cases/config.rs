@@ -73,7 +73,7 @@ fn test_custom_config_multiple_ddl() {
         .arg(config.path)
         .arg("--run-ddl")
         .arg("-c")
-        .arg("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")
+        .arg("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('x', 'y') ORDER BY table_name ASC")
         .assert()
         .success();
 
