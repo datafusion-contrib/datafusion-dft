@@ -307,6 +307,15 @@ Set the number of iterations for benchmarking queries (10 is the default).
 benchmark_iterations = 10
 ```
 
+The batch size for query execution can be configured based on the app being used (TUI, CLI, or FlightSQL Server). For the TUI it defaults to 100, which may slow down queries, because a Record Batch is used as a unit of pagination and too many rows can cause the TUI to hang. For the CLI and FlightSQL Server, the default is 8092.
+
+```toml
+[execution]
+cli_batch_size = 8092
+tui_batch_size = 100
+flightsql_server_batch_size = 8092
+```
+
 #### Display Config
 
 The display config is where you can define the frame rate of the TUI.
