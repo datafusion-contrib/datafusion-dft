@@ -159,11 +159,13 @@ pub struct ObjectStoreConfig {
     pub s3: Option<Vec<S3Config>>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct ExecutionConfig {
     pub object_store: Option<ObjectStoreConfig>,
     #[serde(default = "default_ddl_path")]
     pub ddl_path: Option<PathBuf>,
+    #[serde(default = "default_benchmark_iterations")]
+    pub benchmark_iterations: usize,
 }
 
 fn default_ddl_path() -> Option<PathBuf> {
@@ -177,6 +179,20 @@ fn default_ddl_path() -> Option<PathBuf> {
         Some(ddl_path)
     } else {
         None
+    }
+}
+
+fn default_benchmark_iterations() -> usize {
+    10
+}
+
+impl Default for ExecutionConfig {
+    fn default() -> Self {
+        Self {
+            object_store: None,
+            ddl_path: default_ddl_path(),
+            benchmark_iterations: default_benchmark_iterations(),
+        }
     }
 }
 

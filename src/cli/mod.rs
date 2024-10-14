@@ -49,54 +49,7 @@ impl CliApp {
     ///
     /// Optionally, use the FlightSQL client for execution.
     pub async fn execute_files_or_commands(&self) -> color_eyre::Result<()> {
-        #[cfg(not(feature = "flightsql"))]
-        match (
-            self.args.files.is_empty(),
-            self.args.commands.is_empty(),
-            self.args.flightsql,
-        ) {
-            (_, _, true) => Err(eyre!(
-                "FLightSQL feature isn't enabled. Reinstall `dft` with `--features=flightsql`"
-            )),
-            (true, true, _) => Err(eyre!("No files or commands provided to execute")),
-            (false, true, _) => {
-                self.execute_files(&self.args.files, self.args.run_ddl)
-                    .await
-            }
-            (true, false, _) => {
-                self.execute_commands(&self.args.commands, self.args.run_ddl)
-                    .await
-            }
-            (false, false, _) => Err(eyre!(
-                "Cannot execute both files and commands at the same time"
-            )),
-        }
-        #[cfg(feature = "flightsql")]
-        match (
-            self.args.files.is_empty(),
-            self.args.commands.is_empty(),
-            self.args.flightsql,
-        ) {
-            (true, true, _) => Err(eyre!("No files or commands provided to execute")),
-            (false, true, true) => self.flightsql_execute_files(&self.args.files).await,
-            (false, true, false) => {
-                self.execute_files(&self.args.files, self.args.run_ddl)
-                    .await
-            }
-            (true, false, true) => self.flightsql_execute_commands(&self.args.commands).await,
-            (true, false, false) => {
-                self.execute_commands(&self.args.commands, self.args.run_ddl)
-                    .await
-            }
-            (false, false, _) => Err(eyre!(
-                "Cannot execute both files and commands at the same time"
-            )),
-        }
-    }
-
-    async fn execute_files(&self, files: &[PathBuf], run_ddl: bool) -> color_eyre::Result<()> {
-        info!("Executing files: {:?}", files);
-        if run_ddl {
+        if self.args.run_ddl {
             let ddl = self.app_execution.execution_ctx().load_ddl();
             if let Some(ddl) = ddl {
                 info!("Executing DDL");
@@ -105,6 +58,57 @@ impl CliApp {
                 info!("No DDL to execute");
             }
         }
+
+        #[cfg(not(feature = "flightsql"))]
+        match (
+            self.args.files.is_empty(),
+            self.args.commands.is_empty(),
+            self.args.flightsql,
+            self.args.bench,
+        ) {
+            (_, _, true, _) => Err(eyre!(
+                "FLightSQL feature isn't enabled. Reinstall `dft` with `--features=flightsql`"
+            )),
+            (true, true, _, _) => Err(eyre!("No files or commands provided to execute")),
+            (false, true, _, false) => self.execute_files(&self.args.files).await,
+            (false, true, _, true) => self.benchmark_files(&self.args.files).await,
+            (true, false, _, false) => self.execute_commands(&self.args.commands).await,
+            (true, false, _, true) => self.benchmark_commands(&self.args.commands).await,
+            (false, false, _, false) => Err(eyre!(
+                "Cannot execute both files and commands at the same time"
+            )),
+            (false, false, false, true) => Err(eyre!("Cannot benchmark without a command or file")),
+        }
+        #[cfg(feature = "flightsql")]
+        match (
+            self.args.files.is_empty(),
+            self.args.commands.is_empty(),
+            self.args.flightsql,
+            self.args.bench,
+        ) {
+            (true, true, _, _) => Err(eyre!("No files or commands provided to execute")),
+            (false, true, true, false) => self.flightsql_execute_files(&self.args.files).await,
+            (false, true, true, true) => self.flightsql_benchmark_files(&self.args.files).await,
+            (false, true, false, false) => self.execute_files(&self.args.files).await,
+            (false, true, false, true) => self.benchmark_files(&self.args.files).await,
+
+            (true, false, true, false) => {
+                self.flightsql_execute_commands(&self.args.commands).await
+            }
+            (true, false, true, true) => {
+                self.flightsql_benchmark_commands(&self.args.commands).await
+            }
+            (true, false, false, false) => self.execute_commands(&self.args.commands).await,
+            (true, false, false, true) => self.benchmark_commands(&self.args.commands).await,
+            (false, false, false, true) => Err(eyre!("Cannot benchmark without a command or file")),
+            (false, false, _, _) => Err(eyre!(
+                "Cannot execute both files and commands at the same time"
+            )),
+        }
+    }
+
+    async fn execute_files(&self, files: &[PathBuf]) -> Result<()> {
+        info!("Executing files: {:?}", files);
         for file in files {
             self.exec_from_file(file).await?
         }
@@ -112,13 +116,29 @@ impl CliApp {
         Ok(())
     }
 
+    async fn benchmark_files(&self, files: &[PathBuf]) -> Result<()> {
+        info!("Benchmarking files: {:?}", files);
+        for file in files {
+            let query = std::fs::read_to_string(file)?;
+            self.benchmark_from_string(&query).await?;
+        }
+        Ok(())
+    }
+
     #[cfg(feature = "flightsql")]
     async fn flightsql_execute_files(&self, files: &[PathBuf]) -> color_eyre::Result<()> {
-        info!("Executing files: {:?}", files);
+        info!("Executing FlightSQL files: {:?}", files);
         for (i, file) in files.iter().enumerate() {
             let file = std::fs::read_to_string(file)?;
             self.exec_from_flightsql(file, i).await?;
         }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "flightsql")]
+    async fn flightsql_benchmark_files(&self, files: &[PathBuf]) -> Result<()> {
+        info!("Benchmarking FlightSQL files: {:?}", files);
 
         Ok(())
     }
@@ -153,17 +173,8 @@ impl CliApp {
         Ok(())
     }
 
-    async fn execute_commands(&self, commands: &[String], run_ddl: bool) -> color_eyre::Result<()> {
+    async fn execute_commands(&self, commands: &[String]) -> color_eyre::Result<()> {
         info!("Executing commands: {:?}", commands);
-        if run_ddl {
-            let ddl = self.app_execution.execution_ctx().load_ddl();
-            if let Some(ddl) = ddl {
-                info!("Executing DDL");
-                self.exec_from_string(&ddl).await?;
-            } else {
-                info!("No DDL to execute");
-            }
-        }
         for command in commands {
             self.exec_from_string(command).await?
         }
@@ -171,12 +182,27 @@ impl CliApp {
         Ok(())
     }
 
+    async fn benchmark_commands(&self, commands: &[String]) -> color_eyre::Result<()> {
+        info!("Benchmarking commands: {:?}", commands);
+        for command in commands {
+            self.benchmark_from_string(command).await?;
+        }
+        Ok(())
+    }
+
     #[cfg(feature = "flightsql")]
     async fn flightsql_execute_commands(&self, commands: &[String]) -> color_eyre::Result<()> {
-        info!("Executing commands: {:?}", commands);
+        info!("Executing FlightSQL commands: {:?}", commands);
         for (i, command) in commands.iter().enumerate() {
             self.exec_from_flightsql(command.to_string(), i).await?
         }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "flightsql")]
+    async fn flightsql_benchmark_commands(&self, commands: &[String]) -> color_eyre::Result<()> {
+        info!("Benchmark FlightSQL commands: {:?}", commands);
 
         Ok(())
     }
@@ -203,6 +229,16 @@ impl CliApp {
                 self.print_any_stream(stream).await;
             }
         }
+        Ok(())
+    }
+
+    async fn benchmark_from_string(&self, sql: &str) -> color_eyre::Result<()> {
+        let stats = self
+            .app_execution
+            .execution_ctx()
+            .benchmark_query(sql)
+            .await?;
+        println!("{}", stats);
         Ok(())
     }
 
