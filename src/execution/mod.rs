@@ -40,16 +40,92 @@ use {
     tokio::sync::Mutex, tonic::transport::Channel,
 };
 
-// Container for benchmark statistics for a single location execution
-//
-// Note: It would be nice if we could split out planning and optimization for both logical and
-// physical planning but its not obvious from the DataFusion APIs how to do that.
+/// Duration summary statistics
 #[derive(Debug)]
-pub struct LocalBenchmarkStats {
-    logical_planning_duration: Duration,
-    physical_planning_duration: Duration,
-    execution_duration: Duration,
-    total_duration: Duration,
+pub struct DurationsSummary {
+    pub min: Duration,
+    pub max: Duration,
+    pub mean: Duration,
+    pub median: Duration,
+}
+
+impl std::fmt::Display for DurationsSummary {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Min: {:?}", self.min)?;
+        writeln!(f, "Max: {:?}", self.max)?;
+        writeln!(f, "Mean: {:?}", self.mean)?;
+        writeln!(f, "Median: {:?}", self.median)
+    }
+}
+
+/// Contains stats for all runs of a benchmarked query and provides methods for aggregating
+#[derive(Debug, Default)]
+pub struct BenchmarkStats {
+    runs: usize,
+    logical_planning_durations: Vec<Duration>,
+    physical_planning_durations: Vec<Duration>,
+    execution_durations: Vec<Duration>,
+    total_durations: Vec<Duration>,
+}
+
+impl BenchmarkStats {
+    fn new(
+        logical_planning_durations: Vec<Duration>,
+        physical_planning_durations: Vec<Duration>,
+        execution_durations: Vec<Duration>,
+        total_durations: Vec<Duration>,
+    ) -> Self {
+        let runs = logical_planning_durations.len();
+        Self {
+            runs,
+            logical_planning_durations,
+            physical_planning_durations,
+            execution_durations,
+            total_durations,
+        }
+    }
+
+    fn summarize(durations: &[Duration]) -> DurationsSummary {
+        let mut sorted = durations.to_vec();
+        sorted.sort();
+        let len = sorted.len();
+        let min = *sorted.first().unwrap();
+        let max = *sorted.last().unwrap();
+        let mean = sorted.iter().sum::<Duration>() / len as u32;
+        let median = sorted[len / 2];
+        DurationsSummary {
+            min,
+            max,
+            mean,
+            median,
+        }
+    }
+}
+
+impl std::fmt::Display for BenchmarkStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f)?;
+        writeln!(f, "----------------------------")?;
+        writeln!(f, "Benchmark Stats ({} runs)", self.runs)?;
+        writeln!(f, "----------------------------")?;
+
+        let logical_planning_summary = BenchmarkStats::summarize(&self.logical_planning_durations);
+        writeln!(f, "Logical Planning")?;
+        writeln!(f, "{}", logical_planning_summary)?;
+
+        let physical_planning_summary =
+            BenchmarkStats::summarize(&self.physical_planning_durations);
+        writeln!(f, "Physical Planning")?;
+        writeln!(f, "{}", physical_planning_summary)?;
+
+        let execution_summary = BenchmarkStats::summarize(&self.execution_durations);
+        writeln!(f, "Execution")?;
+        writeln!(f, "{}", execution_summary)?;
+
+        let total_summary = BenchmarkStats::summarize(&self.total_durations);
+        writeln!(f, "Total")?;
+        writeln!(f, "{}", total_summary)
+    }
 }
 
 /// Provides all core execution functionality for execution queries from either a local
@@ -291,10 +367,13 @@ impl ExecutionContext {
     }
 
     /// Benchmark the provided query.  Currently, on a single statement can be benchmarked
-    pub async fn benchmark_query(&self, query: &str) -> Result<Vec<LocalBenchmarkStats>> {
+    pub async fn benchmark_query(&self, query: &str) -> Result<BenchmarkStats> {
         if let Some(iterations) = self.config().benchmark_iterations {
             info!("Benchmarking query with {} iterations", iterations);
-            let mut benchmark_stats: Vec<LocalBenchmarkStats> = Vec::with_capacity(iterations);
+            let mut logical_planning_durations = Vec::with_capacity(iterations);
+            let mut physical_planning_durations = Vec::with_capacity(iterations);
+            let mut execution_durations = Vec::with_capacity(iterations);
+            let mut total_durations = Vec::with_capacity(iterations);
             let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
             let statements = DFParser::parse_sql_with_dialect(query, &dialect)?;
             if statements.len() == 1 {
@@ -321,22 +400,24 @@ impl ExecutionContext {
                     while stream.next().await.is_some() {}
                     let execution_duration = execution_start.elapsed();
                     let total_duration = start.elapsed();
-                    let stats = LocalBenchmarkStats {
-                        logical_planning_duration,
-                        physical_planning_duration,
-                        execution_duration,
-                        total_duration,
-                    };
-                    benchmark_stats.push(stats);
+                    logical_planning_durations.push(logical_planning_duration);
+                    physical_planning_durations.push(physical_planning_duration);
+                    execution_durations.push(execution_duration);
+                    total_durations.push(total_duration);
                 }
             } else {
                 return Err(eyre::eyre!("Only a single statement can be benchmarked"));
             }
 
-            Ok(benchmark_stats)
+            Ok(BenchmarkStats::new(
+                logical_planning_durations,
+                physical_planning_durations,
+                execution_durations,
+                total_durations,
+            ))
         } else {
             info!("No benchmark iterations configured");
-            Ok(Vec::new())
+            Ok(BenchmarkStats::default())
         }
     }
 }

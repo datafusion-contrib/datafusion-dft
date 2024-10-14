@@ -178,11 +178,6 @@ impl CliApp {
         Ok(())
     }
 
-    async fn benchmark_command(&self, command: &str) -> Result<()> {
-        info!("Benchmarking command: {:?}", command);
-        Ok(())
-    }
-
     async fn benchmark_commands(&self, commands: &[String]) -> color_eyre::Result<()> {
         info!("Benchmarking commands: {:?}", commands);
         for command in commands {
@@ -239,7 +234,7 @@ impl CliApp {
             .execution_ctx()
             .benchmark_query(sql)
             .await?;
-        println!("Stats: {:?}", stats);
+        println!("{}", stats);
         Ok(())
     }
 
