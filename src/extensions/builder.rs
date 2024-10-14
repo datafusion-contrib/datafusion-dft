@@ -73,16 +73,22 @@ impl Default for DftSessionStateBuilder {
 impl DftSessionStateBuilder {
     /// Create a new builder
     pub fn new() -> Self {
-        let session_config = SessionConfig::default()
-            // TODO why is batch size 1?
-            .with_batch_size(100)
-            .with_information_schema(true);
+        let session_config = SessionConfig::default().with_information_schema(true);
+        // TODO why is batch size 1?
+        // .with_batch_size(100)
+        // .with_information_schema(true);
 
         Self {
             session_config,
             table_factories: None,
             runtime_env: None,
         }
+    }
+
+    /// Set the `batch_size` on the [`SessionConfig`]
+    pub fn with_batch_size(mut self, batch_size: usize) -> Self {
+        self.session_config = self.session_config.with_batch_size(batch_size);
+        self
     }
 
     /// Add a table factory to the list of factories on this builder

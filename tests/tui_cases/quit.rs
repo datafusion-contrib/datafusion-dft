@@ -17,7 +17,7 @@
 
 //! Tests for the TUI (e.g. user application with keyboard commands)
 
-use dft::execution::{AppExecution, ExecutionContext};
+use dft::execution::{AppExecution, AppType, ExecutionContext};
 use dft::tui::state::initialize;
 use dft::tui::{App, AppEvent};
 use ratatui::crossterm::event;
@@ -104,7 +104,7 @@ impl<'app> TestApp<'app> {
     fn new() -> Self {
         let config_path = tempdir().unwrap();
         let state = initialize(config_path.path().to_path_buf());
-        let execution = ExecutionContext::try_new(&state.config.execution).unwrap();
+        let execution = ExecutionContext::try_new(&state.config.execution, AppType::Tui).unwrap();
         let app_execution = AppExecution::new(execution);
         let app = App::new(state, app_execution);
         Self { config_path, app }

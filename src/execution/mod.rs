@@ -197,6 +197,12 @@ impl AppExecution {
     }
 }
 
+pub enum AppType {
+    Cli,
+    Tui,
+    FlightSQLServer,
+}
+
 /// Structure for executing queries either locally
 ///
 /// This context includes both:
@@ -225,8 +231,19 @@ impl std::fmt::Debug for ExecutionContext {
 
 impl ExecutionContext {
     /// Construct a new `ExecutionContext` with the specified configuration
-    pub fn try_new(config: &ExecutionConfig) -> Result<Self> {
+    pub fn try_new(config: &ExecutionConfig, app_type: AppType) -> Result<Self> {
         let mut builder = DftSessionStateBuilder::new();
+        match app_type {
+            AppType::Cli => {
+                builder = builder.with_batch_size(config.cli_batch_size);
+            }
+            AppType::Tui => {
+                builder = builder.with_batch_size(config.tui_batch_size);
+            }
+            AppType::FlightSQLServer => {
+                builder = builder.with_batch_size(config.flightsql_server_batch_size);
+            }
+        }
         let extensions = enabled_extensions();
         for extension in &extensions {
             builder = extension.register(config, builder)?;
