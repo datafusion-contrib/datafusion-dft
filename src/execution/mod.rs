@@ -383,55 +383,51 @@ impl ExecutionContext {
 
     /// Benchmark the provided query.  Currently, on a single statement can be benchmarked
     pub async fn benchmark_query(&self, query: &str) -> Result<BenchmarkStats> {
-        if let Some(iterations) = self.config().benchmark_iterations {
-            info!("Benchmarking query with {} iterations", iterations);
-            let mut logical_planning_durations = Vec::with_capacity(iterations);
-            let mut physical_planning_durations = Vec::with_capacity(iterations);
-            let mut execution_durations = Vec::with_capacity(iterations);
-            let mut total_durations = Vec::with_capacity(iterations);
-            let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
-            let statements = DFParser::parse_sql_with_dialect(query, &dialect)?;
-            if statements.len() == 1 {
-                for _ in 0..iterations {
-                    let statement = statements[0].clone();
-                    let start = std::time::Instant::now();
-                    let logical_plan = self
-                        .session_ctx()
-                        .state()
-                        .statement_to_plan(statement)
-                        .await?;
-                    let logical_planning_duration = start.elapsed();
-                    let physical_plan = self
-                        .session_ctx()
-                        .state()
-                        .create_physical_plan(&logical_plan)
-                        .await?;
-                    let physical_planning_duration = start.elapsed();
-                    let task_ctx = self.session_ctx().task_ctx();
-                    let mut stream = execute_stream(physical_plan, task_ctx)?;
-                    while stream.next().await.is_some() {}
-                    let execution_duration = start.elapsed();
-                    let total_duration = start.elapsed();
-                    logical_planning_durations.push(logical_planning_duration);
-                    physical_planning_durations
-                        .push(physical_planning_duration - logical_planning_duration);
-                    execution_durations.push(execution_duration - physical_planning_duration);
-                    total_durations.push(total_duration);
-                }
-            } else {
-                return Err(eyre::eyre!("Only a single statement can be benchmarked"));
+        let iterations = self.config.benchmark_iterations;
+        info!("Benchmarking query with {} iterations", iterations);
+        let mut logical_planning_durations = Vec::with_capacity(iterations);
+        let mut physical_planning_durations = Vec::with_capacity(iterations);
+        let mut execution_durations = Vec::with_capacity(iterations);
+        let mut total_durations = Vec::with_capacity(iterations);
+        let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
+        let statements = DFParser::parse_sql_with_dialect(query, &dialect)?;
+        if statements.len() == 1 {
+            for _ in 0..iterations {
+                let statement = statements[0].clone();
+                let start = std::time::Instant::now();
+                let logical_plan = self
+                    .session_ctx()
+                    .state()
+                    .statement_to_plan(statement)
+                    .await?;
+                let logical_planning_duration = start.elapsed();
+                let physical_plan = self
+                    .session_ctx()
+                    .state()
+                    .create_physical_plan(&logical_plan)
+                    .await?;
+                let physical_planning_duration = start.elapsed();
+                let task_ctx = self.session_ctx().task_ctx();
+                let mut stream = execute_stream(physical_plan, task_ctx)?;
+                while stream.next().await.is_some() {}
+                let execution_duration = start.elapsed();
+                let total_duration = start.elapsed();
+                logical_planning_durations.push(logical_planning_duration);
+                physical_planning_durations
+                    .push(physical_planning_duration - logical_planning_duration);
+                execution_durations.push(execution_duration - physical_planning_duration);
+                total_durations.push(total_duration);
             }
-
-            Ok(BenchmarkStats::new(
-                query.to_string(),
-                logical_planning_durations,
-                physical_planning_durations,
-                execution_durations,
-                total_durations,
-            ))
         } else {
-            info!("No benchmark iterations configured");
-            Ok(BenchmarkStats::default())
+            return Err(eyre::eyre!("Only a single statement can be benchmarked"));
         }
+
+        Ok(BenchmarkStats::new(
+            query.to_string(),
+            logical_planning_durations,
+            physical_planning_durations,
+            execution_durations,
+            total_durations,
+        ))
     }
 }
