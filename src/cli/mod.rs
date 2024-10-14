@@ -118,6 +118,10 @@ impl CliApp {
 
     async fn benchmark_files(&self, files: &[PathBuf]) -> Result<()> {
         info!("Benchmarking files: {:?}", files);
+        for file in files {
+            let query = std::fs::read_to_string(file)?;
+            self.benchmark_from_string(&query).await?;
+        }
         Ok(())
     }
 

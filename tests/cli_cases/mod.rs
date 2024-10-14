@@ -16,6 +16,7 @@
 // under the License.
 
 mod basic;
+mod bench;
 mod config;
 
 use assert_cmd::Command;
