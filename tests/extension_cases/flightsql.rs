@@ -205,16 +205,22 @@ pub async fn test_time_files() {
     fixture.shutdown_and_wait().await;
 }
 
-#[test]
-fn test_bench_command() {
-    let assert = Command::cargo_bin("dft")
-        .unwrap()
-        .arg("-c")
-        .arg("SELECT 1")
-        .arg("--bench")
-        .arg("--flightsql")
-        .assert()
-        .success();
+#[tokio::test]
+pub async fn test_bench_command() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("--bench")
+            .arg("--flightsql")
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
 
     let expected = r##"
 ----------------------------
@@ -223,20 +229,26 @@ Benchmark Stats (10 runs)
 SELECT 1
 ----------------------------"##;
     assert.stdout(contains_str(expected));
+    fixture.shutdown_and_wait().await;
 }
 
-#[test]
-fn test_bench_files() {
+#[tokio::test]
+pub async fn test_bench_files() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
     let file = sql_in_file(r#"SELECT 1 + 1;"#);
-
-    let assert = Command::cargo_bin("dft")
-        .unwrap()
-        .arg("-f")
-        .arg(file.path())
-        .arg("--bench")
-        .arg("--flightsql")
-        .assert()
-        .success();
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-f")
+            .arg(file.path())
+            .arg("--bench")
+            .arg("--flightsql")
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
 
     let expected_err = r##"
 ----------------------------
@@ -245,4 +257,5 @@ Benchmark Stats (10 runs)
 SELECT 1 + 1;
 ----------------------------"##;
     assert.code(0).stdout(contains_str(expected_err));
+    fixture.shutdown_and_wait().await;
 }
