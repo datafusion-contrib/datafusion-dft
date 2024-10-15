@@ -20,8 +20,8 @@ use color_eyre::Result;
 use dft::args::DftArgs;
 use dft::cli::CliApp;
 #[cfg(feature = "flightsql")]
-use dft::execution::FlightSQLContext;
-use dft::execution::{AppExecution, AppType, ExecutionContext};
+use dft::execution::flightsql::FlightSQLContext;
+use dft::execution::{local::ExecutionContext, AppExecution, AppType};
 use dft::telemetry;
 use dft::tui::{state, App};
 #[cfg(feature = "experimental-flightsql-server")]
@@ -40,7 +40,7 @@ async fn main() -> Result<()> {
         env_logger::init();
         let state = state::initialize(cli.config_path());
         let execution_ctx = ExecutionContext::try_new(&state.config.execution, AppType::Cli)?;
-        let app_execution = AppExecution::new(execution_ctx);
+        let mut app_execution = AppExecution::new(execution_ctx);
         #[cfg(feature = "flightsql")]
         {
             if cli.flightsql {

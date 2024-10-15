@@ -24,7 +24,7 @@ use log::{error, info, trace};
 use ratatui::crossterm::event::{self, KeyCode, KeyEvent};
 use tui_logger::TuiWidgetEvent;
 
-use crate::execution::FlightSQLContext;
+// use crate::execution::flightsql::FlightSQLContext;
 #[cfg(feature = "flightsql")]
 use crate::tui::state::tabs::flightsql::FlightSQLConnectionStatus;
 use crate::tui::state::tabs::history::Context;

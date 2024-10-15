@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use crate::execution::{AppExecution, ExecutionContext};
+use crate::execution::{local::ExecutionContext, AppExecution};
 use crate::test_utils::trailers_layer::TrailersLayer;
 use arrow_flight::encode::FlightDataEncoderBuilder;
 use arrow_flight::error::FlightError;

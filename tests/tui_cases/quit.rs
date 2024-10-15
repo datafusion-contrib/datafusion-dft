@@ -17,7 +17,7 @@
 
 //! Tests for the TUI (e.g. user application with keyboard commands)
 
-use dft::execution::{AppExecution, AppType, ExecutionContext};
+use dft::execution::{local::ExecutionContext, AppExecution, AppType};
 use dft::tui::state::initialize;
 use dft::tui::{App, AppEvent};
 use ratatui::crossterm::event;

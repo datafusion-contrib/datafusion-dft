@@ -24,7 +24,7 @@ mod quit;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::common::Result;
 use dft::{
-    execution::{AppExecution, AppType, ExecutionContext},
+    execution::{local::ExecutionContext, AppExecution, AppType},
     tui::{state::initialize, App, AppEvent},
 };
 use tempfile::{tempdir, TempDir};
