@@ -198,7 +198,7 @@ impl CliApp {
     async fn flightsql_benchmark_commands(&self, commands: &[String]) -> color_eyre::Result<()> {
         info!("Benchmark FlightSQL commands: {:?}", commands);
         for command in commands {
-            self.flightsql_benchmark_from_string(command).await;
+            self.flightsql_benchmark_from_string(command).await?;
         }
 
         Ok(())
@@ -240,11 +240,12 @@ impl CliApp {
     }
 
     async fn flightsql_benchmark_from_string(&self, sql: &str) -> Result<()> {
-        // let stats = self
-        //     .app_execution
-        //     .flightsql_ctx()
-        //     .benchmark_query(sql)
-        //     .await?;
+        let stats = self
+            .app_execution
+            .flightsql_ctx()
+            .benchmark_query(sql)
+            .await?;
+        println!("{}", stats);
         Ok(())
     }
 
