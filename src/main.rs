@@ -19,7 +19,9 @@ use clap::Parser;
 use color_eyre::Result;
 use dft::args::DftArgs;
 use dft::cli::CliApp;
-use dft::execution::{AppExecution, AppType, ExecutionContext};
+#[cfg(feature = "flightsql")]
+use dft::execution::flightsql::FlightSQLContext;
+use dft::execution::{local::ExecutionContext, AppExecution, AppType};
 use dft::telemetry;
 use dft::tui::{state, App};
 #[cfg(feature = "experimental-flightsql-server")]
@@ -28,6 +30,7 @@ use {
     log::info,
 };
 
+#[allow(unused_mut)]
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = DftArgs::parse();
@@ -38,13 +41,13 @@ async fn main() -> Result<()> {
         env_logger::init();
         let state = state::initialize(cli.config_path());
         let execution_ctx = ExecutionContext::try_new(&state.config.execution, AppType::Cli)?;
-        let app_execution = AppExecution::new(execution_ctx);
+        let mut app_execution = AppExecution::new(execution_ctx);
         #[cfg(feature = "flightsql")]
         {
             if cli.flightsql {
-                app_execution
-                    .create_flightsql_client(state.config.flightsql)
-                    .await?;
+                let flightsql_ctx = FlightSQLContext::new(state.config.flightsql.clone());
+                flightsql_ctx.create_client().await?;
+                app_execution.with_flightsql_ctx(flightsql_ctx);
             }
         }
         let app = CliApp::new(app_execution, cli);

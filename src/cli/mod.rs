@@ -133,6 +133,10 @@ impl CliApp {
     #[cfg(feature = "flightsql")]
     async fn flightsql_benchmark_files(&self, files: &[PathBuf]) -> Result<()> {
         info!("Benchmarking FlightSQL files: {:?}", files);
+        for file in files {
+            let query = std::fs::read_to_string(file)?;
+            self.flightsql_benchmark_from_string(&query).await?;
+        }
 
         Ok(())
     }
@@ -197,11 +201,14 @@ impl CliApp {
     #[cfg(feature = "flightsql")]
     async fn flightsql_benchmark_commands(&self, commands: &[String]) -> color_eyre::Result<()> {
         info!("Benchmark FlightSQL commands: {:?}", commands);
+        for command in commands {
+            self.flightsql_benchmark_from_string(command).await?;
+        }
 
         Ok(())
     }
 
-    async fn exec_from_string(&self, sql: &str) -> color_eyre::Result<()> {
+    async fn exec_from_string(&self, sql: &str) -> Result<()> {
         let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
         let statements = DFParser::parse_sql_with_dialect(sql, &dialect)?;
         let start = if self.args.time {
@@ -226,10 +233,21 @@ impl CliApp {
         Ok(())
     }
 
-    async fn benchmark_from_string(&self, sql: &str) -> color_eyre::Result<()> {
+    async fn benchmark_from_string(&self, sql: &str) -> Result<()> {
         let stats = self
             .app_execution
             .execution_ctx()
+            .benchmark_query(sql)
+            .await?;
+        println!("{}", stats);
+        Ok(())
+    }
+
+    #[cfg(feature = "flightsql")]
+    async fn flightsql_benchmark_from_string(&self, sql: &str) -> Result<()> {
+        let stats = self
+            .app_execution
+            .flightsql_ctx()
             .benchmark_query(sql)
             .await?;
         println!("{}", stats);

@@ -35,7 +35,7 @@ use tokio_stream::StreamMap;
 
 #[cfg(feature = "flightsql")]
 use {
-    crate::config::FlightSQLConfig, arrow_flight::decode::FlightRecordBatchStream,
+    arrow_flight::decode::FlightRecordBatchStream,
     arrow_flight::sql::client::FlightSqlServiceClient, arrow_flight::Ticket,
     tonic::transport::Channel, tonic::IntoRequest,
 };
@@ -339,8 +339,8 @@ impl TuiExecution {
     }
 
     #[cfg(feature = "flightsql")]
-    pub async fn create_flightsql_client(&self, config: FlightSQLConfig) -> Result<()> {
-        self.inner.create_flightsql_client(config).await
+    pub async fn create_flightsql_client(&self) -> Result<()> {
+        self.inner.flightsql_ctx().create_client().await
     }
 
     #[cfg(feature = "flightsql")]
