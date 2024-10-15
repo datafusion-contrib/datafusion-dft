@@ -27,6 +27,8 @@ mod builder;
 mod deltalake;
 #[cfg(feature = "functions-json")]
 mod functions_json;
+#[cfg(feature = "hudi")]
+mod hudi;
 #[cfg(feature = "s3")]
 mod s3;
 
@@ -55,6 +57,8 @@ pub fn enabled_extensions() -> Vec<Box<dyn Extension>> {
         Box::new(s3::AwsS3Extension::new()),
         #[cfg(feature = "deltalake")]
         Box::new(deltalake::DeltaLakeExtension::new()),
+        #[cfg(feature = "hudi")]
+        Box::new(hudi::HudiExtension::new()),
         #[cfg(feature = "functions-json")]
         Box::new(functions_json::JsonFunctionsExtension::new()),
     ]
