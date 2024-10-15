@@ -133,6 +133,10 @@ impl CliApp {
     #[cfg(feature = "flightsql")]
     async fn flightsql_benchmark_files(&self, files: &[PathBuf]) -> Result<()> {
         info!("Benchmarking FlightSQL files: {:?}", files);
+        for file in files {
+            let query = std::fs::read_to_string(file)?;
+            self.flightsql_benchmark_from_string(&query).await?;
+        }
 
         Ok(())
     }
