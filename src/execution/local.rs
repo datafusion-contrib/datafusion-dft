@@ -32,7 +32,7 @@ use datafusion::prelude::*;
 use datafusion::sql::parser::{DFParser, Statement};
 use tokio_stream::StreamExt;
 
-use super::benchmarks::LocalBenchmarkStats;
+use super::local_benchmarks::LocalBenchmarkStats;
 use super::AppType;
 
 /// Structure for executing queries locally

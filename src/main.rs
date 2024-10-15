@@ -30,6 +30,7 @@ use {
     log::info,
 };
 
+#[allow(unused_mut)]
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = DftArgs::parse();

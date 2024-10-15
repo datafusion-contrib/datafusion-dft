@@ -239,6 +239,7 @@ impl CliApp {
         Ok(())
     }
 
+    #[cfg(feature = "flightsql")]
     async fn flightsql_benchmark_from_string(&self, sql: &str) -> Result<()> {
         let stats = self
             .app_execution

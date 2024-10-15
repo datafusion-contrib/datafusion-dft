@@ -15,12 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-//! [`ExecutionContext`]: DataFusion based execution context for running SQL queries
-
-mod benchmarks;
 #[cfg(feature = "flightsql")]
 pub mod flightsql;
+#[cfg(feature = "flightsql")]
+pub mod flightsql_benchmarks;
 pub mod local;
+mod local_benchmarks;
 mod stats;
 
 pub use stats::{collect_plan_stats, ExecutionStats};
