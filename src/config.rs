@@ -166,6 +166,12 @@ pub struct ExecutionConfig {
     pub ddl_path: Option<PathBuf>,
     #[serde(default = "default_benchmark_iterations")]
     pub benchmark_iterations: usize,
+    #[serde(default = "default_cli_batch_size")]
+    pub cli_batch_size: usize,
+    #[serde(default = "default_tui_batch_size")]
+    pub tui_batch_size: usize,
+    #[serde(default = "default_flightsql_server_batch_size")]
+    pub flightsql_server_batch_size: usize,
 }
 
 fn default_ddl_path() -> Option<PathBuf> {
@@ -186,12 +192,27 @@ fn default_benchmark_iterations() -> usize {
     10
 }
 
+fn default_cli_batch_size() -> usize {
+    8092
+}
+
+fn default_tui_batch_size() -> usize {
+    100
+}
+
+fn default_flightsql_server_batch_size() -> usize {
+    8092
+}
+
 impl Default for ExecutionConfig {
     fn default() -> Self {
         Self {
             object_store: None,
             ddl_path: default_ddl_path(),
             benchmark_iterations: default_benchmark_iterations(),
+            cli_batch_size: default_cli_batch_size(),
+            tui_batch_size: default_tui_batch_size(),
+            flightsql_server_batch_size: default_flightsql_server_batch_size(),
         }
     }
 }

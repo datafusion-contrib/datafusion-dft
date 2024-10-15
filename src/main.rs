@@ -21,7 +21,7 @@ use dft::args::DftArgs;
 use dft::cli::CliApp;
 #[cfg(feature = "flightsql")]
 use dft::execution::FlightSQLContext;
-use dft::execution::{AppExecution, ExecutionContext};
+use dft::execution::{AppExecution, AppType, ExecutionContext};
 use dft::telemetry;
 use dft::tui::{state, App};
 #[cfg(feature = "experimental-flightsql-server")]
@@ -39,8 +39,8 @@ async fn main() -> Result<()> {
         // use env_logger to setup logging for CLI
         env_logger::init();
         let state = state::initialize(cli.config_path());
-        let execution_ctx = ExecutionContext::try_new(&state.config.execution)?;
-        let mut app_execution = AppExecution::new(execution_ctx);
+        let execution_ctx = ExecutionContext::try_new(&state.config.execution, AppType::Cli)?;
+        let app_execution = AppExecution::new(execution_ctx);
         #[cfg(feature = "flightsql")]
         {
             if cli.flightsql {
@@ -58,7 +58,8 @@ async fn main() -> Result<()> {
             env_logger::init();
             info!("Starting FlightSQL server on {}", DEFAULT_SERVER_ADDRESS);
             let state = state::initialize(cli.config_path());
-            let execution_ctx = ExecutionContext::try_new(&state.config.execution)?;
+            let execution_ctx =
+                ExecutionContext::try_new(&state.config.execution, AppType::FlightSQLServer)?;
             if cli.run_ddl {
                 execution_ctx.execute_ddl().await;
             }
@@ -78,8 +79,8 @@ async fn main() -> Result<()> {
         // use alternate logging for TUI
         telemetry::initialize_logs()?;
         let state = state::initialize(cli.config_path());
-        // let execution_ctx = ExecutionContext::try_new(&state.config.execution)?;
-        let app_execution = AppExecution::try_new_from_config(state.config.clone())?;
+        let execution_ctx = ExecutionContext::try_new(&state.config.execution, AppType::Tui)?;
+        let app_execution = AppExecution::new(execution_ctx);
         let app = App::new(state, app_execution);
         app.run_app().await?;
     }
