@@ -15,17 +15,29 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use url::Url;
+
 use crate::extension_cases::TestExecution;
 
 #[tokio::test]
 async fn test_hudi() {
     let test_exec = TestExecution::new();
 
-    test_exec.with_setup(
-        "CREATE EXTERNAL TABLE h STORED AS HUDI LOCATION './data/hudi/v6_simplekeygen_nonhivestyle';",
-    )
-    .await;
+    let cwd = std::env::current_dir().unwrap();
+    let path = Url::from_file_path(cwd.join("data/hudi/v6_simplekeygen_nonhivestyle")).unwrap();
 
-    let output = test_exec.run_and_format("SELECT * FROM h").await;
-    assert_eq!(output, vec![""]);
+    let test_exec = test_exec
+        .with_setup(&format!(
+            "CREATE EXTERNAL TABLE h STORED AS HUDI LOCATION '{}';",
+            path
+        ))
+        .await;
+
+    let output = test_exec
+        .run_and_format("SELECT id FROM h ORDER BY id")
+        .await;
+    assert_eq!(
+        output,
+        vec!["+----+", "| id |", "+----+", "| 1  |", "| 2  |", "| 3  |", "| 4  |", "+----+"]
+    );
 }

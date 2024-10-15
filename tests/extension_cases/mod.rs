@@ -76,8 +76,7 @@ impl TestExecution {
     }
 
     /// run the specified SQL query, returning the result as a Vec of [`RecordBatch`]
-    #[allow(dead_code)]
-    pub async fn run(&mut self, sql: &str) -> Result<Vec<RecordBatch>> {
+    pub async fn run(&self, sql: &str) -> Result<Vec<RecordBatch>> {
         debug!("Running query: {sql}");
         self.execution
             .execute_sql(sql)
@@ -89,7 +88,7 @@ impl TestExecution {
 
     /// Runs the specified SQL query, returning the result as a Vec<String>
     /// suitable for comparison with insta
-    pub async fn run_and_format(&mut self, sql: &str) -> Vec<String> {
+    pub async fn run_and_format(&self, sql: &str) -> Vec<String> {
         format_results(&self.run(sql).await.expect("Error running query"))
     }
 }

@@ -54,6 +54,7 @@ assert_cmd = "2.0.16"
 insta = { version = "1.40.0", features = ["yaml"] }
 predicates = "3.1.2"
 tempfile = "3.2.0"
+url = "2.5.2"
 
 # When addding a new feature, also add it to the features tested list in CI (`.github/workflows/rust.yml`)
 [features]
