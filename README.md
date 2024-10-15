@@ -100,7 +100,7 @@ Both of the commands above support the `--flightsql` parameter to run the SQL wi
 The CLI can also run your configured DDL prior to executing the query by adding the `--ddl` parameter.
 
 #### Benchmarking
-You can benchmark queries by adding the `--bench` parameter.  This will run the query a configurable number of times and output a breakdown of the queries execution time with summary statistics for each component of the query (logical planning, physical planning, execution time, and total time).  Currently only local queries can be benchmarked but benchmarking of FlightSQL queries is planned.
+You can benchmark queries by adding the `--bench` parameter.  This will run the query a configurable number of times and output a breakdown of the queries execution time with summary statistics for each component of the query (logical planning, physical planning, execution time, and total time).
 
 ## `dft` FlightSQL Server
 
