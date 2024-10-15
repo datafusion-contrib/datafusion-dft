@@ -26,7 +26,7 @@ use tonic::{transport::Channel, IntoRequest};
 
 use crate::config::FlightSQLConfig;
 
-use super::local_benchmarks::FlightSQLBenchmarkStats;
+use crate::execution::flightsql_benchmarks::FlightSQLBenchmarkStats;
 
 pub type FlightSQLClient = Mutex<Option<FlightSqlServiceClient<Channel>>>;
 

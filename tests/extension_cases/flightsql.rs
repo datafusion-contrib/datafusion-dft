@@ -204,3 +204,45 @@ pub async fn test_time_files() {
     assert.stdout(contains_str(expected));
     fixture.shutdown_and_wait().await;
 }
+
+#[test]
+fn test_bench_command() {
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT 1")
+        .arg("--bench")
+        .arg("--flightsql")
+        .assert()
+        .success();
+
+    let expected = r##"
+----------------------------
+Benchmark Stats (10 runs)
+----------------------------
+SELECT 1
+----------------------------"##;
+    assert.stdout(contains_str(expected));
+}
+
+#[test]
+fn test_bench_files() {
+    let file = sql_in_file(r#"SELECT 1 + 1;"#);
+
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-f")
+        .arg(file.path())
+        .arg("--bench")
+        .arg("--flightsql")
+        .assert()
+        .success();
+
+    let expected_err = r##"
+----------------------------
+Benchmark Stats (10 runs)
+----------------------------
+SELECT 1 + 1;
+----------------------------"##;
+    assert.code(0).stdout(contains_str(expected_err));
+}

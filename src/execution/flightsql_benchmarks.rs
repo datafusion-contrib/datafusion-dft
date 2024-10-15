@@ -62,7 +62,7 @@ impl FlightSQLBenchmarkStats {
             .map(|d| d.as_nanos())
             .sum::<u128>();
         let percent_of_total = (this_total as f64 / total_duration as f64) * 100.0;
-        LocalDurationsSummary {
+        DurationsSummary {
             min,
             max,
             mean,
