@@ -1,0 +1,19 @@
+[package]
+name = "datafusion-functions-parquet"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+arrow = { version = "52.2.0" }
+async-trait = "0.1.41"
+datafusion = { version = "41.0.0", features = [
+    "avro",
+    "crypto_expressions",
+    "datetime_expressions",
+    "encoding_expressions",
+    "parquet",
+    "regex_expressions",
+    "unicode_expressions",
+    "compression",
+] }
+parquet = { version = "52.2.0", default-features = false }

@@ -22,6 +22,7 @@ crossterm = { version = "0.28.1", features = ["event-stream"] }
 datafusion = "41.0.0"
 datafusion-common = "41.0.0"
 datafusion-functions-json = { version = "0.41.0", optional = true }
+datafusion-functions-parquet = { version = "0.1.0", path = "crates/datafusion-functions-parquet", optional = true }
 deltalake = { version = "0.19.0", features = ["datafusion"], optional = true }
 directories = "5.0.1"
 env_logger = "0.11.5"
@@ -56,11 +57,13 @@ tempfile = "3.2.0"
 
 # When addding a new feature, also add it to the features tested list in CI (`.github/workflows/rust.yml`)
 [features]
+default = ["functions-parquet"]
 deltalake = ["dep:deltalake"]
 flightsql = ["dep:arrow-flight", "dep:tonic"]
 experimental-flightsql-server = ["dep:arrow-flight", "dep:tonic"]
 s3 = ["object_store/aws", "url"]
 functions-json = ["dep:datafusion-functions-json"]
+functions-parquet = ["dep:datafusion-functions-parquet"]
 
 [[bin]]
 name = "dft"

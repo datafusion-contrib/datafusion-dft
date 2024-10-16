@@ -116,9 +116,21 @@ Currently, the only supported packaging is on [crates.io](https://crates.io/sear
 
 Once installed you can run `dft` to start the application.
 
-#### Optional Features (Rust Crate Features)
+#### Internal Optional Features (Workspace Features)
 
-`dft` has several optional (conditionally compiled features) integrations which are controlled by [Rust Crate Features]
+`dft` incubates several optional features in it's `crates` directory.  This provides us with the ability to quickly iterate on new features and test them in the main application while at the same time making it easy to export them to their own crates when they are ready.
+
+#### Parquet Functions (`--features=functions-parquet`)
+
+Includes functions from [datafusion-function-parquet] for querying Parquet files in DataFusion in `dft`.  For example:
+
+```sql
+SELECT * FROM parquet_metadata('my_parquet_file.parquet')
+```
+
+#### External Optional Features (Rust Crate Features)
+
+`dft` also has several external optional (conditionally compiled features) integrations which are controlled by [Rust Crate Features]
 
 To build with all features, you can run 
 

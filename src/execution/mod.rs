@@ -32,12 +32,6 @@ use crate::config::AppConfig;
 use color_eyre::eyre::Result;
 use datafusion::prelude::*;
 
-// #[cfg(feature = "flightsql")]
-// use {
-//     arrow_flight::sql::client::FlightSqlServiceClient, tokio::sync::Mutex,
-//     tonic::transport::Channel,
-// };
-
 pub enum AppType {
     Cli,
     Tui,
@@ -58,7 +52,6 @@ impl AppExecution {
             context,
             #[cfg(feature = "flightsql")]
             flightsql_context: FlightSQLContext::default(),
-            // flightsql_client: Mutex::new(None),
         }
     }
 
@@ -95,27 +88,4 @@ impl AppExecution {
     pub fn with_flightsql_ctx(&mut self, flightsql_ctx: FlightSQLContext) {
         self.flightsql_context = flightsql_ctx;
     }
-
-    // Create FlightSQL client from users FlightSQL config
-    // #[cfg(feature = "flightsql")]
-    // pub async fn create_flightsql_client(&self, config: FlightSQLConfig) -> Result<()> {
-    //     use color_eyre::eyre::eyre;
-    //     use log::info;
-    //
-    //     let url = Box::leak(config.connection_url.into_boxed_str());
-    //     info!("Connecting to FlightSQL host: {}", url);
-    //     let channel = Channel::from_static(url).connect().await;
-    //     match channel {
-    //         Ok(c) => {
-    //             let client = FlightSqlServiceClient::new(c);
-    //             let mut guard = self.flightsql_context.client().lock().await;
-    //             *guard = Some(client);
-    //             Ok(())
-    //         }
-    //         Err(e) => Err(eyre!(
-    //             "Error creating channel for FlightSQL client: {:?}",
-    //             e
-    //         )),
-    //     }
-    // }
 }
