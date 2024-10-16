@@ -120,7 +120,7 @@ Once installed you can run `dft` to start the application.
 
 `dft` incubates several optional features in it's `crates` directory.  This provides us with the ability to quickly iterate on new features and test them in the main application while at the same time making it easy to export them to their own crates when they are ready.
 
-#### Parquet Functions (`--features=functions-parquet`)
+##### Parquet Functions (`--features=functions-parquet`)
 
 Includes functions from [datafusion-function-parquet] for querying Parquet files in DataFusion in `dft`.  For example:
 
@@ -141,7 +141,7 @@ cargo install --path . --all-features
 [Rust Crate Features]: https://doc.rust-lang.org/cargo/reference/features.html
 
 
-#### S3 (`--features=s3`)
+##### S3 (`--features=s3`)
 
 Mutliple s3 `ObjectStore`s can be registered, following the below model in your configuration file.
 
@@ -169,7 +169,7 @@ CREATE EXTERNAL TABLE my_table STORED AS PARQUET LOCATION 's3://my_bucket/table'
 CREATE EXTERNAL TABLE other_table STORED AS PARQUET LOCATION 'ny1://other_bucket/table';
 ```
 
-#### FlightSQL (`--features=flightsql`)
+##### FlightSQL (`--features=flightsql`)
 
 A separate editor for connecting to a FlightSQL server is provided.
 
@@ -180,7 +180,7 @@ The default `connection_url` is `http://localhost:50051` but this can be configu
 connection_url = "http://myhost:myport"
 ```
 
-#### Deltalake (`--features=deltalake`)
+##### Deltalake (`--features=deltalake`)
 
 Register deltalake tables.  For example:
 
@@ -188,7 +188,7 @@ Register deltalake tables.  For example:
 CREATE EXTERNAL TABLE table_name STORED AS DELTATABLE LOCATION 's3://bucket/table'
 ```
 
-#### Json Functions (`--features=function-json`)
+##### Json Functions (`--features=function-json`)
 
 Adds functions from [datafusion-function-json] for querying JSON strings in DataFusion in `dft`.  For example:
 
