@@ -57,6 +57,7 @@ tempfile = "3.2.0"
 
 # When addding a new feature, also add it to the features tested list in CI (`.github/workflows/rust.yml`)
 [features]
+default = ["functions-parquet"]
 deltalake = ["dep:deltalake"]
 flightsql = ["dep:arrow-flight", "dep:tonic"]
 experimental-flightsql-server = ["dep:arrow-flight", "dep:tonic"]
