@@ -36,6 +36,8 @@ use parquet::file::statistics::Statistics;
 use std::fs::File;
 use std::sync::Arc;
 
+// Copied from https://github.com/apache/datafusion/blob/main/datafusion-cli/src/functions.rs
+
 /// PARQUET_META table function
 struct ParquetMetadataTable {
     schema: SchemaRef,
