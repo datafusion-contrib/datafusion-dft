@@ -90,6 +90,12 @@ impl ExecutionContext {
             extension.register_on_ctx(config, &mut session_ctx)?;
         }
 
+        // Register Parquet Metadata Function
+        session_ctx.register_udtf(
+            "parquet_metadata",
+            Arc::new(datafusion_functions_parquet::ParquetMetadataFunc {}),
+        );
+
         Ok(Self {
             config: config.clone(),
             session_ctx,
