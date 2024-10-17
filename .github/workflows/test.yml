@@ -19,74 +19,56 @@ name: Tests
 on: [push, pull_request]
 
 jobs:
-  test:
-    name: Core
+  setup:
+    name: Setup Rust
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [amd64]
-        rust: [stable]
+    outputs:
+      cargo-cache-path: ${{ steps.cache-cargo.outputs.cache-hit }}
+      rust-cache-path: ${{ steps.cache-rust.outputs.cache-hit }}
     steps:
       - uses: actions/checkout@v2
         with:
           submodules: true
+
       - name: Cache Cargo
+        id: cache-cargo
         uses: actions/cache@v2
         with:
           path: /home/runner/.cargo
           key: cargo-dft-cache-
+
       - name: Cache Rust dependencies
+        id: cache-rust
         uses: actions/cache@v2
         with:
           path: /home/runner/target
           key: target-dft-cache-
+
       - name: Setup Rust toolchain
         run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
-      # No tests yet
+          rustup toolchain install stable
+          rustup default stable
+
+  test-core:
+    name: Core
+    runs-on: ubuntu-latest
+    needs: setup
+    steps:
       - name: Run tests (ex-FlightSQL)
-        run: |
-          # All features except FlightSQL which requires being run on a single thread for determinism
-          cargo test --features=deltalake
+        run: cargo test --features=deltalake
+
   test-flightsql:
     name: FlightSQL
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [amd64]
-        rust: [stable]
+    needs: setup
     steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: true
-      - name: Cache Cargo
-        uses: actions/cache@v2
-        with:
-          path: /home/runner/.cargo
-          key: cargo-dft-cache-
-      - name: Cache Rust dependencies
-        uses: actions/cache@v2
-        with:
-          path: /home/runner/target
-          key: target-dft-cache-
-      - name: Setup Rust toolchain
-        run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
       - name: Run FlightSQL tests
         run: |
-          # Single thread needed because we spin up a server that listens on port and we need each
-          # test to only be run against the server spun up in that test.  With parallelism tests 
-          # can connec to server in different test which breaks determinism.
           cargo test --features=flightsql extension_cases::flightsql -- --test-threads=1
+
   test-s3:
     name: S3
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v3
 
@@ -102,62 +84,23 @@ jobs:
           awslocal s3 mb s3://test
           awslocal s3 mv data/aggregate_test_100.csv s3://test/
           echo "Test Execution complete!"
+
       - name: Run S3 tests
-        run: |
-          cargo test --features=s3 extension_cases::s3
+        run: cargo test --features=s3 extension_cases::s3
+
   test-functions-json:
     name: Functions-JSON
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [amd64]
-        rust: [stable]
+    needs: setup
     steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: true
-      - name: Cache Cargo
-        uses: actions/cache@v2
-        with:
-          path: /home/runner/.cargo
-          key: cargo-dft-cache-
-      - name: Cache Rust dependencies
-        uses: actions/cache@v2
-        with:
-          path: /home/runner/target
-          key: target-dft-cache-
-      - name: Setup Rust toolchain
-        run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
-      - name: Run FlightSQL tests
-        run: |
-          cargo test --features=functions-json extension_cases::functions_json
+      - name: Run Functions-JSON tests
+        run: cargo test --features=functions-json extension_cases::functions_json
+
   test-deltalake:
     name: Deltalake
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [amd64]
-        rust: [stable]
+    needs: setup
     steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: true
-      - name: Cache Cargo
-        uses: actions/cache@v2
-        with:
-          path: /home/runner/.cargo
-          key: cargo-dft-cache-
-      - name: Cache Rust dependencies
-        uses: actions/cache@v2
-        with:
-          path: /home/runner/target
-          key: target-dft-cache-
-      - name: Setup Rust toolchain
-        run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
       - name: Run Deltalake tests
-        run: |
-          cargo test --features=deltalake extension_cases::deltalake
+        run: cargo test --features=deltalake extension_cases::deltalake
+
