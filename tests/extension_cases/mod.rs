@@ -17,6 +17,8 @@
 
 //! Tests for extensions (stored in the `extension_cases` directory)
 
+#[cfg(feature = "deltalake")]
+mod deltalake;
 #[cfg(feature = "flightsql")]
 mod flightsql;
 #[cfg(feature = "functions-json")]
