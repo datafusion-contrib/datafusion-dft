@@ -66,6 +66,31 @@ pub async fn test_execute() {
 }
 
 #[tokio::test]
+pub async fn test_invalid_sql_command() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELEC 1;")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .failure()
+    })
+    .await
+    .unwrap();
+
+    // I think its implementation specific how they decide to return errors but I believe they will
+    // all be in the form of an IPC error
+    let expected = r##"Error: Ipc error"##;
+    assert.stderr(contains_str(expected));
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
 pub async fn test_execute_multiple_commands() {
     let test_server = TestFlightSqlServiceImpl::new();
     let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
@@ -124,6 +149,30 @@ pub async fn test_command_in_file() {
 +---------------------+
     "##;
     assert.stdout(contains_str(expected));
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_invalid_sql_command_in_file() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+    let file = sql_in_file("SELEC 1");
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("--flightsql")
+            .arg("-f")
+            .arg(file.path())
+            .assert()
+            .failure()
+    })
+    .await
+    .unwrap();
+
+    // I think its implementation specific how they decide to return errors but I believe they will
+    // all be in the form of an IPC error
+    let expected = r##"Error: Ipc error"##;
+    assert.stderr(contains_str(expected));
     fixture.shutdown_and_wait().await;
 }
 
