@@ -345,3 +345,19 @@ SELECT 1 + 1;
     let expected_err = "executed in";
     assert.code(0).stdout(contains_str(expected_err));
 }
+
+#[test]
+fn test_write_file() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let file = temp_dir.path().join("test_write_file.csv");
+
+    let sql = format!("COPY (SELECT 1 + 1) TO '{}'", file.to_string_lossy());
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(sql)
+        .assert()
+        .success();
+
+    assert!(file.exists());
+}
