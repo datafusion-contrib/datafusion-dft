@@ -84,35 +84,44 @@ impl FlightSqlService for TestFlightSqlServiceImpl {
     ) -> Result<Response<FlightInfo>, Status> {
         let CommandStatementQuery { query, .. } = query;
         let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
-        let statements = DFParser::parse_sql_with_dialect(&query, &dialect).unwrap();
-        // For testing purposes, we only support a single statement
-        assert_eq!(statements.len(), 1, "Only single statements are supported");
-        let statement = statements[0].clone();
-        let logical_plan = self
-            .context
-            .state()
-            .statement_to_plan(statement)
-            .await
-            .unwrap();
-        let schema = logical_plan.schema();
+        match DFParser::parse_sql_with_dialect(&query, &dialect) {
+            Ok(statements) => {
+                // For testing purposes, we only support a single statement
+                assert_eq!(statements.len(), 1, "Only single statements are supported");
+                let statement = statements[0].clone();
+                match self.context.state().statement_to_plan(statement).await {
+                    Ok(logical_plan) => {
+                        let schema = logical_plan.schema();
 
-        let uuid = uuid::Uuid::new_v4();
-        let ticket = TicketStatementQuery {
-            statement_handle: uuid.to_string().into(),
-        };
-        let mut bytes: Vec<u8> = Vec::new();
-        ticket.encode(&mut bytes).unwrap();
+                        let uuid = uuid::Uuid::new_v4();
+                        let ticket = TicketStatementQuery {
+                            statement_handle: uuid.to_string().into(),
+                        };
+                        let mut bytes: Vec<u8> = Vec::new();
+                        ticket.encode(&mut bytes).unwrap();
 
-        let info = FlightInfo::new()
-            .try_with_schema(schema.as_arrow())
-            .unwrap()
-            .with_endpoint(FlightEndpoint::new().with_ticket(Ticket::new(bytes)))
-            .with_descriptor(FlightDescriptor::new_cmd(query));
+                        let info = FlightInfo::new()
+                            .try_with_schema(schema.as_arrow())
+                            .unwrap()
+                            .with_endpoint(FlightEndpoint::new().with_ticket(Ticket::new(bytes)))
+                            .with_descriptor(FlightDescriptor::new_cmd(query));
 
-        let mut guard = self.requests.lock().unwrap();
-        guard.insert(uuid, logical_plan);
+                        let mut guard = self.requests.lock().unwrap();
+                        guard.insert(uuid, logical_plan);
 
-        Ok(Response::new(info))
+                        Ok(Response::new(info))
+                    }
+                    Err(e) => {
+                        let error = format!("{:?}", e);
+                        Err(Status::internal(error))
+                    }
+                }
+            }
+            Err(e) => {
+                let error = format!("{:?}", e);
+                Err(Status::internal(error))
+            }
+        }
     }
 
     async fn do_get_statement(
