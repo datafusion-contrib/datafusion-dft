@@ -20,7 +20,7 @@ use core::cell::RefCell;
 use color_eyre::Result;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::sql::sqlparser::keywords;
-use log::{debug, info};
+use log::debug;
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::palette::tailwind;
 use ratatui::style::{Modifier, Style};
