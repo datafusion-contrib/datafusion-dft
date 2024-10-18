@@ -166,22 +166,14 @@ impl ExecutionContext {
             .await
     }
 
-    /// Load DDL from configured DDL path
+    /// Load DDL from configured DDL path for execution (so strips out comments and empty lines)
     pub fn load_ddl(&self) -> Option<String> {
         info!("Loading DDL from: {:?}", &self.ddl_path);
         if let Some(ddl_path) = &self.ddl_path {
             if ddl_path.exists() {
                 let maybe_ddl = std::fs::read_to_string(ddl_path);
                 match maybe_ddl {
-                    Ok(ddl) => {
-                        info!("DDL: {:?}", ddl);
-                        let filtered_ddl = ddl
-                            .lines()
-                            .filter(|l| !l.starts_with("--") && !l.trim().is_empty())
-                            .map(|l| l.to_string())
-                            .collect::<String>();
-                        Some(filtered_ddl)
-                    }
+                    Ok(ddl) => Some(ddl),
                     Err(err) => {
                         error!("Error reading DDL: {:?}", err);
                         None

@@ -78,6 +78,8 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
             }
             SQLTabMode::DDL => {
                 let _event_tx = app.event_tx().clone();
+                // TODO: Probably want this to load from Editor instead of the file so that
+                // it is the latest content.
                 let ddl = app.execution.load_ddl().unwrap_or_default();
                 if let Err(e) = _event_tx.send(AppEvent::ExecuteDDL(ddl)) {
                     error!("Error sending ExecuteDDL event: {:?}", e);

@@ -40,6 +40,7 @@ use tokio_util::sync::CancellationToken;
 
 use self::execution::{ExecutionError, ExecutionResultsBatch, TuiExecution};
 use self::handlers::{app_event_handler, crossterm_event_handler};
+use crate::execution::sql_utils::clean_sql;
 use crate::execution::AppExecution;
 
 #[derive(Debug)]
@@ -259,11 +260,11 @@ impl<'app> App<'app> {
     /// Execute DDL from users DDL file
     pub fn execute_ddl(&mut self) {
         let ddl = self.execution.load_ddl().unwrap_or_default();
-        info!("DDL: {:?}", ddl);
+        info!("Loaded DDL: {:?}", ddl);
         if !ddl.is_empty() {
             self.state.sql_tab.add_ddl_to_editor(ddl.clone());
         }
-        let _ = self.event_tx().send(AppEvent::ExecuteDDL(ddl));
+        let _ = self.event_tx().send(AppEvent::ExecuteDDL(clean_sql(ddl)));
     }
 
     #[cfg(feature = "flightsql")]
