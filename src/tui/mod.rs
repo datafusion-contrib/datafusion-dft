@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-pub mod app_execution;
+pub mod execution;
 pub mod handlers;
 pub mod state;
 pub mod ui;
@@ -23,7 +23,6 @@ pub mod ui;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use crossterm::event as ct;
-use datafusion::arrow::array::RecordBatch;
 use futures::FutureExt;
 use log::{debug, error, info, trace};
 use ratatui::backend::CrosstermBackend;
@@ -33,74 +32,15 @@ use ratatui::crossterm::{
 };
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
 use std::sync::Arc;
-use std::time::Duration;
 use strum::IntoEnumIterator;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use tokio_util::sync::CancellationToken;
 
-use self::app_execution::TuiExecution;
+use self::execution::{ExecutionError, ExecutionResultsBatch, TuiExecution};
 use self::handlers::{app_event_handler, crossterm_event_handler};
 use crate::execution::AppExecution;
-
-#[derive(Clone, Debug)]
-pub struct ExecutionError {
-    query: String,
-    error: String,
-    duration: Duration,
-}
-
-#[derive(Clone, Debug)]
-pub struct ExecutionResultsBatch {
-    query: String,
-    batch: RecordBatch,
-    duration: Duration,
-}
-
-impl ExecutionResultsBatch {
-    pub fn new(query: String, batch: RecordBatch, duration: Duration) -> Self {
-        Self {
-            query,
-            batch,
-            duration,
-        }
-    }
-
-    pub fn query(&self) -> &str {
-        &self.query
-    }
-
-    pub fn batch(&self) -> &RecordBatch {
-        &self.batch
-    }
-
-    pub fn duration(&self) -> &Duration {
-        &self.duration
-    }
-}
-
-impl ExecutionError {
-    pub fn new(query: String, error: String, duration: Duration) -> Self {
-        Self {
-            query,
-            error,
-            duration,
-        }
-    }
-
-    pub fn query(&self) -> &str {
-        &self.query
-    }
-
-    pub fn error(&self) -> &str {
-        &self.error
-    }
-
-    pub fn duration(&self) -> &Duration {
-        &self.duration
-    }
-}
 
 #[derive(Debug)]
 pub enum AppEvent {
@@ -115,7 +55,10 @@ pub enum AppEvent {
     Paste(String),
     Mouse(event::MouseEvent),
     Resize(u16, u16),
+    // DDL
     ExecuteDDL(String),
+    DDLError,
+    DDLSuccess,
     // Query Execution
     NewExecution,
     ExecutionResultsNextBatch(ExecutionResultsBatch),

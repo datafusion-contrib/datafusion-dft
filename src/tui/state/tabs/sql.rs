@@ -62,6 +62,7 @@ pub enum SQLTabMode {
 pub struct SQLTabState<'app> {
     editor: TextArea<'app>,
     editor_editable: bool,
+    ddl_error: bool,
     ddl_editor: TextArea<'app>,
     ddl_editor_editable: bool,
     query_results_state: Option<RefCell<TableState>>,
@@ -91,6 +92,7 @@ impl<'app> SQLTabState<'app> {
         Self {
             editor: textarea,
             editor_editable: false,
+            ddl_error: false,
             ddl_editor: ddl_textarea,
             ddl_editor_editable: false,
             query_results_state: None,
@@ -121,6 +123,14 @@ impl<'app> SQLTabState<'app> {
         // TODO: Figure out how to do this without clone. Probably need logic in handler to make
         // updates to the Widget and then pass a ref
         self.editor.clone()
+    }
+
+    pub fn ddl_error(&self) -> bool {
+        self.ddl_error
+    }
+
+    pub fn set_ddl_error(&mut self, error: bool) {
+        self.ddl_error = error;
     }
 
     pub fn ddl_editor(&self) -> TextArea {

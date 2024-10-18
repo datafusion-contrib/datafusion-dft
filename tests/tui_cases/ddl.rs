@@ -93,3 +93,14 @@ async fn test_create_table_in_new_catalog() {
     ];
     assert_batches_eq!(expected, &batches);
 }
+
+// Stupid test but its all ive got for now
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_create_table_ddl_error() {
+    let mut test_app = TestApp::new();
+
+    test_app.handle_app_event(AppEvent::DDLError).unwrap();
+
+    let state = test_app.state();
+    assert!(state.sql_tab.ddl_error())
+}
