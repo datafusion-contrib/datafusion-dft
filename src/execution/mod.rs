@@ -20,6 +20,8 @@ pub mod flightsql;
 #[cfg(feature = "flightsql")]
 pub mod flightsql_benchmarks;
 pub mod local;
+pub mod sql_utils;
+
 mod local_benchmarks;
 mod stats;
 

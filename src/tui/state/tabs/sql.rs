@@ -20,6 +20,7 @@ use core::cell::RefCell;
 use color_eyre::Result;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::sql::sqlparser::keywords;
+use log::info;
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::palette::tailwind;
 use ratatui::style::{Modifier, Style};
@@ -173,6 +174,7 @@ impl<'app> SQLTabState<'app> {
     }
 
     pub fn add_ddl_to_editor(&mut self, ddl: String) {
+        info!("Adding DDL to editor: {}", ddl);
         self.ddl_editor.delete_line_by_end();
         self.ddl_editor.set_yank_text(ddl);
         self.ddl_editor.paste();
