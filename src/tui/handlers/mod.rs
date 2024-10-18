@@ -161,7 +161,9 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                 })
                 .collect();
             let ctx = app.execution.session_ctx().clone();
+            let _event_tx = app.event_tx.clone();
             let handle = tokio::spawn(async move {
+                let mut error = false;
                 for q in queries {
                     info!("Executing DDL: {:?}", q);
                     match ctx.sql(&q).await {
@@ -172,12 +174,22 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                         }
                         Err(e) => {
                             error!("Error executing DDL {:?}: {:?}", q, e);
+                            error = true;
                         }
                     }
+                }
+                if error {
+                    if let Err(e) = _event_tx.send(AppEvent::DDLError) {
+                        error!("Error sending DDLError message: {e}");
+                    }
+                } else if let Err(e) = _event_tx.send(AppEvent::DDLSuccess) {
+                    error!("Error sending DDLSuccess message: {e}");
                 }
             });
             app.ddl_task = Some(handle);
         }
+        AppEvent::DDLError => app.state.sql_tab.set_ddl_error(true),
+        AppEvent::DDLSuccess => app.state.sql_tab.set_ddl_error(false),
         AppEvent::NewExecution => {
             app.state.sql_tab.reset_execution_results();
         }

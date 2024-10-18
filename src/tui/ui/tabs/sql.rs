@@ -33,7 +33,14 @@ pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
     } else {
         tailwind::WHITE
     };
-    let title = Span::from(" Editor ").fg(tailwind::WHITE);
+    let title = if sql_tab.ddl_error() {
+        vec![
+            Span::from(" Editor ").fg(tailwind::WHITE),
+            Span::from("(DDL Error) ").red(),
+        ]
+    } else {
+        vec![Span::from(" Editor ").fg(tailwind::WHITE)]
+    };
     let mode_text = format!(" {:?} ", sql_tab.mode());
     let mode = Title::from(mode_text.as_str()).alignment(Alignment::Right);
     let block = Block::default()
