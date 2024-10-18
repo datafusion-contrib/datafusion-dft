@@ -173,15 +173,7 @@ impl ExecutionContext {
             if ddl_path.exists() {
                 let maybe_ddl = std::fs::read_to_string(ddl_path);
                 match maybe_ddl {
-                    Ok(ddl) => {
-                        // info!("DDL: {:?}", ddl);
-                        // let filtered_ddl = ddl
-                        //     .lines()
-                        //     .filter(|l| !l.starts_with("--") && !l.trim().is_empty())
-                        //     .map(|l| l.to_string())
-                        //     .collect::<String>();
-                        Some(ddl)
-                    }
+                    Ok(ddl) => Some(ddl),
                     Err(err) => {
                         error!("Error reading DDL: {:?}", err);
                         None
