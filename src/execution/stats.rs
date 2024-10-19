@@ -15,9 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use datafusion::physical_plan::{visit_execution_plan, ExecutionPlan, ExecutionPlanVisitor};
+use datafusion::physical_plan::{
+    metrics::MetricValue, visit_execution_plan, ExecutionPlan, ExecutionPlanVisitor,
+};
 use log::info;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 #[derive(Clone, Debug)]
 pub struct ExecutionStats {
@@ -31,24 +33,60 @@ impl ExecutionStats {
     }
 }
 
-#[derive(Default)]
-struct PlanVisitor {
-    total_bytes_scanned: usize,
-    // exec_metrics: Vec<ExecMetrics>,
+#[derive(Debug)]
+pub struct ExecutionIOStats {
+    bytes_scanned: usize,
+    time_opening: Option<MetricValue>,
+    time_scanning: Option<MetricValue>,
 }
 
-impl From<PlanVisitor> for ExecutionStats {
-    fn from(value: PlanVisitor) -> Self {
+struct PlanIOVisitor {
+    total_bytes_scanned: usize,
+    time_opening: Option<MetricValue>,
+    time_scanning: Option<MetricValue>,
+}
+
+impl PlanIOVisitor {
+    fn new() -> Self {
         Self {
-            bytes_scanned: value.total_bytes_scanned,
+            total_bytes_scanned: 0,
+            time_opening: None,
+            time_scanning: None,
+        }
+    }
+
+    fn collect_io_metrics(&mut self, plan: &dyn ExecutionPlan) {
+        let io_metrics = plan.metrics();
+        if let Some(metrics) = io_metrics {
+            println!("Metrics for {}: {:#?}", plan.name(), metrics);
+            if let Some(opening) = metrics.sum_by_name("time_elapsed_opening") {
+                self.time_opening = Some(opening);
+            }
+            if let Some(scanning) = metrics.sum_by_name("time_elapsed_scanning_total") {
+                self.time_scanning = Some(scanning);
+            }
         }
     }
 }
 
-impl ExecutionPlanVisitor for PlanVisitor {
+impl From<PlanIOVisitor> for ExecutionIOStats {
+    fn from(value: PlanIOVisitor) -> Self {
+        Self {
+            bytes_scanned: value.total_bytes_scanned,
+            time_opening: value.time_opening,
+            time_scanning: value.time_scanning,
+        }
+    }
+}
+
+impl ExecutionPlanVisitor for PlanIOVisitor {
     type Error = datafusion_common::DataFusionError;
 
     fn pre_visit(&mut self, plan: &dyn ExecutionPlan) -> color_eyre::Result<bool, Self::Error> {
+        if is_io_plan(plan) {
+            println!("Collecting IO metrics for {}", plan.name());
+            self.collect_io_metrics(plan);
+        }
         match plan.metrics() {
             Some(metrics) => match metrics.sum_by_name("bytes_scanned") {
                 Some(bytes_scanned) => {
@@ -67,11 +105,53 @@ impl ExecutionPlanVisitor for PlanVisitor {
     }
 }
 
-pub fn collect_plan_stats(plan: Arc<dyn ExecutionPlan>) -> Option<ExecutionStats> {
-    let mut visitor = PlanVisitor::default();
+fn is_io_plan(plan: &dyn ExecutionPlan) -> bool {
+    let io_plans = ["CsvExec", "ParquetExec", "ArrowExec"];
+    println!("Plan name: {}", plan.name());
+    io_plans.contains(&plan.name())
+}
+
+pub fn collect_plan_io_stats(plan: Arc<dyn ExecutionPlan>) -> Option<ExecutionIOStats> {
+    let mut visitor = PlanIOVisitor::new();
     if visit_execution_plan(plan.as_ref(), &mut visitor).is_ok() {
         Some(visitor.into())
     } else {
         None
+    }
+}
+
+pub fn print_execution_summary(
+    rows: usize,
+    batches: i32,
+    parsing_dur: Duration,
+    logical_planning_dur: Duration,
+    physical_planning_dur: Duration,
+    execution_dur: Duration,
+    total_dur: Duration,
+) {
+    println!("==================== Execution Summary ====================");
+    println!("{:<20} {:<20}", "Rows Returned", "Batches Processed");
+    println!("{:<20} {:<20}", rows, batches);
+    println!();
+    println!(
+        "{:<20} {:<20} {:<20}",
+        "Parsing", "Logical Planning", "Physical Planning"
+    );
+    println!(
+        "{:<20?} {:<20?} {:<20?}",
+        parsing_dur, logical_planning_dur, physical_planning_dur
+    );
+    println!();
+    println!("{:<20} {:<20}", "Execution", "Total");
+    println!("{:<20?} {:<20?}", execution_dur, total_dur);
+    println!();
+}
+
+pub fn print_io_summary(plan: Arc<dyn ExecutionPlan>) {
+    println!("======================= IO Summary ========================");
+    if let Some(stats) = collect_plan_io_stats(plan) {
+        println!("IO Stats: {:#?}", stats);
+    } else {
+        println!("No IO metrics found");
     }
 }
