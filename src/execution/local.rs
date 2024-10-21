@@ -24,7 +24,7 @@ use std::sync::Arc;
 use log::{debug, error, info};
 
 use crate::config::ExecutionConfig;
-use crate::execution::stats::print_execution_summary;
+// use crate::execution::stats::print_execution_summary;
 use crate::extensions::{enabled_extensions, DftSessionStateBuilder};
 use color_eyre::eyre::{self, Result};
 use datafusion::execution::SendableRecordBatchStream;
@@ -34,7 +34,7 @@ use datafusion::sql::parser::{DFParser, Statement};
 use tokio_stream::StreamExt;
 
 use super::local_benchmarks::LocalBenchmarkStats;
-use super::stats::print_io_summary;
+use super::stats::{print_io_summary, ExecutionDurationStats, ExecutionStats};
 use super::AppType;
 
 /// Structure for executing queries locally
@@ -289,7 +289,7 @@ impl ExecutionContext {
         ))
     }
 
-    pub async fn analyze_query(&self, query: &str) -> Result<()> {
+    pub async fn analyze_query(&self, query: &str) -> Result<ExecutionStats> {
         let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
         let start = std::time::Instant::now();
         let statements = DFParser::parse_sql_with_dialect(query, &dialect)?;
@@ -318,20 +318,28 @@ impl ExecutionContext {
                 batches += 1;
             }
             let execution_duration = start.elapsed();
-            print_execution_summary(
-                rows,
-                batches,
+            let durations = ExecutionDurationStats::new(
                 parsing_duration,
                 logical_planning_duration - parsing_duration,
                 physical_planning_duration - logical_planning_duration,
                 execution_duration - physical_planning_duration,
                 start.elapsed(),
             );
-            print_io_summary(physical_plan);
+            ExecutionStats::try_new(durations, rows, batches, physical_plan)
+            // print_execution_summary(
+            //     rows,
+            //     batches,
+            //     parsing_duration,
+            //     logical_planning_duration - parsing_duration,
+            //     physical_planning_duration - logical_planning_duration,
+            //     execution_duration - physical_planning_duration,
+            //     start.elapsed(),
+            // );
+            // print_io_summary(physical_plan);
         } else {
-            return Err(eyre::eyre!("Only a single statement can be benchmarked"));
+            Err(eyre::eyre!("Only a single statement can be benchmarked"))
         }
 
-        Ok(())
+        // Ok(())
     }
 }

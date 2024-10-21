@@ -23,25 +23,151 @@ use std::{sync::Arc, time::Duration};
 
 #[derive(Clone, Debug)]
 pub struct ExecutionStats {
-    bytes_scanned: usize,
-    // exec_metrics: Vec<ExecMetrics>,
+    // bytes_scanned: usize,
+    rows: usize,
+    batches: i32,
+    durations: ExecutionDurationStats,
+    io: Option<ExecutionIOStats>,
+    plan: Arc<dyn ExecutionPlan>,
 }
 
 impl ExecutionStats {
-    pub fn bytes_scanned(&self) -> usize {
-        self.bytes_scanned
+    pub fn try_new(
+        durations: ExecutionDurationStats,
+        rows: usize,
+        batches: i32,
+        plan: Arc<dyn ExecutionPlan>,
+    ) -> color_eyre::Result<Self> {
+        Ok(Self {
+            durations,
+            rows,
+            batches,
+            plan,
+            io: None,
+        })
+    }
+
+    pub fn collect_stats(&mut self) {
+        if let Some(io) = collect_plan_io_stats(Arc::clone(&self.plan)) {
+            self.io = Some(io)
+        }
+    }
+
+    // pub fn bytes_scanned(&self) -> usize {
+    //     self.bytes_scanned
+    // }
+}
+
+impl std::fmt::Display for ExecutionStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "==================== Execution Summary ===================="
+        )?;
+        writeln!(f, "{:<20} {:<20}", "Rows Returned", "Batches Processed")?;
+        writeln!(f, "{:<20} {:<20}", self.rows, self.batches)?;
+        writeln!(f)?;
+        writeln!(f, "{}", self.durations)?;
+        if let Some(io_stats) = &self.io {
+            writeln!(f, "{}", io_stats)?;
+        };
+        Ok(())
     }
 }
 
-#[derive(Debug)]
-pub struct ExecutionIOStats {
-    bytes_scanned: usize,
-    time_opening: Option<MetricValue>,
-    time_scanning: Option<MetricValue>,
+#[derive(Clone, Debug)]
+pub struct ExecutionDurationStats {
+    parsing: Duration,
+    logical_planning: Duration,
+    physical_planning: Duration,
+    execution: Duration,
+    total: Duration,
 }
 
+impl ExecutionDurationStats {
+    pub fn new(
+        parsing: Duration,
+        logical_planning: Duration,
+        physical_planning: Duration,
+        execution: Duration,
+        total: Duration,
+    ) -> Self {
+        Self {
+            parsing,
+            logical_planning,
+            physical_planning,
+            execution,
+            total,
+        }
+    }
+}
+
+impl std::fmt::Display for ExecutionDurationStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{:<20} {:<20} {:<20}",
+            "Parsing", "Logical Planning", "Physical Planning"
+        )?;
+        writeln!(
+            f,
+            "{:<20?} {:<20?} {:<20?}",
+            self.parsing, self.logical_planning, self.physical_planning
+        )?;
+        writeln!(f)?;
+        writeln!(f, "{:<20} {:<20}", "Execution", "Total")?;
+        writeln!(f, "{:<20?} {:<20?}", self.execution, self.total)?;
+        writeln!(f)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ExecutionIOStats {
+    bytes_scanned: Option<MetricValue>,
+    time_opening: Option<MetricValue>,
+    time_scanning: Option<MetricValue>,
+    parquet_stats: Option<ParquetStats>,
+}
+
+impl std::fmt::Display for ExecutionIOStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "======================= IO Summary ========================"
+        )?;
+        writeln!(
+            f,
+            "{:<20} {:<20} {:<20}",
+            "Bytes Scanned", "Time Opening", "Time Scanning"
+        )?;
+        writeln!(
+            f,
+            "{:<20} {:<20} {:<20}",
+            self.bytes_scanned
+                .as_ref()
+                .map(|m| m.to_string())
+                .unwrap_or("None".to_string()),
+            self.time_opening
+                .as_ref()
+                .map(|m| m.to_string())
+                .unwrap_or("None".to_string()),
+            self.time_scanning
+                .as_ref()
+                .map(|m| m.to_string())
+                .unwrap_or("None".to_string())
+        )
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ParquetStats {}
+
+/// Visitor to collect IO metrics from an execution plan
+///
+/// IO metrics are collected from nodes that perform IO operations, such as
+/// `CsvExec`, `ParquetExec`, and `ArrowExec`.
 struct PlanIOVisitor {
-    total_bytes_scanned: usize,
+    bytes_scanned: Option<MetricValue>,
     time_opening: Option<MetricValue>,
     time_scanning: Option<MetricValue>,
 }
@@ -49,7 +175,7 @@ struct PlanIOVisitor {
 impl PlanIOVisitor {
     fn new() -> Self {
         Self {
-            total_bytes_scanned: 0,
+            bytes_scanned: None,
             time_opening: None,
             time_scanning: None,
         }
@@ -59,6 +185,9 @@ impl PlanIOVisitor {
         let io_metrics = plan.metrics();
         if let Some(metrics) = io_metrics {
             println!("Metrics for {}: {:#?}", plan.name(), metrics);
+            if let Some(scanned_bytes) = metrics.sum_by_name("bytes_scanned") {
+                self.bytes_scanned = Some(scanned_bytes);
+            }
             if let Some(opening) = metrics.sum_by_name("time_elapsed_opening") {
                 self.time_opening = Some(opening);
             }
@@ -72,9 +201,10 @@ impl PlanIOVisitor {
 impl From<PlanIOVisitor> for ExecutionIOStats {
     fn from(value: PlanIOVisitor) -> Self {
         Self {
-            bytes_scanned: value.total_bytes_scanned,
+            bytes_scanned: value.bytes_scanned,
             time_opening: value.time_opening,
             time_scanning: value.time_scanning,
+            parquet_stats: None,
         }
     }
 }
@@ -90,8 +220,7 @@ impl ExecutionPlanVisitor for PlanIOVisitor {
         match plan.metrics() {
             Some(metrics) => match metrics.sum_by_name("bytes_scanned") {
                 Some(bytes_scanned) => {
-                    info!("Adding {} to total_bytes_scanned", bytes_scanned.as_usize());
-                    self.total_bytes_scanned += bytes_scanned.as_usize();
+                    self.bytes_scanned = Some(bytes_scanned);
                 }
                 None => {
                     info!("No bytes_scanned for {}", plan.name())
@@ -120,32 +249,32 @@ pub fn collect_plan_io_stats(plan: Arc<dyn ExecutionPlan>) -> Option<ExecutionIO
     }
 }
 
-pub fn print_execution_summary(
-    rows: usize,
-    batches: i32,
-    parsing_dur: Duration,
-    logical_planning_dur: Duration,
-    physical_planning_dur: Duration,
-    execution_dur: Duration,
-    total_dur: Duration,
-) {
-    println!("==================== Execution Summary ====================");
-    println!("{:<20} {:<20}", "Rows Returned", "Batches Processed");
-    println!("{:<20} {:<20}", rows, batches);
-    println!();
-    println!(
-        "{:<20} {:<20} {:<20}",
-        "Parsing", "Logical Planning", "Physical Planning"
-    );
-    println!(
-        "{:<20?} {:<20?} {:<20?}",
-        parsing_dur, logical_planning_dur, physical_planning_dur
-    );
-    println!();
-    println!("{:<20} {:<20}", "Execution", "Total");
-    println!("{:<20?} {:<20?}", execution_dur, total_dur);
-    println!();
-}
+// pub fn print_execution_summary(
+//     rows: usize,
+//     batches: i32,
+//     parsing_dur: Duration,
+//     logical_planning_dur: Duration,
+//     physical_planning_dur: Duration,
+//     execution_dur: Duration,
+//     total_dur: Duration,
+// ) {
+//     println!("==================== Execution Summary ====================");
+//     println!("{:<20} {:<20}", "Rows Returned", "Batches Processed");
+//     println!("{:<20} {:<20}", rows, batches);
+//     println!();
+//     println!(
+//         "{:<20} {:<20} {:<20}",
+//         "Parsing", "Logical Planning", "Physical Planning"
+//     );
+//     println!(
+//         "{:<20?} {:<20?} {:<20?}",
+//         parsing_dur, logical_planning_dur, physical_planning_dur
+//     );
+//     println!();
+//     println!("{:<20} {:<20}", "Execution", "Total");
+//     println!("{:<20?} {:<20?}", execution_dur, total_dur);
+//     println!();
+// }
 
 pub fn print_io_summary(plan: Arc<dyn ExecutionPlan>) {
     println!("======================= IO Summary ========================");

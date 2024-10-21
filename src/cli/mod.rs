@@ -276,12 +276,13 @@ impl CliApp {
     }
 
     async fn analyze_from_string(&self, sql: &str) -> Result<()> {
-        let stats = self
+        let mut stats = self
             .app_execution
             .execution_ctx()
             .analyze_query(sql)
             .await?;
-        // println!("{}", stats);
+        stats.collect_stats();
+        println!("{}", stats);
         Ok(())
     }
 
