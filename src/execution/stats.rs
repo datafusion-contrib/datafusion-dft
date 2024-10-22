@@ -15,19 +15,24 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use datafusion::physical_plan::{
-    metrics::MetricValue, visit_execution_plan, ExecutionPlan, ExecutionPlanVisitor,
+use datafusion::{
+    datasource::physical_plan::ParquetExec,
+    physical_plan::{
+        filter::FilterExec, metrics::MetricValue, visit_execution_plan, ExecutionPlan,
+        ExecutionPlanVisitor,
+    },
 };
+use itertools::Itertools;
 use log::info;
 use std::{sync::Arc, time::Duration};
 
 #[derive(Clone, Debug)]
 pub struct ExecutionStats {
-    // bytes_scanned: usize,
     rows: usize,
     batches: i32,
     durations: ExecutionDurationStats,
     io: Option<ExecutionIOStats>,
+    compute: Option<ExecutionComputeStats>,
     plan: Arc<dyn ExecutionPlan>,
 }
 
@@ -44,6 +49,7 @@ impl ExecutionStats {
             batches,
             plan,
             io: None,
+            compute: None,
         })
     }
 
@@ -51,11 +57,10 @@ impl ExecutionStats {
         if let Some(io) = collect_plan_io_stats(Arc::clone(&self.plan)) {
             self.io = Some(io)
         }
+        if let Some(compute) = collect_plan_compute_stats(Arc::clone(&self.plan)) {
+            self.compute = Some(compute)
+        }
     }
-
-    // pub fn bytes_scanned(&self) -> usize {
-    //     self.bytes_scanned
-    // }
 }
 
 impl std::fmt::Display for ExecutionStats {
@@ -70,6 +75,9 @@ impl std::fmt::Display for ExecutionStats {
         writeln!(f, "{}", self.durations)?;
         if let Some(io_stats) = &self.io {
             writeln!(f, "{}", io_stats)?;
+        };
+        if let Some(compute_stats) = &self.compute {
+            writeln!(f, "{}", compute_stats)?;
         };
         Ok(())
     }
@@ -126,7 +134,13 @@ pub struct ExecutionIOStats {
     bytes_scanned: Option<MetricValue>,
     time_opening: Option<MetricValue>,
     time_scanning: Option<MetricValue>,
-    parquet_stats: Option<ParquetStats>,
+    parquet_output_rows: Option<usize>,
+    parquet_pruned_page_index: Option<MetricValue>,
+    parquet_matched_page_index: Option<MetricValue>,
+    parquet_rg_pruned_stats: Option<MetricValue>,
+    parquet_rg_matched_stats: Option<MetricValue>,
+    parquet_rg_pruned_bloom_filter: Option<MetricValue>,
+    parquet_rg_matched_bloom_filter: Option<MetricValue>,
 }
 
 impl std::fmt::Display for ExecutionIOStats {
@@ -155,12 +169,72 @@ impl std::fmt::Display for ExecutionIOStats {
                 .as_ref()
                 .map(|m| m.to_string())
                 .unwrap_or("None".to_string())
+        )?;
+        writeln!(f)?;
+        writeln!(
+            f,
+            "Parquet IO Stats (Output Rows: {})",
+            self.parquet_output_rows
+                .as_ref()
+                .map(|m| m.to_string())
+                .unwrap_or("None".to_string())
+        )?;
+        writeln!(f)?;
+        writeln!(
+            f,
+            "{:<30} {:<30}",
+            "Pruned Page Index", "Matched Page Index"
+        )?;
+        writeln!(
+            f,
+            "{:<30} {:<30}",
+            self.parquet_pruned_page_index
+                .as_ref()
+                .map(|m| m.to_string())
+                .unwrap_or("None".to_string()),
+            self.parquet_matched_page_index
+                .as_ref()
+                .map(|m| m.to_string())
+                .unwrap_or("None".to_string())
+        )?;
+        writeln!(f)?;
+        writeln!(
+            f,
+            "{:<30} {:<30}",
+            "Row Groups Pruned (Stats)", "Row Groups Matched (Stats)"
+        )?;
+        writeln!(
+            f,
+            "{:<30} {:<30}",
+            self.parquet_rg_pruned_stats
+                .as_ref()
+                .map(|m| m.to_string())
+                .unwrap_or("None".to_string()),
+            self.parquet_rg_matched_stats
+                .as_ref()
+                .map(|m| m.to_string())
+                .unwrap_or("None".to_string())
+        )?;
+        writeln!(f)?;
+        writeln!(
+            f,
+            "{:<30} {:<30}",
+            "Row Groups Pruned (Bloom)", "Row Groups Matched (Bloom)"
+        )?;
+        writeln!(
+            f,
+            "{:<30} {:<30}",
+            self.parquet_rg_pruned_bloom_filter
+                .as_ref()
+                .map(|m| m.to_string())
+                .unwrap_or("None".to_string()),
+            self.parquet_rg_matched_bloom_filter
+                .as_ref()
+                .map(|m| m.to_string())
+                .unwrap_or("None".to_string())
         )
     }
 }
-
-#[derive(Clone, Debug)]
-pub struct ParquetStats {}
 
 /// Visitor to collect IO metrics from an execution plan
 ///
@@ -170,6 +244,13 @@ struct PlanIOVisitor {
     bytes_scanned: Option<MetricValue>,
     time_opening: Option<MetricValue>,
     time_scanning: Option<MetricValue>,
+    parquet_output_rows: Option<usize>,
+    parquet_pruned_page_index: Option<MetricValue>,
+    parquet_matched_page_index: Option<MetricValue>,
+    parquet_rg_pruned_stats: Option<MetricValue>,
+    parquet_rg_matched_stats: Option<MetricValue>,
+    parquet_rg_pruned_bloom_filter: Option<MetricValue>,
+    parquet_rg_matched_bloom_filter: Option<MetricValue>,
 }
 
 impl PlanIOVisitor {
@@ -178,6 +259,13 @@ impl PlanIOVisitor {
             bytes_scanned: None,
             time_opening: None,
             time_scanning: None,
+            parquet_output_rows: None,
+            parquet_pruned_page_index: None,
+            parquet_matched_page_index: None,
+            parquet_rg_pruned_stats: None,
+            parquet_rg_matched_stats: None,
+            parquet_rg_pruned_bloom_filter: None,
+            parquet_rg_matched_bloom_filter: None,
         }
     }
 
@@ -185,14 +273,15 @@ impl PlanIOVisitor {
         let io_metrics = plan.metrics();
         if let Some(metrics) = io_metrics {
             println!("Metrics for {}: {:#?}", plan.name(), metrics);
-            if let Some(scanned_bytes) = metrics.sum_by_name("bytes_scanned") {
-                self.bytes_scanned = Some(scanned_bytes);
-            }
-            if let Some(opening) = metrics.sum_by_name("time_elapsed_opening") {
-                self.time_opening = Some(opening);
-            }
-            if let Some(scanning) = metrics.sum_by_name("time_elapsed_scanning_total") {
-                self.time_scanning = Some(scanning);
+            self.bytes_scanned = metrics.sum_by_name("bytes_scanned");
+            self.time_opening = metrics.sum_by_name("time_elapsed_opening");
+            self.time_scanning = metrics.sum_by_name("time_elapsed_scanning_total");
+
+            if plan.as_any().downcast_ref::<ParquetExec>().is_some() {
+                self.parquet_output_rows = metrics.output_rows();
+                self.parquet_rg_pruned_stats = metrics.sum_by_name("row_groups_pruned_statistics");
+                self.parquet_rg_matched_stats =
+                    metrics.sum_by_name("row_groups_matched_statistics");
             }
         }
     }
@@ -204,7 +293,13 @@ impl From<PlanIOVisitor> for ExecutionIOStats {
             bytes_scanned: value.bytes_scanned,
             time_opening: value.time_opening,
             time_scanning: value.time_scanning,
-            parquet_stats: None,
+            parquet_output_rows: value.parquet_output_rows,
+            parquet_pruned_page_index: value.parquet_pruned_page_index,
+            parquet_matched_page_index: value.parquet_matched_page_index,
+            parquet_rg_pruned_stats: value.parquet_rg_pruned_stats,
+            parquet_rg_matched_stats: value.parquet_rg_matched_stats,
+            parquet_rg_pruned_bloom_filter: value.parquet_rg_pruned_bloom_filter,
+            parquet_rg_matched_bloom_filter: value.parquet_rg_matched_bloom_filter,
         }
     }
 }
@@ -217,18 +312,77 @@ impl ExecutionPlanVisitor for PlanIOVisitor {
             println!("Collecting IO metrics for {}", plan.name());
             self.collect_io_metrics(plan);
         }
-        match plan.metrics() {
-            Some(metrics) => match metrics.sum_by_name("bytes_scanned") {
-                Some(bytes_scanned) => {
-                    self.bytes_scanned = Some(bytes_scanned);
-                }
-                None => {
-                    info!("No bytes_scanned for {}", plan.name())
-                }
-            },
-            None => {
-                info!("No MetricsSet for {}", plan.name())
+        Ok(true)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ExecutionComputeStats {
+    elapsed_compute: Option<usize>,
+}
+
+impl std::fmt::Display for ExecutionComputeStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "======================= Compute Summary ========================"
+        )?;
+        writeln!(f, "{:<20}", "Elapsed Compute",)?;
+        writeln!(
+            f,
+            "{:<20}",
+            self.elapsed_compute
+                .as_ref()
+                .map(|m| m.to_string())
+                .unwrap_or("None".to_string()),
+        )?;
+        writeln!(f)
+    }
+}
+
+pub struct PlanComputeVisitor {
+    elapsed_compute: Option<usize>,
+}
+
+impl PlanComputeVisitor {
+    pub fn new() -> Self {
+        Self {
+            elapsed_compute: None,
+        }
+    }
+
+    fn collect_compute_metrics(&mut self, plan: &dyn ExecutionPlan) {
+        let compute_metrics = plan.metrics();
+        if let Some(metrics) = compute_metrics {
+            println!("Metrics for {}: {:#?}", plan.name(), metrics);
+            self.elapsed_compute = metrics.elapsed_compute();
+        }
+    }
+
+    fn collect_filter_metrics(&mut self, plan: &dyn ExecutionPlan) {
+        if plan.as_any().downcast_ref::<FilterExec>().is_some() {
+            if let Some(metrics) = plan.metrics() {
+                let agg = metrics.iter().chunk_by(|m| m.labels());
             }
+        }
+    }
+}
+
+impl From<PlanComputeVisitor> for ExecutionComputeStats {
+    fn from(value: PlanComputeVisitor) -> Self {
+        Self {
+            elapsed_compute: value.elapsed_compute,
+        }
+    }
+}
+
+impl ExecutionPlanVisitor for PlanComputeVisitor {
+    type Error = datafusion_common::DataFusionError;
+
+    fn pre_visit(&mut self, plan: &dyn ExecutionPlan) -> color_eyre::Result<bool, Self::Error> {
+        if !is_io_plan(plan) {
+            println!("Collecting Compute metrics for {}", plan.name());
+            self.collect_compute_metrics(plan);
         }
         Ok(true)
     }
@@ -249,32 +403,14 @@ pub fn collect_plan_io_stats(plan: Arc<dyn ExecutionPlan>) -> Option<ExecutionIO
     }
 }
 
-// pub fn print_execution_summary(
-//     rows: usize,
-//     batches: i32,
-//     parsing_dur: Duration,
-//     logical_planning_dur: Duration,
-//     physical_planning_dur: Duration,
-//     execution_dur: Duration,
-//     total_dur: Duration,
-// ) {
-//     println!("==================== Execution Summary ====================");
-//     println!("{:<20} {:<20}", "Rows Returned", "Batches Processed");
-//     println!("{:<20} {:<20}", rows, batches);
-//     println!();
-//     println!(
-//         "{:<20} {:<20} {:<20}",
-//         "Parsing", "Logical Planning", "Physical Planning"
-//     );
-//     println!(
-//         "{:<20?} {:<20?} {:<20?}",
-//         parsing_dur, logical_planning_dur, physical_planning_dur
-//     );
-//     println!();
-//     println!("{:<20} {:<20}", "Execution", "Total");
-//     println!("{:<20?} {:<20?}", execution_dur, total_dur);
-//     println!();
-// }
+pub fn collect_plan_compute_stats(plan: Arc<dyn ExecutionPlan>) -> Option<ExecutionComputeStats> {
+    let mut visitor = PlanComputeVisitor::new();
+    if visit_execution_plan(plan.as_ref(), &mut visitor).is_ok() {
+        Some(visitor.into())
+    } else {
+        None
+    }
+}
 
 pub fn print_io_summary(plan: Arc<dyn ExecutionPlan>) {
     println!("======================= IO Summary ========================");
