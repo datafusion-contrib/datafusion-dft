@@ -317,8 +317,18 @@ impl ExecutionPlanVisitor for PlanIOVisitor {
 }
 
 #[derive(Clone, Debug)]
+pub struct PartitionsComputeStats {
+    /// Sorted elapsed compute times
+    elapsed_computes: Vec<usize>,
+}
+
+
+#[derive(Clone, Debug)]
 pub struct ExecutionComputeStats {
     elapsed_compute: Option<usize>,
+    // projection_compute: Option<PartitionsComputeStats>,
+    filter_compute: Option<Vec<PartitionsComputeStats>>,
+    // sort_compute: Option<PartitionsComputeStats>,
 }
 
 impl std::fmt::Display for ExecutionComputeStats {
@@ -336,20 +346,31 @@ impl std::fmt::Display for ExecutionComputeStats {
                 .map(|m| m.to_string())
                 .unwrap_or("None".to_string()),
         )?;
+        writeln!(f)?;
+        writeln!(f, "Filter Stats")?;
+        self.filter_compute
+            .iter()
+            .try_for_each(|node| );
+                // {
+                //     writeln!(f, "{:<20} {:<20} {:<20}", "Min", "Median", "Max"))?;
+                // }
         writeln!(f)
     }
 }
 
+#[derive(Default)]
 pub struct PlanComputeVisitor {
     elapsed_compute: Option<usize>,
+    filter_computes: Vec<PartitionsComputeStats>,
 }
 
 impl PlanComputeVisitor {
-    pub fn new() -> Self {
-        Self {
-            elapsed_compute: None,
-        }
-    }
+    // pub fn new() -> Self {
+    //     Self {
+    //         elapsed_compute: None,
+    //         filter_computes: Vec::new(),
+    //     }
+    // }
 
     fn collect_compute_metrics(&mut self, plan: &dyn ExecutionPlan) {
         let compute_metrics = plan.metrics();
@@ -357,12 +378,24 @@ impl PlanComputeVisitor {
             println!("Metrics for {}: {:#?}", plan.name(), metrics);
             self.elapsed_compute = metrics.elapsed_compute();
         }
+        self.collect_filter_metrics(plan);
     }
 
     fn collect_filter_metrics(&mut self, plan: &dyn ExecutionPlan) {
         if plan.as_any().downcast_ref::<FilterExec>().is_some() {
             if let Some(metrics) = plan.metrics() {
-                let agg = metrics.iter().chunk_by(|m| m.labels());
+                let sorted_computes: Vec<usize> = metrics
+                    .iter()
+                    .filter_map(|m| match m.value() {
+                        MetricValue::ElapsedCompute(t) => Some(t.value()),
+                        _ => None,
+                    })
+                    .sorted()
+                    .collect();
+                let p = PartitionsComputeStats {
+                    elapsed_computes: sorted_computes,
+                };
+                self.filter_computes.push(p)
             }
         }
     }
@@ -372,6 +405,7 @@ impl From<PlanComputeVisitor> for ExecutionComputeStats {
     fn from(value: PlanComputeVisitor) -> Self {
         Self {
             elapsed_compute: value.elapsed_compute,
+            filter_compute: Some(value.filter_computes),
         }
     }
 }
@@ -404,7 +438,7 @@ pub fn collect_plan_io_stats(plan: Arc<dyn ExecutionPlan>) -> Option<ExecutionIO
 }
 
 pub fn collect_plan_compute_stats(plan: Arc<dyn ExecutionPlan>) -> Option<ExecutionComputeStats> {
-    let mut visitor = PlanComputeVisitor::new();
+    let mut visitor = PlanComputeVisitor::default();
     if visit_execution_plan(plan.as_ref(), &mut visitor).is_ok() {
         Some(visitor.into())
     } else {
