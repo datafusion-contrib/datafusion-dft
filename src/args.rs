@@ -72,6 +72,12 @@ pub struct DftArgs {
 
     #[clap(long, short, help = "Benchmark the provided query")]
     pub bench: bool,
+
+    #[clap(
+        long,
+        help = "Print a summary of the query's execution plan and statistics"
+    )]
+    pub analyze: bool,
 }
 
 impl DftArgs {
