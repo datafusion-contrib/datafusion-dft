@@ -100,7 +100,7 @@ fn test_custom_config_benchmark_iterations() {
         .arg("--config")
         .arg(config.path)
         .arg("-c")
-        .arg("SELECT * FROM x")
+        .arg("SELECT 1")
         .assert()
         .success();
 
