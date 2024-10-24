@@ -101,6 +101,7 @@ fn test_custom_config_benchmark_iterations() {
         .arg(config.path)
         .arg("-c")
         .arg("SELECT 1")
+        .arg("--bench")
         .assert()
         .success();
 
