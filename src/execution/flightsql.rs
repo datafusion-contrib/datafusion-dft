@@ -69,6 +69,7 @@ impl FlightSQLContext {
 
     pub async fn benchmark_query(&self, query: &str) -> Result<FlightSQLBenchmarkStats> {
         let iterations = self.config.benchmark_iterations;
+        println!("Config: {:?}", self.config);
         let mut get_flight_info_durations = Vec::with_capacity(iterations);
         let mut ttfb_durations = Vec::with_capacity(iterations);
         let mut do_get_durations = Vec::with_capacity(iterations);

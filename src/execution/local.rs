@@ -240,6 +240,7 @@ impl ExecutionContext {
     /// Benchmark the provided query.  Currently, on a single statement can be benchmarked
     pub async fn benchmark_query(&self, query: &str) -> Result<LocalBenchmarkStats> {
         let iterations = self.config.benchmark_iterations;
+        println!("Config: {:?}", self.config);
         info!("Benchmarking query with {} iterations", iterations);
         let mut logical_planning_durations = Vec::with_capacity(iterations);
         let mut physical_planning_durations = Vec::with_capacity(iterations);

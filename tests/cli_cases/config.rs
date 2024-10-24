@@ -87,3 +87,24 @@ fn test_custom_config_multiple_ddl() {
 
     assert.stdout(contains_str(expected));
 }
+
+#[test]
+fn test_custom_config_benchmark_iterations() {
+    let mut config_builder = TestConfigBuilder::default();
+    config_builder.with_benchmark_iterations(5);
+    let config = config_builder.build("my_config.toml");
+    println!("Test config: {:?}", config);
+
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("--config")
+        .arg(config.path)
+        .arg("-c")
+        .arg("SELECT * FROM x")
+        .assert()
+        .success();
+
+    let expected = "5 runs";
+
+    assert.stdout(contains_str(expected));
+}
