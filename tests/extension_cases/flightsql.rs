@@ -317,7 +317,7 @@ async fn test_custom_config_benchmark_iterations() {
     let test_server = TestFlightSqlServiceImpl::new();
     let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
     let mut config_builder = TestConfigBuilder::default();
-    config_builder.with_benchmark_iterations(5);
+    config_builder.with_flightsql_benchmark_iterations(5);
     let config = config_builder.build("my_config.toml");
     println!("Test config: {:?}", config);
 
