@@ -20,7 +20,10 @@ use std::time::Duration;
 use assert_cmd::Command;
 use dft::test_utils::fixture::{TestFixture, TestFlightSqlServiceImpl};
 
-use crate::cli_cases::{contains_str, sql_in_file};
+use crate::{
+    cli_cases::{contains_str, sql_in_file},
+    config::TestConfigBuilder,
+};
 
 #[tokio::test]
 pub async fn test_execute_with_no_flightsql_server() {
@@ -306,5 +309,35 @@ Benchmark Stats (10 runs)
 SELECT 1 + 1;
 ----------------------------"##;
     assert.code(0).stdout(contains_str(expected_err));
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_custom_config_benchmark_iterations() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+    let mut config_builder = TestConfigBuilder::default();
+    config_builder.with_flightsql_benchmark_iterations(5);
+    let config = config_builder.build("my_config.toml");
+    println!("Test config: {:?}", config);
+
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("--config")
+            .arg(config.path)
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("--flightsql")
+            .arg("--bench")
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = "5 runs";
+
+    assert.stdout(contains_str(expected));
     fixture.shutdown_and_wait().await;
 }

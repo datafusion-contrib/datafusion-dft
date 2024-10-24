@@ -175,7 +175,7 @@ A separate editor for connecting to a FlightSQL server is provided.
 The default `connection_url` is `http://localhost:50051` but this can be configured your config as well:
 
 ```toml
-[flight_sql]
+[flightsql]
 connection_url = "http://myhost:myport"
 ```
 
@@ -351,7 +351,7 @@ paste = true
 The FlightSQL config is where you can define the connection URL for the FlightSQL server.
 
 ```toml
-[flight_sql]
+[flightsql]
 connection_url = "http://localhost:50051"
 ```
 
