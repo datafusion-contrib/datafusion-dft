@@ -48,7 +48,6 @@ Some of the current and planned features are:
 - Tab management to provide clean and structured organization of DataFusion queries, results, and context
   - SQL editor
     - Write query results to file (TODO)
-    - Multiple SQL Editor tabs (TODO)
   - Query history
     - History and statistics of executed queries
   - ExecutionContext information
