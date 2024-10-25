@@ -69,6 +69,15 @@ impl LocalBenchmarkStats {
     }
 
     fn summarize(&self, durations: &[Duration]) -> DurationsSummary {
+        if durations.is_empty() {
+            return DurationsSummary {
+                min: Duration::from_secs(0),
+                max: Duration::from_secs(0),
+                mean: Duration::from_secs(0),
+                median: Duration::from_secs(0),
+                percent_of_total: 0.0,
+            };
+        }
         let mut sorted = durations.to_vec();
         sorted.sort();
         let len = sorted.len();
