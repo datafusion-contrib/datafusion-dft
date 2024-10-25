@@ -18,8 +18,8 @@
 use datafusion::{
     datasource::physical_plan::ParquetExec,
     physical_plan::{
-        filter::FilterExec, metrics::MetricValue, visit_execution_plan, ExecutionPlan,
-        ExecutionPlanVisitor,
+        filter::FilterExec, metrics::MetricValue, sorts::sort::SortExec, visit_execution_plan,
+        ExecutionPlan, ExecutionPlanVisitor,
     },
 };
 use itertools::Itertools;
@@ -322,13 +322,73 @@ pub struct PartitionsComputeStats {
     elapsed_computes: Vec<usize>,
 }
 
+impl PartitionsComputeStats {
+    fn summary_stats(&self) -> (usize, usize, usize, usize, usize) {
+        if self.elapsed_computes.is_empty() {
+            (0, 0, 0, 0, 0)
+        } else {
+            let min = self.elapsed_computes[0];
+            let median = self.elapsed_computes[self.elapsed_computes.len() / 2];
+            let max = self.elapsed_computes[self.elapsed_computes.len() - 1];
+            let total: usize = self.elapsed_computes.iter().sum();
+            let mean = total / self.elapsed_computes.len();
+            (min, median, mean, max, total)
+        }
+    }
+
+    fn partitions(&self) -> usize {
+        self.elapsed_computes.len()
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct ExecutionComputeStats {
     elapsed_compute: Option<usize>,
     // projection_compute: Option<PartitionsComputeStats>,
+    /// Each `FilterExec` node has its own compute stats
     filter_compute: Option<Vec<PartitionsComputeStats>>,
-    // sort_compute: Option<PartitionsComputeStats>,
+    sort_compute: Option<Vec<PartitionsComputeStats>>,
+}
+
+impl ExecutionComputeStats {
+    fn display_compute(
+        &self,
+        f: &mut std::fmt::Formatter<'_>,
+        compute: &Option<Vec<PartitionsComputeStats>>,
+        label: &str,
+    ) -> std::fmt::Result {
+        if let (Some(filter_compute), Some(elapsed_compute)) = (compute, &self.elapsed_compute) {
+            let partitions = filter_compute.iter().fold(0, |acc, c| acc + c.partitions());
+            writeln!(
+                f,
+                "{label} Stats ({} nodes, {} partitions)",
+                filter_compute.len(),
+                partitions
+            )?;
+            filter_compute.iter().try_for_each(|node| {
+                let (min, median, mean, max, total) = node.summary_stats();
+                writeln!(
+                    f,
+                    "{:<18} {:<18} {:<18} {:<18} {:<18}",
+                    "Min", "Median", "Mean", "Max", "Total (%)"
+                )?;
+                let total = format!(
+                    "{} ({:.2}%)",
+                    total,
+                    (total as f32 / *elapsed_compute as f32) * 100.0
+                );
+                writeln!(
+                    f,
+                    "{:<18} {:<18} {:<18} {:<18} {:<18}",
+                    min, median, mean, max, total,
+                )?;
+                Ok(())
+            })?
+        } else {
+            writeln!(f, "No {label} Stats")?;
+        };
+        Ok(())
+    }
 }
 
 impl std::fmt::Display for ExecutionComputeStats {
@@ -347,13 +407,41 @@ impl std::fmt::Display for ExecutionComputeStats {
                 .unwrap_or("None".to_string()),
         )?;
         writeln!(f)?;
-        writeln!(f, "Filter Stats")?;
-        self.filter_compute
-            .iter()
-            .try_for_each(|node| );
-                // {
-                //     writeln!(f, "{:<20} {:<20} {:<20}", "Min", "Median", "Max"))?;
-                // }
+        self.display_compute(f, &self.filter_compute, "Filter");
+        writeln!(f)?;
+        self.display_compute(f, &self.sort_compute, "Sort");
+        // if let (Some(filter_compute), Some(elapsed_compute)) =
+        //     (&self.filter_compute, &self.elapsed_compute)
+        // {
+        //     let partitions = filter_compute.iter().fold(0, |acc, c| acc + c.partitions());
+        //     writeln!(
+        //         f,
+        //         "Filter Stats ({} nodes, {} partitions)",
+        //         filter_compute.len(),
+        //         partitions
+        //     )?;
+        //     filter_compute.iter().try_for_each(|node| {
+        //         let (min, median, mean, max, total) = node.summary_stats();
+        //         writeln!(
+        //             f,
+        //             "{:<18} {:<18} {:<18} {:<18} {:<18}",
+        //             "Min", "Median", "Mean", "Max", "Total (%)"
+        //         )?;
+        //         let total = format!(
+        //             "{} ({:.2}%)",
+        //             total,
+        //             (total as f32 / *elapsed_compute as f32) * 100.0
+        //         );
+        //         writeln!(
+        //             f,
+        //             "{:<18} {:<18} {:<18} {:<18} {:<18}",
+        //             min, median, mean, max, total,
+        //         )?;
+        //         Ok(())
+        //     })?
+        // } else {
+        //     writeln!(f, "No Filter Stats")?;
+        // }
         writeln!(f)
     }
 }
@@ -362,23 +450,27 @@ impl std::fmt::Display for ExecutionComputeStats {
 pub struct PlanComputeVisitor {
     elapsed_compute: Option<usize>,
     filter_computes: Vec<PartitionsComputeStats>,
+    sort_computes: Vec<PartitionsComputeStats>,
 }
 
 impl PlanComputeVisitor {
-    // pub fn new() -> Self {
-    //     Self {
-    //         elapsed_compute: None,
-    //         filter_computes: Vec::new(),
-    //     }
-    // }
+    fn add_elapsed_compute(&mut self, node_elapsed_compute: Option<usize>) {
+        match (self.elapsed_compute, node_elapsed_compute) {
+            (Some(agg_elapsed_compute), Some(node_elapsed_compute)) => {
+                self.elapsed_compute = Some(agg_elapsed_compute + node_elapsed_compute)
+            }
+            (Some(_), None) | (None, None) => {}
+            (None, Some(node_elapsed_compute)) => self.elapsed_compute = Some(node_elapsed_compute),
+        }
+    }
 
     fn collect_compute_metrics(&mut self, plan: &dyn ExecutionPlan) {
         let compute_metrics = plan.metrics();
         if let Some(metrics) = compute_metrics {
-            println!("Metrics for {}: {:#?}", plan.name(), metrics);
-            self.elapsed_compute = metrics.elapsed_compute();
+            self.add_elapsed_compute(metrics.elapsed_compute());
         }
         self.collect_filter_metrics(plan);
+        self.collect_sort_metrics(plan);
     }
 
     fn collect_filter_metrics(&mut self, plan: &dyn ExecutionPlan) {
@@ -399,6 +491,25 @@ impl PlanComputeVisitor {
             }
         }
     }
+
+    fn collect_sort_metrics(&mut self, plan: &dyn ExecutionPlan) {
+        if plan.as_any().downcast_ref::<SortExec>().is_some() {
+            if let Some(metrics) = plan.metrics() {
+                let sorted_computes: Vec<usize> = metrics
+                    .iter()
+                    .filter_map(|m| match m.value() {
+                        MetricValue::ElapsedCompute(t) => Some(t.value()),
+                        _ => None,
+                    })
+                    .sorted()
+                    .collect();
+                let p = PartitionsComputeStats {
+                    elapsed_computes: sorted_computes,
+                };
+                self.sort_computes.push(p)
+            }
+        }
+    }
 }
 
 impl From<PlanComputeVisitor> for ExecutionComputeStats {
@@ -406,6 +517,7 @@ impl From<PlanComputeVisitor> for ExecutionComputeStats {
         Self {
             elapsed_compute: value.elapsed_compute,
             filter_compute: Some(value.filter_computes),
+            sort_compute: Some(value.sort_computes),
         }
     }
 }
@@ -415,7 +527,7 @@ impl ExecutionPlanVisitor for PlanComputeVisitor {
 
     fn pre_visit(&mut self, plan: &dyn ExecutionPlan) -> color_eyre::Result<bool, Self::Error> {
         if !is_io_plan(plan) {
-            println!("Collecting Compute metrics for {}", plan.name());
+            // println!("Collecting Compute metrics for {}", plan.name());
             self.collect_compute_metrics(plan);
         }
         Ok(true)
@@ -424,7 +536,7 @@ impl ExecutionPlanVisitor for PlanComputeVisitor {
 
 fn is_io_plan(plan: &dyn ExecutionPlan) -> bool {
     let io_plans = ["CsvExec", "ParquetExec", "ArrowExec"];
-    println!("Plan name: {}", plan.name());
+    // println!("Plan name: {}", plan.name());
     io_plans.contains(&plan.name())
 }
 
