@@ -312,10 +312,12 @@ impl ExecutionContext {
             let mut stream = execute_stream(Arc::clone(&physical_plan), task_ctx)?;
             let mut rows = 0;
             let mut batches = 0;
+            let mut bytes = 0;
             while let Some(b) = stream.next().await {
                 let batch = b?;
                 rows += batch.num_rows();
                 batches += 1;
+                bytes += batch.get_array_memory_size();
             }
             let execution_duration = start.elapsed();
             let durations = ExecutionDurationStats::new(
@@ -325,7 +327,7 @@ impl ExecutionContext {
                 execution_duration - physical_planning_duration,
                 start.elapsed(),
             );
-            ExecutionStats::try_new(durations, rows, batches, physical_plan)
+            ExecutionStats::try_new(durations, rows, batches, bytes, physical_plan)
             // print_execution_summary(
             //     rows,
             //     batches,

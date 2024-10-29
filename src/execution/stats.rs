@@ -18,18 +18,18 @@
 use datafusion::{
     datasource::physical_plan::ParquetExec,
     physical_plan::{
-        filter::FilterExec, metrics::MetricValue, sorts::sort::SortExec, visit_execution_plan,
-        ExecutionPlan, ExecutionPlanVisitor,
+        filter::FilterExec, metrics::MetricValue, projection::ProjectionExec,
+        sorts::sort::SortExec, visit_execution_plan, ExecutionPlan, ExecutionPlanVisitor,
     },
 };
 use itertools::Itertools;
-use log::info;
 use std::{sync::Arc, time::Duration};
 
 #[derive(Clone, Debug)]
 pub struct ExecutionStats {
     rows: usize,
     batches: i32,
+    bytes: usize,
     durations: ExecutionDurationStats,
     io: Option<ExecutionIOStats>,
     compute: Option<ExecutionComputeStats>,
@@ -41,12 +41,14 @@ impl ExecutionStats {
         durations: ExecutionDurationStats,
         rows: usize,
         batches: i32,
+        bytes: usize,
         plan: Arc<dyn ExecutionPlan>,
     ) -> color_eyre::Result<Self> {
         Ok(Self {
             durations,
             rows,
             batches,
+            bytes,
             plan,
             io: None,
             compute: None,
@@ -61,6 +63,15 @@ impl ExecutionStats {
             self.compute = Some(compute)
         }
     }
+
+    pub fn selectivity(&self) -> f64 {
+        let bytes_scanned = self.io.as_ref().and_then(|io| io.bytes_scanned.clone());
+        if let Some(bytes_scanned) = bytes_scanned {
+            bytes_scanned.as_usize() as f64 / self.bytes as f64
+        } else {
+            0.0
+        }
+    }
 }
 
 impl std::fmt::Display for ExecutionStats {
@@ -69,8 +80,18 @@ impl std::fmt::Display for ExecutionStats {
             f,
             "==================== Execution Summary ===================="
         )?;
-        writeln!(f, "{:<20} {:<20}", "Rows Returned", "Batches Processed")?;
-        writeln!(f, "{:<20} {:<20}", self.rows, self.batches)?;
+        writeln!(
+            f,
+            "{:<20} {:<20} {:<20}",
+            "Rows Returned", "Batches Processed", "Selectivity"
+        )?;
+        writeln!(
+            f,
+            "{:<20} {:<20} {:<20.2}",
+            self.rows,
+            self.batches,
+            self.selectivity()
+        )?;
         writeln!(f)?;
         writeln!(f, "{}", self.durations)?;
         if let Some(io_stats) = &self.io {
@@ -272,7 +293,6 @@ impl PlanIOVisitor {
     fn collect_io_metrics(&mut self, plan: &dyn ExecutionPlan) {
         let io_metrics = plan.metrics();
         if let Some(metrics) = io_metrics {
-            println!("Metrics for {}: {:#?}", plan.name(), metrics);
             self.bytes_scanned = metrics.sum_by_name("bytes_scanned");
             self.time_opening = metrics.sum_by_name("time_elapsed_opening");
             self.time_scanning = metrics.sum_by_name("time_elapsed_scanning_total");
@@ -309,7 +329,6 @@ impl ExecutionPlanVisitor for PlanIOVisitor {
 
     fn pre_visit(&mut self, plan: &dyn ExecutionPlan) -> color_eyre::Result<bool, Self::Error> {
         if is_io_plan(plan) {
-            println!("Collecting IO metrics for {}", plan.name());
             self.collect_io_metrics(plan);
         }
         Ok(true)
@@ -344,8 +363,7 @@ impl PartitionsComputeStats {
 #[derive(Clone, Debug)]
 pub struct ExecutionComputeStats {
     elapsed_compute: Option<usize>,
-    // projection_compute: Option<PartitionsComputeStats>,
-    /// Each `FilterExec` node has its own compute stats
+    projection_compute: Option<Vec<PartitionsComputeStats>>,
     filter_compute: Option<Vec<PartitionsComputeStats>>,
     sort_compute: Option<Vec<PartitionsComputeStats>>,
 }
@@ -407,9 +425,11 @@ impl std::fmt::Display for ExecutionComputeStats {
                 .unwrap_or("None".to_string()),
         )?;
         writeln!(f)?;
-        self.display_compute(f, &self.filter_compute, "Filter");
+        self.display_compute(f, &self.filter_compute, "Filter")?;
         writeln!(f)?;
-        self.display_compute(f, &self.sort_compute, "Sort");
+        self.display_compute(f, &self.sort_compute, "Sort")?;
+        writeln!(f)?;
+        self.display_compute(f, &self.projection_compute, "Projection")?;
         // if let (Some(filter_compute), Some(elapsed_compute)) =
         //     (&self.filter_compute, &self.elapsed_compute)
         // {
@@ -451,6 +471,7 @@ pub struct PlanComputeVisitor {
     elapsed_compute: Option<usize>,
     filter_computes: Vec<PartitionsComputeStats>,
     sort_computes: Vec<PartitionsComputeStats>,
+    projection_computes: Vec<PartitionsComputeStats>,
 }
 
 impl PlanComputeVisitor {
@@ -471,6 +492,7 @@ impl PlanComputeVisitor {
         }
         self.collect_filter_metrics(plan);
         self.collect_sort_metrics(plan);
+        self.collect_projection_metrics(plan);
     }
 
     fn collect_filter_metrics(&mut self, plan: &dyn ExecutionPlan) {
@@ -510,6 +532,25 @@ impl PlanComputeVisitor {
             }
         }
     }
+
+    fn collect_projection_metrics(&mut self, plan: &dyn ExecutionPlan) {
+        if plan.as_any().downcast_ref::<ProjectionExec>().is_some() {
+            if let Some(metrics) = plan.metrics() {
+                let sorted_computes: Vec<usize> = metrics
+                    .iter()
+                    .filter_map(|m| match m.value() {
+                        MetricValue::ElapsedCompute(t) => Some(t.value()),
+                        _ => None,
+                    })
+                    .sorted()
+                    .collect();
+                let p = PartitionsComputeStats {
+                    elapsed_computes: sorted_computes,
+                };
+                self.projection_computes.push(p)
+            }
+        }
+    }
 }
 
 impl From<PlanComputeVisitor> for ExecutionComputeStats {
@@ -518,6 +559,7 @@ impl From<PlanComputeVisitor> for ExecutionComputeStats {
             elapsed_compute: value.elapsed_compute,
             filter_compute: Some(value.filter_computes),
             sort_compute: Some(value.sort_computes),
+            projection_compute: Some(value.projection_computes),
         }
     }
 }
@@ -527,7 +569,6 @@ impl ExecutionPlanVisitor for PlanComputeVisitor {
 
     fn pre_visit(&mut self, plan: &dyn ExecutionPlan) -> color_eyre::Result<bool, Self::Error> {
         if !is_io_plan(plan) {
-            // println!("Collecting Compute metrics for {}", plan.name());
             self.collect_compute_metrics(plan);
         }
         Ok(true)
@@ -536,7 +577,6 @@ impl ExecutionPlanVisitor for PlanComputeVisitor {
 
 fn is_io_plan(plan: &dyn ExecutionPlan) -> bool {
     let io_plans = ["CsvExec", "ParquetExec", "ArrowExec"];
-    // println!("Plan name: {}", plan.name());
     io_plans.contains(&plan.name())
 }
 
