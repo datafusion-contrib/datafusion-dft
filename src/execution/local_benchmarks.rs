@@ -43,6 +43,7 @@ impl std::fmt::Display for DurationsSummary {
 pub struct LocalBenchmarkStats {
     query: String,
     runs: usize,
+    rows: Vec<usize>,
     logical_planning_durations: Vec<Duration>,
     physical_planning_durations: Vec<Duration>,
     execution_durations: Vec<Duration>,
@@ -52,6 +53,7 @@ pub struct LocalBenchmarkStats {
 impl LocalBenchmarkStats {
     pub fn new(
         query: String,
+        rows: Vec<usize>,
         logical_planning_durations: Vec<Duration>,
         physical_planning_durations: Vec<Duration>,
         execution_durations: Vec<Duration>,
@@ -61,6 +63,7 @@ impl LocalBenchmarkStats {
         Self {
             query,
             runs,
+            rows,
             logical_planning_durations,
             physical_planning_durations,
             execution_durations,
@@ -102,6 +105,10 @@ impl LocalBenchmarkStats {
     }
 }
 
+pub fn is_all_same(arr: &[usize]) -> bool {
+    arr.iter().min() == arr.iter().max()
+}
+
 impl std::fmt::Display for LocalBenchmarkStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f)?;
@@ -110,6 +117,13 @@ impl std::fmt::Display for LocalBenchmarkStats {
         writeln!(f, "----------------------------")?;
         writeln!(f, "{}", self.query)?;
         writeln!(f, "----------------------------")?;
+        if is_all_same(&self.rows) {
+            writeln!(f, "Row counts match across runs")?;
+        } else {
+            writeln!(f, "\x1b[31mRow counts differ across runs\x1b[0m")?;
+        }
+        writeln!(f, "----------------------------")?;
+        writeln!(f)?;
 
         let logical_planning_summary = self.summarize(&self.logical_planning_durations);
         writeln!(f, "Logical Planning")?;

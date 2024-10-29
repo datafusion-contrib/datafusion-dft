@@ -17,11 +17,14 @@
 
 use std::time::Duration;
 
+use crate::execution::local_benchmarks::is_all_same;
+
 use super::local_benchmarks::DurationsSummary;
 
 pub struct FlightSQLBenchmarkStats {
     query: String,
     runs: usize,
+    rows: Vec<usize>,
     get_flight_info_durations: Vec<Duration>,
     ttfb_durations: Vec<Duration>,
     do_get_durations: Vec<Duration>,
@@ -31,6 +34,7 @@ pub struct FlightSQLBenchmarkStats {
 impl FlightSQLBenchmarkStats {
     pub fn new(
         query: String,
+        rows: Vec<usize>,
         get_flight_info_durations: Vec<Duration>,
         ttfb_durations: Vec<Duration>,
         do_get_durations: Vec<Duration>,
@@ -40,6 +44,7 @@ impl FlightSQLBenchmarkStats {
         Self {
             query,
             runs,
+            rows,
             get_flight_info_durations,
             ttfb_durations,
             do_get_durations,
@@ -89,6 +94,13 @@ impl std::fmt::Display for FlightSQLBenchmarkStats {
         writeln!(f, "----------------------------")?;
         writeln!(f, "{}", self.query)?;
         writeln!(f, "----------------------------")?;
+        if is_all_same(&self.rows) {
+            writeln!(f, "Row counts match across runs")?;
+        } else {
+            writeln!(f, "\x1b[31mRow counts differ across runs\x1b[0m")?;
+        }
+        writeln!(f, "----------------------------")?;
+        writeln!(f)?;
 
         let logical_planning_summary = self.summarize(&self.get_flight_info_durations);
         writeln!(f, "Get Flight Info")?;
