@@ -69,6 +69,7 @@ impl FlightSQLContext {
 
     pub async fn benchmark_query(&self, query: &str) -> Result<FlightSQLBenchmarkStats> {
         let iterations = self.config.benchmark_iterations;
+        let mut rows_returned = Vec::with_capacity(iterations);
         let mut get_flight_info_durations = Vec::with_capacity(iterations);
         let mut ttfb_durations = Vec::with_capacity(iterations);
         let mut do_get_durations = Vec::with_capacity(iterations);
@@ -79,6 +80,7 @@ impl FlightSQLContext {
         if statements.len() == 1 {
             if let Some(ref mut client) = *self.flightsql_client.lock().await {
                 for _ in 0..iterations {
+                    let mut rows = 0;
                     let start = std::time::Instant::now();
                     let flight_info = client.execute(query.to_string(), None).await?;
                     if flight_info.endpoint.len() > 1 {
@@ -90,9 +92,10 @@ impl FlightSQLContext {
                         if let Some(ticket) = &endpoint.ticket {
                             match client.do_get(ticket.clone().into_request()).await {
                                 Ok(ref mut s) => {
-                                    while let Some((i, _)) =
+                                    while let Some((i, b)) =
                                         futures::stream::StreamExt::enumerate(&mut *s).next().await
                                     {
+                                        rows += b?.num_rows();
                                         if i == 0 {
                                             let ttfb_duration =
                                                 start.elapsed() - get_flight_info_duration;
@@ -109,6 +112,7 @@ impl FlightSQLContext {
                             }
                         }
                     }
+                    rows_returned.push(rows);
                     get_flight_info_durations.push(get_flight_info_duration);
                     let total_duration = start.elapsed();
                     total_durations.push(total_duration);
@@ -118,6 +122,7 @@ impl FlightSQLContext {
             }
             Ok(FlightSQLBenchmarkStats::new(
                 query.to_string(),
+                rows_returned,
                 get_flight_info_durations,
                 ttfb_durations,
                 do_get_durations,
