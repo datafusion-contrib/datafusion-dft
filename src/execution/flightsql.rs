@@ -92,15 +92,15 @@ impl FlightSQLContext {
                         if let Some(ticket) = &endpoint.ticket {
                             match client.do_get(ticket.clone().into_request()).await {
                                 Ok(ref mut s) => {
-                                    while let Some((i, b)) =
-                                        futures::stream::StreamExt::enumerate(&mut *s).next().await
-                                    {
+                                    let mut batch_count = 0;
+                                    while let Some(b) = s.next().await {
                                         rows += b?.num_rows();
-                                        if i == 0 {
+                                        if batch_count == 0 {
                                             let ttfb_duration =
                                                 start.elapsed() - get_flight_info_duration;
                                             ttfb_durations.push(ttfb_duration);
                                         }
+                                        batch_count += 1;
                                     }
                                     let do_get_duration =
                                         start.elapsed() - get_flight_info_duration;

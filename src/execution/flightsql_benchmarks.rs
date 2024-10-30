@@ -107,11 +107,11 @@ impl std::fmt::Display for FlightSQLBenchmarkStats {
         writeln!(f, "{}", logical_planning_summary)?;
 
         let physical_planning_summary = self.summarize(&self.ttfb_durations);
-        writeln!(f, "Time to First Byte")?;
+        writeln!(f, "Time to First Byte (TTFB)")?;
         writeln!(f, "{}", physical_planning_summary)?;
 
         let execution_summary = self.summarize(&self.do_get_durations);
-        writeln!(f, "Do Get")?;
+        writeln!(f, "Do Get (Includes TTFB)")?;
         writeln!(f, "{}", execution_summary)?;
 
         let total_summary = self.summarize(&self.total_durations);
