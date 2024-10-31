@@ -24,7 +24,6 @@ use std::sync::Arc;
 use log::{debug, error, info};
 
 use crate::config::ExecutionConfig;
-// use crate::execution::stats::print_execution_summary;
 use crate::extensions::{enabled_extensions, DftSessionStateBuilder};
 use color_eyre::eyre::{self, Result};
 use datafusion::execution::SendableRecordBatchStream;
@@ -34,7 +33,7 @@ use datafusion::sql::parser::{DFParser, Statement};
 use tokio_stream::StreamExt;
 
 use super::local_benchmarks::LocalBenchmarkStats;
-use super::stats::{print_io_summary, ExecutionDurationStats, ExecutionStats};
+use super::stats::{ExecutionDurationStats, ExecutionStats};
 use super::AppType;
 
 /// Structure for executing queries locally
@@ -299,7 +298,7 @@ impl ExecutionContext {
             let logical_plan = self
                 .session_ctx()
                 .state()
-                .statement_to_plan(statement)
+                .statement_to_plan(statement.clone())
                 .await?;
             let logical_planning_duration = start.elapsed();
             let physical_plan = self
@@ -327,17 +326,14 @@ impl ExecutionContext {
                 execution_duration - physical_planning_duration,
                 start.elapsed(),
             );
-            ExecutionStats::try_new(durations, rows, batches, bytes, physical_plan)
-            // print_execution_summary(
-            //     rows,
-            //     batches,
-            //     parsing_duration,
-            //     logical_planning_duration - parsing_duration,
-            //     physical_planning_duration - logical_planning_duration,
-            //     execution_duration - physical_planning_duration,
-            //     start.elapsed(),
-            // );
-            // print_io_summary(physical_plan);
+            ExecutionStats::try_new(
+                statement.to_string(),
+                durations,
+                rows,
+                batches,
+                bytes,
+                physical_plan,
+            )
         } else {
             Err(eyre::eyre!("Only a single statement can be benchmarked"))
         }

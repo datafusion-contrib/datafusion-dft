@@ -27,6 +27,7 @@ use std::{sync::Arc, time::Duration};
 
 #[derive(Clone, Debug)]
 pub struct ExecutionStats {
+    query: String,
     rows: usize,
     batches: i32,
     bytes: usize,
@@ -38,6 +39,7 @@ pub struct ExecutionStats {
 
 impl ExecutionStats {
     pub fn try_new(
+        query: String,
         durations: ExecutionDurationStats,
         rows: usize,
         batches: i32,
@@ -45,6 +47,7 @@ impl ExecutionStats {
         plan: Arc<dyn ExecutionPlan>,
     ) -> color_eyre::Result<Self> {
         Ok(Self {
+            query,
             durations,
             rows,
             batches,
@@ -64,10 +67,19 @@ impl ExecutionStats {
         }
     }
 
-    pub fn selectivity(&self) -> f64 {
-        let bytes_scanned = self.io.as_ref().and_then(|io| io.bytes_scanned.clone());
-        if let Some(bytes_scanned) = bytes_scanned {
-            bytes_scanned.as_usize() as f64 / self.bytes as f64
+    pub fn rows_selectivity(&self) -> f64 {
+        let maybe_io_output_rows = self.io.as_ref().and_then(|io| io.parquet_output_rows);
+        if let Some(io_output_rows) = maybe_io_output_rows {
+            self.rows as f64 / io_output_rows as f64
+        } else {
+            0.0
+        }
+    }
+
+    pub fn bytes_selectivity(&self) -> f64 {
+        let maybe_io_output_bytes = self.io.as_ref().and_then(|io| io.bytes_scanned.clone());
+        if let Some(io_output_bytes) = maybe_io_output_bytes {
+            self.bytes as f64 / io_output_bytes.as_usize() as f64
         } else {
             0.0
         }
@@ -78,19 +90,24 @@ impl std::fmt::Display for ExecutionStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
+            "========================= Query ==========================="
+        )?;
+        writeln!(f, "{}", self.query)?;
+        writeln!(
+            f,
             "==================== Execution Summary ===================="
         )?;
         writeln!(
             f,
             "{:<20} {:<20} {:<20}",
-            "Rows Returned", "Batches Processed", "Selectivity"
+            "Output Rows (%)", "Output Bytes (%)", "Batches Processed",
         )?;
         writeln!(
             f,
-            "{:<20} {:<20} {:<20.2}",
-            self.rows,
+            "{:<20} {:<20} {:<20}",
+            format!("{} ({:.2})", self.rows, self.rows_selectivity()),
+            format!("{} ({:.2})", self.bytes, self.bytes_selectivity()),
             self.batches,
-            self.selectivity()
         )?;
         writeln!(f)?;
         writeln!(f, "{}", self.durations)?;
@@ -146,7 +163,7 @@ impl std::fmt::Display for ExecutionDurationStats {
         writeln!(f)?;
         writeln!(f, "{:<20} {:<20}", "Execution", "Total")?;
         writeln!(f, "{:<20?} {:<20?}", self.execution, self.total)?;
-        writeln!(f)
+        Ok(())
     }
 }
 
@@ -162,6 +179,60 @@ pub struct ExecutionIOStats {
     parquet_rg_matched_stats: Option<MetricValue>,
     parquet_rg_pruned_bloom_filter: Option<MetricValue>,
     parquet_rg_matched_bloom_filter: Option<MetricValue>,
+}
+
+impl ExecutionIOStats {
+    fn parquet_rg_pruned_stats_ratio(&self) -> f64 {
+        if let (Some(pruned), Some(matched)) = (
+            self.parquet_rg_matched_stats.as_ref(),
+            self.parquet_rg_pruned_stats.as_ref(),
+        ) {
+            let pruned = pruned.as_usize() as f64;
+            let matched = matched.as_usize() as f64;
+            matched / (pruned + matched)
+        } else {
+            0.0
+        }
+    }
+
+    fn parquet_rg_pruned_bloom_filter_ratio(&self) -> f64 {
+        if let (Some(pruned), Some(matched)) = (
+            self.parquet_rg_matched_bloom_filter.as_ref(),
+            self.parquet_rg_pruned_bloom_filter.as_ref(),
+        ) {
+            let pruned = pruned.as_usize() as f64;
+            let matched = matched.as_usize() as f64;
+            matched / (pruned + matched)
+        } else {
+            0.0
+        }
+    }
+
+    fn parquet_rg_pruned_page_index_ratio(&self) -> f64 {
+        if let (Some(pruned), Some(matched)) = (
+            self.parquet_matched_page_index.as_ref(),
+            self.parquet_pruned_page_index.as_ref(),
+        ) {
+            let pruned = pruned.as_usize() as f64;
+            let matched = matched.as_usize() as f64;
+            matched / (pruned + matched)
+        } else {
+            0.0
+        }
+    }
+
+    fn row_group_count(&self) -> usize {
+        if let (Some(pruned), Some(matched)) = (
+            self.parquet_rg_matched_stats.as_ref(),
+            self.parquet_rg_pruned_stats.as_ref(),
+        ) {
+            let pruned = pruned.as_usize();
+            let matched = matched.as_usize();
+            pruned + matched
+        } else {
+            0
+        }
+    }
 }
 
 impl std::fmt::Display for ExecutionIOStats {
@@ -194,66 +265,26 @@ impl std::fmt::Display for ExecutionIOStats {
         writeln!(f)?;
         writeln!(
             f,
-            "Parquet IO Stats (Output Rows: {})",
+            "Parquet Pruning Stats (Output Rows: {}, Row Groups: {})",
             self.parquet_output_rows
                 .as_ref()
                 .map(|m| m.to_string())
-                .unwrap_or("None".to_string())
-        )?;
-        writeln!(f)?;
-        writeln!(
-            f,
-            "{:<30} {:<30}",
-            "Pruned Page Index", "Matched Page Index"
-        )?;
-        writeln!(
-            f,
-            "{:<30} {:<30}",
-            self.parquet_pruned_page_index
-                .as_ref()
-                .map(|m| m.to_string())
                 .unwrap_or("None".to_string()),
-            self.parquet_matched_page_index
-                .as_ref()
-                .map(|m| m.to_string())
-                .unwrap_or("None".to_string())
-        )?;
-        writeln!(f)?;
-        writeln!(
-            f,
-            "{:<30} {:<30}",
-            "Row Groups Pruned (Stats)", "Row Groups Matched (Stats)"
+            self.row_group_count()
         )?;
         writeln!(
             f,
-            "{:<30} {:<30}",
-            self.parquet_rg_pruned_stats
-                .as_ref()
-                .map(|m| m.to_string())
-                .unwrap_or("None".to_string()),
-            self.parquet_rg_matched_stats
-                .as_ref()
-                .map(|m| m.to_string())
-                .unwrap_or("None".to_string())
-        )?;
-        writeln!(f)?;
-        writeln!(
-            f,
-            "{:<30} {:<30}",
-            "Row Groups Pruned (Bloom)", "Row Groups Matched (Bloom)"
+            "{:<20} {:<20} {:<20}",
+            "Matched RG Stats %", "Matched RG Bloom %", "Matched Page Index %"
         )?;
         writeln!(
             f,
-            "{:<30} {:<30}",
-            self.parquet_rg_pruned_bloom_filter
-                .as_ref()
-                .map(|m| m.to_string())
-                .unwrap_or("None".to_string()),
-            self.parquet_rg_matched_bloom_filter
-                .as_ref()
-                .map(|m| m.to_string())
-                .unwrap_or("None".to_string())
-        )
+            "{:<20.2} {:<20.2} {:<20.2}",
+            self.parquet_rg_pruned_stats_ratio(),
+            self.parquet_rg_pruned_bloom_filter_ratio(),
+            self.parquet_rg_pruned_page_index_ratio()
+        )?;
+        Ok(())
     }
 }
 
@@ -366,6 +397,7 @@ pub struct ExecutionComputeStats {
     projection_compute: Option<Vec<PartitionsComputeStats>>,
     filter_compute: Option<Vec<PartitionsComputeStats>>,
     sort_compute: Option<Vec<PartitionsComputeStats>>,
+    other_compute: Option<Vec<PartitionsComputeStats>>,
 }
 
 impl ExecutionComputeStats {
@@ -413,7 +445,7 @@ impl std::fmt::Display for ExecutionComputeStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
-            "======================= Compute Summary ========================"
+            "==================================== Compute Summary ====================================="
         )?;
         writeln!(f, "{:<20}", "Elapsed Compute",)?;
         writeln!(
@@ -430,38 +462,8 @@ impl std::fmt::Display for ExecutionComputeStats {
         self.display_compute(f, &self.sort_compute, "Sort")?;
         writeln!(f)?;
         self.display_compute(f, &self.projection_compute, "Projection")?;
-        // if let (Some(filter_compute), Some(elapsed_compute)) =
-        //     (&self.filter_compute, &self.elapsed_compute)
-        // {
-        //     let partitions = filter_compute.iter().fold(0, |acc, c| acc + c.partitions());
-        //     writeln!(
-        //         f,
-        //         "Filter Stats ({} nodes, {} partitions)",
-        //         filter_compute.len(),
-        //         partitions
-        //     )?;
-        //     filter_compute.iter().try_for_each(|node| {
-        //         let (min, median, mean, max, total) = node.summary_stats();
-        //         writeln!(
-        //             f,
-        //             "{:<18} {:<18} {:<18} {:<18} {:<18}",
-        //             "Min", "Median", "Mean", "Max", "Total (%)"
-        //         )?;
-        //         let total = format!(
-        //             "{} ({:.2}%)",
-        //             total,
-        //             (total as f32 / *elapsed_compute as f32) * 100.0
-        //         );
-        //         writeln!(
-        //             f,
-        //             "{:<18} {:<18} {:<18} {:<18} {:<18}",
-        //             min, median, mean, max, total,
-        //         )?;
-        //         Ok(())
-        //     })?
-        // } else {
-        //     writeln!(f, "No Filter Stats")?;
-        // }
+        writeln!(f)?;
+        self.display_compute(f, &self.other_compute, "Other")?;
         writeln!(f)
     }
 }
@@ -472,6 +474,7 @@ pub struct PlanComputeVisitor {
     filter_computes: Vec<PartitionsComputeStats>,
     sort_computes: Vec<PartitionsComputeStats>,
     projection_computes: Vec<PartitionsComputeStats>,
+    other_computes: Vec<PartitionsComputeStats>,
 }
 
 impl PlanComputeVisitor {
@@ -493,10 +496,11 @@ impl PlanComputeVisitor {
         self.collect_filter_metrics(plan);
         self.collect_sort_metrics(plan);
         self.collect_projection_metrics(plan);
+        self.collect_other_metrics(plan);
     }
 
     fn collect_filter_metrics(&mut self, plan: &dyn ExecutionPlan) {
-        if plan.as_any().downcast_ref::<FilterExec>().is_some() {
+        if is_filter_plan(plan) {
             if let Some(metrics) = plan.metrics() {
                 let sorted_computes: Vec<usize> = metrics
                     .iter()
@@ -515,7 +519,7 @@ impl PlanComputeVisitor {
     }
 
     fn collect_sort_metrics(&mut self, plan: &dyn ExecutionPlan) {
-        if plan.as_any().downcast_ref::<SortExec>().is_some() {
+        if is_sort_plan(plan) {
             if let Some(metrics) = plan.metrics() {
                 let sorted_computes: Vec<usize> = metrics
                     .iter()
@@ -534,7 +538,7 @@ impl PlanComputeVisitor {
     }
 
     fn collect_projection_metrics(&mut self, plan: &dyn ExecutionPlan) {
-        if plan.as_any().downcast_ref::<ProjectionExec>().is_some() {
+        if is_projection_plan(plan) {
             if let Some(metrics) = plan.metrics() {
                 let sorted_computes: Vec<usize> = metrics
                     .iter()
@@ -551,6 +555,37 @@ impl PlanComputeVisitor {
             }
         }
     }
+
+    fn collect_other_metrics(&mut self, plan: &dyn ExecutionPlan) {
+        if !is_filter_plan(plan) && !is_sort_plan(plan) && !is_projection_plan(plan) {
+            if let Some(metrics) = plan.metrics() {
+                let sorted_computes: Vec<usize> = metrics
+                    .iter()
+                    .filter_map(|m| match m.value() {
+                        MetricValue::ElapsedCompute(t) => Some(t.value()),
+                        _ => None,
+                    })
+                    .sorted()
+                    .collect();
+                let p = PartitionsComputeStats {
+                    elapsed_computes: sorted_computes,
+                };
+                self.other_computes.push(p)
+            }
+        }
+    }
+}
+
+fn is_filter_plan(plan: &dyn ExecutionPlan) -> bool {
+    plan.as_any().downcast_ref::<FilterExec>().is_some()
+}
+
+fn is_sort_plan(plan: &dyn ExecutionPlan) -> bool {
+    plan.as_any().downcast_ref::<SortExec>().is_some()
+}
+
+fn is_projection_plan(plan: &dyn ExecutionPlan) -> bool {
+    plan.as_any().downcast_ref::<ProjectionExec>().is_some()
 }
 
 impl From<PlanComputeVisitor> for ExecutionComputeStats {
@@ -560,6 +595,7 @@ impl From<PlanComputeVisitor> for ExecutionComputeStats {
             filter_compute: Some(value.filter_computes),
             sort_compute: Some(value.sort_computes),
             projection_compute: Some(value.projection_computes),
+            other_compute: Some(value.other_computes),
         }
     }
 }
