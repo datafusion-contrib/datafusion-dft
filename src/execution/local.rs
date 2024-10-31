@@ -221,6 +221,10 @@ impl ExecutionContext {
                     if statement.trim().is_empty() {
                         continue;
                     }
+                    if statement.trim().starts_with("--") {
+                        continue;
+                    }
+
                     debug!("Executing DDL statement: {:?}", statement);
                     match self.execute_sql_and_discard_results(statement).await {
                         Ok(_) => {

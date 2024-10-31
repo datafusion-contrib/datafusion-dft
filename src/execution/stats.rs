@@ -18,8 +18,16 @@
 use datafusion::{
     datasource::physical_plan::ParquetExec,
     physical_plan::{
-        filter::FilterExec, metrics::MetricValue, projection::ProjectionExec,
-        sorts::sort::SortExec, visit_execution_plan, ExecutionPlan, ExecutionPlanVisitor,
+        aggregates::AggregateExec,
+        filter::FilterExec,
+        joins::{
+            CrossJoinExec, HashJoinExec, NestedLoopJoinExec, SortMergeJoinExec,
+            SymmetricHashJoinExec,
+        },
+        metrics::MetricValue,
+        projection::ProjectionExec,
+        sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
+        visit_execution_plan, ExecutionPlan, ExecutionPlanVisitor,
     },
 };
 use itertools::Itertools;
@@ -397,6 +405,8 @@ pub struct ExecutionComputeStats {
     projection_compute: Option<Vec<PartitionsComputeStats>>,
     filter_compute: Option<Vec<PartitionsComputeStats>>,
     sort_compute: Option<Vec<PartitionsComputeStats>>,
+    join_compute: Option<Vec<PartitionsComputeStats>>,
+    aggregate_compute: Option<Vec<PartitionsComputeStats>>,
     other_compute: Option<Vec<PartitionsComputeStats>>,
 }
 
@@ -457,11 +467,15 @@ impl std::fmt::Display for ExecutionComputeStats {
                 .unwrap_or("None".to_string()),
         )?;
         writeln!(f)?;
+        self.display_compute(f, &self.projection_compute, "Projection")?;
+        writeln!(f)?;
         self.display_compute(f, &self.filter_compute, "Filter")?;
         writeln!(f)?;
         self.display_compute(f, &self.sort_compute, "Sort")?;
         writeln!(f)?;
-        self.display_compute(f, &self.projection_compute, "Projection")?;
+        self.display_compute(f, &self.join_compute, "Join")?;
+        writeln!(f)?;
+        self.display_compute(f, &self.aggregate_compute, "Aggregate")?;
         writeln!(f)?;
         self.display_compute(f, &self.other_compute, "Other")?;
         writeln!(f)
@@ -474,6 +488,8 @@ pub struct PlanComputeVisitor {
     filter_computes: Vec<PartitionsComputeStats>,
     sort_computes: Vec<PartitionsComputeStats>,
     projection_computes: Vec<PartitionsComputeStats>,
+    join_computes: Vec<PartitionsComputeStats>,
+    aggregate_computes: Vec<PartitionsComputeStats>,
     other_computes: Vec<PartitionsComputeStats>,
 }
 
@@ -496,9 +512,12 @@ impl PlanComputeVisitor {
         self.collect_filter_metrics(plan);
         self.collect_sort_metrics(plan);
         self.collect_projection_metrics(plan);
+        self.collect_join_metrics(plan);
+        self.collect_aggregate_metrics(plan);
         self.collect_other_metrics(plan);
     }
 
+    // TODO: Refactor to have a single function that takes predicate and collector
     fn collect_filter_metrics(&mut self, plan: &dyn ExecutionPlan) {
         if is_filter_plan(plan) {
             if let Some(metrics) = plan.metrics() {
@@ -556,6 +575,44 @@ impl PlanComputeVisitor {
         }
     }
 
+    fn collect_join_metrics(&mut self, plan: &dyn ExecutionPlan) {
+        if is_join_plan(plan) {
+            if let Some(metrics) = plan.metrics() {
+                let sorted_computes: Vec<usize> = metrics
+                    .iter()
+                    .filter_map(|m| match m.value() {
+                        MetricValue::ElapsedCompute(t) => Some(t.value()),
+                        _ => None,
+                    })
+                    .sorted()
+                    .collect();
+                let p = PartitionsComputeStats {
+                    elapsed_computes: sorted_computes,
+                };
+                self.join_computes.push(p)
+            }
+        }
+    }
+
+    fn collect_aggregate_metrics(&mut self, plan: &dyn ExecutionPlan) {
+        if is_aggregate_plan(plan) {
+            if let Some(metrics) = plan.metrics() {
+                let sorted_computes: Vec<usize> = metrics
+                    .iter()
+                    .filter_map(|m| match m.value() {
+                        MetricValue::ElapsedCompute(t) => Some(t.value()),
+                        _ => None,
+                    })
+                    .sorted()
+                    .collect();
+                let p = PartitionsComputeStats {
+                    elapsed_computes: sorted_computes,
+                };
+                self.aggregate_computes.push(p)
+            }
+        }
+    }
+
     fn collect_other_metrics(&mut self, plan: &dyn ExecutionPlan) {
         if !is_filter_plan(plan) && !is_sort_plan(plan) && !is_projection_plan(plan) {
             if let Some(metrics) = plan.metrics() {
@@ -582,10 +639,29 @@ fn is_filter_plan(plan: &dyn ExecutionPlan) -> bool {
 
 fn is_sort_plan(plan: &dyn ExecutionPlan) -> bool {
     plan.as_any().downcast_ref::<SortExec>().is_some()
+        || plan
+            .as_any()
+            .downcast_ref::<SortPreservingMergeExec>()
+            .is_some()
 }
 
 fn is_projection_plan(plan: &dyn ExecutionPlan) -> bool {
     plan.as_any().downcast_ref::<ProjectionExec>().is_some()
+}
+
+fn is_join_plan(plan: &dyn ExecutionPlan) -> bool {
+    plan.as_any().downcast_ref::<HashJoinExec>().is_some()
+        || plan.as_any().downcast_ref::<CrossJoinExec>().is_some()
+        || plan.as_any().downcast_ref::<SortMergeJoinExec>().is_some()
+        || plan.as_any().downcast_ref::<NestedLoopJoinExec>().is_some()
+        || plan
+            .as_any()
+            .downcast_ref::<SymmetricHashJoinExec>()
+            .is_some()
+}
+
+fn is_aggregate_plan(plan: &dyn ExecutionPlan) -> bool {
+    plan.as_any().downcast_ref::<AggregateExec>().is_some()
 }
 
 impl From<PlanComputeVisitor> for ExecutionComputeStats {
@@ -595,6 +671,8 @@ impl From<PlanComputeVisitor> for ExecutionComputeStats {
             filter_compute: Some(value.filter_computes),
             sort_compute: Some(value.sort_computes),
             projection_compute: Some(value.projection_computes),
+            join_compute: Some(value.join_computes),
+            aggregate_compute: Some(value.aggregate_computes),
             other_compute: Some(value.other_computes),
         }
     }
