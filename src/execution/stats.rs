@@ -294,12 +294,19 @@ impl std::fmt::Display for ExecutionIOStats {
         writeln!(f)?;
         writeln!(
             f,
-            "Parquet Pruning Stats (Output Rows: {}, Row Groups: {})",
+            "Parquet Pruning Stats (Output Rows: {}, Row Groups: {} [{}ms per row group])",
             self.parquet_output_rows
                 .as_ref()
                 .map(|m| m.to_string())
                 .unwrap_or("None".to_string()),
-            self.row_group_count()
+            self.row_group_count(),
+            self.time_scanning
+                .as_ref()
+                .map(
+                    |ts| ((ts.as_usize() / 1_000_000) as f64 / self.row_group_count() as f64)
+                        .to_string()
+                )
+                .unwrap_or("None".to_string())
         )?;
         writeln!(
             f,
