@@ -72,6 +72,9 @@ pub struct DftArgs {
 
     #[clap(long, short, help = "Benchmark the provided query")]
     pub bench: bool,
+
+    #[clap(long, help = "Run the provided query before running the benchmark")]
+    pub run_before: Option<String>,
 }
 
 impl DftArgs {

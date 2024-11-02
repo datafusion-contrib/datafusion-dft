@@ -60,3 +60,47 @@ SELECT 1 + 1;
 ----------------------------"##;
     assert.code(0).stdout(contains_str(expected_err));
 }
+
+#[test]
+fn test_bench_command_with_run_before() {
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT * FROM t")
+        .arg("--bench")
+        .arg("--run-before")
+        .arg("CREATE TABLE t AS VALUES (1)")
+        .assert()
+        .success();
+
+    let expected = r##"
+----------------------------
+Benchmark Stats (10 runs)
+----------------------------
+SELECT * FROM t
+----------------------------"##;
+    assert.stdout(contains_str(expected));
+}
+
+#[test]
+fn test_bench_files_with_run_before() {
+    let file = sql_in_file(r#"SELECT * FROM t;"#);
+
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-f")
+        .arg(file.path())
+        .arg("--bench")
+        .arg("--run-before")
+        .arg("CREATE TABLE t AS VALUES (1)")
+        .assert()
+        .success();
+
+    let expected_err = r##"
+----------------------------
+Benchmark Stats (10 runs)
+----------------------------
+SELECT * FROM t;
+----------------------------"##;
+    assert.code(0).stdout(contains_str(expected_err));
+}

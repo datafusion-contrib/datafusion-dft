@@ -111,6 +111,12 @@ impl CliApp {
     }
 
     async fn benchmark_files(&self, files: &[PathBuf]) -> Result<()> {
+        if let Some(run_before_query) = &self.args.run_before {
+            self.app_execution
+                .execution_ctx()
+                .execute_sql_and_discard_results(run_before_query)
+                .await?;
+        }
         info!("Benchmarking files: {:?}", files);
         for file in files {
             let query = std::fs::read_to_string(file)?;
@@ -181,6 +187,12 @@ impl CliApp {
     }
 
     async fn benchmark_commands(&self, commands: &[String]) -> color_eyre::Result<()> {
+        if let Some(run_before_query) = &self.args.run_before {
+            self.app_execution
+                .execution_ctx()
+                .execute_sql_and_discard_results(run_before_query)
+                .await?;
+        }
         info!("Benchmarking commands: {:?}", commands);
         for command in commands {
             self.benchmark_from_string(command).await?;
