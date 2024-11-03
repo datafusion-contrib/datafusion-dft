@@ -103,6 +103,11 @@ impl LocalBenchmarkStats {
             percent_of_total,
         }
     }
+
+    pub fn to_csv(&self) -> String {
+        let mut csv = String::new();
+        csv
+    }
 }
 
 pub fn is_all_same(arr: &[usize]) -> bool {
