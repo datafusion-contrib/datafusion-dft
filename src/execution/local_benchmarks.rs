@@ -136,31 +136,6 @@ impl LocalBenchmarkStats {
         csv.push(',');
         csv.push_str(total_summary.to_csv_fields().as_str());
         csv
-
-        // csv.push_str(&self.query);
-        // csv.push(',');
-        // csv.push_str(&self.runs.to_string());
-        // csv.push(',');
-        // csv.push_str(
-        //     logical_planning_summary
-        //         .median
-        //         .as_millis()
-        //         .to_string()
-        //         .as_str(),
-        // );
-        // csv.push(',');
-        // csv.push_str(
-        //     physical_planning_summary
-        //         .median
-        //         .as_millis()
-        //         .to_string()
-        //         .as_str(),
-        // );
-        // csv.push(',');
-        // csv.push_str(execution_summary.median.as_millis().to_string().as_str());
-        // csv.push(',');
-        // csv.push_str(total_summary.median.as_millis().to_string().as_str());
-        // csv
     }
 }
 

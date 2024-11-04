@@ -104,3 +104,78 @@ SELECT * FROM t;
 ----------------------------"##;
     assert.code(0).stdout(contains_str(expected_err));
 }
+
+#[test]
+fn test_bench_command_with_save() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let file = temp_dir.path().join("results.csv");
+
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT 1")
+        .arg("--bench")
+        .arg("--save")
+        .arg(file.to_str().unwrap())
+        .assert()
+        .success();
+
+    let expected = r##"
+----------------------------
+Benchmark Stats (10 runs)
+----------------------------
+SELECT 1
+----------------------------"##;
+    assert.stdout(contains_str(expected));
+
+    assert!(file.exists());
+}
+
+#[test]
+fn test_bench_command_with_save_and_append() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let file = temp_dir.path().join("results.csv");
+
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT 1")
+        .arg("--bench")
+        .arg("--save")
+        .arg(file.to_str().unwrap())
+        .assert()
+        .success();
+
+    let expected = r##"
+----------------------------
+Benchmark Stats (10 runs)
+----------------------------
+SELECT 1
+----------------------------"##;
+    assert.stdout(contains_str(expected));
+
+    assert!(file.exists());
+
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT 1")
+        .arg("--bench")
+        .arg("--save")
+        .arg(file.to_str().unwrap())
+        .arg("--append")
+        .assert()
+        .success();
+
+    let expected = r##"
+----------------------------
+Benchmark Stats (10 runs)
+----------------------------
+SELECT 1
+----------------------------"##;
+    assert.stdout(contains_str(expected));
+
+    let contents = std::fs::read_to_string(file).unwrap();
+    let lines: Vec<&str> = contents.lines().collect();
+    assert_eq!(lines.len(), 3);
+}
