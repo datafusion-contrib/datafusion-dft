@@ -80,7 +80,7 @@ pub struct DftArgs {
     pub save: Option<PathBuf>,
 
     #[clap(long, help = "Append the benchmark results to an existing file")]
-    pub append: Option<bool>,
+    pub append: bool,
 }
 
 impl DftArgs {

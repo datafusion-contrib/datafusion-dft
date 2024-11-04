@@ -32,7 +32,7 @@ use std::path::{Path, PathBuf};
 use tonic::IntoRequest;
 
 const DEFAULT_LOCAL_BENCHMARK_HEADER_ROW: &str =
-    "query,runs,logical_planning,physical_planning,execution,total";
+    "query,runs,logical_planning_min,logical_planning_max,logical_planning_mean,logical_planning_median,logical_planning_percent_of_total,physical_planning_min,physical_planning_max,physical_planning,mean,physical_planning_median,physical_planning_percent_of_total,execution_min,execution_max,execution_execution_mean,execution_median,execution_percent_of_total,total_min,total_max,total_mean,total_median,total_percent_of_total";
 
 /// Encapsulates the command line interface
 pub struct CliApp {
@@ -200,24 +200,31 @@ impl CliApp {
         }
         info!("Benchmarking commands: {:?}", commands);
         let mut open_opts = std::fs::OpenOptions::new();
-        let mut file = match (&self.args.save, &self.args.append) {
-            (Some(p), Some(true)) => {
+        let mut file = if let Some(p) = &self.args.save {
+            if !p.exists() {
+                if let Some(parent) = p.parent() {
+                    std::fs::DirBuilder::new().recursive(true).create(parent)?;
+                }
+            };
+            if self.args.append && p.exists() {
                 open_opts.append(true).create(true);
                 Some(open_opts.open(p)?)
-            }
-            (Some(p), _) => {
-                open_opts.write(true).create(true);
+            } else {
+                open_opts.write(true).create(true).truncate(true);
                 let mut file = open_opts.open(p)?;
                 writeln!(file, "{}", DEFAULT_LOCAL_BENCHMARK_HEADER_ROW)?;
                 Some(file)
             }
-            _ => None,
+        } else {
+            None
         };
 
         for command in commands {
             let stats = self.benchmark_from_string(command).await?;
             println!("{}", stats);
-            if let Some(ref mut file) = &mut file {}
+            if let Some(ref mut file) = &mut file {
+                writeln!(file, "{}", stats.to_summary_csv_row())?;
+            }
         }
         Ok(())
     }

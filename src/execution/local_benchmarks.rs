@@ -29,6 +29,19 @@ pub struct DurationsSummary {
     pub percent_of_total: f64,
 }
 
+impl DurationsSummary {
+    pub fn to_csv_fields(&self) -> String {
+        format!(
+            "{},{},{},{},{:.2}",
+            self.min.as_millis(),
+            self.max.as_millis(),
+            self.mean.as_millis(),
+            self.median.as_millis(),
+            self.percent_of_total,
+        )
+    }
+}
+
 impl std::fmt::Display for DurationsSummary {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Min: {:?}", self.min)?;
@@ -104,9 +117,50 @@ impl LocalBenchmarkStats {
         }
     }
 
-    pub fn to_csv(&self) -> String {
+    pub fn to_summary_csv_row(&self) -> String {
         let mut csv = String::new();
+        let logical_planning_summary = self.summarize(&self.logical_planning_durations);
+        let physical_planning_summary = self.summarize(&self.physical_planning_durations);
+        let execution_summary = self.summarize(&self.execution_durations);
+        let total_summary = self.summarize(&self.total_durations);
+
+        csv.push_str(&self.query);
+        csv.push(',');
+        csv.push_str(&self.runs.to_string());
+        csv.push(',');
+        csv.push_str(logical_planning_summary.to_csv_fields().as_str());
+        csv.push(',');
+        csv.push_str(physical_planning_summary.to_csv_fields().as_str());
+        csv.push(',');
+        csv.push_str(execution_summary.to_csv_fields().as_str());
+        csv.push(',');
+        csv.push_str(total_summary.to_csv_fields().as_str());
         csv
+
+        // csv.push_str(&self.query);
+        // csv.push(',');
+        // csv.push_str(&self.runs.to_string());
+        // csv.push(',');
+        // csv.push_str(
+        //     logical_planning_summary
+        //         .median
+        //         .as_millis()
+        //         .to_string()
+        //         .as_str(),
+        // );
+        // csv.push(',');
+        // csv.push_str(
+        //     physical_planning_summary
+        //         .median
+        //         .as_millis()
+        //         .to_string()
+        //         .as_str(),
+        // );
+        // csv.push(',');
+        // csv.push_str(execution_summary.median.as_millis().to_string().as_str());
+        // csv.push(',');
+        // csv.push_str(total_summary.median.as_millis().to_string().as_str());
+        // csv
     }
 }
 
