@@ -17,7 +17,7 @@
 //! [`CliApp`]: Command Line User Interface
 
 use crate::args::DftArgs;
-use crate::execution::AppExecution;
+use crate::execution::{local_benchmarks::LocalBenchmarkStats, AppExecution};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use datafusion::arrow::array::RecordBatch;
@@ -26,9 +26,13 @@ use datafusion::sql::parser::DFParser;
 use futures::{Stream, StreamExt};
 use log::info;
 use std::error::Error;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 #[cfg(feature = "flightsql")]
 use tonic::IntoRequest;
+
+const DEFAULT_LOCAL_BENCHMARK_HEADER_ROW: &str =
+    "query,runs,logical_planning_min,logical_planning_max,logical_planning_mean,logical_planning_median,logical_planning_percent_of_total,physical_planning_min,physical_planning_max,physical_planning,mean,physical_planning_median,physical_planning_percent_of_total,execution_min,execution_max,execution_execution_mean,execution_median,execution_percent_of_total,total_min,total_max,total_mean,total_median,total_percent_of_total";
 
 /// Encapsulates the command line interface
 pub struct CliApp {
@@ -120,7 +124,8 @@ impl CliApp {
         info!("Benchmarking files: {:?}", files);
         for file in files {
             let query = std::fs::read_to_string(file)?;
-            self.benchmark_from_string(&query).await?;
+            let stats = self.benchmark_from_string(&query).await?;
+            println!("{}", stats);
         }
         Ok(())
     }
@@ -194,8 +199,32 @@ impl CliApp {
                 .await?;
         }
         info!("Benchmarking commands: {:?}", commands);
+        let mut open_opts = std::fs::OpenOptions::new();
+        let mut file = if let Some(p) = &self.args.save {
+            if !p.exists() {
+                if let Some(parent) = p.parent() {
+                    std::fs::DirBuilder::new().recursive(true).create(parent)?;
+                }
+            };
+            if self.args.append && p.exists() {
+                open_opts.append(true).create(true);
+                Some(open_opts.open(p)?)
+            } else {
+                open_opts.write(true).create(true).truncate(true);
+                let mut file = open_opts.open(p)?;
+                writeln!(file, "{}", DEFAULT_LOCAL_BENCHMARK_HEADER_ROW)?;
+                Some(file)
+            }
+        } else {
+            None
+        };
+
         for command in commands {
-            self.benchmark_from_string(command).await?;
+            let stats = self.benchmark_from_string(command).await?;
+            println!("{}", stats);
+            if let Some(ref mut file) = &mut file {
+                writeln!(file, "{}", stats.to_summary_csv_row())?;
+            }
         }
         Ok(())
     }
@@ -245,14 +274,13 @@ impl CliApp {
         Ok(())
     }
 
-    async fn benchmark_from_string(&self, sql: &str) -> Result<()> {
+    async fn benchmark_from_string(&self, sql: &str) -> Result<LocalBenchmarkStats> {
         let stats = self
             .app_execution
             .execution_ctx()
             .benchmark_query(sql)
             .await?;
-        println!("{}", stats);
-        Ok(())
+        Ok(stats)
     }
 
     #[cfg(feature = "flightsql")]

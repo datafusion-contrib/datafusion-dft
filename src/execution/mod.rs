@@ -22,7 +22,7 @@ pub mod flightsql_benchmarks;
 pub mod local;
 pub mod sql_utils;
 
-mod local_benchmarks;
+pub mod local_benchmarks;
 mod stats;
 
 pub use stats::{collect_plan_stats, ExecutionStats};
