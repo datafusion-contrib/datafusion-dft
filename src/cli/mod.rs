@@ -147,9 +147,34 @@ impl CliApp {
     #[cfg(feature = "flightsql")]
     async fn flightsql_benchmark_files(&self, files: &[PathBuf]) -> Result<()> {
         info!("Benchmarking FlightSQL files: {:?}", files);
+
+        let mut open_opts = std::fs::OpenOptions::new();
+        let mut results_file = if let Some(p) = &self.args.save {
+            if !p.exists() {
+                if let Some(parent) = p.parent() {
+                    std::fs::DirBuilder::new().recursive(true).create(parent)?;
+                }
+            };
+            if self.args.append && p.exists() {
+                open_opts.append(true).create(true);
+                Some(open_opts.open(p)?)
+            } else {
+                open_opts.write(true).create(true).truncate(true);
+                let mut file = open_opts.open(p)?;
+                writeln!(file, "{}", FLIGHTSQL_BENCHMARK_HEADER_ROW)?;
+                Some(file)
+            }
+        } else {
+            None
+        };
+
         for file in files {
             let query = std::fs::read_to_string(file)?;
-            self.flightsql_benchmark_from_string(&query).await?;
+            let stats = self.flightsql_benchmark_from_string(&query).await?;
+            println!("{}", stats);
+            if let Some(ref mut results_file) = &mut results_file {
+                writeln!(results_file, "{}", stats.to_summary_csv_row())?
+            }
         }
 
         Ok(())

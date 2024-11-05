@@ -409,3 +409,59 @@ SELECT 1 + 1;
     assert!(results_file.exists());
     fixture.shutdown_and_wait().await;
 }
+
+#[tokio::test]
+pub async fn test_bench_command_and_save_then_append() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let file = temp_dir.path().join("results.csv");
+    let cloned = file.clone();
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("--bench")
+            .arg("--flightsql")
+            .arg("--save")
+            .arg(cloned.to_str().unwrap())
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r##"
+----------------------------
+Benchmark Stats (10 runs)
+----------------------------
+SELECT 1
+----------------------------"##;
+    assert.stdout(contains_str(expected));
+    assert!(file.exists());
+
+    let cloned_again = file.clone();
+    tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("--bench")
+            .arg("--flightsql")
+            .arg("--save")
+            .arg(cloned_again.to_str().unwrap())
+            .arg("--append")
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let contents = std::fs::read_to_string(file).unwrap();
+    let lines: Vec<&str> = contents.lines().collect();
+    assert_eq!(3, lines.len());
+
+    fixture.shutdown_and_wait().await;
+}
