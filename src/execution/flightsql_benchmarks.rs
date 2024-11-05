@@ -84,6 +84,27 @@ impl FlightSQLBenchmarkStats {
             percent_of_total,
         }
     }
+
+    pub fn to_summary_csv_row(&self) -> String {
+        let mut csv = String::new();
+        let logical_planning_summary = self.summarize(&self.get_flight_info_durations);
+        let physical_planning_summary = self.summarize(&self.ttfb_durations);
+        let execution_summary = self.summarize(&self.do_get_durations);
+        let total_summary = self.summarize(&self.total_durations);
+
+        csv.push_str(&self.query);
+        csv.push(',');
+        csv.push_str(&self.runs.to_string());
+        csv.push(',');
+        csv.push_str(logical_planning_summary.to_csv_fields().as_str());
+        csv.push(',');
+        csv.push_str(physical_planning_summary.to_csv_fields().as_str());
+        csv.push(',');
+        csv.push_str(execution_summary.to_csv_fields().as_str());
+        csv.push(',');
+        csv.push_str(total_summary.to_csv_fields().as_str());
+        csv
+    }
 }
 
 impl std::fmt::Display for FlightSQLBenchmarkStats {
