@@ -340,3 +340,72 @@ async fn test_custom_config_benchmark_iterations() {
     assert.stdout(contains_str(expected));
     fixture.shutdown_and_wait().await;
 }
+
+#[tokio::test]
+pub async fn test_bench_command_and_save() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let file = temp_dir.path().join("results.csv");
+    let cloned = file.clone();
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("--bench")
+            .arg("--flightsql")
+            .arg("--save")
+            .arg(cloned.to_str().unwrap())
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r##"
+----------------------------
+Benchmark Stats (10 runs)
+----------------------------
+SELECT 1
+----------------------------"##;
+    assert.stdout(contains_str(expected));
+    assert!(file.exists());
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_bench_files_and_save() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+    let file = sql_in_file(r#"SELECT 1 + 1;"#);
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let results_file = temp_dir.path().join("results.csv");
+    let cloned = results_file.clone();
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-f")
+            .arg(file.path())
+            .arg("--bench")
+            .arg("--flightsql")
+            .arg("--save")
+            .arg(cloned.to_str().unwrap())
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected_err = r##"
+----------------------------
+Benchmark Stats (10 runs)
+----------------------------
+SELECT 1 + 1;
+----------------------------"##;
+    assert.code(0).stdout(contains_str(expected_err));
+    assert!(results_file.exists());
+    fixture.shutdown_and_wait().await;
+}
