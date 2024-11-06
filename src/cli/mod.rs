@@ -174,6 +174,7 @@ impl CliApp {
         info!("Analyzing files: {:?}", files);
         for file in files {
             let query = std::fs::read_to_string(file)?;
+            self.analyze_from_string(&query).await?;
         }
         Ok(())
     }
