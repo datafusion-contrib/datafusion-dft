@@ -138,7 +138,7 @@ impl std::fmt::Display for ExecutionStats {
         )?;
         writeln!(f)?;
         writeln!(f, "{}", self.durations)?;
-        writeln!(f, "{:<20}", "Pruning / Selectivity (Higher is better)")?;
+        writeln!(f, "{:<20}", "Parquet Efficiency (Pruning / Selectivity)")?;
         writeln!(f, "{:<20.2}", self.selectivity_efficiency())?;
         writeln!(f)?;
         if let Some(io_stats) = &self.io {
