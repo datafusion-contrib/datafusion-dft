@@ -26,7 +26,7 @@ pub mod stats;
 mod local_analyze;
 pub mod local_benchmarks;
 
-pub use stats::{collect_plan_stats, ExecutionStats};
+pub use stats::{collect_plan_io_stats, ExecutionStats};
 
 #[cfg(feature = "flightsql")]
 use self::flightsql::{FlightSQLClient, FlightSQLContext};
