@@ -29,6 +29,19 @@ pub struct DurationsSummary {
     pub percent_of_total: f64,
 }
 
+impl DurationsSummary {
+    pub fn to_csv_fields(&self) -> String {
+        format!(
+            "{},{},{},{},{:.2}",
+            self.min.as_millis(),
+            self.max.as_millis(),
+            self.mean.as_millis(),
+            self.median.as_millis(),
+            self.percent_of_total,
+        )
+    }
+}
+
 impl std::fmt::Display for DurationsSummary {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Min: {:?}", self.min)?;
@@ -43,6 +56,7 @@ impl std::fmt::Display for DurationsSummary {
 pub struct LocalBenchmarkStats {
     query: String,
     runs: usize,
+    rows: Vec<usize>,
     logical_planning_durations: Vec<Duration>,
     physical_planning_durations: Vec<Duration>,
     execution_durations: Vec<Duration>,
@@ -52,6 +66,7 @@ pub struct LocalBenchmarkStats {
 impl LocalBenchmarkStats {
     pub fn new(
         query: String,
+        rows: Vec<usize>,
         logical_planning_durations: Vec<Duration>,
         physical_planning_durations: Vec<Duration>,
         execution_durations: Vec<Duration>,
@@ -61,6 +76,7 @@ impl LocalBenchmarkStats {
         Self {
             query,
             runs,
+            rows,
             logical_planning_durations,
             physical_planning_durations,
             execution_durations,
@@ -100,6 +116,31 @@ impl LocalBenchmarkStats {
             percent_of_total,
         }
     }
+
+    pub fn to_summary_csv_row(&self) -> String {
+        let mut csv = String::new();
+        let logical_planning_summary = self.summarize(&self.logical_planning_durations);
+        let physical_planning_summary = self.summarize(&self.physical_planning_durations);
+        let execution_summary = self.summarize(&self.execution_durations);
+        let total_summary = self.summarize(&self.total_durations);
+
+        csv.push_str(&self.query);
+        csv.push(',');
+        csv.push_str(&self.runs.to_string());
+        csv.push(',');
+        csv.push_str(logical_planning_summary.to_csv_fields().as_str());
+        csv.push(',');
+        csv.push_str(physical_planning_summary.to_csv_fields().as_str());
+        csv.push(',');
+        csv.push_str(execution_summary.to_csv_fields().as_str());
+        csv.push(',');
+        csv.push_str(total_summary.to_csv_fields().as_str());
+        csv
+    }
+}
+
+pub fn is_all_same(arr: &[usize]) -> bool {
+    arr.iter().min() == arr.iter().max()
 }
 
 impl std::fmt::Display for LocalBenchmarkStats {
@@ -110,6 +151,13 @@ impl std::fmt::Display for LocalBenchmarkStats {
         writeln!(f, "----------------------------")?;
         writeln!(f, "{}", self.query)?;
         writeln!(f, "----------------------------")?;
+        if is_all_same(&self.rows) {
+            writeln!(f, "Row counts match across runs")?;
+        } else {
+            writeln!(f, "\x1b[31mRow counts differ across runs\x1b[0m")?;
+        }
+        writeln!(f, "----------------------------")?;
+        writeln!(f)?;
 
         let logical_planning_summary = self.summarize(&self.logical_planning_durations);
         writeln!(f, "Logical Planning")?;

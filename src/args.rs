@@ -78,6 +78,15 @@ pub struct DftArgs {
         help = "Print a summary of the query's execution plan and statistics"
     )]
     pub analyze: bool,
+
+    #[clap(long, help = "Run the provided query before running the benchmark")]
+    pub run_before: Option<String>,
+
+    #[clap(long, help = "Save the benchmark results to a file")]
+    pub save: Option<PathBuf>,
+
+    #[clap(long, help = "Append the benchmark results to an existing file")]
+    pub append: bool,
 }
 
 impl DftArgs {

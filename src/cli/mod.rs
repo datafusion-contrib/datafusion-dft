@@ -17,7 +17,7 @@
 //! [`CliApp`]: Command Line User Interface
 
 use crate::args::DftArgs;
-use crate::execution::AppExecution;
+use crate::execution::{local_benchmarks::LocalBenchmarkStats, AppExecution};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use datafusion::arrow::array::RecordBatch;
@@ -26,9 +26,16 @@ use datafusion::sql::parser::DFParser;
 use futures::{Stream, StreamExt};
 use log::info;
 use std::error::Error;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 #[cfg(feature = "flightsql")]
-use tonic::IntoRequest;
+use {crate::execution::flightsql_benchmarks::FlightSQLBenchmarkStats, tonic::IntoRequest};
+
+const LOCAL_BENCHMARK_HEADER_ROW: &str =
+    "query,runs,logical_planning_min,logical_planning_max,logical_planning_mean,logical_planning_median,logical_planning_percent_of_total,physical_planning_min,physical_planning_max,physical_planning,mean,physical_planning_median,physical_planning_percent_of_total,execution_min,execution_max,execution_execution_mean,execution_median,execution_percent_of_total,total_min,total_max,total_mean,total_median,total_percent_of_total";
+
+const FLIGHTSQL_BENCHMARK_HEADER_ROW: &str =
+    "query,runs,get_flight_info_min,get_flight_info_max,get_flight_info_mean,get_flight_info_median,get_flight_info_percent_of_total,ttfb_min,ttfb_max,ttfb,mean,ttfb_median,ttfb_percent_of_total,do_get_min,do_get_max,do_get_mean,do_get_median,do_get_percent_of_total,total_min,total_max,total_mean,total_median,total_percent_of_total";
 
 /// Encapsulates the command line interface
 pub struct CliApp {
@@ -126,10 +133,17 @@ impl CliApp {
     }
 
     async fn benchmark_files(&self, files: &[PathBuf]) -> Result<()> {
+        if let Some(run_before_query) = &self.args.run_before {
+            self.app_execution
+                .execution_ctx()
+                .execute_sql_and_discard_results(run_before_query)
+                .await?;
+        }
         info!("Benchmarking files: {:?}", files);
         for file in files {
             let query = std::fs::read_to_string(file)?;
-            self.benchmark_from_string(&query).await?;
+            let stats = self.benchmark_from_string(&query).await?;
+            println!("{}", stats);
         }
         Ok(())
     }
@@ -156,9 +170,34 @@ impl CliApp {
     #[cfg(feature = "flightsql")]
     async fn flightsql_benchmark_files(&self, files: &[PathBuf]) -> Result<()> {
         info!("Benchmarking FlightSQL files: {:?}", files);
+
+        let mut open_opts = std::fs::OpenOptions::new();
+        let mut results_file = if let Some(p) = &self.args.save {
+            if !p.exists() {
+                if let Some(parent) = p.parent() {
+                    std::fs::DirBuilder::new().recursive(true).create(parent)?;
+                }
+            };
+            if self.args.append && p.exists() {
+                open_opts.append(true).create(true);
+                Some(open_opts.open(p)?)
+            } else {
+                open_opts.write(true).create(true).truncate(true);
+                let mut file = open_opts.open(p)?;
+                writeln!(file, "{}", FLIGHTSQL_BENCHMARK_HEADER_ROW)?;
+                Some(file)
+            }
+        } else {
+            None
+        };
+
         for file in files {
             let query = std::fs::read_to_string(file)?;
-            self.flightsql_benchmark_from_string(&query).await?;
+            let stats = self.flightsql_benchmark_from_string(&query).await?;
+            println!("{}", stats);
+            if let Some(ref mut results_file) = &mut results_file {
+                writeln!(results_file, "{}", stats.to_summary_csv_row())?
+            }
         }
 
         Ok(())
@@ -204,9 +243,39 @@ impl CliApp {
     }
 
     async fn benchmark_commands(&self, commands: &[String]) -> color_eyre::Result<()> {
+        if let Some(run_before_query) = &self.args.run_before {
+            self.app_execution
+                .execution_ctx()
+                .execute_sql_and_discard_results(run_before_query)
+                .await?;
+        }
         info!("Benchmarking commands: {:?}", commands);
+        let mut open_opts = std::fs::OpenOptions::new();
+        let mut file = if let Some(p) = &self.args.save {
+            if !p.exists() {
+                if let Some(parent) = p.parent() {
+                    std::fs::DirBuilder::new().recursive(true).create(parent)?;
+                }
+            };
+            if self.args.append && p.exists() {
+                open_opts.append(true).create(true);
+                Some(open_opts.open(p)?)
+            } else {
+                open_opts.write(true).create(true).truncate(true);
+                let mut file = open_opts.open(p)?;
+                writeln!(file, "{}", LOCAL_BENCHMARK_HEADER_ROW)?;
+                Some(file)
+            }
+        } else {
+            None
+        };
+
         for command in commands {
-            self.benchmark_from_string(command).await?;
+            let stats = self.benchmark_from_string(command).await?;
+            println!("{}", stats);
+            if let Some(ref mut file) = &mut file {
+                writeln!(file, "{}", stats.to_summary_csv_row())?;
+            }
         }
         Ok(())
     }
@@ -233,8 +302,33 @@ impl CliApp {
     #[cfg(feature = "flightsql")]
     async fn flightsql_benchmark_commands(&self, commands: &[String]) -> color_eyre::Result<()> {
         info!("Benchmark FlightSQL commands: {:?}", commands);
+
+        let mut open_opts = std::fs::OpenOptions::new();
+        let mut file = if let Some(p) = &self.args.save {
+            if !p.exists() {
+                if let Some(parent) = p.parent() {
+                    std::fs::DirBuilder::new().recursive(true).create(parent)?;
+                }
+            };
+            if self.args.append && p.exists() {
+                open_opts.append(true).create(true);
+                Some(open_opts.open(p)?)
+            } else {
+                open_opts.write(true).create(true).truncate(true);
+                let mut file = open_opts.open(p)?;
+                writeln!(file, "{}", FLIGHTSQL_BENCHMARK_HEADER_ROW)?;
+                Some(file)
+            }
+        } else {
+            None
+        };
+
         for command in commands {
-            self.flightsql_benchmark_from_string(command).await?;
+            let stats = self.flightsql_benchmark_from_string(command).await?;
+            println!("{}", stats);
+            if let Some(ref mut file) = &mut file {
+                writeln!(file, "{}", stats.to_summary_csv_row())?
+            }
         }
 
         Ok(())
@@ -265,14 +359,13 @@ impl CliApp {
         Ok(())
     }
 
-    async fn benchmark_from_string(&self, sql: &str) -> Result<()> {
+    async fn benchmark_from_string(&self, sql: &str) -> Result<LocalBenchmarkStats> {
         let stats = self
             .app_execution
             .execution_ctx()
             .benchmark_query(sql)
             .await?;
-        println!("{}", stats);
-        Ok(())
+        Ok(stats)
     }
 
     async fn analyze_from_string(&self, sql: &str) -> Result<()> {
@@ -287,14 +380,13 @@ impl CliApp {
     }
 
     #[cfg(feature = "flightsql")]
-    async fn flightsql_benchmark_from_string(&self, sql: &str) -> Result<()> {
+    async fn flightsql_benchmark_from_string(&self, sql: &str) -> Result<FlightSQLBenchmarkStats> {
         let stats = self
             .app_execution
             .flightsql_ctx()
             .benchmark_query(sql)
             .await?;
-        println!("{}", stats);
-        Ok(())
+        Ok(stats)
     }
 
     /// run and execute SQL statements and commands from a file, against a context

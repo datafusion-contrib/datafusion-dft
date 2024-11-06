@@ -17,11 +17,14 @@
 
 use std::time::Duration;
 
+use crate::execution::local_benchmarks::is_all_same;
+
 use super::local_benchmarks::DurationsSummary;
 
 pub struct FlightSQLBenchmarkStats {
     query: String,
     runs: usize,
+    rows: Vec<usize>,
     get_flight_info_durations: Vec<Duration>,
     ttfb_durations: Vec<Duration>,
     do_get_durations: Vec<Duration>,
@@ -31,6 +34,7 @@ pub struct FlightSQLBenchmarkStats {
 impl FlightSQLBenchmarkStats {
     pub fn new(
         query: String,
+        rows: Vec<usize>,
         get_flight_info_durations: Vec<Duration>,
         ttfb_durations: Vec<Duration>,
         do_get_durations: Vec<Duration>,
@@ -40,6 +44,7 @@ impl FlightSQLBenchmarkStats {
         Self {
             query,
             runs,
+            rows,
             get_flight_info_durations,
             ttfb_durations,
             do_get_durations,
@@ -79,6 +84,27 @@ impl FlightSQLBenchmarkStats {
             percent_of_total,
         }
     }
+
+    pub fn to_summary_csv_row(&self) -> String {
+        let mut csv = String::new();
+        let logical_planning_summary = self.summarize(&self.get_flight_info_durations);
+        let physical_planning_summary = self.summarize(&self.ttfb_durations);
+        let execution_summary = self.summarize(&self.do_get_durations);
+        let total_summary = self.summarize(&self.total_durations);
+
+        csv.push_str(&self.query);
+        csv.push(',');
+        csv.push_str(&self.runs.to_string());
+        csv.push(',');
+        csv.push_str(logical_planning_summary.to_csv_fields().as_str());
+        csv.push(',');
+        csv.push_str(physical_planning_summary.to_csv_fields().as_str());
+        csv.push(',');
+        csv.push_str(execution_summary.to_csv_fields().as_str());
+        csv.push(',');
+        csv.push_str(total_summary.to_csv_fields().as_str());
+        csv
+    }
 }
 
 impl std::fmt::Display for FlightSQLBenchmarkStats {
@@ -89,17 +115,24 @@ impl std::fmt::Display for FlightSQLBenchmarkStats {
         writeln!(f, "----------------------------")?;
         writeln!(f, "{}", self.query)?;
         writeln!(f, "----------------------------")?;
+        if is_all_same(&self.rows) {
+            writeln!(f, "Row counts match across runs")?;
+        } else {
+            writeln!(f, "\x1b[31mRow counts differ across runs\x1b[0m")?;
+        }
+        writeln!(f, "----------------------------")?;
+        writeln!(f)?;
 
         let logical_planning_summary = self.summarize(&self.get_flight_info_durations);
         writeln!(f, "Get Flight Info")?;
         writeln!(f, "{}", logical_planning_summary)?;
 
         let physical_planning_summary = self.summarize(&self.ttfb_durations);
-        writeln!(f, "Time to First Byte")?;
+        writeln!(f, "Time to First Byte (TTFB)")?;
         writeln!(f, "{}", physical_planning_summary)?;
 
         let execution_summary = self.summarize(&self.do_get_durations);
-        writeln!(f, "Do Get")?;
+        writeln!(f, "Do Get (Includes TTFB)")?;
         writeln!(f, "{}", execution_summary)?;
 
         let total_summary = self.summarize(&self.total_durations);

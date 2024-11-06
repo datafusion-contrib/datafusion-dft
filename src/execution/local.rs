@@ -242,10 +242,11 @@ impl ExecutionContext {
         }
     }
 
-    /// Benchmark the provided query.  Currently, on a single statement can be benchmarked
+    /// Benchmark the provided query.  Currently, only a single statement can be benchmarked
     pub async fn benchmark_query(&self, query: &str) -> Result<LocalBenchmarkStats> {
         let iterations = self.config.benchmark_iterations;
         info!("Benchmarking query with {} iterations", iterations);
+        let mut rows_returned = Vec::with_capacity(iterations);
         let mut logical_planning_durations = Vec::with_capacity(iterations);
         let mut physical_planning_durations = Vec::with_capacity(iterations);
         let mut execution_durations = Vec::with_capacity(iterations);
@@ -270,7 +271,11 @@ impl ExecutionContext {
                 let physical_planning_duration = start.elapsed();
                 let task_ctx = self.session_ctx().task_ctx();
                 let mut stream = execute_stream(physical_plan, task_ctx)?;
-                while stream.next().await.is_some() {}
+                let mut rows = 0;
+                while let Some(b) = stream.next().await {
+                    rows += b?.num_rows();
+                }
+                rows_returned.push(rows);
                 let execution_duration = start.elapsed();
                 let total_duration = start.elapsed();
                 logical_planning_durations.push(logical_planning_duration);
@@ -285,6 +290,7 @@ impl ExecutionContext {
 
         Ok(LocalBenchmarkStats::new(
             query.to_string(),
+            rows_returned,
             logical_planning_durations,
             physical_planning_durations,
             execution_durations,

@@ -1,0 +1,2 @@
+query,runs,get_flight_info_min,get_flight_info_max,get_flight_info_mean,get_flight_info_median,get_flight_info_percent_of_total,ttfb_min,ttfb_max,ttfb,mean,ttfb_median,ttfb_percent_of_total,do_get_min,do_get_max,do_get_mean,do_get_median,do_get_percent_of_total,total_min,total_max,total_mean,total_median,total_percent_of_total
+SELECT 1,10,7,28,11,9,33.44,9,127,22,10,66.29,9,127,22,10,66.43,17,139,33,19,100.00

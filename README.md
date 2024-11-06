@@ -101,6 +101,10 @@ The CLI can also run your configured DDL prior to executing the query by adding 
 #### Benchmarking
 You can benchmark queries by adding the `--bench` parameter.  This will run the query a configurable number of times and output a breakdown of the queries execution time with summary statistics for each component of the query (logical planning, physical planning, execution time, and total time).
 
+Optionally you can use the `--run-before` param to run a query before the benchmark is run.  This is useful in cases where you want to hit a temp table or write a file to disk that your benchmark query will use.
+
+To save benchmark results to a file use the `--save` parameter with a file path.  Further, you can use the `--append` parameter to append to the file instead of overwriting it.
+
 ## `dft` FlightSQL Server
 
 The `dft` FlightSQL server (feature flag `experimental-flightsql-server`) is a Flight service that can be used to execute SQL queries against DataFusion.  The server is started by running `dft --serve` and can optionally run your configured DDL with the `--run-ddl` parameter.
