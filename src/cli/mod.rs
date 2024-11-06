@@ -34,6 +34,7 @@ use {crate::execution::flightsql_benchmarks::FlightSQLBenchmarkStats, tonic::Int
 const LOCAL_BENCHMARK_HEADER_ROW: &str =
     "query,runs,logical_planning_min,logical_planning_max,logical_planning_mean,logical_planning_median,logical_planning_percent_of_total,physical_planning_min,physical_planning_max,physical_planning,mean,physical_planning_median,physical_planning_percent_of_total,execution_min,execution_max,execution_execution_mean,execution_median,execution_percent_of_total,total_min,total_max,total_mean,total_median,total_percent_of_total";
 
+#[cfg(feature = "flightsql")]
 const FLIGHTSQL_BENCHMARK_HEADER_ROW: &str =
     "query,runs,get_flight_info_min,get_flight_info_max,get_flight_info_mean,get_flight_info_median,get_flight_info_percent_of_total,ttfb_min,ttfb_max,ttfb,mean,ttfb_median,ttfb_percent_of_total,do_get_min,do_get_max,do_get_mean,do_get_median,do_get_percent_of_total,total_min,total_max,total_mean,total_median,total_percent_of_total";
 
