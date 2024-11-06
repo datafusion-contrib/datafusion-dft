@@ -102,25 +102,46 @@ impl CliApp {
             self.args.commands.is_empty(),
             self.args.flightsql,
             self.args.bench,
+            self.args.analyze,
         ) {
-            (true, true, _, _) => Err(eyre!("No files or commands provided to execute")),
-            (false, true, true, false) => self.flightsql_execute_files(&self.args.files).await,
-            (false, true, true, true) => self.flightsql_benchmark_files(&self.args.files).await,
-            (false, true, false, false) => self.execute_files(&self.args.files).await,
-            (false, true, false, true) => self.benchmark_files(&self.args.files).await,
-
-            (true, false, true, false) => {
-                self.flightsql_execute_commands(&self.args.commands).await
+            // Error cases
+            (true, true, _, _, _) => Err(eyre!("No files or commands provided to execute")),
+            (false, false, false, true, _) => {
+                Err(eyre!("Cannot benchmark without a command or file"))
             }
-            (true, false, true, true) => {
-                self.flightsql_benchmark_commands(&self.args.commands).await
-            }
-            (true, false, false, false) => self.execute_commands(&self.args.commands).await,
-            (true, false, false, true) => self.benchmark_commands(&self.args.commands).await,
-            (false, false, false, true) => Err(eyre!("Cannot benchmark without a command or file")),
-            (false, false, _, _) => Err(eyre!(
+            (false, false, _, _, _) => Err(eyre!(
                 "Cannot execute both files and commands at the same time"
             )),
+            (_, _, _, true, true) => Err(eyre!(
+                "The `benchmark` and `analyze` flags are mutually exclusive"
+            )),
+            (_, _, true, false, true) => Err(eyre!(
+                "The `analyze` flag is not currently supported with FlightSQL"
+            )),
+
+            // Execution cases
+            (true, false, false, false, false) => self.execute_commands(&self.args.commands).await,
+            (false, true, false, false, false) => self.execute_files(&self.args.files).await,
+            (false, true, true, false, false) => {
+                self.flightsql_execute_files(&self.args.files).await
+            }
+            (true, false, true, false, false) => {
+                self.flightsql_execute_commands(&self.args.commands).await
+            }
+
+            // Benchmark cases
+            (false, true, false, true, false) => self.benchmark_files(&self.args.files).await,
+            (false, true, true, true, false) => {
+                self.flightsql_benchmark_files(&self.args.files).await
+            }
+            (true, false, true, true, false) => {
+                self.flightsql_benchmark_commands(&self.args.commands).await
+            }
+            (true, false, false, true, false) => self.benchmark_commands(&self.args.commands).await,
+
+            // Analyze cases
+            (true, false, false, false, true) => self.analyze_commands(&self.args.commands).await,
+            (false, true, false, false, true) => self.analyze_files(&self.args.files).await,
         }
     }
 

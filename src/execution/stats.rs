@@ -104,7 +104,7 @@ impl ExecutionStats {
     ///    - row groups pruned: 0
     ///    - row groups matched: 10
     ///    - row selectivity: 1.0
-    pub fn efficiency(&self) -> f64 {
+    pub fn selectivity_efficiency(&self) -> f64 {
         if let Some(io) = &self.io {
             io.parquet_rg_pruned_stats_ratio() / self.rows_selectivity()
         } else {
@@ -138,8 +138,9 @@ impl std::fmt::Display for ExecutionStats {
         )?;
         writeln!(f)?;
         writeln!(f, "{}", self.durations)?;
-        writeln!(f, "{:<20}", "Efficiency")?;
-        writeln!(f, "{:<20.2}", self.efficiency())?;
+        writeln!(f, "{:<20}", "Pruning / Selectivity (Higher is better)")?;
+        writeln!(f, "{:<20.2}", self.selectivity_efficiency())?;
+        writeln!(f)?;
         if let Some(io_stats) = &self.io {
             writeln!(f, "{}", io_stats)?;
         };
@@ -302,10 +303,10 @@ impl std::fmt::Display for ExecutionIOStats {
             self.row_group_count(),
             self.time_scanning
                 .as_ref()
-                .map(
-                    |ts| ((ts.as_usize() / 1_000_000) as f64 / self.row_group_count() as f64)
-                        .to_string()
-                )
+                .map(|ts| format!(
+                    "{:.2}",
+                    (ts.as_usize() / 1_000_000) as f64 / self.row_group_count() as f64
+                ))
                 .unwrap_or("None".to_string())
         )?;
         writeln!(
@@ -493,6 +494,11 @@ impl std::fmt::Display for ExecutionComputeStats {
                 .as_ref()
                 .map(|m| m.to_string())
                 .unwrap_or("None".to_string()),
+        )?;
+        writeln!(f)?;
+        writeln!(
+            f,
+            "=========================================================================================="
         )?;
         writeln!(f)?;
         self.display_compute(f, &self.projection_compute, "Projection")?;
