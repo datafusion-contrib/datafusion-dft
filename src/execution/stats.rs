@@ -93,17 +93,6 @@ impl ExecutionStats {
         }
     }
 
-    /// A ratio of the selectivity of the query to the effectivness of pruning the parquet file.
-    ///
-    /// V1: Simply look at row groups pruned by statistics and the row selectivity
-    /// TODO: Incorporate bloom filter and page index pruning
-    ///
-    /// Example calculations:
-    ///
-    /// 1. No pruning and select all rows
-    ///    - row groups pruned: 0
-    ///    - row groups matched: 10
-    ///    - row selectivity: 1.0
     pub fn selectivity_efficiency(&self) -> f64 {
         if let Some(io) = &self.io {
             io.parquet_rg_pruned_stats_ratio() / self.rows_selectivity()
@@ -496,10 +485,6 @@ impl std::fmt::Display for ExecutionComputeStats {
                 .unwrap_or("None".to_string()),
         )?;
         writeln!(f)?;
-        writeln!(
-            f,
-            "=========================================================================================="
-        )?;
         writeln!(f)?;
         self.display_compute(f, &self.projection_compute, "Projection")?;
         writeln!(f)?;
