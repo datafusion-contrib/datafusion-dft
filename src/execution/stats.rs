@@ -394,6 +394,7 @@ impl ExecutionPlanVisitor for PlanIOVisitor {
 
 #[derive(Clone, Debug)]
 pub struct PartitionsComputeStats {
+    name: String,
     /// Sorted elapsed compute times
     elapsed_computes: Vec<usize>,
 }
@@ -443,13 +444,13 @@ impl ExecutionComputeStats {
                 filter_compute.len(),
                 partitions
             )?;
+            writeln!(
+                f,
+                "{:<30} {:<16} {:<16} {:<16} {:<16} {:<16}",
+                "Node(Partitions)", "Min", "Median", "Mean", "Max", "Total (%)"
+            )?;
             filter_compute.iter().try_for_each(|node| {
                 let (min, median, mean, max, total) = node.summary_stats();
-                writeln!(
-                    f,
-                    "{:<18} {:<18} {:<18} {:<18} {:<18}",
-                    "Min", "Median", "Mean", "Max", "Total (%)"
-                )?;
                 let total = format!(
                     "{} ({:.2}%)",
                     total,
@@ -457,8 +458,13 @@ impl ExecutionComputeStats {
                 );
                 writeln!(
                     f,
-                    "{:<18} {:<18} {:<18} {:<18} {:<18}",
-                    min, median, mean, max, total,
+                    "{:<30} {:<16} {:<16} {:<16} {:<16} {:<16}",
+                    format!("{}({})", node.name, node.elapsed_computes.len()),
+                    min,
+                    median,
+                    mean,
+                    max,
+                    total,
                 )?;
                 Ok(())
             })?
@@ -549,6 +555,7 @@ impl PlanComputeVisitor {
                     .sorted()
                     .collect();
                 let p = PartitionsComputeStats {
+                    name: plan.name().to_string(),
                     elapsed_computes: sorted_computes,
                 };
                 self.filter_computes.push(p)
@@ -568,6 +575,7 @@ impl PlanComputeVisitor {
                     .sorted()
                     .collect();
                 let p = PartitionsComputeStats {
+                    name: plan.name().to_string(),
                     elapsed_computes: sorted_computes,
                 };
                 self.sort_computes.push(p)
@@ -587,6 +595,7 @@ impl PlanComputeVisitor {
                     .sorted()
                     .collect();
                 let p = PartitionsComputeStats {
+                    name: plan.name().to_string(),
                     elapsed_computes: sorted_computes,
                 };
                 self.projection_computes.push(p)
@@ -606,6 +615,7 @@ impl PlanComputeVisitor {
                     .sorted()
                     .collect();
                 let p = PartitionsComputeStats {
+                    name: plan.name().to_string(),
                     elapsed_computes: sorted_computes,
                 };
                 self.join_computes.push(p)
@@ -625,6 +635,7 @@ impl PlanComputeVisitor {
                     .sorted()
                     .collect();
                 let p = PartitionsComputeStats {
+                    name: plan.name().to_string(),
                     elapsed_computes: sorted_computes,
                 };
                 self.aggregate_computes.push(p)
@@ -633,7 +644,12 @@ impl PlanComputeVisitor {
     }
 
     fn collect_other_metrics(&mut self, plan: &dyn ExecutionPlan) {
-        if !is_filter_plan(plan) && !is_sort_plan(plan) && !is_projection_plan(plan) {
+        if !is_filter_plan(plan)
+            && !is_sort_plan(plan)
+            && !is_projection_plan(plan)
+            && !is_aggregate_plan(plan)
+            && !is_join_plan(plan)
+        {
             if let Some(metrics) = plan.metrics() {
                 let sorted_computes: Vec<usize> = metrics
                     .iter()
@@ -644,6 +660,7 @@ impl PlanComputeVisitor {
                     .sorted()
                     .collect();
                 let p = PartitionsComputeStats {
+                    name: plan.name().to_string(),
                     elapsed_computes: sorted_computes,
                 };
                 self.other_computes.push(p)
