@@ -491,7 +491,6 @@ impl std::fmt::Display for ExecutionComputeStats {
                 .unwrap_or("None".to_string()),
         )?;
         writeln!(f)?;
-        writeln!(f)?;
         self.display_compute(f, &self.projection_compute, "Projection")?;
         writeln!(f)?;
         self.display_compute(f, &self.filter_compute, "Filter")?;

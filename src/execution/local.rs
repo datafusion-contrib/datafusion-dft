@@ -337,7 +337,7 @@ impl ExecutionContext {
                 start.elapsed(),
             );
             ExecutionStats::try_new(
-                statement.to_string(),
+                query.to_string(),
                 durations,
                 rows,
                 batches,
