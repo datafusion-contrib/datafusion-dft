@@ -23,7 +23,6 @@ pub mod local;
 pub mod sql_utils;
 pub mod stats;
 
-mod local_analyze;
 pub mod local_benchmarks;
 
 pub use stats::{collect_plan_io_stats, ExecutionStats};
