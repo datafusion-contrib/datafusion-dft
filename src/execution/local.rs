@@ -33,6 +33,7 @@ use datafusion::sql::parser::{DFParser, Statement};
 use tokio_stream::StreamExt;
 
 use super::local_benchmarks::LocalBenchmarkStats;
+use super::stats::{ExecutionDurationStats, ExecutionStats};
 use super::AppType;
 
 /// Structure for executing queries locally
@@ -220,6 +221,10 @@ impl ExecutionContext {
                     if statement.trim().is_empty() {
                         continue;
                     }
+                    if statement.trim().starts_with("--") {
+                        continue;
+                    }
+
                     debug!("Executing DDL statement: {:?}", statement);
                     match self.execute_sql_and_discard_results(statement).await {
                         Ok(_) => {
@@ -291,5 +296,58 @@ impl ExecutionContext {
             execution_durations,
             total_durations,
         ))
+    }
+
+    pub async fn analyze_query(&self, query: &str) -> Result<ExecutionStats> {
+        let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
+        let start = std::time::Instant::now();
+        let statements = DFParser::parse_sql_with_dialect(query, &dialect)?;
+        let parsing_duration = start.elapsed();
+        if statements.len() == 1 {
+            let statement = statements[0].clone();
+            let logical_plan = self
+                .session_ctx()
+                .state()
+                .statement_to_plan(statement.clone())
+                .await?;
+            let logical_planning_duration = start.elapsed();
+            let physical_plan = self
+                .session_ctx()
+                .state()
+                .create_physical_plan(&logical_plan)
+                .await?;
+            let physical_planning_duration = start.elapsed();
+            let task_ctx = self.session_ctx().task_ctx();
+            let mut stream = execute_stream(Arc::clone(&physical_plan), task_ctx)?;
+            let mut rows = 0;
+            let mut batches = 0;
+            let mut bytes = 0;
+            while let Some(b) = stream.next().await {
+                let batch = b?;
+                rows += batch.num_rows();
+                batches += 1;
+                bytes += batch.get_array_memory_size();
+            }
+            let execution_duration = start.elapsed();
+            let durations = ExecutionDurationStats::new(
+                parsing_duration,
+                logical_planning_duration - parsing_duration,
+                physical_planning_duration - logical_planning_duration,
+                execution_duration - physical_planning_duration,
+                start.elapsed(),
+            );
+            ExecutionStats::try_new(
+                query.to_string(),
+                durations,
+                rows,
+                batches,
+                bytes,
+                physical_plan,
+            )
+        } else {
+            Err(eyre::eyre!("Only a single statement can be benchmarked"))
+        }
+
+        // Ok(())
     }
 }

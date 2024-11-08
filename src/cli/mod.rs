@@ -34,6 +34,7 @@ use {crate::execution::flightsql_benchmarks::FlightSQLBenchmarkStats, tonic::Int
 const LOCAL_BENCHMARK_HEADER_ROW: &str =
     "query,runs,logical_planning_min,logical_planning_max,logical_planning_mean,logical_planning_median,logical_planning_percent_of_total,physical_planning_min,physical_planning_max,physical_planning,mean,physical_planning_median,physical_planning_percent_of_total,execution_min,execution_max,execution_execution_mean,execution_median,execution_percent_of_total,total_min,total_max,total_mean,total_median,total_percent_of_total";
 
+#[cfg(feature = "flightsql")]
 const FLIGHTSQL_BENCHMARK_HEADER_ROW: &str =
     "query,runs,get_flight_info_min,get_flight_info_max,get_flight_info_mean,get_flight_info_median,get_flight_info_percent_of_total,ttfb_min,ttfb_max,ttfb,mean,ttfb_median,ttfb_percent_of_total,do_get_min,do_get_max,do_get_mean,do_get_median,do_get_percent_of_total,total_min,total_max,total_mean,total_median,total_percent_of_total";
 
@@ -66,19 +67,34 @@ impl CliApp {
             self.args.commands.is_empty(),
             self.args.flightsql,
             self.args.bench,
+            self.args.analyze,
         ) {
-            (_, _, true, _) => Err(eyre!(
+            // Error cases
+            (_, _, true, _, _) => Err(eyre!(
                 "FLightSQL feature isn't enabled. Reinstall `dft` with `--features=flightsql`"
             )),
-            (true, true, _, _) => Err(eyre!("No files or commands provided to execute")),
-            (false, true, _, false) => self.execute_files(&self.args.files).await,
-            (false, true, _, true) => self.benchmark_files(&self.args.files).await,
-            (true, false, _, false) => self.execute_commands(&self.args.commands).await,
-            (true, false, _, true) => self.benchmark_commands(&self.args.commands).await,
-            (false, false, _, false) => Err(eyre!(
+            (false, false, false, true, _) => {
+                Err(eyre!("Cannot benchmark without a command or file"))
+            }
+            (true, true, _, _, _) => Err(eyre!("No files or commands provided to execute")),
+            (false, false, _, false, _) => Err(eyre!(
                 "Cannot execute both files and commands at the same time"
             )),
-            (false, false, false, true) => Err(eyre!("Cannot benchmark without a command or file")),
+            (_, _, false, true, true) => Err(eyre!(
+                "The `benchmark` and `analyze` flags are mutually exclusive"
+            )),
+
+            // Execution cases
+            (false, true, _, false, false) => self.execute_files(&self.args.files).await,
+            (true, false, _, false, false) => self.execute_commands(&self.args.commands).await,
+
+            // Benchmark cases
+            (false, true, _, true, false) => self.benchmark_files(&self.args.files).await,
+            (true, false, _, true, false) => self.benchmark_commands(&self.args.commands).await,
+
+            // Analyze cases
+            (false, true, _, false, true) => self.analyze_files(&self.args.files).await,
+            (true, false, _, false, true) => self.analyze_commands(&self.args.commands).await,
         }
         #[cfg(feature = "flightsql")]
         match (
@@ -86,25 +102,46 @@ impl CliApp {
             self.args.commands.is_empty(),
             self.args.flightsql,
             self.args.bench,
+            self.args.analyze,
         ) {
-            (true, true, _, _) => Err(eyre!("No files or commands provided to execute")),
-            (false, true, true, false) => self.flightsql_execute_files(&self.args.files).await,
-            (false, true, true, true) => self.flightsql_benchmark_files(&self.args.files).await,
-            (false, true, false, false) => self.execute_files(&self.args.files).await,
-            (false, true, false, true) => self.benchmark_files(&self.args.files).await,
-
-            (true, false, true, false) => {
-                self.flightsql_execute_commands(&self.args.commands).await
+            // Error cases
+            (true, true, _, _, _) => Err(eyre!("No files or commands provided to execute")),
+            (false, false, false, true, _) => {
+                Err(eyre!("Cannot benchmark without a command or file"))
             }
-            (true, false, true, true) => {
-                self.flightsql_benchmark_commands(&self.args.commands).await
-            }
-            (true, false, false, false) => self.execute_commands(&self.args.commands).await,
-            (true, false, false, true) => self.benchmark_commands(&self.args.commands).await,
-            (false, false, false, true) => Err(eyre!("Cannot benchmark without a command or file")),
-            (false, false, _, _) => Err(eyre!(
+            (false, false, _, _, _) => Err(eyre!(
                 "Cannot execute both files and commands at the same time"
             )),
+            (_, _, _, true, true) => Err(eyre!(
+                "The `benchmark` and `analyze` flags are mutually exclusive"
+            )),
+            (_, _, true, false, true) => Err(eyre!(
+                "The `analyze` flag is not currently supported with FlightSQL"
+            )),
+
+            // Execution cases
+            (true, false, false, false, false) => self.execute_commands(&self.args.commands).await,
+            (false, true, false, false, false) => self.execute_files(&self.args.files).await,
+            (false, true, true, false, false) => {
+                self.flightsql_execute_files(&self.args.files).await
+            }
+            (true, false, true, false, false) => {
+                self.flightsql_execute_commands(&self.args.commands).await
+            }
+
+            // Benchmark cases
+            (false, true, false, true, false) => self.benchmark_files(&self.args.files).await,
+            (false, true, true, true, false) => {
+                self.flightsql_benchmark_files(&self.args.files).await
+            }
+            (true, false, true, true, false) => {
+                self.flightsql_benchmark_commands(&self.args.commands).await
+            }
+            (true, false, false, true, false) => self.benchmark_commands(&self.args.commands).await,
+
+            // Analyze cases
+            (true, false, false, false, true) => self.analyze_commands(&self.args.commands).await,
+            (false, true, false, false, true) => self.analyze_files(&self.args.files).await,
         }
     }
 
@@ -129,6 +166,15 @@ impl CliApp {
             let query = std::fs::read_to_string(file)?;
             let stats = self.benchmark_from_string(&query).await?;
             println!("{}", stats);
+        }
+        Ok(())
+    }
+
+    async fn analyze_files(&self, files: &[PathBuf]) -> Result<()> {
+        info!("Analyzing files: {:?}", files);
+        for file in files {
+            let query = std::fs::read_to_string(file)?;
+            self.analyze_from_string(&query).await?;
         }
         Ok(())
     }
@@ -257,6 +303,15 @@ impl CliApp {
         Ok(())
     }
 
+    async fn analyze_commands(&self, commands: &[String]) -> color_eyre::Result<()> {
+        info!("Analyzing commands: {:?}", commands);
+        for command in commands {
+            self.analyze_from_string(command).await?;
+        }
+
+        Ok(())
+    }
+
     #[cfg(feature = "flightsql")]
     async fn flightsql_execute_commands(&self, commands: &[String]) -> color_eyre::Result<()> {
         info!("Executing FlightSQL commands: {:?}", commands);
@@ -334,6 +389,17 @@ impl CliApp {
             .benchmark_query(sql)
             .await?;
         Ok(stats)
+    }
+
+    async fn analyze_from_string(&self, sql: &str) -> Result<()> {
+        let mut stats = self
+            .app_execution
+            .execution_ctx()
+            .analyze_query(sql)
+            .await?;
+        stats.collect_stats();
+        println!("{}", stats);
+        Ok(())
     }
 
     #[cfg(feature = "flightsql")]

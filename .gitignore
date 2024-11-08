@@ -95,3 +95,6 @@ Cargo.lock
 
 # For local development of benchmarking
 benchmark_results/
+
+# For local query testing
+queries/**
