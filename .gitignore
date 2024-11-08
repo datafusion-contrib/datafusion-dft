@@ -97,4 +97,4 @@ Cargo.lock
 benchmark_results/
 
 # For local query testing
-queries/
+queries/**
