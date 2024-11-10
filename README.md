@@ -277,7 +277,7 @@ Same interface as SQL tab but sends SQL queries to FlightSQL server.
   - Edit mode
     - Character keys to write queries
     - Backspace / tab / enter work same as normal
-        - `Shift` + Up/Down/Left/Right => Select text
+    - `Shift` + Up/Down/Left/Right => Select text
     - `Alt` + `Enter` => execute query
     - `esc` to exit Edit mode and go back to Normal mode
 
