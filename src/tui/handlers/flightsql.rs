@@ -93,6 +93,17 @@ pub fn editable_handler(app: &mut App, key: KeyEvent) {
         (KeyCode::Right, KeyModifiers::ALT) => app.state.flightsql_tab.next_word(),
         (KeyCode::Backspace, KeyModifiers::ALT) => app.state.flightsql_tab.delete_word(),
         (KeyCode::Esc, _) => app.state.flightsql_tab.exit_edit(),
+        (KeyCode::Enter, KeyModifiers::ALT) => {
+            // TODO: Encapsulate this logic
+            let sql = app.state.sql_tab.sql();
+            info!("Running query: {}", sql);
+            let _event_tx = app.event_tx().clone();
+            let execution = Arc::clone(&app.execution);
+            let sqls: Vec<String> = sql.split(';').map(|s| s.to_string()).collect();
+            let handle = tokio::spawn(execution.run_sqls(sqls, _event_tx));
+            app.state.sql_tab.set_execution_task(handle);
+        }
+
         _ => app.state.flightsql_tab.update_editor_content(key),
     }
 }
