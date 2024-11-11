@@ -386,7 +386,7 @@ impl CliApp {
         let stats = self
             .app_execution
             .execution_ctx()
-            .benchmark_query(sql)
+            .benchmark_query(sql, self.args.benchmark_iterations)
             .await?;
         Ok(stats)
     }
@@ -407,7 +407,7 @@ impl CliApp {
         let stats = self
             .app_execution
             .flightsql_ctx()
-            .benchmark_query(sql)
+            .benchmark_query(sql, self.args.benchmark_iterations)
             .await?;
         Ok(stats)
     }

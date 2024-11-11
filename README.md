@@ -105,6 +105,8 @@ Optionally you can use the `--run-before` param to run a query before the benchm
 
 To save benchmark results to a file use the `--save` parameter with a file path.  Further, you can use the `--append` parameter to append to the file instead of overwriting it.
 
+The number of benchmark iterations is defined in your configuration (default is 10) and can be configured per benchmark run with `-n` parameter.
+
 #### Analyze Queries
 
 The output from `EXPLAIN ANALYZE` provides a wealth of information on a queries execution - however, the amount of information and connecting the dots can be difficult and manual.  Further, there is detail in the `MetricSet`'s of the underlying `ExecutionPlan`'s that is lost in the output.
