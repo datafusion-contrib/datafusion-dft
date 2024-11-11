@@ -179,3 +179,24 @@ SELECT 1
     let lines: Vec<&str> = contents.lines().collect();
     assert_eq!(lines.len(), 3);
 }
+
+#[test]
+fn test_bench_command_with_custom_iterations() {
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT 1")
+        .arg("--bench")
+        .arg("-n")
+        .arg("3")
+        .assert()
+        .success();
+
+    let expected = r##"
+----------------------------
+Benchmark Stats (3 runs)
+----------------------------
+SELECT 1
+----------------------------"##;
+    assert.stdout(contains_str(expected));
+}

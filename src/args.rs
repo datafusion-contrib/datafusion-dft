@@ -87,6 +87,9 @@ pub struct DftArgs {
 
     #[clap(long, help = "Append the benchmark results to an existing file")]
     pub append: bool,
+
+    #[clap(short = 'n', help = "Set the number of benchmark iterations to run")]
+    pub benchmark_iterations: Option<usize>,
 }
 
 impl DftArgs {

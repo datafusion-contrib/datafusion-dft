@@ -465,3 +465,33 @@ SELECT 1
 
     fixture.shutdown_and_wait().await;
 }
+
+#[tokio::test]
+pub async fn test_bench_command_customer_iterations() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("--bench")
+            .arg("--flightsql")
+            .arg("-n")
+            .arg("3")
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r##"
+----------------------------
+Benchmark Stats (3 runs)
+----------------------------
+SELECT 1
+----------------------------"##;
+    assert.stdout(contains_str(expected));
+    fixture.shutdown_and_wait().await;
+}

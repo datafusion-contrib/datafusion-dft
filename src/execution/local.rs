@@ -243,8 +243,12 @@ impl ExecutionContext {
     }
 
     /// Benchmark the provided query.  Currently, only a single statement can be benchmarked
-    pub async fn benchmark_query(&self, query: &str) -> Result<LocalBenchmarkStats> {
-        let iterations = self.config.benchmark_iterations;
+    pub async fn benchmark_query(
+        &self,
+        query: &str,
+        cli_iterations: Option<usize>,
+    ) -> Result<LocalBenchmarkStats> {
+        let iterations = cli_iterations.unwrap_or(self.config.benchmark_iterations);
         info!("Benchmarking query with {} iterations", iterations);
         let mut rows_returned = Vec::with_capacity(iterations);
         let mut logical_planning_durations = Vec::with_capacity(iterations);
