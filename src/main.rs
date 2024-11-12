@@ -46,11 +46,13 @@ async fn main() -> Result<()> {
         {
             if cli.flightsql {
                 let flightsql_ctx = FlightSQLContext::new(state.config.flightsql.clone());
-                flightsql_ctx.create_client().await?;
+                flightsql_ctx
+                    .create_client(cli.flightsql_host.clone())
+                    .await?;
                 app_execution.with_flightsql_ctx(flightsql_ctx);
             }
         }
-        let app = CliApp::new(app_execution, cli);
+        let app = CliApp::new(app_execution, cli.clone());
         app.execute_files_or_commands().await?;
     } else if cli.serve {
         #[cfg(feature = "experimental-flightsql-server")]
@@ -66,7 +68,12 @@ async fn main() -> Result<()> {
             }
             let app_execution = AppExecution::new(execution_ctx);
             let server = FlightSqlServiceImpl::new(app_execution);
-            let app = FlightSqlApp::new(server.service(), DEFAULT_SERVER_ADDRESS).await;
+            let app = FlightSqlApp::new(
+                server.service(),
+                &cli.flightsql_host
+                    .unwrap_or(DEFAULT_SERVER_ADDRESS.to_string()),
+            )
+            .await;
             app.run_app().await;
         }
 
@@ -82,7 +89,7 @@ async fn main() -> Result<()> {
         let state = state::initialize(cli.config_path());
         let execution_ctx = ExecutionContext::try_new(&state.config.execution, AppType::Tui)?;
         let app_execution = AppExecution::new(execution_ctx);
-        let app = App::new(state, app_execution);
+        let app = App::new(state, cli, app_execution);
         app.run_app().await?;
     }
 

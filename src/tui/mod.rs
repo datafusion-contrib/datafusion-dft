@@ -40,6 +40,7 @@ use tokio_util::sync::CancellationToken;
 
 use self::execution::{ExecutionError, ExecutionResultsBatch, TuiExecution};
 use self::handlers::{app_event_handler, crossterm_event_handler};
+use crate::args::DftArgs;
 use crate::execution::sql_utils::clean_sql;
 use crate::execution::AppExecution;
 
@@ -92,18 +93,19 @@ pub struct App<'app> {
     cancellation_token: CancellationToken,
     task: JoinHandle<()>,
     ddl_task: Option<JoinHandle<()>>,
+    args: DftArgs,
 }
 
 impl<'app> App<'app> {
-    pub fn new(state: state::AppState<'app>, execution: AppExecution) -> Self {
+    pub fn new(state: state::AppState<'app>, args: DftArgs, execution: AppExecution) -> Self {
         let (event_tx, event_rx) = mpsc::unbounded_channel();
         let cancellation_token = CancellationToken::new();
         let task = tokio::spawn(async {});
-        // let ddl_task = tokio::spawn(async {});
         let app_execution = Arc::new(TuiExecution::new(Arc::new(execution)));
 
         Self {
             state,
+            args,
             task,
             event_rx,
             event_tx,
