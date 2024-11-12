@@ -92,7 +92,7 @@ $ dft -c "SELECT 1+2"
 
 #### FlightSQL
 
-Both of the commands above support the `--flightsql` parameter to run the SQL with your configured FlightSQL client.
+Both of the commands above support the `--flightsql` parameter to run the SQL with your configured FlightSQL client.  You can also configure the host used for creating FlightSQL client per command with `--flightsql-host` - for example `--flightsql-host "http://127.0.0.1:50052"`.
 
 #### DDL
 

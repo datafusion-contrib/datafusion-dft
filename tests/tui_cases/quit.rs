@@ -17,6 +17,7 @@
 
 //! Tests for the TUI (e.g. user application with keyboard commands)
 
+use dft::args::DftArgs;
 use dft::execution::{local::ExecutionContext, AppExecution, AppType};
 use dft::tui::state::initialize;
 use dft::tui::{App, AppEvent};
@@ -105,8 +106,9 @@ impl<'app> TestApp<'app> {
         let config_path = tempdir().unwrap();
         let state = initialize(config_path.path().to_path_buf());
         let execution = ExecutionContext::try_new(&state.config.execution, AppType::Tui).unwrap();
+        let args = DftArgs::default();
         let app_execution = AppExecution::new(execution);
-        let app = App::new(state, app_execution);
+        let app = App::new(state, args, app_execution);
         Self { config_path, app }
     }
 

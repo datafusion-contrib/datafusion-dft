@@ -495,3 +495,34 @@ SELECT 1
     assert.stdout(contains_str(expected));
     fixture.shutdown_and_wait().await;
 }
+
+#[tokio::test]
+pub async fn test_execute_custom_port() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50052").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1 + 2;")
+            .arg("--flightsql")
+            .arg("--flightsql-host")
+            .arg("http://localhost:50052")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r##"
++---------------------+
+| Int64(1) + Int64(2) |
++---------------------+
+| 3                   |
++---------------------+
+    "##;
+    assert.stdout(contains_str(expected));
+    fixture.shutdown_and_wait().await;
+}

@@ -403,10 +403,9 @@ impl TuiExecution {
 
     // TODO: Maybe just expose `inner` and use that rather than re-implementing the same
     // functions here.
-
     #[cfg(feature = "flightsql")]
-    pub async fn create_flightsql_client(&self) -> Result<()> {
-        self.inner.flightsql_ctx().create_client().await
+    pub async fn create_flightsql_client(&self, cli_host: Option<String>) -> Result<()> {
+        self.inner.flightsql_ctx().create_client(cli_host).await
     }
 
     #[cfg(feature = "flightsql")]

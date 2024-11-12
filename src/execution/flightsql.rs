@@ -49,8 +49,9 @@ impl FlightSQLContext {
     }
 
     /// Create FlightSQL client from users FlightSQL config
-    pub async fn create_client(&self) -> Result<()> {
-        let url = Box::leak(self.config.connection_url.clone().into_boxed_str());
+    pub async fn create_client(&self, cli_host: Option<String>) -> Result<()> {
+        let final_url = cli_host.unwrap_or(self.config.connection_url.clone());
+        let url = Box::leak(final_url.into_boxed_str());
         info!("Connecting to FlightSQL host: {}", url);
         let channel = Channel::from_static(url).connect().await;
         match channel {
