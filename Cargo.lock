@@ -1599,6 +1599,7 @@ dependencies = [
  "lazy_static",
  "log",
  "object_store",
+ "parking_lot",
  "pin-project-lite",
  "predicates",
  "prost",

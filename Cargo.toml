@@ -33,6 +33,7 @@ itertools = "0.13.0"
 lazy_static = "1.4.0"
 log = "0.4.22"
 object_store = { version = "0.10.2", features = ["aws"], optional = true }
+parking_lot = "0.12.3"
 pin-project-lite = {version = "0.2.14" }
 prost = "0.12.3"
 ratatui = "0.28.0"

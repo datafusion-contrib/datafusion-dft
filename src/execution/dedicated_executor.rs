@@ -16,18 +16,20 @@
 // under the License.
 
 use std::{
-    sync::{Arc, OnceLock, RwLock},
+    sync::{Arc, OnceLock},
     time::Duration,
 };
 
 use futures::{
     future::{BoxFuture, Shared},
-    FutureExt,
+    Future, FutureExt, TryFutureExt,
 };
 use log::warn;
+use parking_lot::RwLock;
 use tokio::{
     runtime::Handle,
     sync::{oneshot::error::RecvError, Notify},
+    task::JoinSet,
 };
 
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(60 * 5);
@@ -84,6 +86,11 @@ const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(60 * 5);
 /// context.', .../tokio-1.4.0/src/runtime/blocking/shutdown.rs:51:21
 struct DedicatedExecutor {
     state: Arc<RwLock<State>>,
+
+    /// Used for testing.
+    ///
+    /// This will ignore explicit shutdown requests.
+    testing: bool,
 }
 
 /// [`DedicatedExecutor`] for testing purposes.
@@ -182,12 +189,7 @@ impl DedicatedExecutor {
                 // - https://github.com/influxdata/influxdb_iox/pull/11030
                 runtime_builder.enable_time();
 
-                Self::new_inner(
-                    "testing",
-                    runtime_builder,
-                    Arc::new(Registry::default()),
-                    true,
-                )
+                Self::new_inner("testing", runtime_builder, true)
             })
             .clone()
     }
