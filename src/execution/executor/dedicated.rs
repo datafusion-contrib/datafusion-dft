@@ -32,7 +32,17 @@ use tokio::{
     task::JoinSet,
 };
 
+use super::io::register_io_runtime;
+
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(60 * 5);
+
+/// Errors occurring when polling [`DedicatedExecutor::spawn`].
+#[derive(Debug)]
+#[allow(missing_docs)]
+pub enum JobError {
+    WorkerGone,
+    Panic { msg: String },
+}
 
 /// Manages a separate tokio runtime (thread pool) for executing tasks.
 ///
@@ -84,6 +94,7 @@ const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(60 * 5);
 /// drop a runtime in a context where blocking is not allowed. This
 /// happens when a runtime is dropped from within an asynchronous
 /// context.', .../tokio-1.4.0/src/runtime/blocking/shutdown.rs:51:21
+#[derive(Clone)]
 struct DedicatedExecutor {
     state: Arc<RwLock<State>>,
 

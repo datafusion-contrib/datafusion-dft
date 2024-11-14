@@ -270,16 +270,6 @@ impl FlightSqlApp {
         }
     }
 
-    // pub async fn channel(&self) -> Channel {
-    //     let url = format!("http://{}", self.addr);
-    //     let uri: Uri = url.parse().expect("Valid URI");
-    //     Channel::builder(uri)
-    //         .timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECONDS))
-    //         .connect()
-    //         .await
-    //         .expect("error connecting to server")
-    // }
-
     /// Stops the server and waits for the server to shutdown
     pub async fn shutdown_and_wait(mut self) {
         if let Some(shutdown) = self.shutdown.take() {

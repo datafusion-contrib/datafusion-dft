@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-pub mod dedicated_executor;
+pub mod executor;
 #[cfg(feature = "flightsql")]
 pub mod flightsql;
 #[cfg(feature = "flightsql")]
