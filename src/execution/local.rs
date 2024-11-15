@@ -21,6 +21,8 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use datafusion_common::DataFusionError;
+use futures::{Future, TryFutureExt};
 use log::{debug, error, info};
 
 use crate::config::ExecutionConfig;
@@ -32,6 +34,7 @@ use datafusion::prelude::*;
 use datafusion::sql::parser::{DFParser, Statement};
 use tokio_stream::StreamExt;
 
+use super::executor::dedicated::{DedicatedExecutor, JobError};
 use super::local_benchmarks::LocalBenchmarkStats;
 use super::stats::{ExecutionDurationStats, ExecutionStats};
 use super::AppType;
@@ -52,8 +55,12 @@ use super::AppType;
 #[derive(Clone)]
 pub struct ExecutionContext {
     config: ExecutionConfig,
+    /// Underlying `SessionContext`
     session_ctx: SessionContext,
+    /// Path to the configured DDL file
     ddl_path: Option<PathBuf>,
+    /// Dedicated executor for running CPU intensive work
+    executor: Option<DedicatedExecutor>,
 }
 
 impl std::fmt::Debug for ExecutionContext {
@@ -66,6 +73,7 @@ impl ExecutionContext {
     /// Construct a new `ExecutionContext` with the specified configuration
     pub fn try_new(config: &ExecutionConfig, app_type: AppType) -> Result<Self> {
         let mut builder = DftSessionStateBuilder::new();
+        let mut executor = None;
         match app_type {
             AppType::Cli => {
                 builder = builder.with_batch_size(config.cli_batch_size);
@@ -75,6 +83,9 @@ impl ExecutionContext {
             }
             AppType::FlightSQLServer => {
                 builder = builder.with_batch_size(config.flightsql_server_batch_size);
+                let runtime_builder = tokio::runtime::Builder::new_multi_thread();
+                let dedicated_executor = DedicatedExecutor::new("cpu_runtime", runtime_builder);
+                executor = Some(dedicated_executor)
             }
         }
         let extensions = enabled_extensions();
@@ -101,6 +112,7 @@ impl ExecutionContext {
             config: config.clone(),
             session_ctx,
             ddl_path: config.ddl_path.as_ref().map(PathBuf::from),
+            executor,
         })
     }
 
@@ -116,6 +128,25 @@ impl ExecutionContext {
     pub fn session_ctx(&self) -> &SessionContext {
         &self.session_ctx
     }
+
+    /// Return the inner [`DedicatedExecutor`]
+    pub fn executor(&self) -> &Option<DedicatedExecutor> {
+        &self.executor
+    }
+
+    // pub fn run<T>(&self, task: T) -> impl Future<Output = Result<T::Output, DataFusionError>>
+    // where
+    //     T: Future + Send + 'static,
+    //     T::Output: Send + 'static,
+    // {
+    //     if let Some(executor) = &self.executor {
+    //         executor
+    //             .spawn(task)
+    //             .map_err(|_| DataFusionError::External("A".into()))
+    //     } else {
+    //         task
+    //     }
+    // }
 
     /// Executes the specified sql string, driving it to completion but discarding any results
     pub async fn execute_sql_and_discard_results(

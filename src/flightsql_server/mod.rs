@@ -25,6 +25,7 @@ use arrow_flight::sql::{Any, CommandStatementQuery, SqlInfo, TicketStatementQuer
 use arrow_flight::{FlightDescriptor, FlightEndpoint, FlightInfo, Ticket};
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::sql::parser::DFParser;
+use datafusion_common::DataFusionError;
 use futures::{StreamExt, TryStreamExt};
 use log::{debug, error, info};
 use prost::Message;
@@ -78,13 +79,19 @@ impl FlightSqlService for FlightSqlServiceImpl {
             Ok(statements) => {
                 let statement = statements[0].clone();
                 let start = std::time::Instant::now();
-                match self
-                    .execution
-                    .session_ctx()
-                    .state()
-                    .statement_to_plan(statement)
-                    .await
-                {
+
+                let ctx = self.execution.session_ctx().clone();
+                let task = async move { ctx.state().statement_to_plan(statement).await };
+
+                let res = if let Some(e) = self.execution.executor() {
+                    e.spawn(task)
+                        .await
+                        .map_err(|e| tonic::Status::internal("A".to_string()))?
+                } else {
+                    task.await
+                };
+
+                match res {
                     Ok(logical_plan) => {
                         debug!("logical planning took: {:?}", start.elapsed());
                         let schema = logical_plan.schema();

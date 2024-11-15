@@ -16,6 +16,7 @@
 // under the License.
 
 use std::{
+    fmt::Display,
     sync::{Arc, OnceLock},
     time::Duration,
 };
@@ -42,6 +43,17 @@ const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(60 * 5);
 pub enum JobError {
     WorkerGone,
     Panic { msg: String },
+}
+
+impl Display for JobError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            JobError::WorkerGone => {
+                write!(f, "Worker thread gone, executor was likely shut down")
+            }
+            JobError::Panic { msg } => write!(f, "Panic: {}", msg),
+        }
+    }
 }
 
 /// Manages a separate tokio runtime (thread pool) for executing tasks.
@@ -95,7 +107,7 @@ pub enum JobError {
 /// happens when a runtime is dropped from within an asynchronous
 /// context.', .../tokio-1.4.0/src/runtime/blocking/shutdown.rs:51:21
 #[derive(Clone)]
-struct DedicatedExecutor {
+pub struct DedicatedExecutor {
     state: Arc<RwLock<State>>,
 
     /// Used for testing.
@@ -342,5 +354,403 @@ impl Drop for State {
 
         // join thread but don't care about the results
         self.thread.take().expect("not dropped yet").join().ok();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::execution::executor::io::spawn_io;
+
+    use super::*;
+    use std::{
+        panic::panic_any,
+        sync::{Arc, Barrier},
+        time::Duration,
+    };
+    use tokio::{net::TcpListener, sync::Barrier as AsyncBarrier};
+
+    /// Wait for the barrier and then return `result`
+    async fn do_work(result: usize, barrier: Arc<Barrier>) -> usize {
+        barrier.wait();
+        result
+    }
+
+    /// Wait for the barrier and then return `result`
+    async fn do_work_async(result: usize, barrier: Arc<AsyncBarrier>) -> usize {
+        barrier.wait().await;
+        result
+    }
+
+    fn exec() -> DedicatedExecutor {
+        exec_with_threads(1)
+    }
+
+    fn exec2() -> DedicatedExecutor {
+        exec_with_threads(2)
+    }
+
+    fn exec_with_threads(threads: usize) -> DedicatedExecutor {
+        let mut runtime_builder = tokio::runtime::Builder::new_multi_thread();
+        runtime_builder.worker_threads(threads);
+        runtime_builder.enable_all();
+
+        DedicatedExecutor::new("Test DedicatedExecutor", runtime_builder)
+    }
+
+    async fn test_io_runtime_multi_thread_impl(dedicated: DedicatedExecutor) {
+        let io_runtime_id = std::thread::current().id();
+        dedicated
+            .spawn(async move {
+                let dedicated_id = std::thread::current().id();
+                let spawned = spawn_io(async move { std::thread::current().id() }).await;
+
+                assert_ne!(dedicated_id, spawned);
+                assert_eq!(io_runtime_id, spawned);
+            })
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn basic() {
+        let barrier = Arc::new(Barrier::new(2));
+
+        let exec = exec();
+        let dedicated_task = exec.spawn(do_work(42, Arc::clone(&barrier)));
+
+        // Note the dedicated task will never complete if it runs on
+        // the main tokio thread (as this test is not using the
+        // 'multithreaded' version of the executor and the call to
+        // barrier.wait actually blocks the tokio thread)
+        barrier.wait();
+
+        // should be able to get the result
+        assert_eq!(dedicated_task.await.unwrap(), 42);
+
+        exec.join().await;
+    }
+
+    #[tokio::test]
+    async fn basic_clone() {
+        let barrier = Arc::new(Barrier::new(2));
+        let exec = exec();
+        // Run task on clone should work fine
+        let dedicated_task = exec.clone().spawn(do_work(42, Arc::clone(&barrier)));
+        barrier.wait();
+        assert_eq!(dedicated_task.await.unwrap(), 42);
+
+        exec.join().await;
+    }
+
+    #[tokio::test]
+    async fn drop_empty_exec() {
+        exec();
+    }
+
+    #[tokio::test]
+    async fn drop_clone() {
+        let barrier = Arc::new(Barrier::new(2));
+        let exec = exec();
+
+        drop(exec.clone());
+
+        let task = exec.spawn(do_work(42, Arc::clone(&barrier)));
+        barrier.wait();
+        assert_eq!(task.await.unwrap(), 42);
+
+        exec.join().await;
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "foo")]
+    async fn just_panic() {
+        struct S(DedicatedExecutor);
+
+        impl Drop for S {
+            fn drop(&mut self) {
+                self.0.join().now_or_never();
+            }
+        }
+
+        let exec = exec();
+        let _s = S(exec);
+
+        // this must not lead to a double-panic and SIGILL
+        panic!("foo")
+    }
+
+    #[tokio::test]
+    async fn multi_task() {
+        let barrier = Arc::new(Barrier::new(3));
+
+        // make an executor with two threads
+        let exec = exec2();
+        let dedicated_task1 = exec.spawn(do_work(11, Arc::clone(&barrier)));
+        let dedicated_task2 = exec.spawn(do_work(42, Arc::clone(&barrier)));
+
+        // block main thread until completion of other two tasks
+        barrier.wait();
+
+        // should be able to get the result
+        assert_eq!(dedicated_task1.await.unwrap(), 11);
+        assert_eq!(dedicated_task2.await.unwrap(), 42);
+
+        exec.join().await;
+    }
+
+    #[tokio::test]
+    async fn tokio_spawn() {
+        let exec = exec2();
+
+        // spawn a task that spawns to other tasks and ensure they run on the dedicated
+        // executor
+        let dedicated_task = exec.spawn(async move {
+            // spawn separate tasks
+            let t1 = tokio::task::spawn(async { 25usize });
+            t1.await.unwrap()
+        });
+
+        // Validate the inner task ran to completion (aka it did not panic)
+        assert_eq!(dedicated_task.await.unwrap(), 25);
+
+        exec.join().await;
+    }
+
+    #[tokio::test]
+    async fn panic_on_executor_str() {
+        let exec = exec();
+        let dedicated_task = exec.spawn(async move {
+            if true {
+                panic!("At the disco, on the dedicated task scheduler");
+            } else {
+                42
+            }
+        });
+
+        // should not be able to get the result
+        let err = dedicated_task.await.unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "Panic: At the disco, on the dedicated task scheduler",
+        );
+
+        exec.join().await;
+    }
+
+    #[tokio::test]
+    async fn panic_on_executor_string() {
+        let exec = exec();
+        let dedicated_task = exec.spawn(async move {
+            if true {
+                panic!("{} {}", 1, 2);
+            } else {
+                42
+            }
+        });
+
+        // should not be able to get the result
+        let err = dedicated_task.await.unwrap_err();
+        assert_eq!(err.to_string(), "Panic: 1 2",);
+
+        exec.join().await;
+    }
+
+    #[tokio::test]
+    async fn panic_on_executor_other() {
+        let exec = exec();
+        let dedicated_task = exec.spawn(async move {
+            if true {
+                panic_any(1)
+            } else {
+                42
+            }
+        });
+
+        // should not be able to get the result
+        let err = dedicated_task.await.unwrap_err();
+        assert_eq!(err.to_string(), "Panic: unknown internal error",);
+
+        exec.join().await;
+    }
+
+    #[tokio::test]
+    async fn executor_shutdown_while_task_running() {
+        let barrier_1 = Arc::new(Barrier::new(2));
+        let captured_1 = Arc::clone(&barrier_1);
+        let barrier_2 = Arc::new(Barrier::new(2));
+        let captured_2 = Arc::clone(&barrier_2);
+
+        let exec = exec();
+        let dedicated_task = exec.spawn(async move {
+            captured_1.wait();
+            do_work(42, captured_2).await
+        });
+        barrier_1.wait();
+
+        exec.shutdown();
+        // block main thread until completion of the outstanding task
+        barrier_2.wait();
+
+        // task should complete successfully
+        assert_eq!(dedicated_task.await.unwrap(), 42);
+
+        exec.join().await;
+    }
+
+    #[tokio::test]
+    async fn executor_submit_task_after_shutdown() {
+        let exec = exec();
+
+        // Simulate trying to submit tasks once executor has shutdown
+        exec.shutdown();
+        let dedicated_task = exec.spawn(async { 11 });
+
+        // task should complete, but return an error
+        let err = dedicated_task.await.unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "Worker thread gone, executor was likely shut down"
+        );
+
+        exec.join().await;
+    }
+
+    #[tokio::test]
+    async fn executor_submit_task_after_clone_shutdown() {
+        let exec = exec();
+
+        // shutdown the clone (but not the exec)
+        exec.clone().join().await;
+
+        // Simulate trying to submit tasks once executor has shutdown
+        let dedicated_task = exec.spawn(async { 11 });
+
+        // task should complete, but return an error
+        let err = dedicated_task.await.unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "Worker thread gone, executor was likely shut down"
+        );
+
+        exec.join().await;
+    }
+
+    #[tokio::test]
+    async fn executor_join() {
+        let exec = exec();
+        // test it doesn't hang
+        exec.join().await;
+    }
+
+    #[tokio::test]
+    async fn executor_join2() {
+        let exec = exec();
+        // test it doesn't hang
+        exec.join().await;
+        exec.join().await;
+    }
+
+    #[tokio::test]
+    #[allow(clippy::redundant_clone)]
+    async fn executor_clone_join() {
+        let exec = exec();
+        // test it doesn't hang
+        exec.clone().join().await;
+        exec.clone().join().await;
+        exec.join().await;
+    }
+
+    #[tokio::test]
+    async fn drop_receiver() {
+        // create empty executor
+        let exec = exec();
+
+        // create first blocked task
+        let barrier1_pre = Arc::new(AsyncBarrier::new(2));
+        let barrier1_pre_captured = Arc::clone(&barrier1_pre);
+        let barrier1_post = Arc::new(AsyncBarrier::new(2));
+        let barrier1_post_captured = Arc::clone(&barrier1_post);
+        let dedicated_task1 = exec.spawn(async move {
+            barrier1_pre_captured.wait().await;
+            do_work_async(11, barrier1_post_captured).await
+        });
+        barrier1_pre.wait().await;
+
+        // create second blocked task
+        let barrier2_pre = Arc::new(AsyncBarrier::new(2));
+        let barrier2_pre_captured = Arc::clone(&barrier2_pre);
+        let barrier2_post = Arc::new(AsyncBarrier::new(2));
+        let barrier2_post_captured = Arc::clone(&barrier2_post);
+        let dedicated_task2 = exec.spawn(async move {
+            barrier2_pre_captured.wait().await;
+            do_work_async(22, barrier2_post_captured).await
+        });
+        barrier2_pre.wait().await;
+
+        // cancel task
+        drop(dedicated_task1);
+
+        // cancelation might take a short while
+        tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                if Arc::strong_count(&barrier1_post) == 1 {
+                    return;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await
+            }
+        })
+        .await
+        .unwrap();
+
+        // unblock other task
+        barrier2_post.wait().await;
+        assert_eq!(dedicated_task2.await.unwrap(), 22);
+        tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                if Arc::strong_count(&barrier2_post) == 1 {
+                    return;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await
+            }
+        })
+        .await
+        .unwrap();
+
+        exec.join().await;
+    }
+
+    #[tokio::test]
+    async fn test_io_runtime_multi_thread() {
+        let mut runtime_builder = tokio::runtime::Builder::new_multi_thread();
+        runtime_builder.worker_threads(1);
+
+        let dedicated = DedicatedExecutor::new("Test DedicatedExecutor", runtime_builder);
+        test_io_runtime_multi_thread_impl(dedicated).await;
+    }
+
+    #[tokio::test]
+    async fn test_io_runtime_current_thread() {
+        let runtime_builder = tokio::runtime::Builder::new_current_thread();
+
+        let dedicated = DedicatedExecutor::new("Test DedicatedExecutor", runtime_builder);
+        test_io_runtime_multi_thread_impl(dedicated).await;
+    }
+
+    #[tokio::test]
+    async fn test_that_testing_executor_prevents_io() {
+        let exec = DedicatedExecutor::new_testing();
+
+        let io_disabled = exec
+            .spawn(async move {
+                // the only way (I've found) to test if IO is enabled is to use it and observer if tokio panics
+                TcpListener::bind("127.0.0.1:0")
+                    .catch_unwind()
+                    .await
+                    .is_err()
+            })
+            .await
+            .unwrap();
+
+        assert!(io_disabled)
     }
 }

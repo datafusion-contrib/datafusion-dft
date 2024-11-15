@@ -18,15 +18,10 @@
 use std::{
     cell::RefCell,
     pin::Pin,
-    sync::{Arc, OnceLock},
     task::{Context, Poll},
-    time::Duration,
 };
 
-use futures::{
-    future::{BoxFuture, Shared},
-    Future, FutureExt, TryFutureExt,
-};
+use futures::{Future, FutureExt};
 use tokio::{runtime::Handle, task::JoinHandle};
 
 thread_local! {
@@ -76,5 +71,61 @@ impl<T> Future for DropGuard<T> {
             Err(e) if e.is_cancelled() => panic!("IO runtime was shut down"),
             Err(e) => std::panic::resume_unwind(e.into_panic()),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_happy_path() {
+        let rt_io = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .enable_all()
+            .build()
+            .unwrap();
+
+        let io_thread_id = rt_io
+            .spawn(async move { std::thread::current().id() })
+            .await
+            .unwrap();
+        let parent_thread_id = std::thread::current().id();
+        assert_ne!(io_thread_id, parent_thread_id);
+
+        register_io_runtime(Some(rt_io.handle().clone()));
+
+        let measured_thread_id = spawn_io(async move { std::thread::current().id() }).await;
+        assert_eq!(measured_thread_id, io_thread_id);
+
+        rt_io.shutdown_background();
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "IO runtime registered")]
+    async fn test_panic_if_no_runtime_registered() {
+        spawn_io(futures::future::ready(())).await;
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "IO runtime was shut down")]
+    async fn test_io_runtime_down() {
+        let rt_io = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
+            .enable_all()
+            .build()
+            .unwrap();
+
+        register_io_runtime(Some(rt_io.handle().clone()));
+
+        tokio::task::spawn_blocking(move || {
+            rt_io.shutdown_timeout(Duration::from_secs(1));
+        })
+        .await
+        .unwrap();
+
+        spawn_io(futures::future::ready(())).await;
     }
 }
