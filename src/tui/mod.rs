@@ -93,7 +93,7 @@ pub struct App<'app> {
     cancellation_token: CancellationToken,
     task: JoinHandle<()>,
     ddl_task: Option<JoinHandle<()>>,
-    args: DftArgs,
+    _args: DftArgs,
 }
 
 impl<'app> App<'app> {
@@ -105,13 +105,13 @@ impl<'app> App<'app> {
 
         Self {
             state,
-            args,
             task,
             event_rx,
             event_tx,
             cancellation_token,
             execution: app_execution,
             ddl_task: None,
+            _args: args,
         }
     }
 

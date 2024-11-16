@@ -19,25 +19,23 @@
 
 use std::io::Write;
 use std::path::PathBuf;
-use std::pin::Pin;
 use std::sync::Arc;
 
 use color_eyre::eyre::eyre;
 use datafusion::logical_expr::LogicalPlan;
-use datafusion_common::DataFusionError;
-use futures::{Future, TryFutureExt};
+use futures::TryFutureExt;
 use log::{debug, error, info};
 
 use crate::config::ExecutionConfig;
 use crate::extensions::{enabled_extensions, DftSessionStateBuilder};
 use color_eyre::eyre::{self, Result};
-use datafusion::execution::{RecordBatchStream, SendableRecordBatchStream};
+use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::{execute_stream, ExecutionPlan};
 use datafusion::prelude::*;
 use datafusion::sql::parser::{DFParser, Statement};
 use tokio_stream::StreamExt;
 
-use super::executor::dedicated::{DedicatedExecutor, JobError};
+use super::executor::dedicated::DedicatedExecutor;
 use super::local_benchmarks::LocalBenchmarkStats;
 use super::stats::{ExecutionDurationStats, ExecutionStats};
 use super::AppType;
