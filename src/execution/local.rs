@@ -19,8 +19,11 @@
 
 use std::io::Write;
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::sync::Arc;
 
+use color_eyre::eyre::eyre;
+use datafusion::logical_expr::LogicalPlan;
 use datafusion_common::DataFusionError;
 use futures::{Future, TryFutureExt};
 use log::{debug, error, info};
@@ -28,7 +31,7 @@ use log::{debug, error, info};
 use crate::config::ExecutionConfig;
 use crate::extensions::{enabled_extensions, DftSessionStateBuilder};
 use color_eyre::eyre::{self, Result};
-use datafusion::execution::SendableRecordBatchStream;
+use datafusion::execution::{RecordBatchStream, SendableRecordBatchStream};
 use datafusion::physical_plan::{execute_stream, ExecutionPlan};
 use datafusion::prelude::*;
 use datafusion::sql::parser::{DFParser, Statement};
@@ -134,19 +137,35 @@ impl ExecutionContext {
         &self.executor
     }
 
-    // pub fn run<T>(&self, task: T) -> impl Future<Output = Result<T::Output, DataFusionError>>
-    // where
-    //     T: Future + Send + 'static,
-    //     T::Output: Send + 'static,
-    // {
-    //     if let Some(executor) = &self.executor {
-    //         executor
-    //             .spawn(task)
-    //             .map_err(|_| DataFusionError::External("A".into()))
-    //     } else {
-    //         task
-    //     }
-    // }
+    pub async fn statement_to_logical_plan(&self, statement: Statement) -> Result<LogicalPlan> {
+        let ctx = self.session_ctx.clone();
+        let task = async move { ctx.state().statement_to_plan(statement).await };
+        if let Some(executor) = &self.executor {
+            let job = executor.spawn(task).map_err(|e| eyre::eyre!(e));
+            let job_res = job.await?;
+            job_res.map_err(|e| eyre!(e))
+        } else {
+            task.await.map_err(|e| eyre!(e))
+        }
+    }
+
+    pub async fn execute_logical_plan(
+        &self,
+        logical_plan: LogicalPlan,
+    ) -> Result<SendableRecordBatchStream> {
+        let ctx = self.session_ctx.clone();
+        let task = async move {
+            let df = ctx.execute_logical_plan(logical_plan).await?;
+            df.execute_stream().await
+        };
+        if let Some(executor) = &self.executor {
+            let job = executor.spawn(task).map_err(|e| eyre!(e));
+            let job_res = job.await?;
+            job_res.map_err(|e| eyre!(e))
+        } else {
+            task.await.map_err(|e| eyre!(e))
+        }
+    }
 
     /// Executes the specified sql string, driving it to completion but discarding any results
     pub async fn execute_sql_and_discard_results(

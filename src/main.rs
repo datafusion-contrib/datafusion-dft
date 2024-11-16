@@ -77,7 +77,7 @@ async fn main() -> Result<()> {
             app.run_app().await;
         }
 
-        #[cfg(not(feature = "flightsql"))]
+        #[cfg(not(feature = "experimental-flightsql-server"))]
         {
             panic!("FlightSQL feature is not enabled");
         }

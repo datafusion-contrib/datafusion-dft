@@ -25,7 +25,6 @@ use arrow_flight::sql::{Any, CommandStatementQuery, SqlInfo, TicketStatementQuer
 use arrow_flight::{FlightDescriptor, FlightEndpoint, FlightInfo, Ticket};
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::sql::parser::DFParser;
-use datafusion_common::DataFusionError;
 use futures::{StreamExt, TryStreamExt};
 use log::{debug, error, info};
 use prost::Message;
@@ -60,13 +59,8 @@ impl FlightSqlServiceImpl {
         // wrap up tonic goop
         FlightServiceServer::new(self.clone())
     }
-}
 
-#[tonic::async_trait]
-impl FlightSqlService for FlightSqlServiceImpl {
-    type FlightService = FlightSqlServiceImpl;
-
-    async fn get_flight_info_statement(
+    async fn get_flight_info_statement_handler(
         &self,
         query: CommandStatementQuery,
         request: Request<FlightDescriptor>,
@@ -80,18 +74,9 @@ impl FlightSqlService for FlightSqlServiceImpl {
                 let statement = statements[0].clone();
                 let start = std::time::Instant::now();
 
-                let ctx = self.execution.session_ctx().clone();
-                let task = async move { ctx.state().statement_to_plan(statement).await };
+                let logical_plan = self.execution.statement_to_logical_plan(statement).await;
 
-                let res = if let Some(e) = self.execution.executor() {
-                    e.spawn(task)
-                        .await
-                        .map_err(|e| tonic::Status::internal("A".to_string()))?
-                } else {
-                    task.await
-                };
-
-                match res {
+                match logical_plan {
                     Ok(logical_plan) => {
                         debug!("logical planning took: {:?}", start.elapsed());
                         let schema = logical_plan.schema();
@@ -125,26 +110,18 @@ impl FlightSqlService for FlightSqlServiceImpl {
                     }
                     Err(e) => {
                         error!("Error planning SQL query: {:?}", e);
-                        return Err(Status::internal("Error planning SQL query"));
+                        Err(Status::internal("Error planning SQL query"))
                     }
                 }
             }
             Err(e) => {
                 error!("Error parsing SQL query: {:?}", e);
-                return Err(Status::internal("Error parsing SQL query"));
+                Err(Status::internal("Error parsing SQL query"))
             }
         }
     }
 
-    async fn do_get_statement(
-        &self,
-        _ticket: TicketStatementQuery,
-        _request: Request<Ticket>,
-    ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
-        Err(Status::unimplemented("Not implemented"))
-    }
-
-    async fn do_get_fallback(
+    async fn do_get_fallback_handler(
         &self,
         request: Request<Ticket>,
         message: Any,
@@ -169,35 +146,20 @@ impl FlightSqlService for FlightSqlServiceImpl {
                                     guard.get(&id).cloned()
                                 };
                                 if let Some(plan) = maybe_plan {
-                                    match self
+                                    let stream = self
                                         .execution
-                                        .session_ctx()
                                         .execute_logical_plan(plan)
                                         .await
-                                    {
-                                        Ok(df) => {
-                                            let stream = df
-                                                .execute_stream()
-                                                .await
-                                                .map_err(|_| {
-                                                    Status::internal("Error executing plan")
-                                                })?
-                                                .map_err(|e| {
-                                                    FlightError::ExternalError(Box::new(e))
-                                                });
-                                            let builder = FlightDataEncoderBuilder::new();
-                                            let flight_data_stream = builder.build(stream);
-                                            let b = flight_data_stream
-                                                .map_err(|_| Status::internal("Hi"))
-                                                .boxed();
-                                            let res = Response::new(b);
-                                            Ok(res)
-                                        }
-                                        Err(e) => {
-                                            error!("error executing plan: {:?}", e);
-                                            Err(Status::internal("Error executing plan"))
-                                        }
-                                    }
+                                        .map_err(|e| Status::internal(e.to_string()))?;
+                                    let builder = FlightDataEncoderBuilder::new();
+                                    let flight_data_stream =
+                                        builder
+                                            .build(stream.map_err(|e| {
+                                                FlightError::ExternalError(Box::new(e))
+                                            }))
+                                            .map_err(|e| Status::internal(e.to_string()))
+                                            .boxed();
+                                    Ok(Response::new(flight_data_stream))
                                 } else {
                                     Err(Status::internal("Plan not found for id"))
                                 }
@@ -219,6 +181,35 @@ impl FlightSqlService for FlightSqlServiceImpl {
                 Err(Status::internal("Error decoding ticket"))
             }
         }
+    }
+}
+
+#[tonic::async_trait]
+impl FlightSqlService for FlightSqlServiceImpl {
+    type FlightService = FlightSqlServiceImpl;
+
+    async fn get_flight_info_statement(
+        &self,
+        query: CommandStatementQuery,
+        request: Request<FlightDescriptor>,
+    ) -> Result<Response<FlightInfo>, Status> {
+        self.get_flight_info_statement_handler(query, request).await
+    }
+
+    async fn do_get_statement(
+        &self,
+        _ticket: TicketStatementQuery,
+        _request: Request<Ticket>,
+    ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
+        Err(Status::unimplemented("Not implemented"))
+    }
+
+    async fn do_get_fallback(
+        &self,
+        request: Request<Ticket>,
+        message: Any,
+    ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
+        self.do_get_fallback_handler(request, message).await
     }
 
     async fn register_sql_info(&self, _id: i32, _result: &SqlInfo) {}
