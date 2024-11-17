@@ -85,6 +85,7 @@ pub enum AppEvent {
     FlightSQLConnected,
 }
 
+#[allow(dead_code)]
 pub struct App<'app> {
     state: state::AppState<'app>,
     execution: Arc<TuiExecution>,
@@ -93,7 +94,7 @@ pub struct App<'app> {
     cancellation_token: CancellationToken,
     task: JoinHandle<()>,
     ddl_task: Option<JoinHandle<()>>,
-    _args: DftArgs,
+    args: DftArgs,
 }
 
 impl<'app> App<'app> {
@@ -105,13 +106,13 @@ impl<'app> App<'app> {
 
         Self {
             state,
+            args,
             task,
             event_rx,
             event_tx,
             cancellation_token,
             execution: app_execution,
             ddl_task: None,
-            _args: args,
         }
     }
 
