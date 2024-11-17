@@ -172,6 +172,8 @@ pub struct ExecutionConfig {
     pub tui_batch_size: usize,
     #[serde(default = "default_flightsql_server_batch_size")]
     pub flightsql_server_batch_size: usize,
+    #[serde(default = "default_dedicated_executor_enabled")]
+    pub dedicated_executor_enabled: bool,
 }
 
 fn default_ddl_path() -> Option<PathBuf> {
@@ -204,6 +206,10 @@ fn default_flightsql_server_batch_size() -> usize {
     8092
 }
 
+fn default_dedicated_executor_enabled() -> bool {
+    false
+}
+
 impl Default for ExecutionConfig {
     fn default() -> Self {
         Self {
@@ -213,6 +219,7 @@ impl Default for ExecutionConfig {
             cli_batch_size: default_cli_batch_size(),
             tui_batch_size: default_tui_batch_size(),
             flightsql_server_batch_size: default_flightsql_server_batch_size(),
+            dedicated_executor_enabled: default_dedicated_executor_enabled(),
         }
     }
 }

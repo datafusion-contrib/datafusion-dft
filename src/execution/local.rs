@@ -83,10 +83,15 @@ impl ExecutionContext {
                 builder = builder.with_batch_size(config.tui_batch_size);
             }
             AppType::FlightSQLServer => {
-                builder = builder.with_batch_size(config.flightsql_server_batch_size);
-                let runtime_builder = tokio::runtime::Builder::new_multi_thread();
-                let dedicated_executor = DedicatedExecutor::new("cpu_runtime", runtime_builder);
-                executor = Some(dedicated_executor)
+                if config.dedicated_executor_enabled {
+                    builder = builder.with_batch_size(config.flightsql_server_batch_size);
+                    // Ideally we would only use `enable_time` but we are still doing
+                    // some network requests as part of planning / execution which require network
+                    // functionality.
+                    let runtime_builder = tokio::runtime::Builder::new_multi_thread();
+                    let dedicated_executor = DedicatedExecutor::new("cpu_runtime", runtime_builder);
+                    executor = Some(dedicated_executor)
+                }
             }
         }
         let extensions = enabled_extensions();
@@ -135,6 +140,7 @@ impl ExecutionContext {
         &self.executor
     }
 
+    /// Convert the statement to a `LogicalPlan`.  Uses the [`DedicatedExecutor`] if it is available.
     pub async fn statement_to_logical_plan(&self, statement: Statement) -> Result<LogicalPlan> {
         let ctx = self.session_ctx.clone();
         let task = async move { ctx.state().statement_to_plan(statement).await };
@@ -147,6 +153,7 @@ impl ExecutionContext {
         }
     }
 
+    /// Executes the provided `LogicalPlan` returning a `SendableRecordBatchStream`.  Uses the [`DedicatedExecutor`] if it is available.
     pub async fn execute_logical_plan(
         &self,
         logical_plan: LogicalPlan,

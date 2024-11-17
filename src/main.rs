@@ -31,10 +31,19 @@ use {
 };
 
 #[allow(unused_mut)]
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     let cli = DftArgs::parse();
 
+    let entry_point = app_entry_point(cli);
+
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+
+    runtime.block_on(entry_point)
+}
+
+async fn app_entry_point(cli: DftArgs) -> Result<()> {
     // CLI mode: executing commands from files or CLI arguments
     if !cli.files.is_empty() || !cli.commands.is_empty() {
         // use env_logger to setup logging for CLI
@@ -54,7 +63,12 @@ async fn main() -> Result<()> {
         }
         let app = CliApp::new(app_execution, cli.clone());
         app.execute_files_or_commands().await?;
+    // FlightSQL Server mode: start a FlightSQL server
     } else if cli.serve {
+        #[cfg(not(feature = "experimental-flightsql-server"))]
+        {
+            panic!("FlightSQL feature is not enabled");
+        }
         #[cfg(feature = "experimental-flightsql-server")]
         {
             const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1:50051";
@@ -76,13 +90,8 @@ async fn main() -> Result<()> {
             .await;
             app.run_app().await;
         }
-
-        #[cfg(not(feature = "experimental-flightsql-server"))]
-        {
-            panic!("FlightSQL feature is not enabled");
-        }
     }
-    // UI mode: running the TUI
+    // TUI mode: running the TUI
     else {
         // use alternate logging for TUI
         telemetry::initialize_logs()?;
