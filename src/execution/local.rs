@@ -83,13 +83,15 @@ impl ExecutionContext {
                 builder = builder.with_batch_size(config.tui_batch_size);
             }
             AppType::FlightSQLServer => {
+                builder = builder.with_batch_size(config.flightsql_server_batch_size);
                 if config.dedicated_executor_enabled {
-                    builder = builder.with_batch_size(config.flightsql_server_batch_size);
                     // Ideally we would only use `enable_time` but we are still doing
                     // some network requests as part of planning / execution which require network
                     // functionality.
+
                     let runtime_builder = tokio::runtime::Builder::new_multi_thread();
-                    let dedicated_executor = DedicatedExecutor::new("cpu_runtime", runtime_builder);
+                    let dedicated_executor =
+                        DedicatedExecutor::new("cpu_runtime", config.clone(), runtime_builder);
                     executor = Some(dedicated_executor)
                 }
             }

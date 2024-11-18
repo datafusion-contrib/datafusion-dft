@@ -33,6 +33,8 @@ use tokio::{
     task::JoinSet,
 };
 
+use crate::config::ExecutionConfig;
+
 use super::io::register_io_runtime;
 
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(60 * 5);
@@ -131,11 +133,20 @@ impl DedicatedExecutor {
     /// thus set, via [`register_io_runtime`] by all threads spawned by the
     /// executor. This will allow scheduling IO outside the context of
     /// [`DedicatedExecutor`] using [`spawn_io`].
-    pub fn new(name: &str, runtime_builder: tokio::runtime::Builder) -> Self {
-        Self::new_inner(name, runtime_builder, false)
+    pub fn new(
+        name: &str,
+        config: ExecutionConfig,
+        runtime_builder: tokio::runtime::Builder,
+    ) -> Self {
+        Self::new_inner(name, config, runtime_builder, false)
     }
 
-    fn new_inner(name: &str, runtime_builder: tokio::runtime::Builder, testing: bool) -> Self {
+    fn new_inner(
+        name: &str,
+        config: ExecutionConfig,
+        runtime_builder: tokio::runtime::Builder,
+        testing: bool,
+    ) -> Self {
         let name = name.to_owned();
 
         let notify_shutdown = Arc::new(Notify::new());
@@ -152,8 +163,13 @@ impl DedicatedExecutor {
                 // current thread RT)
                 register_io_runtime(io_handle.clone());
 
+                let cpus = num_cpus::get();
+                let cpu_threads =
+                    (config.dedicated_executor_threads_percent * cpus as f64) as usize;
+
                 let mut runtime_builder = runtime_builder;
                 let runtime = runtime_builder
+                    .worker_threads(cpu_threads)
                     .on_thread_start(move || register_io_runtime(io_handle.clone()))
                     .build()
                     .expect("Creating tokio runtime");
@@ -212,7 +228,7 @@ impl DedicatedExecutor {
                 // - https://github.com/influxdata/influxdb_iox/pull/11030
                 runtime_builder.enable_time();
 
-                Self::new_inner("testing", runtime_builder, true)
+                Self::new_inner("testing", ExecutionConfig::default(), runtime_builder, true)
             })
             .clone()
     }
@@ -394,7 +410,11 @@ mod tests {
         runtime_builder.worker_threads(threads);
         runtime_builder.enable_all();
 
-        DedicatedExecutor::new("Test DedicatedExecutor", runtime_builder)
+        DedicatedExecutor::new(
+            "Test DedicatedExecutor",
+            ExecutionConfig::default(),
+            runtime_builder,
+        )
     }
 
     async fn test_io_runtime_multi_thread_impl(dedicated: DedicatedExecutor) {
@@ -724,7 +744,11 @@ mod tests {
         let mut runtime_builder = tokio::runtime::Builder::new_multi_thread();
         runtime_builder.worker_threads(1);
 
-        let dedicated = DedicatedExecutor::new("Test DedicatedExecutor", runtime_builder);
+        let dedicated = DedicatedExecutor::new(
+            "Test DedicatedExecutor",
+            ExecutionConfig::default(),
+            runtime_builder,
+        );
         test_io_runtime_multi_thread_impl(dedicated).await;
     }
 
@@ -732,7 +756,11 @@ mod tests {
     async fn test_io_runtime_current_thread() {
         let runtime_builder = tokio::runtime::Builder::new_current_thread();
 
-        let dedicated = DedicatedExecutor::new("Test DedicatedExecutor", runtime_builder);
+        let dedicated = DedicatedExecutor::new(
+            "Test DedicatedExecutor",
+            ExecutionConfig::default(),
+            runtime_builder,
+        );
         test_io_runtime_multi_thread_impl(dedicated).await;
     }
 

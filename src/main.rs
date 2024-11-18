@@ -23,6 +23,7 @@ use dft::cli::CliApp;
 use dft::execution::flightsql::FlightSQLContext;
 use dft::execution::{local::ExecutionContext, AppExecution, AppType};
 use dft::telemetry;
+use dft::tui::state::AppState;
 use dft::tui::{state, App};
 #[cfg(feature = "experimental-flightsql-server")]
 use {
@@ -34,21 +35,30 @@ use {
 fn main() -> Result<()> {
     let cli = DftArgs::parse();
 
-    let entry_point = app_entry_point(cli);
+    let state = state::initialize(cli.config_path());
+
+    let cpus = num_cpus::get();
+    let main_threads = if state.config.execution.dedicated_executor_enabled {
+        // Just for IO
+        (cpus as f64 * (1.0 - state.config.execution.dedicated_executor_threads_percent)) as usize
+    } else {
+        cpus
+    };
 
     let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(main_threads)
         .enable_all()
         .build()?;
 
+    let entry_point = app_entry_point(cli, state);
     runtime.block_on(entry_point)
 }
 
-async fn app_entry_point(cli: DftArgs) -> Result<()> {
+async fn app_entry_point(cli: DftArgs, state: AppState<'_>) -> Result<()> {
     // CLI mode: executing commands from files or CLI arguments
     if !cli.files.is_empty() || !cli.commands.is_empty() {
         // use env_logger to setup logging for CLI
         env_logger::init();
-        let state = state::initialize(cli.config_path());
         let execution_ctx = ExecutionContext::try_new(&state.config.execution, AppType::Cli)?;
         let mut app_execution = AppExecution::new(execution_ctx);
         #[cfg(feature = "flightsql")]
