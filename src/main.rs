@@ -22,14 +22,12 @@ use dft::cli::CliApp;
 #[cfg(feature = "flightsql")]
 use dft::execution::flightsql::FlightSQLContext;
 use dft::execution::{local::ExecutionContext, AppExecution, AppType};
+#[cfg(feature = "experimental-flightsql-server")]
+use dft::flightsql_server::{FlightSqlApp, FlightSqlServiceImpl};
 use dft::telemetry;
 use dft::tui::state::AppState;
 use dft::tui::{state, App};
-#[cfg(feature = "experimental-flightsql-server")]
-use {
-    dft::flightsql_server::{FlightSqlApp, FlightSqlServiceImpl},
-    log::info,
-};
+use log::info;
 
 #[allow(unused_mut)]
 fn main() -> Result<()> {
