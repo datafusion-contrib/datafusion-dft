@@ -25,7 +25,7 @@ use futures::{
     future::{BoxFuture, Shared},
     Future, FutureExt, TryFutureExt,
 };
-use log::warn;
+use log::{info, warn};
 use parking_lot::RwLock;
 use tokio::{
     runtime::Handle,
@@ -166,6 +166,8 @@ impl DedicatedExecutor {
                 let cpus = num_cpus::get();
                 let cpu_threads =
                     (config.dedicated_executor_threads_percent * cpus as f64) as usize;
+
+                info!("Creating DedicatedExecutor with {cpu_threads} threads");
 
                 let mut runtime_builder = runtime_builder;
                 let runtime = runtime_builder

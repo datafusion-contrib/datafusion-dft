@@ -35,6 +35,10 @@ use {
 fn main() -> Result<()> {
     let cli = DftArgs::parse();
 
+    if !cli.files.is_empty() || !cli.commands.is_empty() || cli.serve {
+        env_logger::init();
+    }
+
     let state = state::initialize(cli.config_path());
 
     let cpus = num_cpus::get();
@@ -44,6 +48,8 @@ fn main() -> Result<()> {
     } else {
         cpus
     };
+
+    info!("Creating main Tokio Runtime with {main_threads} threads");
 
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(main_threads)
@@ -57,9 +63,8 @@ fn main() -> Result<()> {
 async fn app_entry_point(cli: DftArgs, state: AppState<'_>) -> Result<()> {
     // CLI mode: executing commands from files or CLI arguments
     if !cli.files.is_empty() || !cli.commands.is_empty() {
-        // use env_logger to setup logging for CLI
-        env_logger::init();
         let execution_ctx = ExecutionContext::try_new(&state.config.execution, AppType::Cli)?;
+        #[allow(unused_mut)]
         let mut app_execution = AppExecution::new(execution_ctx);
         #[cfg(feature = "flightsql")]
         {
@@ -82,7 +87,6 @@ async fn app_entry_point(cli: DftArgs, state: AppState<'_>) -> Result<()> {
         #[cfg(feature = "experimental-flightsql-server")]
         {
             const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1:50051";
-            env_logger::init();
             info!("Starting FlightSQL server on {}", DEFAULT_SERVER_ADDRESS);
             let state = state::initialize(cli.config_path());
             let execution_ctx =
