@@ -163,15 +163,14 @@ impl DedicatedExecutor {
                 // current thread RT)
                 register_io_runtime(io_handle.clone());
 
-                let cpus = num_cpus::get();
-                let cpu_threads =
-                    (config.dedicated_executor_threads_percent * cpus as f64) as usize;
-
-                info!("Creating DedicatedExecutor with {cpu_threads} threads");
+                info!(
+                    "Creating DedicatedExecutor with {} threads",
+                    config.dedicated_executor_threads
+                );
 
                 let mut runtime_builder = runtime_builder;
                 let runtime = runtime_builder
-                    .worker_threads(cpu_threads)
+                    .worker_threads(config.dedicated_executor_threads)
                     .on_thread_start(move || register_io_runtime(io_handle.clone()))
                     .build()
                     .expect("Creating tokio runtime");

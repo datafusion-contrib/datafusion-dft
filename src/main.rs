@@ -39,18 +39,12 @@ fn main() -> Result<()> {
 
     let state = state::initialize(cli.config_path());
 
-    let cpus = num_cpus::get();
-    let main_threads = if state.config.execution.dedicated_executor_enabled {
-        // Just for IO
-        (cpus as f64 * (1.0 - state.config.execution.dedicated_executor_threads_percent)) as usize
-    } else {
-        cpus
-    };
-
-    info!("Creating main Tokio Runtime with {main_threads} threads");
-
+    // With Runtimes configured correctly the main Tokio runtime should only be used for network
+    // IO, in which a single thread should be sufficient.
+    //
+    // Ref: https://github.com/datafusion-contrib/datafusion-dft/pull/247#discussion_r1848270250
     let runtime = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(main_threads)
+        .worker_threads(1)
         .enable_all()
         .build()?;
 
