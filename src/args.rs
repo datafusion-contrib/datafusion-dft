@@ -91,7 +91,7 @@ pub struct DftArgs {
     #[clap(short = 'n', help = "Set the number of benchmark iterations to run")]
     pub benchmark_iterations: Option<usize>,
 
-    #[cfg(feature = "flightsql")]
+    #[cfg(any(feature = "flightsql", feature = "experimental-flightsql-server"))]
     #[clap(long, help = "Set the host and port to be used for FlightSQL")]
     pub flightsql_host: Option<String>,
 }

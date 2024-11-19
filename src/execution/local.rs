@@ -21,6 +21,9 @@ use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use color_eyre::eyre::eyre;
+use datafusion::logical_expr::LogicalPlan;
+use futures::TryFutureExt;
 use log::{debug, error, info};
 
 use crate::config::ExecutionConfig;
@@ -32,6 +35,7 @@ use datafusion::prelude::*;
 use datafusion::sql::parser::{DFParser, Statement};
 use tokio_stream::StreamExt;
 
+use super::executor::dedicated::DedicatedExecutor;
 use super::local_benchmarks::LocalBenchmarkStats;
 use super::stats::{ExecutionDurationStats, ExecutionStats};
 use super::AppType;
@@ -52,8 +56,12 @@ use super::AppType;
 #[derive(Clone)]
 pub struct ExecutionContext {
     config: ExecutionConfig,
+    /// Underlying `SessionContext`
     session_ctx: SessionContext,
+    /// Path to the configured DDL file
     ddl_path: Option<PathBuf>,
+    /// Dedicated executor for running CPU intensive work
+    executor: Option<DedicatedExecutor>,
 }
 
 impl std::fmt::Debug for ExecutionContext {
@@ -66,6 +74,7 @@ impl ExecutionContext {
     /// Construct a new `ExecutionContext` with the specified configuration
     pub fn try_new(config: &ExecutionConfig, app_type: AppType) -> Result<Self> {
         let mut builder = DftSessionStateBuilder::new();
+        let mut executor = None;
         match app_type {
             AppType::Cli => {
                 builder = builder.with_batch_size(config.cli_batch_size);
@@ -75,6 +84,16 @@ impl ExecutionContext {
             }
             AppType::FlightSQLServer => {
                 builder = builder.with_batch_size(config.flightsql_server_batch_size);
+                if config.dedicated_executor_enabled {
+                    // Ideally we would only use `enable_time` but we are still doing
+                    // some network requests as part of planning / execution which require network
+                    // functionality.
+
+                    let runtime_builder = tokio::runtime::Builder::new_multi_thread();
+                    let dedicated_executor =
+                        DedicatedExecutor::new("cpu_runtime", config.clone(), runtime_builder);
+                    executor = Some(dedicated_executor)
+                }
             }
         }
         let extensions = enabled_extensions();
@@ -101,6 +120,7 @@ impl ExecutionContext {
             config: config.clone(),
             session_ctx,
             ddl_path: config.ddl_path.as_ref().map(PathBuf::from),
+            executor,
         })
     }
 
@@ -115,6 +135,43 @@ impl ExecutionContext {
     /// Return the inner DataFusion [`SessionContext`]
     pub fn session_ctx(&self) -> &SessionContext {
         &self.session_ctx
+    }
+
+    /// Return the inner [`DedicatedExecutor`]
+    pub fn executor(&self) -> &Option<DedicatedExecutor> {
+        &self.executor
+    }
+
+    /// Convert the statement to a `LogicalPlan`.  Uses the [`DedicatedExecutor`] if it is available.
+    pub async fn statement_to_logical_plan(&self, statement: Statement) -> Result<LogicalPlan> {
+        let ctx = self.session_ctx.clone();
+        let task = async move { ctx.state().statement_to_plan(statement).await };
+        if let Some(executor) = &self.executor {
+            let job = executor.spawn(task).map_err(|e| eyre::eyre!(e));
+            let job_res = job.await?;
+            job_res.map_err(|e| eyre!(e))
+        } else {
+            task.await.map_err(|e| eyre!(e))
+        }
+    }
+
+    /// Executes the provided `LogicalPlan` returning a `SendableRecordBatchStream`.  Uses the [`DedicatedExecutor`] if it is available.
+    pub async fn execute_logical_plan(
+        &self,
+        logical_plan: LogicalPlan,
+    ) -> Result<SendableRecordBatchStream> {
+        let ctx = self.session_ctx.clone();
+        let task = async move {
+            let df = ctx.execute_logical_plan(logical_plan).await?;
+            df.execute_stream().await
+        };
+        if let Some(executor) = &self.executor {
+            let job = executor.spawn(task).map_err(|e| eyre!(e));
+            let job_res = job.await?;
+            job_res.map_err(|e| eyre!(e))
+        } else {
+            task.await.map_err(|e| eyre!(e))
+        }
     }
 
     /// Executes the specified sql string, driving it to completion but discarding any results

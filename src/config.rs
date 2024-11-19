@@ -172,6 +172,10 @@ pub struct ExecutionConfig {
     pub tui_batch_size: usize,
     #[serde(default = "default_flightsql_server_batch_size")]
     pub flightsql_server_batch_size: usize,
+    #[serde(default = "default_dedicated_executor_enabled")]
+    pub dedicated_executor_enabled: bool,
+    #[serde(default = "default_dedicated_executor_threads")]
+    pub dedicated_executor_threads: usize,
 }
 
 fn default_ddl_path() -> Option<PathBuf> {
@@ -204,6 +208,18 @@ fn default_flightsql_server_batch_size() -> usize {
     8092
 }
 
+fn default_dedicated_executor_enabled() -> bool {
+    false
+}
+
+fn default_dedicated_executor_threads() -> usize {
+    // By default we slightly over provision CPUs.  For example, if you have N CPUs available we
+    // have N CPUs for the [`DedicatedExecutor`] and 1 for the main / IO runtime.
+    //
+    // Ref: https://github.com/datafusion-contrib/datafusion-dft/pull/247#discussion_r1848270250
+    num_cpus::get()
+}
+
 impl Default for ExecutionConfig {
     fn default() -> Self {
         Self {
@@ -213,6 +229,8 @@ impl Default for ExecutionConfig {
             cli_batch_size: default_cli_batch_size(),
             tui_batch_size: default_tui_batch_size(),
             flightsql_server_batch_size: default_flightsql_server_batch_size(),
+            dedicated_executor_enabled: default_dedicated_executor_enabled(),
+            dedicated_executor_threads: default_dedicated_executor_threads(),
         }
     }
 }

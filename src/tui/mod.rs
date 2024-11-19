@@ -85,6 +85,7 @@ pub enum AppEvent {
     FlightSQLConnected,
 }
 
+#[allow(dead_code)]
 pub struct App<'app> {
     state: state::AppState<'app>,
     execution: Arc<TuiExecution>,
