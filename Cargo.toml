@@ -15,7 +15,7 @@ default-run = "dft"
 
 [dependencies]
 arrow-flight = { version = "52.2.0", features = ["flight-sql-experimental"] , optional = true }
-async-trait = "0.1.80"
+async-trait = "0.1.83"
 clap = { version = "4.5.1", features = ["derive"] }
 color-eyre = "0.6.3"
 crossterm = { version = "0.28.1", features = ["event-stream"] }
