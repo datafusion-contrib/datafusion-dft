@@ -19,6 +19,7 @@
 
 use crate::config::ExecutionConfig;
 use crate::extensions::{DftSessionStateBuilder, Extension};
+use crate::object_store::io_object_store::IoObjectStore;
 use log::info;
 use std::sync::Arc;
 
@@ -56,9 +57,10 @@ impl Extension for AwsS3Extension {
                         info!("Endpoint exists");
                         if let Ok(parsed_endpoint) = Url::parse(object_store_url) {
                             info!("Parsed endpoint");
+                            let io_store = IoObjectStore::new(Arc::new(object_store));
                             builder
                                 .runtime_env()
-                                .register_object_store(&parsed_endpoint, Arc::new(object_store));
+                                .register_object_store(&parsed_endpoint, Arc::new(io_store));
                             info!("Registered s3 object store");
                         }
                     }

@@ -33,14 +33,6 @@ pub struct IoObjectStore {
     inner: Arc<dyn ObjectStore>,
 }
 
-impl IoObjectStore {
-    pub fn new(object_store: Arc<dyn ObjectStore>) -> Self {
-        Self {
-            inner: object_store,
-        }
-    }
-}
-
 impl std::fmt::Display for IoObjectStore {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "IoObjectStore")
@@ -71,7 +63,7 @@ impl ObjectStore for IoObjectStore {
 
     async fn delete(&self, location: &Path) -> Result<()> {
         let location = location.clone();
-        let store = Arc::clone(&self.inner);
+        let store = self.inner.clone();
         spawn_io(async move { store.delete(&location).await }).await
     }
 
@@ -81,7 +73,7 @@ impl ObjectStore for IoObjectStore {
 
     async fn list_with_delimiter(&self, prefix: Option<&Path>) -> Result<ListResult> {
         let prefix = prefix.cloned();
-        let store = Arc::clone(&self.inner);
+        let store = self.inner.clone();
         spawn_io(async move { store.list_with_delimiter(prefix.as_ref()).await }).await
     }
 
@@ -91,7 +83,7 @@ impl ObjectStore for IoObjectStore {
         opts: PutMultipartOpts,
     ) -> Result<Box<dyn MultipartUpload>> {
         let location = location.clone();
-        let store = Arc::clone(&self.inner);
+        let store = self.inner.clone();
         spawn_io(async move { store.put_multipart_opts(&location, opts).await }).await
     }
 
@@ -102,7 +94,7 @@ impl ObjectStore for IoObjectStore {
         opts: PutOptions,
     ) -> Result<PutResult> {
         let location = location.clone();
-        let store = Arc::clone(&self.inner);
+        let store = self.inner.clone();
         spawn_io(async move { store.put_opts(&location, payload, opts).await }).await
     }
 }
