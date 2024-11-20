@@ -14,5 +14,5 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-
+#[cfg(feature = "s3")]
 pub mod io_object_store;

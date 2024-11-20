@@ -19,7 +19,7 @@
 
 use crate::config::ExecutionConfig;
 use crate::extensions::{DftSessionStateBuilder, Extension};
-use crate::object_store::io_object_store::IoObjectStore;
+use crate::object_stores::io_object_store::IoObjectStore;
 use log::info;
 use std::sync::Arc;
 
