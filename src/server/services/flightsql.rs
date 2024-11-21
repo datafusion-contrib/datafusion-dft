@@ -16,7 +16,6 @@
 // under the License.
 
 use crate::execution::{local::ExecutionContext, AppExecution};
-use crate::test_utils::trailers_layer::TrailersLayer;
 use arrow_flight::encode::FlightDataEncoderBuilder;
 use arrow_flight::error::FlightError;
 use arrow_flight::flight_service_server::{FlightService, FlightServiceServer};
@@ -29,12 +28,8 @@ use futures::{StreamExt, TryStreamExt};
 use log::{debug, error, info};
 use prost::Message;
 use std::collections::HashMap;
-use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
-use tokio::net::TcpListener;
-use tokio::task::JoinHandle;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
@@ -213,82 +208,4 @@ impl FlightSqlService for FlightSqlServiceImpl {
     }
 
     async fn register_sql_info(&self, _id: i32, _result: &SqlInfo) {}
-}
-
-const DEFAULT_TIMEOUT_SECONDS: u64 = 60;
-
-/// Creates and manages a running FlightSqlServer with a background task
-pub struct FlightSqlApp {
-    /// channel to send shutdown command
-    shutdown: Option<tokio::sync::oneshot::Sender<()>>,
-
-    /// Address the server is listening on
-    pub addr: SocketAddr,
-
-    /// handle for the server task
-    handle: Option<JoinHandle<Result<(), tonic::transport::Error>>>,
-}
-
-impl FlightSqlApp {
-    /// create a new app for the flightsql server
-    #[allow(dead_code)]
-    pub async fn new<T: FlightService>(
-        flightsql_server: FlightServiceServer<T>,
-        addr: &str,
-    ) -> Self {
-        // let OS choose a free port
-        let listener = TcpListener::bind(addr).await.unwrap();
-        let addr = listener.local_addr().unwrap();
-
-        // prepare the shutdown channel
-        let (tx, rx) = tokio::sync::oneshot::channel();
-
-        let server_timeout = Duration::from_secs(DEFAULT_TIMEOUT_SECONDS);
-
-        let shutdown_future = async move {
-            rx.await.ok();
-        };
-
-        let serve_future = tonic::transport::Server::builder()
-            .timeout(server_timeout)
-            .layer(TrailersLayer)
-            .add_service(flightsql_server)
-            .serve_with_incoming_shutdown(
-                tokio_stream::wrappers::TcpListenerStream::new(listener),
-                shutdown_future,
-            );
-
-        // Run the server in its own background task
-        let handle = tokio::task::spawn(serve_future);
-
-        Self {
-            shutdown: Some(tx),
-            addr,
-            handle: Some(handle),
-        }
-    }
-
-    /// Stops the server and waits for the server to shutdown
-    pub async fn shutdown_and_wait(mut self) {
-        if let Some(shutdown) = self.shutdown.take() {
-            shutdown.send(()).expect("server quit early");
-        }
-        if let Some(handle) = self.handle.take() {
-            handle
-                .await
-                .expect("task join error (panic?)")
-                .expect("Server Error found at shutdown");
-        }
-    }
-
-    pub async fn run_app(self) {
-        if let Some(handle) = self.handle {
-            handle
-                .await
-                .expect("Unable to run server task")
-                .expect("Server Error found at shutdown");
-        } else {
-            panic!("Server task not found");
-        }
-    }
 }

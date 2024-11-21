@@ -15,6 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use std::net::SocketAddr;
+
 use clap::Parser;
 use color_eyre::Result;
 use dft::args::DftArgs;
@@ -23,11 +25,12 @@ use dft::cli::CliApp;
 use dft::execution::flightsql::FlightSQLContext;
 use dft::execution::{local::ExecutionContext, AppExecution, AppType};
 #[cfg(feature = "experimental-flightsql-server")]
-use dft::flightsql_server::{FlightSqlApp, FlightSqlServiceImpl};
+use dft::server::FlightSqlApp;
 use dft::telemetry;
 use dft::tui::state::AppState;
 use dft::tui::{state, App};
 use log::info;
+use metrics_exporter_prometheus::PrometheusBuilder;
 
 #[allow(unused_mut)]
 fn main() -> Result<()> {
@@ -53,6 +56,36 @@ fn main() -> Result<()> {
 }
 
 async fn app_entry_point(cli: DftArgs, state: AppState<'_>) -> Result<()> {
+    #[cfg(feature = "experimental-flightsql-server")]
+    if cli.serve {
+        const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1:50051";
+        info!("Starting FlightSQL server on {}", DEFAULT_SERVER_ADDRESS);
+        let state = state::initialize(cli.config_path());
+        let execution_ctx =
+            ExecutionContext::try_new(&state.config.execution, AppType::FlightSQLServer)?;
+        if cli.run_ddl {
+            execution_ctx.execute_ddl().await;
+        }
+        let app_execution = AppExecution::new(execution_ctx);
+        let app = FlightSqlApp::new(
+            app_execution,
+            &cli.flightsql_host
+                .unwrap_or(DEFAULT_SERVER_ADDRESS.to_string()),
+        )
+        .await;
+        #[cfg(feature = "metrics")]
+        {
+            let builder = PrometheusBuilder::new();
+            let addr: SocketAddr = state.config.flightsql.server_metrics_port.parse()?;
+            info!("Listening to metrics on {addr}");
+            builder
+                .with_http_listener(addr)
+                .install()
+                .expect("failed to install metrics recorder/exporter");
+        }
+        app.run_app().await;
+        return Ok(());
+    }
     // CLI mode: executing commands from files or CLI arguments
     if !cli.files.is_empty() || !cli.commands.is_empty() {
         let execution_ctx = ExecutionContext::try_new(&state.config.execution, AppType::Cli)?;
@@ -70,37 +103,10 @@ async fn app_entry_point(cli: DftArgs, state: AppState<'_>) -> Result<()> {
         }
         let app = CliApp::new(app_execution, cli.clone());
         app.execute_files_or_commands().await?;
-    // FlightSQL Server mode: start a FlightSQL server
-    } else if cli.serve {
-        #[cfg(not(feature = "experimental-flightsql-server"))]
-        {
-            panic!("FlightSQL feature is not enabled");
-        }
-        #[cfg(feature = "experimental-flightsql-server")]
-        {
-            const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1:50051";
-            info!("Starting FlightSQL server on {}", DEFAULT_SERVER_ADDRESS);
-            let state = state::initialize(cli.config_path());
-            let execution_ctx =
-                ExecutionContext::try_new(&state.config.execution, AppType::FlightSQLServer)?;
-            if cli.run_ddl {
-                execution_ctx.execute_ddl().await;
-            }
-            let app_execution = AppExecution::new(execution_ctx);
-            let server = FlightSqlServiceImpl::new(app_execution);
-            let app = FlightSqlApp::new(
-                server.service(),
-                &cli.flightsql_host
-                    .unwrap_or(DEFAULT_SERVER_ADDRESS.to_string()),
-            )
-            .await;
-            app.run_app().await;
-        }
-    }
-    // TUI mode: running the TUI
-    else {
-        // use alternate logging for TUI
-        telemetry::initialize_logs()?;
+        // FlightSQL Server mode: start a FlightSQL server
+    } else {
+        // TUI mode: running the TUI
+        telemetry::initialize_logs()?; // use alternate logging for TUI
         let state = state::initialize(cli.config_path());
         let execution_ctx = ExecutionContext::try_new(&state.config.execution, AppType::Tui)?;
         let app_execution = AppExecution::new(execution_ctx);

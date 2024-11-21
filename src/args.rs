@@ -67,6 +67,7 @@ pub struct DftArgs {
     #[clap(long, short, help = "Only show how long the query took to run")]
     pub time: bool,
 
+    #[cfg(feature = "experimental-flightsql-server")]
     #[clap(long, help = "Start a FlightSQL server")]
     pub serve: bool,
 
