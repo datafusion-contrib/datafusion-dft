@@ -19,6 +19,9 @@ pub mod services;
 
 use crate::execution::AppExecution;
 use crate::test_utils::trailers_layer::TrailersLayer;
+use color_eyre::Result;
+use log::info;
+use metrics_exporter_prometheus::PrometheusBuilder;
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::net::TcpListener;
@@ -41,7 +44,11 @@ pub struct FlightSqlApp {
 impl FlightSqlApp {
     /// create a new app for the flightsql server
     #[allow(dead_code)]
-    pub async fn new(app_execution: AppExecution, addr: &str) -> Self {
+    pub async fn try_new(
+        app_execution: AppExecution,
+        addr: &str,
+        metrics_addr: &str,
+    ) -> Result<Self> {
         let flightsql = services::flightsql::FlightSqlServiceImpl::new(app_execution);
         // let OS choose a free port
         let listener = TcpListener::bind(addr).await.unwrap();
@@ -65,14 +72,32 @@ impl FlightSqlApp {
                 shutdown_future,
             );
 
+        #[cfg(feature = "metrics")]
+        {
+            let builder = PrometheusBuilder::new();
+            let addr: SocketAddr = metrics_addr.parse()?;
+            info!("Listening to metrics on {addr}");
+            builder
+                .with_http_listener(addr)
+                .install()
+                .expect("failed to install metrics recorder/exporter");
+
+            metrics::describe_histogram!(
+                "logical_planning_ms",
+                metrics::Unit::Milliseconds,
+                "Logical planning ms"
+            );
+        }
+
         // Run the server in its own background task
         let handle = tokio::task::spawn(serve_future);
 
-        Self {
+        let app = Self {
             shutdown: Some(tx),
             addr,
             handle: Some(handle),
-        }
+        };
+        Ok(app)
     }
 
     /// Stops the server and waits for the server to shutdown

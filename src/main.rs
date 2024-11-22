@@ -15,8 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::net::SocketAddr;
-
 use clap::Parser;
 use color_eyre::Result;
 use dft::args::DftArgs;
@@ -30,7 +28,6 @@ use dft::telemetry;
 use dft::tui::state::AppState;
 use dft::tui::{state, App};
 use log::info;
-use metrics_exporter_prometheus::PrometheusBuilder;
 
 #[allow(unused_mut)]
 fn main() -> Result<()> {
@@ -67,22 +64,13 @@ async fn app_entry_point(cli: DftArgs, state: AppState<'_>) -> Result<()> {
             execution_ctx.execute_ddl().await;
         }
         let app_execution = AppExecution::new(execution_ctx);
-        let app = FlightSqlApp::new(
+        let app = FlightSqlApp::try_new(
             app_execution,
             &cli.flightsql_host
                 .unwrap_or(DEFAULT_SERVER_ADDRESS.to_string()),
+            &state.config.flightsql.server_metrics_port,
         )
-        .await;
-        #[cfg(feature = "metrics")]
-        {
-            let builder = PrometheusBuilder::new();
-            let addr: SocketAddr = state.config.flightsql.server_metrics_port.parse()?;
-            info!("Listening to metrics on {addr}");
-            builder
-                .with_http_listener(addr)
-                .install()
-                .expect("failed to install metrics recorder/exporter");
-        }
+        .await?;
         app.run_app().await;
         return Ok(());
     }
