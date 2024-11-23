@@ -26,10 +26,12 @@ use datafusion::logical_expr::LogicalPlan;
 use datafusion::sql::parser::DFParser;
 use futures::{StreamExt, TryStreamExt};
 use log::{debug, error, info};
+use metrics::{counter, histogram};
 use prost::Message;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
@@ -99,18 +101,18 @@ impl FlightSqlServiceImpl {
 
                             Ok(Response::new(info))
                         } else {
-                            error!("Error encoding ticket");
+                            error!("error encoding ticket");
                             Err(Status::internal("Error encoding ticket"))
                         }
                     }
                     Err(e) => {
-                        error!("Error planning SQL query: {:?}", e);
+                        error!("error planning SQL query: {:?}", e);
                         Err(Status::internal("Error planning SQL query"))
                     }
                 }
             }
             Err(e) => {
-                error!("Error parsing SQL query: {:?}", e);
+                error!("error parsing SQL query: {:?}", e);
                 Err(Status::internal("Error parsing SQL query"))
             }
         }
@@ -172,7 +174,7 @@ impl FlightSqlServiceImpl {
                 }
             }
             Err(e) => {
-                error!("Error decoding ticket: {:?}", e);
+                error!("error decoding ticket: {:?}", e);
                 Err(Status::internal("Error decoding ticket"))
             }
         }
@@ -188,7 +190,12 @@ impl FlightSqlService for FlightSqlServiceImpl {
         query: CommandStatementQuery,
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
-        self.get_flight_info_statement_handler(query, request).await
+        counter!("requests", "endpoint" => "get_flight_info").increment(1);
+        let start = Instant::now();
+        let res = self.get_flight_info_statement_handler(query, request).await;
+        let duration = start.elapsed();
+        histogram!("get_flight_info_latency_ms").record(duration.as_millis() as f64);
+        res
     }
 
     async fn do_get_statement(
@@ -204,7 +211,12 @@ impl FlightSqlService for FlightSqlServiceImpl {
         request: Request<Ticket>,
         message: Any,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
-        self.do_get_fallback_handler(request, message).await
+        counter!("requests", "endpoint" => "do_get_fallback").increment(1);
+        let start = Instant::now();
+        let res = self.do_get_fallback_handler(request, message).await;
+        let duration = start.elapsed();
+        histogram!("do_get_fallback_latency_ms").record(duration.as_millis() as f64);
+        res
     }
 
     async fn register_sql_info(&self, _id: i32, _result: &SqlInfo) {}

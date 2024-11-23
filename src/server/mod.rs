@@ -21,13 +21,30 @@ use crate::execution::AppExecution;
 use crate::test_utils::trailers_layer::TrailersLayer;
 use color_eyre::Result;
 use log::info;
-use metrics_exporter_prometheus::PrometheusBuilder;
+use metrics::{describe_counter, describe_histogram};
+use metrics_exporter_prometheus::{Matcher, PrometheusBuilder};
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 
 const DEFAULT_TIMEOUT_SECONDS: u64 = 60;
+
+fn initialize_metrics() {
+    describe_counter!("requests", "Incoming requests by FlightSQL endpoint");
+
+    describe_histogram!(
+        "get_flight_info_latency_ms",
+        metrics::Unit::Milliseconds,
+        "Get flight info latency ms"
+    );
+
+    describe_histogram!(
+        "do_get_fallback_latency_ms",
+        metrics::Unit::Milliseconds,
+        "Do get fallback latency ms"
+    )
+}
 
 /// Creates and manages a running FlightSqlServer with a background task
 pub struct FlightSqlApp {
@@ -79,14 +96,17 @@ impl FlightSqlApp {
             info!("Listening to metrics on {addr}");
             builder
                 .with_http_listener(addr)
+                .set_buckets_for_metric(
+                    Matcher::Suffix("latency_ms".to_string()),
+                    &[
+                        1.0, 3.0, 5.0, 10.0, 25.0, 50.0, 75.0, 100.0, 250.0, 500.0, 1000.0, 2500.0,
+                        5000.0, 10000.0, 20000.0,
+                    ],
+                )?
                 .install()
                 .expect("failed to install metrics recorder/exporter");
 
-            metrics::describe_histogram!(
-                "logical_planning_ms",
-                metrics::Unit::Milliseconds,
-                "Logical planning ms"
-            );
+            initialize_metrics();
         }
 
         // Run the server in its own background task
