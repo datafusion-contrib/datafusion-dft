@@ -85,6 +85,7 @@ impl TestConfigBuilder {
         self
     }
 
+    #[cfg(feature = "flightsql")]
     pub fn with_flightsql_benchmark_iterations(&mut self, iterations: u64) -> &mut Self {
         self.config_text.push_str(&format!(
             "[flightsql]\nbenchmark_iterations = {}\n",

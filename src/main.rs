@@ -27,15 +27,12 @@ use dft::server::FlightSqlApp;
 use dft::telemetry;
 use dft::tui::state::AppState;
 use dft::tui::{state, App};
+#[cfg(feature = "experimental-flightsql-server")]
 use log::info;
 
 #[allow(unused_mut)]
 fn main() -> Result<()> {
     let cli = DftArgs::parse();
-
-    if !cli.files.is_empty() || !cli.commands.is_empty() || cli.serve {
-        env_logger::init();
-    }
 
     let state = state::initialize(cli.config_path());
 
@@ -55,6 +52,7 @@ fn main() -> Result<()> {
 async fn app_entry_point(cli: DftArgs, state: AppState<'_>) -> Result<()> {
     #[cfg(feature = "experimental-flightsql-server")]
     if cli.serve {
+        env_logger::init();
         const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1:50051";
         info!("Starting FlightSQL server on {}", DEFAULT_SERVER_ADDRESS);
         let state = state::initialize(cli.config_path());
@@ -76,6 +74,7 @@ async fn app_entry_point(cli: DftArgs, state: AppState<'_>) -> Result<()> {
     }
     // CLI mode: executing commands from files or CLI arguments
     if !cli.files.is_empty() || !cli.commands.is_empty() {
+        env_logger::init();
         let execution_ctx = ExecutionContext::try_new(&state.config.execution, AppType::Cli)?;
         #[allow(unused_mut)]
         let mut app_execution = AppExecution::new(execution_ctx);
