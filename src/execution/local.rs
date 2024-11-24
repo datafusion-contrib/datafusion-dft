@@ -111,6 +111,8 @@ impl ExecutionContext {
         }
 
         // Register Parquet Metadata Function
+        let session_ctx = session_ctx.enable_url_table();
+
         session_ctx.register_udtf(
             "parquet_metadata",
             Arc::new(datafusion_functions_parquet::ParquetMetadataFunc {}),
