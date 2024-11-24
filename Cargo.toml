@@ -32,6 +32,8 @@ http-body = {version = "0.4.5" }
 itertools = "0.13.0"
 lazy_static = "1.4.0"
 log = "0.4.22"
+metrics = {version = "0.24.0", optional = true }
+metrics-exporter-prometheus = {version = "0.16.0", optional = true }
 num_cpus = "1.16.0"
 object_store = { version = "0.10.2", features = ["aws"], optional = true }
 parking_lot = "0.12.3"
@@ -63,10 +65,11 @@ url = "2.5.2"
 default = ["functions-parquet"]
 deltalake = ["dep:deltalake"]
 flightsql = ["dep:arrow-flight", "dep:tonic"]
-experimental-flightsql-server = ["dep:arrow-flight", "dep:tonic"]
+experimental-flightsql-server = ["flightsql"]
 s3 = ["object_store/aws", "url"]
 functions-json = ["dep:datafusion-functions-json"]
 functions-parquet = ["dep:datafusion-functions-parquet"]
+metrics = ["dep:metrics", "dep:metrics-exporter-prometheus"]
 
 [[bin]]
 name = "dft"
