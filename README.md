@@ -117,7 +117,7 @@ This feature is still in it's early stages and is expected to evolve.  Once it h
 
 ## `dft` FlightSQL Server
 
-The `dft` FlightSQL server (feature flag `experimental-flightsql-server`) is a Flight service that can be used to execute SQL queries against DataFusion.  The server is started by running `dft --serve` and can optionally run your configured DDL with the `--run-ddl` parameter.
+The `dft` FlightSQL server (feature flag `experimental-flightsql-server`) is a Flight service that can be used to execute SQL queries against DataFusion.  The server is started by running `dft --serve` and can optionally run your configured DDL with the `--run-ddl` parameter.  Prometheus metrics can optionally be exported with the `metrics` feature.
 
 This feature is experimental and does not currently implement all FlightSQL endpoints.  Endpoints will be added in tandem with adding more features to the FlightSQL clients within the TUI and CLI.
 
@@ -373,6 +373,7 @@ The FlightSQL config is where you can define the connection URL for the FlightSQ
 ```toml
 [flightsql]
 connection_url = "http://localhost:50051"
+server_metrics_port = "0.0.0.0:9000"
 ```
 
 #### Editor Config
