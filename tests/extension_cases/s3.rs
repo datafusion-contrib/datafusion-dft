@@ -48,16 +48,16 @@ fn test_s3_basic() {
         .arg(config.path)
         .arg("--run-ddl")
         .arg("-c")
-        .arg("SELECT column_1 FROM a LIMIT 1")
+        .arg("SELECT c1 FROM a LIMIT 1")
         .assert()
         .success();
 
     let expected = r#"
-+----------+
-| column_1 |
-+----------+
-| c1       |
-+----------+
++----+
+| c1 |
++----+
+| c  |
++----+
 "#;
 
     assert.stdout(contains_str(expected));
