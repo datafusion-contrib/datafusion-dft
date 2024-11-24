@@ -269,6 +269,7 @@ impl Default for FlightSQLConfig {
         Self {
             connection_url: default_connection_url(),
             benchmark_iterations: default_benchmark_iterations(),
+            #[cfg(feature = "metrics")]
             server_metrics_port: default_server_metrics_port(),
         }
     }
