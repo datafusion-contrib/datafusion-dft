@@ -72,7 +72,7 @@ impl std::fmt::Debug for ExecutionContext {
 
 impl ExecutionContext {
     /// Construct a new `ExecutionContext` with the specified configuration
-    pub fn try_new(config: &ExecutionConfig, app_type: AppType) -> Result<Self> {
+    pub async fn try_new(config: &ExecutionConfig, app_type: AppType) -> Result<Self> {
         let mut builder = DftSessionStateBuilder::new();
         let mut executor = None;
         match app_type {
@@ -97,8 +97,9 @@ impl ExecutionContext {
             }
         }
         let extensions = enabled_extensions();
+
         for extension in &extensions {
-            builder = extension.register(config, builder)?;
+            builder = extension.register(config.clone(), builder).await?;
         }
 
         let state = builder.build()?;

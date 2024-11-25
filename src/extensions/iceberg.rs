@@ -15,35 +15,30 @@
 // specific language governing permissions and limitations
 // under the License.
 
-//! [datafusion-function-json] Integration: [JsonFunctionsExtension]
-//!
-//! [datafusion-function-json]: https://github.com/datafusion-contrib/datafusion-functions-json
+//! DeltaLake integration: [DeltaLakeExtension]
 
 use crate::config::ExecutionConfig;
 use crate::extensions::{DftSessionStateBuilder, Extension};
-use datafusion::prelude::SessionContext;
-use datafusion_common::Result;
+use iceberg_datafusion::{IcebergCatalogProvider, IcebergTableProviderFactory};
+use std::sync::Arc;
 
 #[derive(Debug, Default)]
-pub struct JsonFunctionsExtension {}
+pub struct IcebergExtension {}
 
-impl JsonFunctionsExtension {
+impl IcebergExtension {
     pub fn new() -> Self {
         Self {}
     }
 }
 
-impl Extension for JsonFunctionsExtension {
+impl Extension for IcebergExtension {
     async fn register(
         &self,
         _config: ExecutionConfig,
         builder: DftSessionStateBuilder,
     ) -> datafusion_common::Result<DftSessionStateBuilder> {
-        Ok(builder)
-    }
+        Ok(builder.with_table_factory("ICEBERG", Arc::new(IcebergTableProviderFactory {})));
 
-    fn register_on_ctx(&self, _config: &ExecutionConfig, ctx: &mut SessionContext) -> Result<()> {
-        datafusion_functions_json::register_all(ctx)?;
-        Ok(())
+        let catalog_provider = IcebergCatalogProvider::try_new(catalog).await?;
     }
 }

@@ -54,10 +54,9 @@ impl Debug for DftSessionStateBuilder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DftSessionStateBuilder")
             .field("session_config", &self.session_config)
-            //.field("table_factories", &self.table_factories)
             .field(
                 "table_factories",
-                &"TODO TableFactoryDoes not implement Debug",
+                &"TODO TableFactory does not implement Debug",
             )
             .field("runtime_env", &self.runtime_env)
             .finish()

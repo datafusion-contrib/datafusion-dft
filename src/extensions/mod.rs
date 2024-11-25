@@ -27,16 +27,19 @@ mod builder;
 mod deltalake;
 #[cfg(feature = "functions-json")]
 mod functions_json;
+#[cfg(feature = "iceberg")]
+mod iceberg;
 #[cfg(feature = "s3")]
 mod s3;
 
 pub use builder::DftSessionStateBuilder;
 
+#[async_trait::async_trait]
 pub trait Extension: Debug {
     /// Registers this extension with the DataFusion [`SessionStateBuilder`]
-    fn register(
+    async fn register(
         &self,
-        _config: &ExecutionConfig,
+        _config: ExecutionConfig,
         _builder: DftSessionStateBuilder,
     ) -> Result<DftSessionStateBuilder>;
 
@@ -55,6 +58,8 @@ pub fn enabled_extensions() -> Vec<Box<dyn Extension>> {
         Box::new(s3::AwsS3Extension::new()),
         #[cfg(feature = "deltalake")]
         Box::new(deltalake::DeltaLakeExtension::new()),
+        #[cfg(feature = "iceberg")]
+        Box::new(iceberg::IcebergExtension::new()),
         #[cfg(feature = "functions-json")]
         Box::new(functions_json::JsonFunctionsExtension::new()),
     ]
