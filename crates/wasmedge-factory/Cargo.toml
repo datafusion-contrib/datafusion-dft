@@ -1,0 +1,16 @@
+[package]
+name = "wasmedge-factory"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+arrow-udf-wasm = "0.2.2"
+async-trait = "0.1.82"
+datafusion = "38.0.0"
+log = "0.4.22"
+project-root = "0.2.2"
+thiserror = "1.0.63"
+tokio = "1.40.0"
+wasm-udfs = { version = "0.1.0", path = "../wasm-udfs" }
+# wasmedge-sdk = "0.13.2"
+weak-table = "0.3.2"
