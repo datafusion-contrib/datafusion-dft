@@ -50,8 +50,9 @@ impl TestExecution {
     pub fn new() -> Self {
         let config = AppConfig::default();
 
-        let fut = ExecutionContext::try_new(&config.execution, AppType::Cli);
-        let execution = tokio::task::block_in_place(move || {
+        let mut execution = ExecutionContext::try_new(&config.execution, AppType::Cli).unwrap();
+        let fut = execution.register_extensions();
+        tokio::task::block_in_place(move || {
             tokio::runtime::Handle::current().block_on(fut).unwrap()
         });
         Self { execution }

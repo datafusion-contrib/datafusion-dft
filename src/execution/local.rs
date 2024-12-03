@@ -72,7 +72,7 @@ impl std::fmt::Debug for ExecutionContext {
 
 impl ExecutionContext {
     /// Construct a new `ExecutionContext` with the specified configuration
-    pub async fn try_new(config: &ExecutionConfig, app_type: AppType) -> Result<Self> {
+    pub fn try_new(config: &ExecutionConfig, app_type: AppType) -> Result<Self> {
         let mut builder = DftSessionStateBuilder::new();
         let mut executor = None;
         match app_type {
@@ -96,20 +96,9 @@ impl ExecutionContext {
                 }
             }
         }
-        let extensions = enabled_extensions();
-
-        for extension in &extensions {
-            builder = extension.register(config.clone(), builder).await?;
-        }
 
         let state = builder.build()?;
-        let mut session_ctx = SessionContext::new_with_state(state);
-
-        // Apply any additional setup to the session context (e.g. registering
-        // functions)
-        for extension in &extensions {
-            extension.register_on_ctx(config, &mut session_ctx)?;
-        }
+        let session_ctx = SessionContext::new_with_state(state);
 
         // Register Parquet Metadata Function
         let session_ctx = session_ctx.enable_url_table();
@@ -125,6 +114,19 @@ impl ExecutionContext {
             ddl_path: config.ddl_path.as_ref().map(PathBuf::from),
             executor,
         })
+    }
+
+    pub async fn register_extensions(&mut self) -> Result<()> {
+        let ctx = &mut self.session_ctx;
+        let config = &self.config;
+        let extensions = enabled_extensions();
+        // Apply any additional setup to the session context (e.g. registering
+        // functions)
+        for extension in &extensions {
+            extension.register_on_ctx(config, ctx)?;
+        }
+
+        Ok(())
     }
 
     pub fn config(&self) -> &ExecutionConfig {
