@@ -31,6 +31,7 @@ impl IcebergExtension {
     }
 }
 
+#[async_trait::async_trait]
 impl Extension for IcebergExtension {
     async fn register(
         &self,

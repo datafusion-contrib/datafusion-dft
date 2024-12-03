@@ -33,8 +33,9 @@ impl AwsS3Extension {
     }
 }
 
+#[async_trait::async_trait]
 impl Extension for AwsS3Extension {
-    fn register(
+    async fn register(
         &self,
         config: ExecutionConfig,
         mut builder: DftSessionStateBuilder,

@@ -31,8 +31,9 @@ impl DeltaLakeExtension {
     }
 }
 
+#[async_trait::async_trait]
 impl Extension for DeltaLakeExtension {
-    fn register(
+    async fn register(
         &self,
         _config: ExecutionConfig,
         builder: DftSessionStateBuilder,

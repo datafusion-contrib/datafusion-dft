@@ -33,6 +33,7 @@ impl JsonFunctionsExtension {
     }
 }
 
+#[async_trait::async_trait]
 impl Extension for JsonFunctionsExtension {
     async fn register(
         &self,
