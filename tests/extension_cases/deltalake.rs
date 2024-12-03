@@ -19,9 +19,9 @@ use url::Url;
 
 use crate::extension_cases::TestExecution;
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_deltalake() {
-    let test_exec = TestExecution::new().await;
+    let test_exec = TestExecution::new();
 
     let cwd = std::env::current_dir().unwrap();
     let path = Url::from_file_path(cwd.join("data/deltalake/simple_table")).unwrap();
