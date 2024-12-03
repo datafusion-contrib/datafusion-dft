@@ -49,8 +49,10 @@ impl<'app> TestApp<'app> {
     fn new() -> Self {
         let config_path = tempdir().unwrap();
         let state = initialize(config_path.path().to_path_buf());
-        let execution_ctx =
-            ExecutionContext::try_new(&state.config.execution, AppType::Tui).unwrap();
+        let fut = ExecutionContext::try_new(&state.config.execution, AppType::Tui);
+        let execution_ctx = tokio::task::block_in_place(move || {
+            tokio::runtime::Handle::current().block_on(fut).unwrap()
+        });
         let app_execution = AppExecution::new(execution_ctx);
         let args = DftArgs::default();
         let mut app = App::new(state, args, app_execution);

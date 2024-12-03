@@ -24,12 +24,12 @@ use dft::tui::{App, AppEvent};
 use ratatui::crossterm::event;
 use tempfile::{tempdir, TempDir};
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn construct_with_no_args() {
     let _test_app = TestApp::new();
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn quit_app_from_sql_tab() {
     let mut test_app = TestApp::new();
     // SQL Tab
@@ -40,7 +40,7 @@ async fn quit_app_from_sql_tab() {
     assert!(test_app.state().should_quit);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn quit_app_from_flightsql_tab() {
     let mut test_app = TestApp::new();
     let flightsql_key = event::KeyEvent::new(event::KeyCode::Char('2'), event::KeyModifiers::NONE);
@@ -52,7 +52,7 @@ async fn quit_app_from_flightsql_tab() {
     assert!(test_app.state().should_quit);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn quit_app_from_history_tab() {
     let mut test_app = TestApp::new();
     let history_key = event::KeyEvent::new(event::KeyCode::Char('3'), event::KeyModifiers::NONE);
@@ -64,7 +64,7 @@ async fn quit_app_from_history_tab() {
     assert!(test_app.state().should_quit);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn quit_app_from_logs_tab() {
     let mut test_app = TestApp::new();
     let logs_key = event::KeyEvent::new(event::KeyCode::Char('4'), event::KeyModifiers::NONE);
@@ -76,7 +76,7 @@ async fn quit_app_from_logs_tab() {
     assert!(test_app.state().should_quit);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn quit_app_from_context_tab() {
     let mut test_app = TestApp::new();
     let context_key = event::KeyEvent::new(event::KeyCode::Char('5'), event::KeyModifiers::NONE);
@@ -105,7 +105,11 @@ impl<'app> TestApp<'app> {
     fn new() -> Self {
         let config_path = tempdir().unwrap();
         let state = initialize(config_path.path().to_path_buf());
-        let execution = ExecutionContext::try_new(&state.config.execution, AppType::Tui).unwrap();
+        let fut = ExecutionContext::try_new(&state.config.execution, AppType::Tui);
+
+        let execution = tokio::task::block_in_place(move || {
+            tokio::runtime::Handle::current().block_on(fut).unwrap()
+        });
         let args = DftArgs::default();
         let app_execution = AppExecution::new(execution);
         let app = App::new(state, args, app_execution);

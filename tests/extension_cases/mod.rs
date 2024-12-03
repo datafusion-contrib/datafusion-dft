@@ -49,8 +49,11 @@ impl Default for TestExecution {
 impl TestExecution {
     pub fn new() -> Self {
         let config = AppConfig::default();
-        let execution = ExecutionContext::try_new(&config.execution, AppType::Cli)
-            .expect("cannot create execution context");
+
+        let fut = ExecutionContext::try_new(&config.execution, AppType::Cli);
+        let execution = tokio::task::block_in_place(move || {
+            tokio::runtime::Handle::current().block_on(fut).unwrap()
+        });
         Self { execution }
     }
 
