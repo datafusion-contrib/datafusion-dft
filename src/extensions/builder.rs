@@ -17,6 +17,7 @@
 
 //! [`DftSessionStateBuilder`] for configuring DataFusion [`SessionState`]
 
+use color_eyre::eyre;
 use datafusion::catalog::TableProviderFactory;
 use datafusion::execution::context::SessionState;
 use datafusion::execution::runtime_env::RuntimeEnv;
@@ -25,6 +26,10 @@ use datafusion::prelude::SessionConfig;
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
+
+use crate::config::ExecutionConfig;
+
+use super::{enabled_extensions, Extension};
 
 /// Builds a DataFusion [`SessionState`] with any necessary configuration
 ///
@@ -88,11 +93,7 @@ impl DftSessionStateBuilder {
     }
 
     /// Add a table factory to the list of factories on this builder
-    pub fn with_table_factory(
-        mut self,
-        name: &str,
-        factory: Arc<dyn TableProviderFactory>,
-    ) -> Self {
+    pub fn add_table_factory(&mut self, name: &str, factory: Arc<dyn TableProviderFactory>) {
         if self.table_factories.is_none() {
             self.table_factories = Some(HashMap::from([(name.to_string(), factory)]));
         } else {
@@ -101,7 +102,6 @@ impl DftSessionStateBuilder {
                 .unwrap()
                 .insert(name.to_string(), factory);
         }
-        self
     }
 
     /// Return the current [`RuntimeEnv`], creating a default if it doesn't exist
@@ -110,6 +110,28 @@ impl DftSessionStateBuilder {
             self.runtime_env = Some(Arc::new(RuntimeEnv::default()));
         }
         self.runtime_env.as_ref().unwrap()
+    }
+
+    pub async fn register_extension(
+        &mut self,
+        config: ExecutionConfig,
+        extension: Arc<dyn Extension>,
+    ) -> color_eyre::Result<()> {
+        extension
+            .register(config, self)
+            .await
+            .map_err(|_| eyre::eyre!("E"))
+    }
+
+    /// Apply all enabled extensions to the `SessionContext`
+    pub async fn register_extensions(&mut self, config: ExecutionConfig) -> color_eyre::Result<()> {
+        let extensions = enabled_extensions();
+
+        for extension in extensions {
+            self.register_extension(config.clone(), extension).await?;
+        }
+
+        Ok(())
     }
 
     /// Build the [`SessionState`] from the specified configuration

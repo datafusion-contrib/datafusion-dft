@@ -38,9 +38,9 @@ impl Extension for JsonFunctionsExtension {
     async fn register(
         &self,
         _config: ExecutionConfig,
-        builder: DftSessionStateBuilder,
-    ) -> datafusion_common::Result<DftSessionStateBuilder> {
-        Ok(builder)
+        builder: &mut DftSessionStateBuilder,
+    ) -> datafusion_common::Result<()> {
+        Ok(())
     }
 
     fn register_on_ctx(&self, _config: &ExecutionConfig, ctx: &mut SessionContext) -> Result<()> {

@@ -50,12 +50,18 @@ impl TestExecution {
     pub fn new() -> Self {
         let config = AppConfig::default();
 
-        let mut execution = ExecutionContext::try_new(&config.execution, AppType::Cli).unwrap();
-        let fut = execution.register_extensions();
-        tokio::task::block_in_place(move || {
-            tokio::runtime::Handle::current().block_on(fut).unwrap()
-        });
+        let execution = ExecutionContext::try_new(&config.execution, AppType::Cli).unwrap();
+        // let fut = execution.register_extensions();
+        // tokio::task::block_in_place(move || {
+        //     tokio::runtime::Handle::current().block_on(fut).unwrap()
+        // });
         Self { execution }
+    }
+
+    /// Register extensions to `SessionContext`
+    pub async fn register_extensions(&mut self) {
+        println!("Registerinbg extensions in TestExecution");
+        self.execution.register_extensions().await.unwrap()
     }
 
     /// Run the setup SQL query, discarding the result

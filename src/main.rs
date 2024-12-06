@@ -22,6 +22,7 @@ use dft::cli::CliApp;
 #[cfg(feature = "flightsql")]
 use dft::execution::flightsql::FlightSQLContext;
 use dft::execution::{local::ExecutionContext, AppExecution, AppType};
+use dft::extensions::DftSessionStateBuilder;
 #[cfg(feature = "experimental-flightsql-server")]
 use dft::server::FlightSqlApp;
 use dft::telemetry;
@@ -56,9 +57,12 @@ async fn app_entry_point(cli: DftArgs, state: AppState<'_>) -> Result<()> {
         const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1:50051";
         info!("Starting FlightSQL server on {}", DEFAULT_SERVER_ADDRESS);
         let state = state::initialize(cli.config_path());
-        let mut execution_ctx =
+        let mut session_state = DftSessionStateBuilder::new();
+        session_state
+            .register_extensions(state.config.execution.clone())
+            .await;
+        let execution_ctx =
             ExecutionContext::try_new(&state.config.execution, AppType::FlightSQLServer)?;
-        execution_context.register_extensions().await?;
         if cli.run_ddl {
             execution_ctx.execute_ddl().await;
         }

@@ -20,7 +20,7 @@
 use crate::config::ExecutionConfig;
 use datafusion::common::Result;
 use datafusion::prelude::SessionContext;
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
 mod builder;
 #[cfg(feature = "deltalake")]
@@ -40,27 +40,27 @@ pub trait Extension: Debug {
     async fn register(
         &self,
         _config: ExecutionConfig,
-        _builder: DftSessionStateBuilder,
-    ) -> Result<DftSessionStateBuilder>;
+        _builder: &mut DftSessionStateBuilder,
+    ) -> Result<()>;
 
-    /// Registers this extension after the SessionContext has been created
-    /// (this is to match the historic way many extensions were registered)
-    /// TODO file a ticket upstream to use the builder pattern
+    // Registers this extension after the SessionContext has been created
+    // (this is to match the historic way many extensions were registered)
+    // TODO file a ticket upstream to use the builder pattern
     fn register_on_ctx(&self, _config: &ExecutionConfig, _ctx: &mut SessionContext) -> Result<()> {
         Ok(())
     }
 }
 
 /// Return all extensions currently enabled
-pub fn enabled_extensions() -> Vec<Box<dyn Extension>> {
+pub fn enabled_extensions() -> Vec<Arc<dyn Extension>> {
     vec![
         #[cfg(feature = "s3")]
-        Box::new(s3::AwsS3Extension::new()),
+        Arc::new(s3::AwsS3Extension::new()),
         #[cfg(feature = "deltalake")]
-        Box::new(deltalake::DeltaLakeExtension::new()),
+        Arc::new(deltalake::DeltaLakeExtension::new()),
         #[cfg(feature = "iceberg")]
-        Box::new(iceberg::IcebergExtension::new()),
+        Arc::new(iceberg::IcebergExtension::new()),
         #[cfg(feature = "functions-json")]
-        Box::new(functions_json::JsonFunctionsExtension::new()),
+        Arc::new(functions_json::JsonFunctionsExtension::new()),
     ]
 }

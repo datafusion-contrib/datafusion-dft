@@ -36,10 +36,11 @@ impl Extension for IcebergExtension {
     async fn register(
         &self,
         _config: ExecutionConfig,
-        builder: DftSessionStateBuilder,
-    ) -> datafusion_common::Result<DftSessionStateBuilder> {
-        Ok(builder.with_table_factory("ICEBERG", Arc::new(IcebergTableProviderFactory {})));
-
-        let catalog_provider = IcebergCatalogProvider::try_new(catalog).await?;
+        builder: &mut DftSessionStateBuilder,
+    ) -> datafusion_common::Result<()> {
+        Ok(())
+        // Ok(builder.with_table_factory("ICEBERG", Arc::new(IcebergTableProviderFactory {})));
+        //
+        // let catalog_provider = IcebergCatalogProvider::try_new(catalog).await?;
     }
 }

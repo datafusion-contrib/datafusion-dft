@@ -36,8 +36,10 @@ impl Extension for DeltaLakeExtension {
     async fn register(
         &self,
         _config: ExecutionConfig,
-        builder: DftSessionStateBuilder,
-    ) -> datafusion_common::Result<DftSessionStateBuilder> {
-        Ok(builder.with_table_factory("DELTATABLE", Arc::new(DeltaTableFactory {})))
+        builder: &mut DftSessionStateBuilder,
+    ) -> datafusion_common::Result<()> {
+        println!("Registering deltalake");
+        builder.add_table_factory("DELTATABLE", Arc::new(DeltaTableFactory {}));
+        Ok(())
     }
 }

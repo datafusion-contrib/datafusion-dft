@@ -116,15 +116,16 @@ impl ExecutionContext {
         })
     }
 
+    /// Apply all enabled extensions to the `SessionContext`
     pub async fn register_extensions(&mut self) -> Result<()> {
-        let ctx = &mut self.session_ctx;
-        let config = &self.config;
-        let extensions = enabled_extensions();
-        // Apply any additional setup to the session context (e.g. registering
-        // functions)
-        for extension in &extensions {
-            extension.register_on_ctx(config, ctx)?;
-        }
+        // let ctx = &mut self.session_ctx;
+        // let config = &self.config;
+
+        // let extensions = enabled_extensions();
+        //
+        // for extension in &extensions {
+        //     extension.register_on_ctx(config, ctx).await?;
+        // }
 
         Ok(())
     }
