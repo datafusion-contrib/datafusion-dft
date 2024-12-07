@@ -27,7 +27,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use crate::config::ExecutionConfig;
+use crate::{config::ExecutionConfig, execution::AppType};
 
 use super::{enabled_extensions, Extension};
 
@@ -50,6 +50,8 @@ use super::{enabled_extensions, Extension};
 ///   <https://github.com/apache/datafusion/issues/12554>
 //#[derive(Debug)]
 pub struct DftSessionStateBuilder {
+    app_type: AppType,
+    execution_config: ExecutionConfig,
     session_config: SessionConfig,
     table_factories: Option<HashMap<String, Arc<dyn TableProviderFactory>>>,
     runtime_env: Option<Arc<RuntimeEnv>>,
@@ -70,20 +72,26 @@ impl Debug for DftSessionStateBuilder {
 
 impl Default for DftSessionStateBuilder {
     fn default() -> Self {
-        Self::new()
+        Self::new(AppType::Cli, ExecutionConfig::default())
     }
 }
 
 impl DftSessionStateBuilder {
     /// Create a new builder
-    pub fn new() -> Self {
+    pub fn new(app_type: AppType, execution_config: ExecutionConfig) -> Self {
         let session_config = SessionConfig::default().with_information_schema(true);
 
         Self {
+            app_type,
+            execution_config,
             session_config,
             table_factories: None,
             runtime_env: None,
         }
+    }
+
+    pub fn with_execution_config(mut self, config: ExecutionConfig) -> Self {
+        self
     }
 
     /// Set the `batch_size` on the [`SessionConfig`]
@@ -123,6 +131,17 @@ impl DftSessionStateBuilder {
             .map_err(|_| eyre::eyre!("E"))
     }
 
+    pub async fn with_extensions(mut self) -> color_eyre::Result<Self> {
+        let extensions = enabled_extensions();
+
+        for extension in extensions {
+            self.register_extension(self.execution_config.clone(), extension)
+                .await?;
+        }
+
+        Ok(self)
+    }
+
     /// Apply all enabled extensions to the `SessionContext`
     pub async fn register_extensions(&mut self, config: ExecutionConfig) -> color_eyre::Result<()> {
         let extensions = enabled_extensions();
@@ -140,6 +159,7 @@ impl DftSessionStateBuilder {
             session_config,
             table_factories,
             runtime_env,
+            ..
         } = self;
 
         let mut builder = SessionStateBuilder::new()

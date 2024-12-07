@@ -57,10 +57,10 @@ async fn app_entry_point(cli: DftArgs, state: AppState<'_>) -> Result<()> {
         const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1:50051";
         info!("Starting FlightSQL server on {}", DEFAULT_SERVER_ADDRESS);
         let state = state::initialize(cli.config_path());
-        let mut session_state = DftSessionStateBuilder::new();
-        session_state
-            .register_extensions(state.config.execution.clone())
-            .await;
+        let mut session_state =
+            DftSessionStateBuilder::new(AppType::FlightSQLServer, state.config.execution.clone())
+                .with_extensions()
+                .await?;
         let execution_ctx =
             ExecutionContext::try_new(&state.config.execution, AppType::FlightSQLServer)?;
         if cli.run_ddl {
