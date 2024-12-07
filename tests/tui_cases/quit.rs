@@ -19,6 +19,7 @@
 
 use dft::args::DftArgs;
 use dft::execution::{local::ExecutionContext, AppExecution, AppType};
+use dft::extensions::DftSessionStateBuilder;
 use dft::tui::state::initialize;
 use dft::tui::{App, AppEvent};
 use ratatui::crossterm::event;
@@ -26,12 +27,12 @@ use tempfile::{tempdir, TempDir};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn construct_with_no_args() {
-    let _test_app = TestApp::new();
+    let _test_app = TestApp::new().await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn quit_app_from_sql_tab() {
-    let mut test_app = TestApp::new();
+    let mut test_app = TestApp::new().await;
     // SQL Tab
     let key = event::KeyEvent::new(event::KeyCode::Char('q'), event::KeyModifiers::NONE);
     let app_event = AppEvent::Key(key);
@@ -42,7 +43,7 @@ async fn quit_app_from_sql_tab() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn quit_app_from_flightsql_tab() {
-    let mut test_app = TestApp::new();
+    let mut test_app = TestApp::new().await;
     let flightsql_key = event::KeyEvent::new(event::KeyCode::Char('2'), event::KeyModifiers::NONE);
     let app_event = AppEvent::Key(flightsql_key);
     test_app.handle_app_event(app_event).unwrap();
@@ -54,7 +55,7 @@ async fn quit_app_from_flightsql_tab() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn quit_app_from_history_tab() {
-    let mut test_app = TestApp::new();
+    let mut test_app = TestApp::new().await;
     let history_key = event::KeyEvent::new(event::KeyCode::Char('3'), event::KeyModifiers::NONE);
     let app_event = AppEvent::Key(history_key);
     test_app.handle_app_event(app_event).unwrap();
@@ -66,7 +67,7 @@ async fn quit_app_from_history_tab() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn quit_app_from_logs_tab() {
-    let mut test_app = TestApp::new();
+    let mut test_app = TestApp::new().await;
     let logs_key = event::KeyEvent::new(event::KeyCode::Char('4'), event::KeyModifiers::NONE);
     let app_event = AppEvent::Key(logs_key);
     test_app.handle_app_event(app_event).unwrap();
@@ -78,7 +79,7 @@ async fn quit_app_from_logs_tab() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn quit_app_from_context_tab() {
-    let mut test_app = TestApp::new();
+    let mut test_app = TestApp::new().await;
     let context_key = event::KeyEvent::new(event::KeyCode::Char('5'), event::KeyModifiers::NONE);
     let app_event = AppEvent::Key(context_key);
     test_app.handle_app_event(app_event).unwrap();
@@ -102,16 +103,25 @@ struct TestApp<'app> {
 
 impl<'app> TestApp<'app> {
     /// Create a new [`TestApp`] instance configured with a temporary directory
-    fn new() -> Self {
+    async fn new() -> Self {
         let config_path = tempdir().unwrap();
         let state = initialize(config_path.path().to_path_buf());
-        let mut execution =
-            ExecutionContext::try_new(&state.config.execution, AppType::Tui).unwrap();
-        let fut = execution.register_extensions();
 
-        tokio::task::block_in_place(move || {
-            tokio::runtime::Handle::current().block_on(fut).unwrap()
-        });
+        let session_state = DftSessionStateBuilder::new()
+            .with_app_type(AppType::Tui)
+            .with_extensions()
+            .await
+            .unwrap()
+            .build()
+            .unwrap();
+        let execution =
+            ExecutionContext::try_new(&state.config.execution, session_state, AppType::Tui)
+                .unwrap();
+        // let fut = execution.register_extensions();
+
+        // tokio::task::block_in_place(move || {
+        //     tokio::runtime::Handle::current().block_on(fut).unwrap()
+        // });
         let args = DftArgs::default();
         let app_execution = AppExecution::new(execution);
         let app = App::new(state, args, app_execution);

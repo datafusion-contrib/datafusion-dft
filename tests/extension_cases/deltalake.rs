@@ -21,13 +21,13 @@ use crate::extension_cases::TestExecution;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_deltalake() {
-    let mut test_exec = TestExecution::new();
-    test_exec.register_extensions().await;
+    let test_exec = TestExecution::new();
 
     let cwd = std::env::current_dir().unwrap();
     let path = Url::from_file_path(cwd.join("data/deltalake/simple_table")).unwrap();
 
     let mut test_exec = test_exec
+        .await
         .with_setup(&format!(
             "CREATE EXTERNAL TABLE d STORED AS DELTATABLE LOCATION '{}';",
             path

@@ -27,7 +27,6 @@ use futures::TryFutureExt;
 use log::{debug, error, info};
 
 use crate::config::ExecutionConfig;
-use crate::extensions::{enabled_extensions, DftSessionStateBuilder};
 use color_eyre::eyre::{self, Result};
 use datafusion::execution::{SendableRecordBatchStream, SessionState};
 use datafusion::physical_plan::{execute_stream, ExecutionPlan};

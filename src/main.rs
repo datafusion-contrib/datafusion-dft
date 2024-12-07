@@ -52,22 +52,18 @@ fn main() -> Result<()> {
 
 async fn app_entry_point(cli: DftArgs, state: AppState<'_>) -> Result<()> {
     let state = state::initialize(cli.config_path());
-    let mut session_state_builder =
-        DftSessionStateBuilder::new(AppType::FlightSQLServer, state.config.execution.clone())
-            .with_extensions()
-            .await?;
-    let session_state = session_state_builder.build()?;
+    let session_state_builder = DftSessionStateBuilder::new()
+        .with_execution_config(state.config.execution.clone())
+        .with_extensions()
+        .await?;
     #[cfg(feature = "experimental-flightsql-server")]
     if cli.serve {
         env_logger::init();
         const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1:50051";
         info!("Starting FlightSQL server on {}", DEFAULT_SERVER_ADDRESS);
-        // let state = state::initialize(cli.config_path());
-        // let mut session_state_builder =
-        //     DftSessionStateBuilder::new(AppType::FlightSQLServer, state.config.execution.clone())
-        //         .with_extensions()
-        //         .await?;
-        // let session_state = session_state_builder.build()?;
+        let session_state = session_state_builder
+            .with_app_type(AppType::FlightSQLServer)
+            .build()?;
         let execution_ctx = ExecutionContext::try_new(
             &state.config.execution,
             session_state,
@@ -90,7 +86,8 @@ async fn app_entry_point(cli: DftArgs, state: AppState<'_>) -> Result<()> {
     // CLI mode: executing commands from files or CLI arguments
     if !cli.files.is_empty() || !cli.commands.is_empty() {
         env_logger::init();
-        let mut execution_ctx =
+        let session_state = session_state_builder.with_app_type(AppType::Cli).build()?;
+        let execution_ctx =
             ExecutionContext::try_new(&state.config.execution, session_state, AppType::Cli)?;
         #[allow(unused_mut)]
         let mut app_execution = AppExecution::new(execution_ctx);
@@ -111,6 +108,7 @@ async fn app_entry_point(cli: DftArgs, state: AppState<'_>) -> Result<()> {
         // TUI mode: running the TUI
         telemetry::initialize_logs()?; // use alternate logging for TUI
         let state = state::initialize(cli.config_path());
+        let session_state = session_state_builder.with_app_type(AppType::Tui).build()?;
         let execution_ctx =
             ExecutionContext::try_new(&state.config.execution, session_state, AppType::Tui)?;
         let app_execution = AppExecution::new(execution_ctx);
