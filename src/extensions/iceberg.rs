@@ -19,7 +19,7 @@
 
 use crate::config::ExecutionConfig;
 use crate::extensions::{DftSessionStateBuilder, Extension};
-use iceberg_datafusion::{IcebergCatalogProvider, IcebergTableProviderFactory};
+use iceberg_datafusion::IcebergTableProviderFactory;
 use std::sync::Arc;
 
 #[derive(Debug, Default)]
@@ -38,9 +38,9 @@ impl Extension for IcebergExtension {
         _config: ExecutionConfig,
         builder: &mut DftSessionStateBuilder,
     ) -> datafusion_common::Result<()> {
+        // TODO Add Iceberg Catalog
+        let factory = Arc::new(IcebergTableProviderFactory {});
+        builder.add_table_factory("ICEBERG", factory);
         Ok(())
-        // Ok(builder.with_table_factory("ICEBERG", Arc::new(IcebergTableProviderFactory {})));
-        //
-        // let catalog_provider = IcebergCatalogProvider::try_new(catalog).await?;
     }
 }
