@@ -27,7 +27,10 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use crate::{config::ExecutionConfig, execution::AppType};
+use crate::{
+    config::ExecutionConfig,
+    execution::{executor::dedicated::DedicatedExecutor, AppType},
+};
 
 use super::{enabled_extensions, Extension};
 
@@ -79,7 +82,20 @@ impl Default for DftSessionStateBuilder {
 impl DftSessionStateBuilder {
     /// Create a new builder
     pub fn new(app_type: AppType, execution_config: ExecutionConfig) -> Self {
-        let session_config = SessionConfig::default().with_information_schema(true);
+        let mut session_config = SessionConfig::default().with_information_schema(true);
+
+        match app_type {
+            AppType::Cli => {
+                session_config = session_config.with_batch_size(execution_config.cli_batch_size);
+            }
+            AppType::Tui => {
+                session_config = session_config.with_batch_size(execution_config.tui_batch_size);
+            }
+            AppType::FlightSQLServer => {
+                session_config =
+                    session_config.with_batch_size(execution_config.flightsql_server_batch_size);
+            }
+        }
 
         Self {
             app_type,
@@ -88,10 +104,6 @@ impl DftSessionStateBuilder {
             table_factories: None,
             runtime_env: None,
         }
-    }
-
-    pub fn with_execution_config(mut self, config: ExecutionConfig) -> Self {
-        self
     }
 
     /// Set the `batch_size` on the [`SessionConfig`]
