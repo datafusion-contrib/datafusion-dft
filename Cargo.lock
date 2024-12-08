@@ -1985,6 +1985,7 @@ dependencies = [
  "futures",
  "http",
  "http-body",
+ "iceberg-catalog-rest",
  "iceberg-datafusion",
  "insta",
  "itertools 0.13.0",
@@ -2691,6 +2692,26 @@ dependencies = [
  "tokio",
  "typed-builder 0.20.0",
  "url",
+ "uuid",
+]
+
+[[package]]
+name = "iceberg-catalog-rest"
+version = "0.3.0"
+source = "git+https://github.com/apache/iceberg-rust?rev=16f9411dd3897134a401ece97d73cd33d6790bff#16f9411dd3897134a401ece97d73cd33d6790bff"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "http",
+ "iceberg",
+ "itertools 0.13.0",
+ "log",
+ "reqwest",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "tokio",
+ "typed-builder 0.20.0",
  "uuid",
 ]
 

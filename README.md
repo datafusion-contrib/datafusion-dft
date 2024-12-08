@@ -201,6 +201,23 @@ Register deltalake tables.  For example:
 CREATE EXTERNAL TABLE table_name STORED AS DELTATABLE LOCATION 's3://bucket/table'
 ```
 
+##### Iceberg (`--features=iceberg`)
+
+Register iceberg tables.  For example:
+
+```sql
+CREATE EXTERNAL TABLE table_name STORED AS ICEBERG LOCATION 's3://bucket/table'
+```
+
+Register Iceberg Rest Catalog
+
+```toml
+[[execution.iceberg.rest_catalog]]
+name = "my_iceberg_catalog"
+addr = "192.168.1.1:8181"
+```
+
+
 ##### Json Functions (`--features=function-json`)
 
 Adds functions from [datafusion-function-json] for querying JSON strings in DataFusion in `dft`.  For example:

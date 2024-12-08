@@ -18,7 +18,8 @@
 //! [`DftSessionStateBuilder`] for configuring DataFusion [`SessionState`]
 
 use color_eyre::eyre;
-use datafusion::catalog::TableProviderFactory;
+use datafusion::catalog::{CatalogProvider, CatalogProviderList, TableProviderFactory};
+use datafusion::catalog_common::MemoryCatalogProviderList;
 use datafusion::execution::context::SessionState;
 use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::execution::session_state::SessionStateBuilder;
@@ -54,6 +55,7 @@ pub struct DftSessionStateBuilder {
     execution_config: Option<ExecutionConfig>,
     session_config: SessionConfig,
     table_factories: Option<HashMap<String, Arc<dyn TableProviderFactory>>>,
+    catalog_providers: Option<HashMap<String, Arc<dyn CatalogProvider>>>,
     runtime_env: Option<Arc<RuntimeEnv>>,
 }
 
@@ -86,6 +88,7 @@ impl DftSessionStateBuilder {
             app_type: None,
             execution_config: None,
             table_factories: None,
+            catalog_providers: None,
             runtime_env: None,
         }
     }
@@ -112,6 +115,18 @@ impl DftSessionStateBuilder {
             self.table_factories = Some(HashMap::from([(name.to_string(), factory)]));
         } else {
             self.table_factories
+                .as_mut()
+                .unwrap()
+                .insert(name.to_string(), factory);
+        }
+    }
+
+    /// Add a catalog provider to the list of providers on this builder
+    pub fn add_catalog_provider(&mut self, name: &str, factory: Arc<dyn CatalogProvider>) {
+        if self.catalog_providers.is_none() {
+            self.catalog_providers = Some(HashMap::from([(name.to_string(), factory)]));
+        } else {
+            self.catalog_providers
                 .as_mut()
                 .unwrap()
                 .insert(name.to_string(), factory);
@@ -166,6 +181,7 @@ impl DftSessionStateBuilder {
             execution_config,
             mut session_config,
             table_factories,
+            catalog_providers,
             runtime_env,
             ..
         } = self;
@@ -195,6 +211,14 @@ impl DftSessionStateBuilder {
         }
         if let Some(table_factories) = table_factories {
             builder = builder.with_table_factories(table_factories);
+        }
+
+        if let Some(catalog_providers) = catalog_providers {
+            let catalogs_list = MemoryCatalogProviderList::new();
+            for (k, v) in catalog_providers {
+                catalogs_list.register_catalog(k, v);
+            }
+            builder = builder.with_catalog_list(Arc::new(catalogs_list));
         }
 
         Ok(builder.build())

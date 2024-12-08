@@ -176,6 +176,8 @@ pub struct ExecutionConfig {
     pub dedicated_executor_enabled: bool,
     #[serde(default = "default_dedicated_executor_threads")]
     pub dedicated_executor_threads: usize,
+    #[serde(default = "default_iceberg_config")]
+    pub iceberg: IcebergConfig,
 }
 
 fn default_ddl_path() -> Option<PathBuf> {
@@ -220,6 +222,12 @@ fn default_dedicated_executor_threads() -> usize {
     num_cpus::get()
 }
 
+fn default_iceberg_config() -> IcebergConfig {
+    IcebergConfig {
+        rest_catalogs: Vec::new(),
+    }
+}
+
 impl Default for ExecutionConfig {
     fn default() -> Self {
         Self {
@@ -231,8 +239,20 @@ impl Default for ExecutionConfig {
             flightsql_server_batch_size: default_flightsql_server_batch_size(),
             dedicated_executor_enabled: default_dedicated_executor_enabled(),
             dedicated_executor_threads: default_dedicated_executor_threads(),
+            iceberg: default_iceberg_config(),
         }
     }
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct RestCatalogConfig {
+    pub name: String,
+    pub addr: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct IcebergConfig {
+    pub rest_catalogs: Vec<RestCatalogConfig>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
