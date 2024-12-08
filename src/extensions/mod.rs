@@ -25,8 +25,6 @@ use std::{fmt::Debug, sync::Arc};
 mod builder;
 #[cfg(feature = "deltalake")]
 mod deltalake;
-#[cfg(feature = "functions-json")]
-mod functions_json;
 #[cfg(feature = "iceberg")]
 mod iceberg;
 #[cfg(feature = "s3")]
@@ -60,7 +58,5 @@ pub fn enabled_extensions() -> Vec<Arc<dyn Extension>> {
         Arc::new(deltalake::DeltaLakeExtension::new()),
         #[cfg(feature = "iceberg")]
         Arc::new(iceberg::IcebergExtension::new()),
-        #[cfg(feature = "functions-json")]
-        Arc::new(functions_json::JsonFunctionsExtension::new()),
     ]
 }
