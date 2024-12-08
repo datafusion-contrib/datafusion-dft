@@ -27,9 +27,8 @@ use futures::TryFutureExt;
 use log::{debug, error, info};
 
 use crate::config::ExecutionConfig;
-use crate::extensions::{enabled_extensions, DftSessionStateBuilder};
 use color_eyre::eyre::{self, Result};
-use datafusion::execution::SendableRecordBatchStream;
+use datafusion::execution::{SendableRecordBatchStream, SessionState};
 use datafusion::physical_plan::{execute_stream, ExecutionPlan};
 use datafusion::prelude::*;
 use datafusion::sql::parser::{DFParser, Statement};
@@ -72,43 +71,29 @@ impl std::fmt::Debug for ExecutionContext {
 
 impl ExecutionContext {
     /// Construct a new `ExecutionContext` with the specified configuration
-    pub fn try_new(config: &ExecutionConfig, app_type: AppType) -> Result<Self> {
-        let mut builder = DftSessionStateBuilder::new();
+    pub fn try_new(
+        config: &ExecutionConfig,
+        session_state: SessionState,
+        app_type: AppType,
+    ) -> Result<Self> {
         let mut executor = None;
-        match app_type {
-            AppType::Cli => {
-                builder = builder.with_batch_size(config.cli_batch_size);
-            }
-            AppType::Tui => {
-                builder = builder.with_batch_size(config.tui_batch_size);
-            }
-            AppType::FlightSQLServer => {
-                builder = builder.with_batch_size(config.flightsql_server_batch_size);
-                if config.dedicated_executor_enabled {
-                    // Ideally we would only use `enable_time` but we are still doing
-                    // some network requests as part of planning / execution which require network
-                    // functionality.
+        if let AppType::FlightSQLServer = app_type {
+            if config.dedicated_executor_enabled {
+                // Ideally we would only use `enable_time` but we are still doing
+                // some network requests as part of planning / execution which require network
+                // functionality.
 
-                    let runtime_builder = tokio::runtime::Builder::new_multi_thread();
-                    let dedicated_executor =
-                        DedicatedExecutor::new("cpu_runtime", config.clone(), runtime_builder);
-                    executor = Some(dedicated_executor)
-                }
+                let runtime_builder = tokio::runtime::Builder::new_multi_thread();
+                let dedicated_executor =
+                    DedicatedExecutor::new("cpu_runtime", config.clone(), runtime_builder);
+                executor = Some(dedicated_executor)
             }
         }
-        let extensions = enabled_extensions();
-        for extension in &extensions {
-            builder = extension.register(config, builder)?;
-        }
 
-        let state = builder.build()?;
-        let mut session_ctx = SessionContext::new_with_state(state);
+        let mut session_ctx = SessionContext::new_with_state(session_state);
 
-        // Apply any additional setup to the session context (e.g. registering
-        // functions)
-        for extension in &extensions {
-            extension.register_on_ctx(config, &mut session_ctx)?;
-        }
+        #[cfg(feature = "functions-json")]
+        datafusion_functions_json::register_all(&mut session_ctx)?;
 
         // Register Parquet Metadata Function
         let session_ctx = session_ctx.enable_url_table();

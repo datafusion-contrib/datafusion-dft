@@ -130,7 +130,7 @@ jobs:
         run: |
           rustup toolchain install ${{ matrix.rust }}
           rustup default ${{ matrix.rust }}
-      - name: Run FlightSQL tests
+      - name: Run Functions-JSON tests
         run: |
           cargo test --features=functions-json extension_cases::functions_json
   test-deltalake:

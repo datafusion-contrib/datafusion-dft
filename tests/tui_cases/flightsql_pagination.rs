@@ -44,7 +44,7 @@ async fn create_execution_results(query: &str) -> ExecutionResultsBatch {
 // Tests that a single page of results is displayed correctly
 #[tokio::test]
 async fn single_page() {
-    let mut test_app = TestApp::new();
+    let mut test_app = TestApp::new().await;
 
     test_app
         .handle_app_event(AppEvent::FlightSQLNewExecution)
@@ -86,7 +86,7 @@ fn create_values_query(num: usize) -> String {
 // Tests that we can paginate through multiple pages and go back to the first page
 #[tokio::test]
 async fn multiple_pages_forward_and_back() {
-    let mut test_app = TestApp::new();
+    let mut test_app = TestApp::new().await;
     let query = create_values_query(101);
     let res1 = create_execution_results(&query).await;
     let event1 = AppEvent::FlightSQLExecutionResultsNextBatch(res1);
@@ -151,7 +151,7 @@ async fn multiple_pages_forward_and_back() {
 // page
 #[tokio::test]
 async fn multiple_pages_forward_and_back_and_forward() {
-    let mut test_app = TestApp::new();
+    let mut test_app = TestApp::new().await;
     let query = create_values_query(101);
     let res1 = create_execution_results(&query).await;
     let event1 = AppEvent::FlightSQLExecutionResultsNextBatch(res1);

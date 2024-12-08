@@ -72,7 +72,7 @@ pub struct FlightSQLTabState<'app> {
     connection_status: FlightSQLConnectionStatus,
 }
 
-impl<'app> FlightSQLTabState<'app> {
+impl FlightSQLTabState<'_> {
     pub fn new(config: &AppConfig) -> Self {
         let empty_text = vec!["Enter a query here.".to_string()];
         // TODO: Enable vim mode from config?

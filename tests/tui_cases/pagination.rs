@@ -41,9 +41,9 @@ fn create_execution_results(query: &str, adj: u32) -> ExecutionResultsBatch {
 }
 
 // Tests that a single page of results is displayed correctly
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn single_page() {
-    let mut test_app = TestApp::new();
+    let mut test_app = TestApp::new().await;
     let res1 = create_execution_results("SELECT 1", 0);
     let event1 = AppEvent::ExecutionResultsNextBatch(res1);
 
@@ -76,9 +76,9 @@ async fn single_page() {
 }
 
 // Tests that we can paginate through multiple pages and go back to the first page
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn multiple_pages_forward_and_back() {
-    let mut test_app = TestApp::new();
+    let mut test_app = TestApp::new().await;
     let res1 = create_execution_results("SELECT 1", 0);
     let event1 = AppEvent::ExecutionResultsNextBatch(res1);
 
@@ -153,9 +153,9 @@ async fn multiple_pages_forward_and_back() {
 
 // Tests that we can still paginate when we already have the batch because we previously viewed the
 // page
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn multiple_pages_forward_and_back_and_forward() {
-    let mut test_app = TestApp::new();
+    let mut test_app = TestApp::new().await;
     let res1 = create_execution_results("SELECT 1", 0);
     let event1 = AppEvent::ExecutionResultsNextBatch(res1);
 
