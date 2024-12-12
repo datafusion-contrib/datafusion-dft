@@ -66,7 +66,7 @@ url = "2.5.2"
 [features]
 default = ["functions-parquet"]
 deltalake = ["dep:deltalake"]
-iceberg = ["dep:iceberg-datafusion"]
+iceberg = ["dep:iceberg-datafusion", "dep:iceberg-catalog-rest"]
 flightsql = ["dep:arrow-flight", "dep:tonic"]
 experimental-flightsql-server = ["flightsql"]
 s3 = ["object_store/aws", "url"]
