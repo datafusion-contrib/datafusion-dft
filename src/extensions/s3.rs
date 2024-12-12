@@ -33,18 +33,19 @@ impl AwsS3Extension {
     }
 }
 
+#[async_trait::async_trait]
 impl Extension for AwsS3Extension {
-    fn register(
+    async fn register(
         &self,
-        config: &ExecutionConfig,
-        mut builder: DftSessionStateBuilder,
-    ) -> datafusion_common::Result<DftSessionStateBuilder> {
+        config: ExecutionConfig,
+        builder: &mut DftSessionStateBuilder,
+    ) -> datafusion_common::Result<()> {
         let Some(object_store_config) = &config.object_store else {
-            return Ok(builder);
+            return Ok(());
         };
 
         let Some(s3_configs) = &object_store_config.s3 else {
-            return Ok(builder);
+            return Ok(());
         };
 
         info!("S3 configs exists");
@@ -69,6 +70,6 @@ impl Extension for AwsS3Extension {
             }
         }
 
-        Ok(builder)
+        Ok(())
     }
 }

@@ -74,7 +74,7 @@ pub struct SQLTabState<'app> {
     mode: SQLTabMode,
 }
 
-impl<'app> SQLTabState<'app> {
+impl SQLTabState<'_> {
     pub fn new(config: &AppConfig) -> Self {
         let empty_text = vec!["Enter a query here.".to_string()];
         // TODO: Enable vim mode from config?

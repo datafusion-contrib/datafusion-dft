@@ -29,6 +29,8 @@ env_logger = "0.11.5"
 futures = "0.3.30"
 http = "1"
 http-body = "1"
+iceberg-catalog-rest = { git = "https://github.com/apache/iceberg-rust", rev = "16f9411dd3897134a401ece97d73cd33d6790bff", optional = true}
+iceberg-datafusion = { git = "https://github.com/apache/iceberg-rust", rev = "16f9411dd3897134a401ece97d73cd33d6790bff", optional = true }
 itertools = "0.13.0"
 lazy_static = "1.4.0"
 log = "0.4.22"
@@ -64,6 +66,7 @@ url = "2.5.2"
 [features]
 default = ["functions-parquet"]
 deltalake = ["dep:deltalake"]
+iceberg = ["dep:iceberg-datafusion", "dep:iceberg-catalog-rest"]
 flightsql = ["dep:arrow-flight", "dep:tonic"]
 experimental-flightsql-server = ["flightsql"]
 s3 = ["object_store/aws", "url"]
