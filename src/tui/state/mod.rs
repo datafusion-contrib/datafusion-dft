@@ -82,7 +82,7 @@ pub fn initialize<'app>(config_path: PathBuf) -> AppState<'app> {
     AppState::new(config)
 }
 
-impl<'app> AppState<'app> {
+impl AppState {
     pub fn new(config: AppConfig) -> Self {
         let tabs = Tabs::default();
 
