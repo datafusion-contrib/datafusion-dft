@@ -29,7 +29,7 @@ env_logger = "0.11.5"
 futures = "0.3.30"
 http = "1"
 http-body = "1"
-iceberg-catalog-rest = { git = "https://github.com/apache/iceberg-rust", rev = "16f9411dd3897134a401ece97d73cd33d6790bff"}
+iceberg-catalog-rest = { git = "https://github.com/apache/iceberg-rust", rev = "16f9411dd3897134a401ece97d73cd33d6790bff", optional = true}
 iceberg-datafusion = { git = "https://github.com/apache/iceberg-rust", rev = "16f9411dd3897134a401ece97d73cd33d6790bff", optional = true }
 itertools = "0.13.0"
 lazy_static = "1.4.0"
