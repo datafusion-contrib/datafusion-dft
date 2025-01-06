@@ -27,6 +27,7 @@ async fn test_hudi() {
     let path = Url::from_file_path(cwd.join("data/hudi/v6_simplekeygen_nonhivestyle")).unwrap();
 
     let test_exec = test_exec
+        .await
         .with_setup(&format!(
             "CREATE EXTERNAL TABLE h STORED AS HUDI LOCATION '{}';",
             path
