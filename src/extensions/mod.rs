@@ -25,8 +25,6 @@ use std::{fmt::Debug, sync::Arc};
 mod builder;
 #[cfg(feature = "deltalake")]
 mod deltalake;
-#[cfg(feature = "functions-json")]
-mod functions_json;
 #[cfg(feature = "hudi")]
 mod hudi;
 #[cfg(feature = "iceberg")]
