@@ -31,12 +31,14 @@ impl HudiExtension {
     }
 }
 
+#[async_trait::async_trait]
 impl Extension for HudiExtension {
-    fn register(
+    async fn register(
         &self,
-        _config: &ExecutionConfig,
-        builder: DftSessionStateBuilder,
-    ) -> datafusion_common::Result<DftSessionStateBuilder> {
-        Ok(builder.with_table_factory("HUDI", Arc::new(HudiTableFactory {})))
+        _config: ExecutionConfig,
+        builder: &mut DftSessionStateBuilder,
+    ) -> datafusion_common::Result<()> {
+        builder.add_table_factory("HUDI", Arc::new(HudiTableFactory {}));
+        Ok(())
     }
 }

@@ -59,7 +59,7 @@ pub fn enabled_extensions() -> Vec<Arc<dyn Extension>> {
         #[cfg(feature = "deltalake")]
         Arc::new(deltalake::DeltaLakeExtension::new()),
         #[cfg(feature = "hudi")]
-        Box::new(hudi::HudiExtension::new()),
+        Arc::new(hudi::HudiExtension::new()),
         #[cfg(feature = "iceberg")]
         Arc::new(iceberg::IcebergExtension::new()),
     ]
