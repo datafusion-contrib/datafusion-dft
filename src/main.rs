@@ -22,10 +22,10 @@ use dft::cli::CliApp;
 #[cfg(feature = "flightsql")]
 use dft::execution::flightsql::FlightSQLContext;
 use dft::execution::{local::ExecutionContext, AppExecution, AppType};
+use dft::extensions::DftSessionStateBuilder;
 #[cfg(feature = "experimental-flightsql-server")]
 use dft::server::FlightSqlApp;
 use dft::telemetry;
-use dft::tui::state::AppState;
 use dft::tui::{state, App};
 #[cfg(feature = "experimental-flightsql-server")]
 use log::info;
@@ -33,8 +33,6 @@ use log::info;
 #[allow(unused_mut)]
 fn main() -> Result<()> {
     let cli = DftArgs::parse();
-
-    let state = state::initialize(cli.config_path());
 
     // With Runtimes configured correctly the main Tokio runtime should only be used for network
     // IO, in which a single thread should be sufficient.
@@ -45,19 +43,30 @@ fn main() -> Result<()> {
         .enable_all()
         .build()?;
 
-    let entry_point = app_entry_point(cli, state);
+    let entry_point = app_entry_point(cli);
     runtime.block_on(entry_point)
 }
 
-async fn app_entry_point(cli: DftArgs, state: AppState<'_>) -> Result<()> {
+async fn app_entry_point(cli: DftArgs) -> Result<()> {
+    let state = state::initialize(cli.config_path());
+    let session_state_builder = DftSessionStateBuilder::new()
+        .with_execution_config(state.config.execution.clone())
+        .with_extensions()
+        .await?;
     #[cfg(feature = "experimental-flightsql-server")]
     if cli.serve {
+        // FlightSQL Server mode: start a FlightSQL server
         env_logger::init();
         const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1:50051";
         info!("Starting FlightSQL server on {}", DEFAULT_SERVER_ADDRESS);
-        let state = state::initialize(cli.config_path());
-        let execution_ctx =
-            ExecutionContext::try_new(&state.config.execution, AppType::FlightSQLServer)?;
+        let session_state = session_state_builder
+            .with_app_type(AppType::FlightSQLServer)
+            .build()?;
+        let execution_ctx = ExecutionContext::try_new(
+            &state.config.execution,
+            session_state,
+            AppType::FlightSQLServer,
+        )?;
         if cli.run_ddl {
             execution_ctx.execute_ddl().await;
         }
@@ -72,10 +81,12 @@ async fn app_entry_point(cli: DftArgs, state: AppState<'_>) -> Result<()> {
         app.run_app().await;
         return Ok(());
     }
-    // CLI mode: executing commands from files or CLI arguments
     if !cli.files.is_empty() || !cli.commands.is_empty() {
+        // CLI mode: executing commands from files or CLI arguments
         env_logger::init();
-        let execution_ctx = ExecutionContext::try_new(&state.config.execution, AppType::Cli)?;
+        let session_state = session_state_builder.with_app_type(AppType::Cli).build()?;
+        let execution_ctx =
+            ExecutionContext::try_new(&state.config.execution, session_state, AppType::Cli)?;
         #[allow(unused_mut)]
         let mut app_execution = AppExecution::new(execution_ctx);
         #[cfg(feature = "flightsql")]
@@ -90,12 +101,13 @@ async fn app_entry_point(cli: DftArgs, state: AppState<'_>) -> Result<()> {
         }
         let app = CliApp::new(app_execution, cli.clone());
         app.execute_files_or_commands().await?;
-        // FlightSQL Server mode: start a FlightSQL server
     } else {
         // TUI mode: running the TUI
         telemetry::initialize_logs()?; // use alternate logging for TUI
         let state = state::initialize(cli.config_path());
-        let execution_ctx = ExecutionContext::try_new(&state.config.execution, AppType::Tui)?;
+        let session_state = session_state_builder.with_app_type(AppType::Tui).build()?;
+        let execution_ctx =
+            ExecutionContext::try_new(&state.config.execution, session_state, AppType::Tui)?;
         let app_execution = AppExecution::new(execution_ctx);
         let app = App::new(state, cli, app_execution);
         app.run_app().await?;

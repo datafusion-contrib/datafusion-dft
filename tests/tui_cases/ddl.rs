@@ -22,7 +22,7 @@ use crate::tui_cases::TestApp;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_create_table_ddl() {
-    let mut test_app = TestApp::new();
+    let mut test_app = TestApp::new().await;
 
     let ddl = "CREATE TABLE foo AS VALUES (1);";
     test_app
@@ -45,7 +45,7 @@ async fn test_create_table_ddl() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_create_table_in_new_schema() {
-    let mut test_app = TestApp::new();
+    let mut test_app = TestApp::new().await;
 
     let create_schema = "CREATE SCHEMA foo;";
     let create_table = "CREATE TABLE foo.bar AS VALUES (1);";
@@ -70,7 +70,7 @@ async fn test_create_table_in_new_schema() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_create_table_in_new_catalog() {
-    let mut test_app = TestApp::new();
+    let mut test_app = TestApp::new().await;
 
     let create_catalog = "CREATE DATABASE foo;";
     let create_schema = "CREATE SCHEMA foo.bar;";
@@ -97,7 +97,7 @@ async fn test_create_table_in_new_catalog() {
 // Stupid test but its all ive got for now
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_create_table_ddl_error() {
-    let mut test_app = TestApp::new();
+    let mut test_app = TestApp::new().await;
 
     test_app.handle_app_event(AppEvent::DDLError).unwrap();
 

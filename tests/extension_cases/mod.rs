@@ -33,6 +33,7 @@ use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::sql::parser::DFParser;
 use datafusion_common::Result;
 use dft::execution::local::ExecutionContext;
+use dft::extensions::DftSessionStateBuilder;
 use dft::{config::AppConfig, execution::AppType};
 use futures::{StreamExt, TryStreamExt};
 use log::debug;
@@ -42,17 +43,25 @@ pub struct TestExecution {
     execution: ExecutionContext,
 }
 
-impl Default for TestExecution {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// impl Default for TestExecution {
+//     fn default() -> Self {
+//         Self::new()
+//     }
+// }
 
 impl TestExecution {
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         let config = AppConfig::default();
-        let execution = ExecutionContext::try_new(&config.execution, AppType::Cli)
-            .expect("cannot create execution context");
+
+        let session_state = DftSessionStateBuilder::new()
+            .with_app_type(AppType::Cli)
+            .with_extensions()
+            .await
+            .unwrap()
+            .build()
+            .unwrap();
+        let execution =
+            ExecutionContext::try_new(&config.execution, session_state, AppType::Cli).unwrap();
         Self { execution }
     }
 

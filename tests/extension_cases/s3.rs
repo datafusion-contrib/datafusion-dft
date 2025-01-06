@@ -21,8 +21,8 @@ use assert_cmd::Command;
 
 use crate::{cli_cases::contains_str, config::TestConfigBuilder};
 
-#[test]
-fn test_s3_basic() {
+#[tokio::test(flavor = "multi_thread")]
+async fn test_s3_basic() {
     let tempdir = tempfile::tempdir().unwrap();
     let ddl_path = tempdir.path().join("my_ddl.sql");
     let mut file = std::fs::File::create(ddl_path.clone()).unwrap();

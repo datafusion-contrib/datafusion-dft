@@ -31,8 +31,6 @@ pub use stats::{collect_plan_io_stats, ExecutionStats};
 #[cfg(feature = "flightsql")]
 use self::flightsql::{FlightSQLClient, FlightSQLContext};
 use self::local::ExecutionContext;
-use crate::config::AppConfig;
-use color_eyre::eyre::Result;
 use datafusion::prelude::*;
 
 pub enum AppType {
@@ -56,17 +54,6 @@ impl AppExecution {
             #[cfg(feature = "flightsql")]
             flightsql_context: FlightSQLContext::default(),
         }
-    }
-
-    pub fn try_new_from_config(config: AppConfig, app_type: AppType) -> Result<Self> {
-        let context = ExecutionContext::try_new(&config.execution, app_type)?;
-        #[cfg(feature = "flightsql")]
-        let flightsql_context = FlightSQLContext::new(config.flightsql);
-        Ok(Self {
-            context,
-            #[cfg(feature = "flightsql")]
-            flightsql_context,
-        })
     }
 
     pub fn execution_ctx(&self) -> &ExecutionContext {
