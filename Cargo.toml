@@ -29,6 +29,7 @@ env_logger = "0.11.5"
 futures = "0.3.30"
 http = "1"
 http-body = "1"
+hudi = { features = ["datafusion"], optional = true, git = "https://github.com/apache/hudi-rs", rev = "64b1dc11cb9f1ec9be472025ecc9a43cae49d6cb" }
 iceberg-catalog-rest = { git = "https://github.com/apache/iceberg-rust", rev = "16f9411dd3897134a401ece97d73cd33d6790bff", optional = true}
 iceberg-datafusion = { git = "https://github.com/apache/iceberg-rust", rev = "16f9411dd3897134a401ece97d73cd33d6790bff", optional = true }
 itertools = "0.13.0"
@@ -66,6 +67,7 @@ url = "2.5.2"
 [features]
 default = ["functions-parquet"]
 deltalake = ["dep:deltalake"]
+hudi = ["dep:hudi"]
 iceberg = ["dep:iceberg-datafusion", "dep:iceberg-catalog-rest"]
 flightsql = ["dep:arrow-flight", "dep:tonic"]
 experimental-flightsql-server = ["flightsql"]

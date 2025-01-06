@@ -465,13 +465,11 @@ impl ExecutionComputeStats {
                     mean,
                     max,
                     total,
-                )?;
-                Ok(())
-            })?
+                )
+            })
         } else {
-            writeln!(f, "No {label} Stats")?;
-        };
-        Ok(())
+            writeln!(f, "No {label} Stats")
+        }
     }
 }
 
