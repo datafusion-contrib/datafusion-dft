@@ -18,8 +18,9 @@
 //! [`AppExecution`]: Handles executing queries for the TUI application.
 
 use crate::execution::AppExecution;
-use crate::tui::{AppEvent, ExecutionError, ExecutionResultsBatch};
+use crate::tui::AppEvent;
 use color_eyre::eyre::Result;
+use datafusion::arrow::array::RecordBatch;
 #[allow(unused_imports)] // No idea why this is being picked up as unused when I use it twice.
 use datafusion::arrow::error::ArrowError;
 use datafusion::execution::context::SessionContext;
@@ -28,6 +29,7 @@ use datafusion::physical_plan::execute_stream;
 use futures::StreamExt;
 use log::{error, info};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::Mutex;
 #[cfg(feature = "flightsql")]
@@ -35,10 +37,68 @@ use tokio_stream::StreamMap;
 
 #[cfg(feature = "flightsql")]
 use {
-    crate::config::FlightSQLConfig, arrow_flight::decode::FlightRecordBatchStream,
+    arrow_flight::decode::FlightRecordBatchStream,
     arrow_flight::sql::client::FlightSqlServiceClient, arrow_flight::Ticket,
     tonic::transport::Channel, tonic::IntoRequest,
 };
+
+#[derive(Clone, Debug)]
+pub struct ExecutionError {
+    query: String,
+    error: String,
+    duration: Duration,
+}
+
+impl ExecutionError {
+    pub fn new(query: String, error: String, duration: Duration) -> Self {
+        Self {
+            query,
+            error,
+            duration,
+        }
+    }
+
+    pub fn query(&self) -> &str {
+        &self.query
+    }
+
+    pub fn error(&self) -> &str {
+        &self.error
+    }
+
+    pub fn duration(&self) -> &Duration {
+        &self.duration
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct ExecutionResultsBatch {
+    pub query: String,
+    pub batch: RecordBatch,
+    pub duration: Duration,
+}
+
+impl ExecutionResultsBatch {
+    pub fn new(query: String, batch: RecordBatch, duration: Duration) -> Self {
+        Self {
+            query,
+            batch,
+            duration,
+        }
+    }
+
+    pub fn query(&self) -> &str {
+        &self.query
+    }
+
+    pub fn batch(&self) -> &RecordBatch {
+        &self.batch
+    }
+
+    pub fn duration(&self) -> &Duration {
+        &self.duration
+    }
+}
 
 /// Handles executing queries for the TUI application, formatting results
 /// and sending them to the UI.
@@ -47,6 +107,9 @@ use {
 pub struct TuiExecution {
     inner: Arc<AppExecution>,
     result_stream: Arc<Mutex<Option<SendableRecordBatchStream>>>,
+    /// StreamMao of FlightSQL streams that could be coming from multiple endpoints / tickets.
+    /// Often times there is only one but we need to be able to handle multiple.  We should test
+    /// this at some point as well.
     #[cfg(feature = "flightsql")]
     flightsql_result_stream: Arc<Mutex<Option<StreamMap<String, FlightRecordBatchStream>>>>,
 }
@@ -338,9 +401,11 @@ impl TuiExecution {
         }
     }
 
+    // TODO: Maybe just expose `inner` and use that rather than re-implementing the same
+    // functions here.
     #[cfg(feature = "flightsql")]
-    pub async fn create_flightsql_client(&self, config: FlightSQLConfig) -> Result<()> {
-        self.inner.create_flightsql_client(config).await
+    pub async fn create_flightsql_client(&self, cli_host: Option<String>) -> Result<()> {
+        self.inner.flightsql_ctx().create_client(cli_host).await
     }
 
     #[cfg(feature = "flightsql")]

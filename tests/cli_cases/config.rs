@@ -54,3 +54,57 @@ fn test_custom_config() {
 
     assert.stdout(contains_str(expected));
 }
+
+#[test]
+fn test_custom_config_multiple_ddl() {
+    let tempdir = tempfile::tempdir().unwrap();
+    let ddl_path = tempdir.path().join("my_ddl.sql");
+    let mut file = std::fs::File::create(ddl_path.clone()).unwrap();
+    let ddl = "CREATE TABLE x AS VALUES (1);\nCREATE TABLE y AS VALUES (2)";
+    file.write_all(ddl.as_bytes()).unwrap();
+    file.flush().unwrap();
+    let mut config_builder = TestConfigBuilder::default();
+    config_builder.with_ddl_path(ddl_path);
+    let config = config_builder.build("my_config.toml");
+
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("--config")
+        .arg(config.path)
+        .arg("--run-ddl")
+        .arg("-c")
+        .arg("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name IN ('x', 'y') ORDER BY table_name ASC")
+        .assert()
+        .success();
+
+    let expected = r##"+------------+
+| table_name |
++------------+
+| x          |
+| y          |
++------------+
+"##;
+
+    assert.stdout(contains_str(expected));
+}
+
+#[test]
+fn test_custom_config_benchmark_iterations() {
+    let mut config_builder = TestConfigBuilder::default();
+    config_builder.with_benchmark_iterations(5);
+    let config = config_builder.build("my_config.toml");
+
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("--config")
+        .arg(config.path)
+        .arg("-c")
+        .arg("SELECT 1")
+        .arg("--bench")
+        .assert()
+        .success();
+
+    let expected = "5 runs";
+
+    assert.stdout(contains_str(expected));
+}

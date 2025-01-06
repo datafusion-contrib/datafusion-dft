@@ -67,8 +67,34 @@ pub struct DftArgs {
     #[clap(long, short, help = "Only show how long the query took to run")]
     pub time: bool,
 
+    #[cfg(feature = "experimental-flightsql-server")]
     #[clap(long, help = "Start a FlightSQL server")]
     pub serve: bool,
+
+    #[clap(long, short, help = "Benchmark the provided query")]
+    pub bench: bool,
+
+    #[clap(
+        long,
+        help = "Print a summary of the query's execution plan and statistics"
+    )]
+    pub analyze: bool,
+
+    #[clap(long, help = "Run the provided query before running the benchmark")]
+    pub run_before: Option<String>,
+
+    #[clap(long, help = "Save the benchmark results to a file")]
+    pub save: Option<PathBuf>,
+
+    #[clap(long, help = "Append the benchmark results to an existing file")]
+    pub append: bool,
+
+    #[clap(short = 'n', help = "Set the number of benchmark iterations to run")]
+    pub benchmark_iterations: Option<usize>,
+
+    #[cfg(any(feature = "flightsql", feature = "experimental-flightsql-server"))]
+    #[clap(long, help = "Set the host and port to be used for FlightSQL")]
+    pub flightsql_host: Option<String>,
 }
 
 impl DftArgs {

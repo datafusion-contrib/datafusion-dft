@@ -4,7 +4,7 @@ pub mod config;
 pub mod execution;
 pub mod extensions;
 #[cfg(feature = "experimental-flightsql-server")]
-pub mod flightsql_server;
+pub mod server;
 pub mod telemetry;
 pub mod test_utils;
 pub mod tui;

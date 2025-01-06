@@ -274,8 +274,38 @@ impl<'app> FlightSQLTabState<'app> {
         }
     }
 
+    /// Returns the SQL to be executed.  If no text is selected it returns the entire buffer else
+    /// it returns the current selection.
     pub fn sql(&self) -> String {
-        self.editor.lines().join("\n")
+        if let Some(((start_row, start_col), (end_row, end_col))) = self.editor.selection_range() {
+            if start_row == end_row {
+                let line = &self.editor.lines()[start_row];
+                line.chars()
+                    .skip(start_col)
+                    .take(end_col - start_col)
+                    .collect()
+            } else {
+                let lines: Vec<String> = self
+                    .editor
+                    .lines()
+                    .iter()
+                    .enumerate()
+                    .map(|(i, line)| {
+                        let selected_chars: Vec<char> = if i == start_row {
+                            line.chars().skip(start_col).collect()
+                        } else if i == end_row {
+                            line.chars().take(end_col).collect()
+                        } else {
+                            line.chars().collect()
+                        };
+                        selected_chars.into_iter().collect()
+                    })
+                    .collect();
+                lines.join("\n")
+            }
+        } else {
+            self.editor.lines().join("\n")
+        }
     }
 }
 

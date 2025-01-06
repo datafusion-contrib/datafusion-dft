@@ -20,6 +20,7 @@ use core::cell::RefCell;
 use color_eyre::Result;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::sql::sqlparser::keywords;
+use log::debug;
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::palette::tailwind;
 use ratatui::style::{Modifier, Style};
@@ -62,6 +63,7 @@ pub enum SQLTabMode {
 pub struct SQLTabState<'app> {
     editor: TextArea<'app>,
     editor_editable: bool,
+    ddl_error: bool,
     ddl_editor: TextArea<'app>,
     ddl_editor_editable: bool,
     query_results_state: Option<RefCell<TableState>>,
@@ -91,6 +93,7 @@ impl<'app> SQLTabState<'app> {
         Self {
             editor: textarea,
             editor_editable: false,
+            ddl_error: false,
             ddl_editor: ddl_textarea,
             ddl_editor_editable: false,
             query_results_state: None,
@@ -121,6 +124,14 @@ impl<'app> SQLTabState<'app> {
         // TODO: Figure out how to do this without clone. Probably need logic in handler to make
         // updates to the Widget and then pass a ref
         self.editor.clone()
+    }
+
+    pub fn ddl_error(&self) -> bool {
+        self.ddl_error
+    }
+
+    pub fn set_ddl_error(&mut self, error: bool) {
+        self.ddl_error = error;
     }
 
     pub fn ddl_editor(&self) -> TextArea {
@@ -163,6 +174,7 @@ impl<'app> SQLTabState<'app> {
     }
 
     pub fn add_ddl_to_editor(&mut self, ddl: String) {
+        debug!("Adding DDL to editor: {}", ddl);
         self.ddl_editor.delete_line_by_end();
         self.ddl_editor.set_yank_text(ddl);
         self.ddl_editor.paste();
@@ -289,9 +301,43 @@ impl<'app> SQLTabState<'app> {
         self.mode = mode
     }
 
+    /// Returns the SQL to be executed.  If no text is selected it returns the entire buffer else
+    /// it returns the current selection. For DDL it returns the entire buffer.
     pub fn sql(&self) -> String {
         match self.mode {
-            SQLTabMode::Normal => self.editor.lines().join("\n"),
+            SQLTabMode::Normal => {
+                if let Some(((start_row, start_col), (end_row, end_col))) =
+                    self.editor.selection_range()
+                {
+                    if start_row == end_row {
+                        let line = &self.editor.lines()[start_row];
+                        line.chars()
+                            .skip(start_col)
+                            .take(end_col - start_col)
+                            .collect()
+                    } else {
+                        let lines: Vec<String> = self
+                            .editor
+                            .lines()
+                            .iter()
+                            .enumerate()
+                            .map(|(i, line)| {
+                                let selected_chars: Vec<char> = if i == start_row {
+                                    line.chars().skip(start_col).collect()
+                                } else if i == end_row {
+                                    line.chars().take(end_col).collect()
+                                } else {
+                                    line.chars().collect()
+                                };
+                                selected_chars.into_iter().collect()
+                            })
+                            .collect();
+                        lines.join("\n")
+                    }
+                } else {
+                    self.editor.lines().join("\n")
+                }
+            }
             SQLTabMode::DDL => self.ddl_editor.lines().join("\n"),
         }
     }

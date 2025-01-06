@@ -161,7 +161,9 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                 })
                 .collect();
             let ctx = app.execution.session_ctx().clone();
+            let _event_tx = app.event_tx.clone();
             let handle = tokio::spawn(async move {
+                let mut error = false;
                 for q in queries {
                     info!("Executing DDL: {:?}", q);
                     match ctx.sql(&q).await {
@@ -172,12 +174,22 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                         }
                         Err(e) => {
                             error!("Error executing DDL {:?}: {:?}", q, e);
+                            error = true;
                         }
                     }
+                }
+                if error {
+                    if let Err(e) = _event_tx.send(AppEvent::DDLError) {
+                        error!("Error sending DDLError message: {e}");
+                    }
+                } else if let Err(e) = _event_tx.send(AppEvent::DDLSuccess) {
+                    error!("Error sending DDLSuccess message: {e}");
                 }
             });
             app.ddl_task = Some(handle);
         }
+        AppEvent::DDLError => app.state.sql_tab.set_ddl_error(true),
+        AppEvent::DDLSuccess => app.state.sql_tab.set_ddl_error(false),
         AppEvent::NewExecution => {
             app.state.sql_tab.reset_execution_results();
         }
@@ -232,10 +244,10 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
         #[cfg(feature = "flightsql")]
         AppEvent::FlightSQLEstablishConnection => {
             let execution = Arc::clone(&app.execution);
-            let flightsql_config = app.state.config.flightsql.clone();
             let _event_tx = app.event_tx.clone();
+            let cli_url = app.args.flightsql_host.clone();
             tokio::spawn(async move {
-                if let Err(e) = execution.create_flightsql_client(flightsql_config).await {
+                if let Err(e) = execution.create_flightsql_client(cli_url).await {
                     error!("Error creating FlightSQL client: {:?}", e);
                     if let Err(e) = _event_tx.send(AppEvent::FlightSQLFailedToConnect) {
                         error!("Error sending FlightSQLFailedToConnect message: {e}");

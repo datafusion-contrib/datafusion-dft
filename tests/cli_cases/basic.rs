@@ -345,3 +345,51 @@ SELECT 1 + 1;
     let expected_err = "executed in";
     assert.code(0).stdout(contains_str(expected_err));
 }
+
+#[test]
+fn test_write_file() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let file = temp_dir.path().join("test_write_file.csv");
+
+    let sql = format!("COPY (SELECT 1 + 1) TO '{}'", file.to_string_lossy());
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(sql)
+        .assert()
+        .success();
+
+    assert!(file.exists());
+}
+
+#[test]
+fn test_query_local_file() {
+    let sql = "SELECT c1 FROM 'data/aggregate_test_100.csv' LIMIT 1".to_string();
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(sql)
+        .assert()
+        .success();
+
+    let expected = "
++----+
+| c1 |
++----+
+| c  |
++----+
+";
+
+    assert.stdout(contains_str(expected));
+}
+
+#[test]
+fn test_query_non_existent_local_file() {
+    let sql = "SELECT c1 FROM 'data/nofile.csv' LIMIT 1".to_string();
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(sql)
+        .assert()
+        .failure();
+}

@@ -44,7 +44,6 @@ jobs:
         run: |
           rustup toolchain install ${{ matrix.rust }}
           rustup default ${{ matrix.rust }}
-          rustup component add rustfmt
       # No tests yet
       - name: Run tests (ex-FlightSQL)
         run: |
@@ -75,7 +74,6 @@ jobs:
         run: |
           rustup toolchain install ${{ matrix.rust }}
           rustup default ${{ matrix.rust }}
-          rustup component add rustfmt
       - name: Run FlightSQL tests
         run: |
           # Single thread needed because we spin up a server that listens on port and we need each
@@ -132,7 +130,34 @@ jobs:
         run: |
           rustup toolchain install ${{ matrix.rust }}
           rustup default ${{ matrix.rust }}
-          rustup component add rustfmt
       - name: Run FlightSQL tests
         run: |
           cargo test --features=functions-json extension_cases::functions_json
+  test-deltalake:
+    name: Deltalake
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64]
+        rust: [stable]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Cache Cargo
+        uses: actions/cache@v2
+        with:
+          path: /home/runner/.cargo
+          key: cargo-dft-cache-
+      - name: Cache Rust dependencies
+        uses: actions/cache@v2
+        with:
+          path: /home/runner/target
+          key: target-dft-cache-
+      - name: Setup Rust toolchain
+        run: |
+          rustup toolchain install ${{ matrix.rust }}
+          rustup default ${{ matrix.rust }}
+      - name: Run Deltalake tests
+        run: |
+          cargo test --features=deltalake extension_cases::deltalake

@@ -19,22 +19,27 @@ async-trait = "0.1.80"
 clap = { version = "4.5.1", features = ["derive"] }
 color-eyre = "0.6.3"
 crossterm = { version = "0.28.1", features = ["event-stream"] }
-datafusion = "42.0.0"
-datafusion-common = "42.0.0"
-datafusion-functions-json = { version = "0.41.0", optional = true }
-deltalake = { version = "0.19.0", features = ["datafusion"], optional = true }
+datafusion = "43.0.0"
+datafusion-common = "43.0.0"
+datafusion-functions-json = { version = "0.43.0", optional = true }
+datafusion-functions-parquet = { version = "0.1.0", path = "crates/datafusion-functions-parquet", optional = true }
+deltalake = { version = "0.22.0", features = ["datafusion"], optional = true }
 directories = "5.0.1"
 env_logger = "0.11.5"
 futures = "0.3.30"
-http = "0.2.9"
-http-body = {version = "0.4.5" }
-hudi = { features = ["datafusion"], optional = true, git = "https://github.com/apache/hudi-rs", rev = "abb3e635a28af229ba1e872fd6005c381e2b7ded" }
+http = "1"
+http-body = "1"
+hudi = { features = ["datafusion"], optional = true, git = "https://github.com/apache/hudi-rs", rev = "64b1dc11cb9f1ec9be472025ecc9a43cae49d6cb" }
 itertools = "0.13.0"
 lazy_static = "1.4.0"
 log = "0.4.22"
-object_store = { version = "0.10.2", features = ["aws"], optional = true }
+metrics = {version = "0.24.0", optional = true }
+metrics-exporter-prometheus = {version = "0.16.0", optional = true }
+num_cpus = "1.16.0"
+object_store = { version = "0.11.0", features = ["aws"], optional = true }
+parking_lot = "0.12.3"
 pin-project-lite = {version = "0.2.14" }
-prost = "0.12.3"
+prost = "0.13.1"
 ratatui = "0.28.0"
 serde = { version = "1.0.197", features = ["derive"] }
 strum = "0.26.2"
@@ -42,8 +47,8 @@ tokio = { version = "1.36.0", features = ["rt-multi-thread", "macros"] }
 tokio-stream = { version = "0.1.15", features = ["net"] }
 tokio-util = "0.7.10"
 toml = "0.8.12"
-tonic = { version = "0.11.0", optional = true }
-tower = {version = "0.4.13" }
+tonic = { version = "0.12.3", optional = true }
+tower = {version = "0.5.0" }
 tui-logger = {version = "0.12", features = ["tracing-support"]}
 tui-textarea = { version = "0.6.1", features = ["search"] }
 url = { version = "2.5.2", optional = true }
@@ -58,12 +63,15 @@ url = "2.5.2"
 
 # When addding a new feature, also add it to the features tested list in CI (`.github/workflows/rust.yml`)
 [features]
+default = ["functions-parquet"]
 deltalake = ["dep:deltalake"]
 hudi = ["dep:hudi"]
 flightsql = ["dep:arrow-flight", "dep:tonic"]
-experimental-flightsql-server = ["dep:arrow-flight", "dep:tonic"]
+experimental-flightsql-server = ["flightsql"]
 s3 = ["object_store/aws", "url"]
 functions-json = ["dep:datafusion-functions-json"]
+functions-parquet = ["dep:datafusion-functions-parquet"]
+metrics = ["dep:metrics", "dep:metrics-exporter-prometheus"]
 
 [[bin]]
 name = "dft"

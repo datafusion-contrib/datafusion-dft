@@ -15,8 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use crate::execution::{AppExecution, ExecutionContext};
-use crate::test_utils::trailers_layer::TrailersLayer;
+use crate::execution::{local::ExecutionContext, AppExecution};
 use arrow_flight::encode::FlightDataEncoderBuilder;
 use arrow_flight::error::FlightError;
 use arrow_flight::flight_service_server::{FlightService, FlightServiceServer};
@@ -27,14 +26,12 @@ use datafusion::logical_expr::LogicalPlan;
 use datafusion::sql::parser::DFParser;
 use futures::{StreamExt, TryStreamExt};
 use log::{debug, error, info};
+use metrics::{counter, histogram};
 use prost::Message;
 use std::collections::HashMap;
-use std::net::SocketAddr;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
-use tokio::net::TcpListener;
-use tokio::task::JoinHandle;
+use std::time::Instant;
 use tonic::{Request, Response, Status};
 use uuid::Uuid;
 
@@ -59,13 +56,8 @@ impl FlightSqlServiceImpl {
         // wrap up tonic goop
         FlightServiceServer::new(self.clone())
     }
-}
 
-#[tonic::async_trait]
-impl FlightSqlService for FlightSqlServiceImpl {
-    type FlightService = FlightSqlServiceImpl;
-
-    async fn get_flight_info_statement(
+    async fn get_flight_info_statement_handler(
         &self,
         query: CommandStatementQuery,
         request: Request<FlightDescriptor>,
@@ -78,13 +70,10 @@ impl FlightSqlService for FlightSqlServiceImpl {
             Ok(statements) => {
                 let statement = statements[0].clone();
                 let start = std::time::Instant::now();
-                match self
-                    .execution
-                    .session_ctx()
-                    .state()
-                    .statement_to_plan(statement)
-                    .await
-                {
+
+                let logical_plan = self.execution.statement_to_logical_plan(statement).await;
+
+                match logical_plan {
                     Ok(logical_plan) => {
                         debug!("logical planning took: {:?}", start.elapsed());
                         let schema = logical_plan.schema();
@@ -112,32 +101,24 @@ impl FlightSqlService for FlightSqlServiceImpl {
 
                             Ok(Response::new(info))
                         } else {
-                            error!("Error encoding ticket");
+                            error!("error encoding ticket");
                             Err(Status::internal("Error encoding ticket"))
                         }
                     }
                     Err(e) => {
-                        error!("Error planning SQL query: {:?}", e);
-                        return Err(Status::internal("Error planning SQL query"));
+                        error!("error planning SQL query: {:?}", e);
+                        Err(Status::internal("Error planning SQL query"))
                     }
                 }
             }
             Err(e) => {
-                error!("Error parsing SQL query: {:?}", e);
-                return Err(Status::internal("Error parsing SQL query"));
+                error!("error parsing SQL query: {:?}", e);
+                Err(Status::internal("Error parsing SQL query"))
             }
         }
     }
 
-    async fn do_get_statement(
-        &self,
-        _ticket: TicketStatementQuery,
-        _request: Request<Ticket>,
-    ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
-        Err(Status::unimplemented("Not implemented"))
-    }
-
-    async fn do_get_fallback(
+    async fn do_get_fallback_handler(
         &self,
         request: Request<Ticket>,
         message: Any,
@@ -162,35 +143,20 @@ impl FlightSqlService for FlightSqlServiceImpl {
                                     guard.get(&id).cloned()
                                 };
                                 if let Some(plan) = maybe_plan {
-                                    match self
+                                    let stream = self
                                         .execution
-                                        .session_ctx()
                                         .execute_logical_plan(plan)
                                         .await
-                                    {
-                                        Ok(df) => {
-                                            let stream = df
-                                                .execute_stream()
-                                                .await
-                                                .map_err(|_| {
-                                                    Status::internal("Error executing plan")
-                                                })?
-                                                .map_err(|e| {
-                                                    FlightError::ExternalError(Box::new(e))
-                                                });
-                                            let builder = FlightDataEncoderBuilder::new();
-                                            let flight_data_stream = builder.build(stream);
-                                            let b = flight_data_stream
-                                                .map_err(|_| Status::internal("Hi"))
-                                                .boxed();
-                                            let res = Response::new(b);
-                                            Ok(res)
-                                        }
-                                        Err(e) => {
-                                            error!("error executing plan: {:?}", e);
-                                            Err(Status::internal("Error executing plan"))
-                                        }
-                                    }
+                                        .map_err(|e| Status::internal(e.to_string()))?;
+                                    let builder = FlightDataEncoderBuilder::new();
+                                    let flight_data_stream =
+                                        builder
+                                            .build(stream.map_err(|e| {
+                                                FlightError::ExternalError(Box::new(e))
+                                            }))
+                                            .map_err(|e| Status::internal(e.to_string()))
+                                            .boxed();
+                                    Ok(Response::new(flight_data_stream))
                                 } else {
                                     Err(Status::internal("Plan not found for id"))
                                 }
@@ -208,99 +174,50 @@ impl FlightSqlService for FlightSqlServiceImpl {
                 }
             }
             Err(e) => {
-                error!("Error decoding ticket: {:?}", e);
+                error!("error decoding ticket: {:?}", e);
                 Err(Status::internal("Error decoding ticket"))
             }
         }
     }
+}
+
+#[tonic::async_trait]
+impl FlightSqlService for FlightSqlServiceImpl {
+    type FlightService = FlightSqlServiceImpl;
+
+    async fn get_flight_info_statement(
+        &self,
+        query: CommandStatementQuery,
+        request: Request<FlightDescriptor>,
+    ) -> Result<Response<FlightInfo>, Status> {
+        counter!("requests", "endpoint" => "get_flight_info").increment(1);
+        let start = Instant::now();
+        let res = self.get_flight_info_statement_handler(query, request).await;
+        let duration = start.elapsed();
+        histogram!("get_flight_info_latency_ms").record(duration.as_millis() as f64);
+        res
+    }
+
+    async fn do_get_statement(
+        &self,
+        _ticket: TicketStatementQuery,
+        _request: Request<Ticket>,
+    ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
+        Err(Status::unimplemented("Not implemented"))
+    }
+
+    async fn do_get_fallback(
+        &self,
+        request: Request<Ticket>,
+        message: Any,
+    ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
+        counter!("requests", "endpoint" => "do_get_fallback").increment(1);
+        let start = Instant::now();
+        let res = self.do_get_fallback_handler(request, message).await;
+        let duration = start.elapsed();
+        histogram!("do_get_fallback_latency_ms").record(duration.as_millis() as f64);
+        res
+    }
 
     async fn register_sql_info(&self, _id: i32, _result: &SqlInfo) {}
-}
-
-const DEFAULT_TIMEOUT_SECONDS: u64 = 60;
-
-/// Creates and manages a running FlightSqlServer with a background task
-pub struct FlightSqlApp {
-    /// channel to send shutdown command
-    shutdown: Option<tokio::sync::oneshot::Sender<()>>,
-
-    /// Address the server is listening on
-    pub addr: SocketAddr,
-
-    /// handle for the server task
-    handle: Option<JoinHandle<Result<(), tonic::transport::Error>>>,
-}
-
-impl FlightSqlApp {
-    /// create a new app for the flightsql server
-    #[allow(dead_code)]
-    pub async fn new<T: FlightService>(
-        flightsql_server: FlightServiceServer<T>,
-        addr: &str,
-    ) -> Self {
-        // let OS choose a free port
-        let listener = TcpListener::bind(addr).await.unwrap();
-        let addr = listener.local_addr().unwrap();
-
-        // prepare the shutdown channel
-        let (tx, rx) = tokio::sync::oneshot::channel();
-
-        let server_timeout = Duration::from_secs(DEFAULT_TIMEOUT_SECONDS);
-
-        let shutdown_future = async move {
-            rx.await.ok();
-        };
-
-        let serve_future = tonic::transport::Server::builder()
-            .timeout(server_timeout)
-            .layer(TrailersLayer)
-            .add_service(flightsql_server)
-            .serve_with_incoming_shutdown(
-                tokio_stream::wrappers::TcpListenerStream::new(listener),
-                shutdown_future,
-            );
-
-        // Run the server in its own background task
-        let handle = tokio::task::spawn(serve_future);
-
-        Self {
-            shutdown: Some(tx),
-            addr,
-            handle: Some(handle),
-        }
-    }
-
-    // pub async fn channel(&self) -> Channel {
-    //     let url = format!("http://{}", self.addr);
-    //     let uri: Uri = url.parse().expect("Valid URI");
-    //     Channel::builder(uri)
-    //         .timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECONDS))
-    //         .connect()
-    //         .await
-    //         .expect("error connecting to server")
-    // }
-
-    /// Stops the server and waits for the server to shutdown
-    pub async fn shutdown_and_wait(mut self) {
-        if let Some(shutdown) = self.shutdown.take() {
-            shutdown.send(()).expect("server quit early");
-        }
-        if let Some(handle) = self.handle.take() {
-            handle
-                .await
-                .expect("task join error (panic?)")
-                .expect("Server Error found at shutdown");
-        }
-    }
-
-    pub async fn run_app(self) {
-        if let Some(handle) = self.handle {
-            handle
-                .await
-                .expect("Unable to run server task")
-                .expect("Server Error found at shutdown");
-        } else {
-            panic!("Server task not found");
-        }
-    }
 }

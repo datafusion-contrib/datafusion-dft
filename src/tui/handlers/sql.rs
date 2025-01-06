@@ -78,6 +78,8 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
             }
             SQLTabMode::DDL => {
                 let _event_tx = app.event_tx().clone();
+                // TODO: Probably want this to load from Editor instead of the file so that
+                // it is the latest content.
                 let ddl = app.execution.load_ddl().unwrap_or_default();
                 if let Err(e) = _event_tx.send(AppEvent::ExecuteDDL(ddl)) {
                     error!("Error sending ExecuteDDL event: {:?}", e);
@@ -120,6 +122,29 @@ pub fn editable_handler(app: &mut App, key: KeyEvent) {
         (KeyCode::Right, KeyModifiers::ALT) => app.state.sql_tab.next_word(),
         (KeyCode::Backspace, KeyModifiers::ALT) => app.state.sql_tab.delete_word(),
         (KeyCode::Esc, _) => app.state.sql_tab.exit_edit(),
+        (KeyCode::Enter, KeyModifiers::ALT) => {
+            match app.state.sql_tab.mode() {
+                // TODO: Encapsulate this logic
+                SQLTabMode::Normal => {
+                    let sql = app.state.sql_tab.sql();
+                    info!("Running query: {}", sql);
+                    let _event_tx = app.event_tx().clone();
+                    let execution = Arc::clone(&app.execution);
+                    let sqls: Vec<String> = sql.split(';').map(|s| s.to_string()).collect();
+                    let handle = tokio::spawn(execution.run_sqls(sqls, _event_tx));
+                    app.state.sql_tab.set_execution_task(handle);
+                }
+                SQLTabMode::DDL => {
+                    let _event_tx = app.event_tx().clone();
+                    // TODO: Probably want this to load from Editor instead of the file so that
+                    // it is the latest content.
+                    let ddl = app.execution.load_ddl().unwrap_or_default();
+                    if let Err(e) = _event_tx.send(AppEvent::ExecuteDDL(ddl)) {
+                        error!("Error sending ExecuteDDL event: {:?}", e);
+                    }
+                }
+            }
+        }
         _ => app.state.sql_tab.update_editor_content(key),
     }
 }

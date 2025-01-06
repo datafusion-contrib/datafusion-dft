@@ -20,7 +20,10 @@ use std::time::Duration;
 use assert_cmd::Command;
 use dft::test_utils::fixture::{TestFixture, TestFlightSqlServiceImpl};
 
-use crate::cli_cases::{contains_str, sql_in_file};
+use crate::{
+    cli_cases::{contains_str, sql_in_file},
+    config::TestConfigBuilder,
+};
 
 #[tokio::test]
 pub async fn test_execute_with_no_flightsql_server() {
@@ -62,6 +65,31 @@ pub async fn test_execute() {
 +---------------------+
     "##;
     assert.stdout(contains_str(expected));
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_invalid_sql_command() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELEC 1;")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .failure()
+    })
+    .await
+    .unwrap();
+
+    // I think its implementation specific how they decide to return errors but I believe they will
+    // all be in the form of an IPC error
+    let expected = r##"Error: Ipc error"##;
+    assert.stderr(contains_str(expected));
     fixture.shutdown_and_wait().await;
 }
 
@@ -124,6 +152,30 @@ pub async fn test_command_in_file() {
 +---------------------+
     "##;
     assert.stdout(contains_str(expected));
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_invalid_sql_command_in_file() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+    let file = sql_in_file("SELEC 1");
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("--flightsql")
+            .arg("-f")
+            .arg(file.path())
+            .assert()
+            .failure()
+    })
+    .await
+    .unwrap();
+
+    // I think its implementation specific how they decide to return errors but I believe they will
+    // all be in the form of an IPC error
+    let expected = r##"Error: Ipc error"##;
+    assert.stderr(contains_str(expected));
     fixture.shutdown_and_wait().await;
 }
 
@@ -201,6 +253,276 @@ pub async fn test_time_files() {
     .await
     .unwrap();
     let expected = r##"executed in"##;
+    assert.stdout(contains_str(expected));
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_bench_command() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("--bench")
+            .arg("--flightsql")
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r##"
+----------------------------
+Benchmark Stats (10 runs)
+----------------------------
+SELECT 1
+----------------------------"##;
+    assert.stdout(contains_str(expected));
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_bench_files() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+    let file = sql_in_file(r#"SELECT 1 + 1;"#);
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-f")
+            .arg(file.path())
+            .arg("--bench")
+            .arg("--flightsql")
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected_err = r##"
+----------------------------
+Benchmark Stats (10 runs)
+----------------------------
+SELECT 1 + 1;
+----------------------------"##;
+    assert.code(0).stdout(contains_str(expected_err));
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_custom_config_benchmark_iterations() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+    let mut config_builder = TestConfigBuilder::default();
+    config_builder.with_flightsql_benchmark_iterations(5);
+    let config = config_builder.build("my_config.toml");
+
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("--config")
+            .arg(config.path)
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("--flightsql")
+            .arg("--bench")
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = "5 runs";
+
+    assert.stdout(contains_str(expected));
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_bench_command_and_save() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let file = temp_dir.path().join("results.csv");
+    let cloned = file.clone();
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("--bench")
+            .arg("--flightsql")
+            .arg("--save")
+            .arg(cloned.to_str().unwrap())
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r##"
+----------------------------
+Benchmark Stats (10 runs)
+----------------------------
+SELECT 1
+----------------------------"##;
+    assert.stdout(contains_str(expected));
+    assert!(file.exists());
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_bench_files_and_save() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+    let file = sql_in_file(r#"SELECT 1 + 1;"#);
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let results_file = temp_dir.path().join("results.csv");
+    let cloned = results_file.clone();
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-f")
+            .arg(file.path())
+            .arg("--bench")
+            .arg("--flightsql")
+            .arg("--save")
+            .arg(cloned.to_str().unwrap())
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected_err = r##"
+----------------------------
+Benchmark Stats (10 runs)
+----------------------------
+SELECT 1 + 1;
+----------------------------"##;
+    assert.code(0).stdout(contains_str(expected_err));
+    assert!(results_file.exists());
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_bench_command_and_save_then_append() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let file = temp_dir.path().join("results.csv");
+    let cloned = file.clone();
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("--bench")
+            .arg("--flightsql")
+            .arg("--save")
+            .arg(cloned.to_str().unwrap())
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r##"
+----------------------------
+Benchmark Stats (10 runs)
+----------------------------
+SELECT 1
+----------------------------"##;
+    assert.stdout(contains_str(expected));
+    assert!(file.exists());
+
+    let cloned_again = file.clone();
+    tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("--bench")
+            .arg("--flightsql")
+            .arg("--save")
+            .arg(cloned_again.to_str().unwrap())
+            .arg("--append")
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let contents = std::fs::read_to_string(file).unwrap();
+    let lines: Vec<&str> = contents.lines().collect();
+    assert_eq!(3, lines.len());
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_bench_command_customer_iterations() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("--bench")
+            .arg("--flightsql")
+            .arg("-n")
+            .arg("3")
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r##"
+----------------------------
+Benchmark Stats (3 runs)
+----------------------------
+SELECT 1
+----------------------------"##;
+    assert.stdout(contains_str(expected));
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_execute_custom_port() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50052").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1 + 2;")
+            .arg("--flightsql")
+            .arg("--flightsql-host")
+            .arg("http://localhost:50052")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r##"
++---------------------+
+| Int64(1) + Int64(2) |
++---------------------+
+| 3                   |
++---------------------+
+    "##;
     assert.stdout(contains_str(expected));
     fixture.shutdown_and_wait().await;
 }

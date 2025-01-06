@@ -17,6 +17,8 @@
 
 //! Tests for extensions (stored in the `extension_cases` directory)
 
+#[cfg(feature = "deltalake")]
+mod deltalake;
 #[cfg(feature = "flightsql")]
 mod flightsql;
 #[cfg(feature = "functions-json")]
@@ -30,8 +32,8 @@ use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::sql::parser::DFParser;
 use datafusion_common::Result;
-use dft::config::AppConfig;
-use dft::execution::ExecutionContext;
+use dft::execution::local::ExecutionContext;
+use dft::{config::AppConfig, execution::AppType};
 use futures::{StreamExt, TryStreamExt};
 use log::debug;
 
@@ -49,8 +51,8 @@ impl Default for TestExecution {
 impl TestExecution {
     pub fn new() -> Self {
         let config = AppConfig::default();
-        let execution =
-            ExecutionContext::try_new(&config.execution).expect("cannot create execution context");
+        let execution = ExecutionContext::try_new(&config.execution, AppType::Cli)
+            .expect("cannot create execution context");
         Self { execution }
     }
 

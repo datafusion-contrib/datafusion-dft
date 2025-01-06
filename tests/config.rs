@@ -76,4 +76,21 @@ impl TestConfigBuilder {
             .push_str(&format!("aws_allow_http = {}\n", allow_http));
         self
     }
+
+    pub fn with_benchmark_iterations(&mut self, iterations: u64) -> &mut Self {
+        self.config_text.push_str(&format!(
+            "[execution]\nbenchmark_iterations = {}\n",
+            iterations
+        ));
+        self
+    }
+
+    #[cfg(feature = "flightsql")]
+    pub fn with_flightsql_benchmark_iterations(&mut self, iterations: u64) -> &mut Self {
+        self.config_text.push_str(&format!(
+            "[flightsql]\nbenchmark_iterations = {}\n",
+            iterations
+        ));
+        self
+    }
 }

@@ -15,36 +15,38 @@
 // specific language governing permissions and limitations
 // under the License.
 
-//! [`ExecutionContext`]: DataFusion based execution context for running SQL queries
-
-mod stats;
-use std::io::Write;
-use std::path::PathBuf;
-use std::sync::Arc;
-
-use log::{error, info};
-pub use stats::{collect_plan_stats, ExecutionStats};
-
-use crate::config::ExecutionConfig;
-use crate::extensions::{enabled_extensions, DftSessionStateBuilder};
-use color_eyre::eyre::Result;
-use datafusion::execution::SendableRecordBatchStream;
-use datafusion::physical_plan::ExecutionPlan;
-use datafusion::prelude::*;
-use datafusion::sql::parser::Statement;
-use tokio_stream::StreamExt;
+pub mod executor;
 #[cfg(feature = "flightsql")]
-use {
-    crate::config::FlightSQLConfig, arrow_flight::sql::client::FlightSqlServiceClient,
-    tokio::sync::Mutex, tonic::transport::Channel,
-};
+pub mod flightsql;
+#[cfg(feature = "flightsql")]
+pub mod flightsql_benchmarks;
+pub mod local;
+pub mod sql_utils;
+pub mod stats;
+
+pub mod local_benchmarks;
+
+pub use stats::{collect_plan_io_stats, ExecutionStats};
+
+#[cfg(feature = "flightsql")]
+use self::flightsql::{FlightSQLClient, FlightSQLContext};
+use self::local::ExecutionContext;
+use crate::config::AppConfig;
+use color_eyre::eyre::Result;
+use datafusion::prelude::*;
+
+pub enum AppType {
+    Cli,
+    Tui,
+    FlightSQLServer,
+}
 
 /// Provides all core execution functionality for execution queries from either a local
 /// `SessionContext` or a remote `FlightSQL` service
 pub struct AppExecution {
     context: ExecutionContext,
     #[cfg(feature = "flightsql")]
-    flightsql_client: Mutex<Option<FlightSqlServiceClient<Channel>>>,
+    flightsql_context: FlightSQLContext,
 }
 
 impl AppExecution {
@@ -52,8 +54,19 @@ impl AppExecution {
         Self {
             context,
             #[cfg(feature = "flightsql")]
-            flightsql_client: Mutex::new(None),
+            flightsql_context: FlightSQLContext::default(),
         }
+    }
+
+    pub fn try_new_from_config(config: AppConfig, app_type: AppType) -> Result<Self> {
+        let context = ExecutionContext::try_new(&config.execution, app_type)?;
+        #[cfg(feature = "flightsql")]
+        let flightsql_context = FlightSQLContext::new(config.flightsql);
+        Ok(Self {
+            context,
+            #[cfg(feature = "flightsql")]
+            flightsql_context,
+        })
     }
 
     pub fn execution_ctx(&self) -> &ExecutionContext {
@@ -65,209 +78,17 @@ impl AppExecution {
     }
 
     #[cfg(feature = "flightsql")]
-    pub fn flightsql_client(&self) -> &Mutex<Option<FlightSqlServiceClient<Channel>>> {
-        &self.flightsql_client
+    pub fn flightsql_client(&self) -> &FlightSQLClient {
+        self.flightsql_context.client()
     }
 
-    /// Create FlightSQL client from users FlightSQL config
     #[cfg(feature = "flightsql")]
-    pub async fn create_flightsql_client(&self, config: FlightSQLConfig) -> Result<()> {
-        use color_eyre::eyre::eyre;
-        use log::info;
-
-        let url = Box::leak(config.connection_url.into_boxed_str());
-        info!("Connecting to FlightSQL host: {}", url);
-        let channel = Channel::from_static(url).connect().await;
-        match channel {
-            Ok(c) => {
-                let client = FlightSqlServiceClient::new(c);
-                let mut guard = self.flightsql_client.lock().await;
-                *guard = Some(client);
-                Ok(())
-            }
-            Err(e) => Err(eyre!(
-                "Error creating channel for FlightSQL client: {:?}",
-                e
-            )),
-        }
-    }
-}
-
-/// Structure for executing queries either locally
-///
-/// This context includes both:
-///
-/// 1. The configuration of a [`SessionContext`] with various extensions enabled
-///
-/// 2. The code for running SQL queries
-///
-/// The design goals for this module are to serve as an example of how to integrate
-/// DataFusion into an application and to provide a simple interface for running SQL queries
-/// with the various extensions enabled.
-///
-/// Thus it is important (eventually) not depend on the code in the app crate
-#[derive(Clone)]
-pub struct ExecutionContext {
-    session_ctx: SessionContext,
-    ddl_path: Option<PathBuf>,
-}
-
-impl std::fmt::Debug for ExecutionContext {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ExecutionContext").finish()
-    }
-}
-
-impl ExecutionContext {
-    /// Construct a new `ExecutionContext` with the specified configuration
-    pub fn try_new(config: &ExecutionConfig) -> Result<Self> {
-        let mut builder = DftSessionStateBuilder::new();
-        let extensions = enabled_extensions();
-        for extension in &extensions {
-            builder = extension.register(config, builder)?;
-        }
-
-        let state = builder.build()?;
-        let mut session_ctx = SessionContext::new_with_state(state);
-
-        // Apply any additional setup to the session context (e.g. registering
-        // functions)
-        for extension in &extensions {
-            extension.register_on_ctx(config, &mut session_ctx)?;
-        }
-
-        Ok(Self {
-            session_ctx,
-            ddl_path: config.ddl_path.as_ref().map(PathBuf::from),
-        })
+    pub fn flightsql_ctx(&self) -> &FlightSQLContext {
+        &self.flightsql_context
     }
 
-    pub fn create_tables(&mut self) -> Result<()> {
-        Ok(())
-    }
-
-    /// Return the inner DataFusion [`SessionContext`]
-    pub fn session_ctx(&self) -> &SessionContext {
-        &self.session_ctx
-    }
-
-    /// Executes the specified sql string, driving it to completion but discarding any results
-    pub async fn execute_sql_and_discard_results(
-        &self,
-        sql: &str,
-    ) -> datafusion::error::Result<()> {
-        let mut stream = self.execute_sql(sql).await?;
-        // note we don't call collect() to avoid buffering data
-        while let Some(maybe_batch) = stream.next().await {
-            maybe_batch?; // check for errors
-        }
-        Ok(())
-    }
-
-    /// Create a physical plan from the specified SQL string.  This is useful if you want to store
-    /// the plan and collect metrics from it.
-    pub async fn create_physical_plan(
-        &self,
-        sql: &str,
-    ) -> datafusion::error::Result<Arc<dyn ExecutionPlan>> {
-        let df = self.session_ctx.sql(sql).await?;
-        df.create_physical_plan().await
-    }
-
-    /// Executes the specified sql string, returning the resulting
-    /// [`SendableRecordBatchStream`] of results
-    pub async fn execute_sql(
-        &self,
-        sql: &str,
-    ) -> datafusion::error::Result<SendableRecordBatchStream> {
-        self.session_ctx.sql(sql).await?.execute_stream().await
-    }
-
-    /// Executes the a pre-parsed DataFusion [`Statement`], returning the
-    /// resulting [`SendableRecordBatchStream`] of results
-    pub async fn execute_statement(
-        &self,
-        statement: Statement,
-    ) -> datafusion::error::Result<SendableRecordBatchStream> {
-        let plan = self
-            .session_ctx
-            .state()
-            .statement_to_plan(statement)
-            .await?;
-        self.session_ctx
-            .execute_logical_plan(plan)
-            .await?
-            .execute_stream()
-            .await
-    }
-
-    /// Load DDL from configured DDL path
-    pub fn load_ddl(&self) -> Option<String> {
-        info!("Loading DDL from: {:?}", &self.ddl_path);
-        if let Some(ddl_path) = &self.ddl_path {
-            if ddl_path.exists() {
-                let maybe_ddl = std::fs::read_to_string(ddl_path);
-                match maybe_ddl {
-                    Ok(ddl) => {
-                        info!("DDL: {:?}", ddl);
-                        Some(ddl)
-                    }
-                    Err(err) => {
-                        error!("Error reading DDL: {:?}", err);
-                        None
-                    }
-                }
-            } else {
-                info!("DDL path ({:?}) does not exist", ddl_path);
-                None
-            }
-        } else {
-            info!("No DDL file configured");
-            None
-        }
-    }
-
-    /// Save DDL to configured DDL path
-    pub fn save_ddl(&self, ddl: String) {
-        info!("Loading DDL from: {:?}", &self.ddl_path);
-        if let Some(ddl_path) = &self.ddl_path {
-            match std::fs::File::create(ddl_path) {
-                Ok(mut f) => match f.write_all(ddl.as_bytes()) {
-                    Ok(_) => {
-                        info!("Saved DDL file")
-                    }
-                    Err(e) => {
-                        error!("Error writing DDL file: {e}")
-                    }
-                },
-                Err(e) => {
-                    error!("Error creating or opening DDL file: {e}")
-                }
-            }
-        } else {
-            info!("No DDL file configured");
-        }
-    }
-
-    /// Execute DDL statements sequentially
-    pub async fn execute_ddl(&self) {
-        match self.load_ddl() {
-            Some(ddl) => {
-                let ddl_statements = ddl.split(';').collect::<Vec<&str>>();
-                for statement in ddl_statements {
-                    match self.execute_sql_and_discard_results(statement).await {
-                        Ok(_) => {
-                            info!("DDL statement executed");
-                        }
-                        Err(e) => {
-                            error!("Error executing DDL statement: {e}");
-                        }
-                    }
-                }
-            }
-            None => {
-                info!("No DDL to execute");
-            }
-        }
+    #[cfg(feature = "flightsql")]
+    pub fn with_flightsql_ctx(&mut self, flightsql_ctx: FlightSQLContext) {
+        self.flightsql_context = flightsql_ctx;
     }
 }

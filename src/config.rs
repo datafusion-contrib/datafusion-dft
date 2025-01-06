@@ -60,7 +60,7 @@ pub fn get_data_dir() -> PathBuf {
     }
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 pub struct AppConfig {
     #[serde(default = "default_execution_config")]
     pub execution: ExecutionConfig,
@@ -92,7 +92,7 @@ fn default_flightsql_config() -> FlightSQLConfig {
     FlightSQLConfig::default()
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct DisplayConfig {
     #[serde(default = "default_frame_rate")]
     pub frame_rate: f64,
@@ -159,11 +159,23 @@ pub struct ObjectStoreConfig {
     pub s3: Option<Vec<S3Config>>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct ExecutionConfig {
     pub object_store: Option<ObjectStoreConfig>,
     #[serde(default = "default_ddl_path")]
     pub ddl_path: Option<PathBuf>,
+    #[serde(default = "default_benchmark_iterations")]
+    pub benchmark_iterations: usize,
+    #[serde(default = "default_cli_batch_size")]
+    pub cli_batch_size: usize,
+    #[serde(default = "default_tui_batch_size")]
+    pub tui_batch_size: usize,
+    #[serde(default = "default_flightsql_server_batch_size")]
+    pub flightsql_server_batch_size: usize,
+    #[serde(default = "default_dedicated_executor_enabled")]
+    pub dedicated_executor_enabled: bool,
+    #[serde(default = "default_dedicated_executor_threads")]
+    pub dedicated_executor_threads: usize,
 }
 
 fn default_ddl_path() -> Option<PathBuf> {
@@ -180,7 +192,50 @@ fn default_ddl_path() -> Option<PathBuf> {
     }
 }
 
-#[derive(Debug, Default, Deserialize)]
+fn default_benchmark_iterations() -> usize {
+    10
+}
+
+fn default_cli_batch_size() -> usize {
+    8092
+}
+
+fn default_tui_batch_size() -> usize {
+    100
+}
+
+fn default_flightsql_server_batch_size() -> usize {
+    8092
+}
+
+fn default_dedicated_executor_enabled() -> bool {
+    false
+}
+
+fn default_dedicated_executor_threads() -> usize {
+    // By default we slightly over provision CPUs.  For example, if you have N CPUs available we
+    // have N CPUs for the [`DedicatedExecutor`] and 1 for the main / IO runtime.
+    //
+    // Ref: https://github.com/datafusion-contrib/datafusion-dft/pull/247#discussion_r1848270250
+    num_cpus::get()
+}
+
+impl Default for ExecutionConfig {
+    fn default() -> Self {
+        Self {
+            object_store: None,
+            ddl_path: default_ddl_path(),
+            benchmark_iterations: default_benchmark_iterations(),
+            cli_batch_size: default_cli_batch_size(),
+            tui_batch_size: default_tui_batch_size(),
+            flightsql_server_batch_size: default_flightsql_server_batch_size(),
+            dedicated_executor_enabled: default_dedicated_executor_enabled(),
+            dedicated_executor_threads: default_dedicated_executor_threads(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
 pub struct InteractionConfig {
     #[serde(default = "default_mouse")]
     pub mouse: bool,
@@ -201,6 +256,11 @@ fn default_paste() -> bool {
 pub struct FlightSQLConfig {
     #[serde(default = "default_connection_url")]
     pub connection_url: String,
+    #[serde(default = "default_benchmark_iterations")]
+    pub benchmark_iterations: usize,
+    #[cfg(feature = "metrics")]
+    #[serde(default = "default_server_metrics_port")]
+    pub server_metrics_port: String,
 }
 
 #[cfg(feature = "flightsql")]
@@ -208,6 +268,9 @@ impl Default for FlightSQLConfig {
     fn default() -> Self {
         Self {
             connection_url: default_connection_url(),
+            benchmark_iterations: default_benchmark_iterations(),
+            #[cfg(feature = "metrics")]
+            server_metrics_port: default_server_metrics_port(),
         }
     }
 }
@@ -217,7 +280,12 @@ pub fn default_connection_url() -> String {
     "http://localhost:50051".to_string()
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[cfg(all(feature = "experimental-flightsql-server", feature = "metrics"))]
+fn default_server_metrics_port() -> String {
+    "0.0.0.0:9000".to_string()
+}
+
+#[derive(Clone, Debug, Default, Deserialize)]
 pub struct EditorConfig {
     pub experimental_syntax_highlighting: bool,
 }
