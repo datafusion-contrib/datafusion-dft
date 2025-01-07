@@ -95,6 +95,13 @@ pub struct DftArgs {
     #[cfg(any(feature = "flightsql", feature = "experimental-flightsql-server"))]
     #[clap(long, help = "Set the host and port to be used for FlightSQL")]
     pub flightsql_host: Option<String>,
+
+    #[clap(
+        long,
+        short,
+        help = "Path to save output to. Type is inferred from file suffix"
+    )]
+    pub output: Option<PathBuf>,
 }
 
 impl DftArgs {
