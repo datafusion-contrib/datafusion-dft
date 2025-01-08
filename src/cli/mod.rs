@@ -53,6 +53,19 @@ impl CliApp {
         }
     }
 
+    fn validate_args(&self) -> color_eyre::Result<()> {
+        let more_than_one_command_or_file = (self.args.commands.len() > 1
+            || self.args.files.len() > 1)
+            && self.args.output.is_some();
+        if more_than_one_command_or_file {
+            return Err(eyre!(
+                "Output can only be saved for a single file or command"
+            ));
+        }
+
+        Ok(())
+    }
+
     /// Execute the provided sql, which was passed as an argument from CLI.
     ///
     /// Optionally, use the FlightSQL client for execution.
@@ -60,6 +73,8 @@ impl CliApp {
         if self.args.run_ddl {
             self.app_execution.execution_ctx().execute_ddl().await;
         }
+
+        self.validate_args()?;
 
         #[cfg(not(feature = "flightsql"))]
         match (

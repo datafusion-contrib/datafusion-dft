@@ -393,3 +393,20 @@ fn test_query_non_existent_local_file() {
         .assert()
         .failure();
 }
+
+#[test]
+fn test_more_than_one_command_with_output() {
+    let sql = "SELECT 1".to_string();
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(sql.clone())
+        .arg("-c")
+        .arg(sql)
+        .arg("-o")
+        .arg("test.csv")
+        .assert()
+        .failure();
+    let expected = "Error: Output can only be saved for a single file or command";
+    assert.stderr(contains_str(expected));
+}
