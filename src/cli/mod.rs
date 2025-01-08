@@ -20,8 +20,9 @@ use crate::args::DftArgs;
 use crate::execution::{local_benchmarks::LocalBenchmarkStats, AppExecution};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
-use datafusion::arrow::array::RecordBatch;
+use datafusion::arrow::array::{RecordBatch, RecordBatchWriter};
 use datafusion::arrow::util::pretty::pretty_format_batches;
+use datafusion::arrow::{csv, json};
 use datafusion::sql::parser::DFParser;
 use futures::{Stream, StreamExt};
 use log::info;
@@ -137,6 +138,8 @@ impl CliApp {
             // Execution cases
             (true, false, false, false, false) => self.execute_commands(&self.args.commands).await,
             (false, true, false, false, false) => self.execute_files(&self.args.files).await,
+
+            // FlightSQL execution cases
             (false, true, true, false, false) => {
                 self.flightsql_execute_files(&self.args.files).await
             }
@@ -386,7 +389,10 @@ impl CliApp {
                 .execution_ctx()
                 .execute_statement(statement)
                 .await?;
-            if let Some(start) = start {
+            if let Some(output_path) = self.args.output {
+                // let writer = path_to_writer(output_path)?;
+                // self.output_stream(stream, writer);
+            } else if let Some(start) = start {
                 self.exec_stream(stream).await;
                 let elapsed = start.elapsed();
                 println!("Query {i} executed in {:?}", elapsed);
@@ -475,4 +481,39 @@ impl CliApp {
             }
         }
     }
+
+    async fn output_stream<S, E, W>(&self, mut stream: S, mut writer: W)
+    where
+        S: Stream<Item = Result<RecordBatch, E>> + Unpin,
+        E: Error,
+        W: RecordBatchWriter,
+    {
+        while let Some(maybe_batch) = stream.next().await {
+            match maybe_batch {
+                Ok(_) => {}
+                Err(e) => {
+                    println!("Error executing SQL: {e}");
+                    break;
+                }
+            }
+        }
+    }
+}
+
+fn path_to_writer(path: PathBuf) -> Result<impl RecordBatchWriter> {
+    if let Some(extension) = path.extension() {
+        if let Some(e) = extension.to_ascii_lowercase().to_str() {
+            let file = std::fs::File::create(path)?;
+            return match e {
+                "csv" => Ok(csv::writer::Writer::new(file)),
+                "json" => Ok(json::writer::Writer::new(file)),
+                _ => {
+                    return Err(eyre!(
+                        "Only 'csv', 'parquet', and 'json' file types can be out"
+                    ))
+                }
+            };
+        }
+    }
+    return Err(eyre!("Unable to parse extension"));
 }
