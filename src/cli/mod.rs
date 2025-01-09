@@ -536,29 +536,6 @@ impl AnyWriter {
     }
 }
 
-// fn path_to_writer(path: &Path, schema: SchemaRef) -> Result<Box<dyn RecordBatchWriter>> {
-//     if let Some(extension) = path.extension() {
-//         if let Some(e) = extension.to_ascii_lowercase().to_str() {
-//             let file = std::fs::File::create(path)?;
-//             return match e {
-//                 "csv" => Ok(Box::new(csv::writer::Writer::new(file))),
-//                 "json" => Ok(Box::new(json::writer::LineDelimitedWriter::new(file))),
-//                 "parquet" => {
-//                     let props = WriterProperties::default();
-//                     let writer = ArrowWriter::try_new(file, schema, Some(props))?;
-//                     Ok(Box::new(writer))
-//                 }
-//                 _ => {
-//                     return Err(eyre!(
-//                         "Only 'csv', 'parquet', and 'json' file types can be output"
-//                     ))
-//                 }
-//             };
-//         }
-//     }
-//     Err(eyre!("Unable to parse extension"))
-// }
-
 fn path_to_writer(path: &Path, schema: SchemaRef) -> Result<AnyWriter> {
     if let Some(extension) = path.extension() {
         if let Some(e) = extension.to_ascii_lowercase().to_str() {
