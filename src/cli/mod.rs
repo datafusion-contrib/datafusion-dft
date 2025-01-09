@@ -21,12 +21,16 @@ use crate::execution::{local_benchmarks::LocalBenchmarkStats, AppExecution};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use datafusion::arrow::array::{RecordBatch, RecordBatchWriter};
+use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::arrow::{csv, json};
+use datafusion::execution::{RecordBatchStream, SendableRecordBatchStream};
 use datafusion::sql::parser::DFParser;
 use futures::{Stream, StreamExt};
 use log::info;
+use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};
 use std::error::Error;
+use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 #[cfg(feature = "flightsql")]
@@ -389,9 +393,8 @@ impl CliApp {
                 .execution_ctx()
                 .execute_statement(statement)
                 .await?;
-            if let Some(output_path) = self.args.output {
-                // let writer = path_to_writer(output_path)?;
-                // self.output_stream(stream, writer);
+            if let Some(output_path) = &self.args.output {
+                self.output_stream(stream, output_path).await?;
             } else if let Some(start) = start {
                 self.exec_stream(stream).await;
                 let elapsed = start.elapsed();
@@ -482,38 +485,98 @@ impl CliApp {
         }
     }
 
-    async fn output_stream<S, E, W>(&self, mut stream: S, mut writer: W)
-    where
-        S: Stream<Item = Result<RecordBatch, E>> + Unpin,
-        E: Error,
-        W: RecordBatchWriter,
-    {
+    async fn output_stream(
+        &self,
+        mut stream: SendableRecordBatchStream,
+        path: &Path,
+    ) -> Result<()>
+where {
+        let mut writer = path_to_writer(path, stream.schema())?;
+
         while let Some(maybe_batch) = stream.next().await {
             match maybe_batch {
-                Ok(_) => {}
-                Err(e) => {
-                    println!("Error executing SQL: {e}");
-                    break;
-                }
+                Ok(batch) => writer.write(&batch)?,
+                Err(e) => return Err(eyre!("Error executing SQL: {e}")),
+            }
+        }
+
+        writer.close()?;
+        Ok(())
+    }
+}
+
+#[allow(clippy::large_enum_variant)]
+enum AnyWriter {
+    Csv(csv::writer::Writer<File>),
+    Json(json::writer::LineDelimitedWriter<File>),
+    Parquet(ArrowWriter<File>),
+}
+
+impl AnyWriter {
+    fn write(&mut self, batch: &RecordBatch) -> Result<()> {
+        match self {
+            AnyWriter::Csv(w) => Ok(w.write(batch)?),
+            AnyWriter::Json(w) => Ok(w.write(batch)?),
+            AnyWriter::Parquet(w) => Ok(w.write(batch)?),
+        }
+    }
+
+    fn close(self) -> Result<()> {
+        match self {
+            AnyWriter::Csv(w) => Ok(w.close()?),
+            AnyWriter::Json(w) => Ok(w.close()?),
+            AnyWriter::Parquet(w) => {
+                w.close()?;
+                Ok(())
             }
         }
     }
 }
 
-fn path_to_writer(path: PathBuf) -> Result<impl RecordBatchWriter> {
+// fn path_to_writer(path: &Path, schema: SchemaRef) -> Result<Box<dyn RecordBatchWriter>> {
+//     if let Some(extension) = path.extension() {
+//         if let Some(e) = extension.to_ascii_lowercase().to_str() {
+//             let file = std::fs::File::create(path)?;
+//             return match e {
+//                 "csv" => Ok(Box::new(csv::writer::Writer::new(file))),
+//                 "json" => Ok(Box::new(json::writer::LineDelimitedWriter::new(file))),
+//                 "parquet" => {
+//                     let props = WriterProperties::default();
+//                     let writer = ArrowWriter::try_new(file, schema, Some(props))?;
+//                     Ok(Box::new(writer))
+//                 }
+//                 _ => {
+//                     return Err(eyre!(
+//                         "Only 'csv', 'parquet', and 'json' file types can be output"
+//                     ))
+//                 }
+//             };
+//         }
+//     }
+//     Err(eyre!("Unable to parse extension"))
+// }
+
+fn path_to_writer(path: &Path, schema: SchemaRef) -> Result<AnyWriter> {
     if let Some(extension) = path.extension() {
         if let Some(e) = extension.to_ascii_lowercase().to_str() {
             let file = std::fs::File::create(path)?;
             return match e {
-                "csv" => Ok(csv::writer::Writer::new(file)),
-                "json" => Ok(json::writer::Writer::new(file)),
+                "csv" => Ok(AnyWriter::Csv(csv::writer::Writer::new(file))),
+                "json" => Ok(AnyWriter::Json(json::writer::LineDelimitedWriter::new(
+                    file,
+                ))),
+                "parquet" => {
+                    let props = WriterProperties::default();
+                    let writer = ArrowWriter::try_new(file, schema, Some(props))?;
+                    Ok(AnyWriter::Parquet(writer))
+                }
                 _ => {
                     return Err(eyre!(
-                        "Only 'csv', 'parquet', and 'json' file types can be out"
+                        "Only 'csv', 'parquet', and 'json' file types can be output"
                     ))
                 }
             };
         }
     }
-    return Err(eyre!("Unable to parse extension"));
+    Err(eyre!("Unable to parse extension"))
 }
