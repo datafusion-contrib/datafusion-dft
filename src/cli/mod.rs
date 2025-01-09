@@ -505,6 +505,9 @@ where {
     }
 }
 
+/// We use an Enum for this because of limitations with using trait objects and the `close` method
+/// on a writer taking `self` as an argument which requires a size for the trait object which is
+/// not known at compile time.
 #[allow(clippy::large_enum_variant)]
 enum AnyWriter {
     Csv(csv::writer::Writer<File>),
