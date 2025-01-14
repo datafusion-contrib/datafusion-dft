@@ -18,7 +18,7 @@
 //! Tests for the CLI (e.g. run from files)
 
 use assert_cmd::Command;
-use std::path::PathBuf;
+use std::{io::Read, path::PathBuf};
 
 use super::{assert_output_contains, contains_str, sql_in_file};
 
@@ -409,4 +409,75 @@ fn test_more_than_one_command_with_output() {
         .failure();
     let expected = "Error: Output can only be saved for a single file or command";
     assert.stderr(contains_str(expected));
+}
+
+#[test]
+fn test_output_csv() {
+    let sql = "SELECT 1".to_string();
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(sql.clone())
+        .arg("-o")
+        .arg("test.csv")
+        .assert()
+        .success();
+
+    let mut file = std::fs::File::open("test.csv").unwrap();
+    let mut buffer = String::new();
+    file.read_to_string(&mut buffer).unwrap();
+
+    let expected = "Int64(1)\n1\n";
+    assert_eq!(buffer, expected);
+}
+
+#[test]
+fn test_output_json() {
+    let sql = "SELECT 1".to_string();
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(sql.clone())
+        .arg("-o")
+        .arg("test.json")
+        .assert()
+        .success();
+
+    let mut file = std::fs::File::open("test.json").unwrap();
+    let mut buffer = String::new();
+    file.read_to_string(&mut buffer).unwrap();
+
+    let expected = "{\"Int64(1)\":1}\n";
+    assert_eq!(buffer, expected);
+}
+
+#[test]
+fn test_output_parquet() {
+    let sql = "SELECT 1".to_string();
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(sql.clone())
+        .arg("-o")
+        .arg("test.parquet")
+        .assert()
+        .success();
+
+    let read_sql = "SELECT * FROM 'test.parquet'";
+
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(read_sql)
+        .assert()
+        .success();
+
+    let expected = r#"
++----------+
+| Int64(1) |
++----------+
+| 1        |
++----------+"#;
+
+    assert.stdout(contains_str(expected));
 }
