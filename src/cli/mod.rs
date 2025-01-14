@@ -24,7 +24,7 @@ use datafusion::arrow::array::{RecordBatch, RecordBatchWriter};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::arrow::{csv, json};
-use datafusion::execution::{RecordBatchStream, SendableRecordBatchStream};
+use datafusion::execution::SendableRecordBatchStream;
 use datafusion::sql::parser::DFParser;
 use futures::{Stream, StreamExt};
 use log::info;
@@ -250,6 +250,8 @@ impl CliApp {
 
     #[cfg(feature = "flightsql")]
     async fn exec_from_flightsql(&self, sql: String, i: usize) -> color_eyre::Result<()> {
+        use std::sync::Arc;
+
         let client = self.app_execution.flightsql_client();
         let mut guard = client.lock().await;
         if let Some(client) = guard.as_mut() {
@@ -262,7 +264,9 @@ impl CliApp {
             for endpoint in flight_info.endpoint {
                 if let Some(ticket) = endpoint.ticket {
                     let stream = client.do_get(ticket.into_request()).await?;
-                    if let Some(start) = start {
+                    if let Some(output_path) = &self.args.output {
+                        self.output_stream(stream, output_path).await?
+                    } else if let Some(start) = start {
                         self.exec_stream(stream).await;
                         let elapsed = start.elapsed();
                         println!("Query {i} executed in {:?}", elapsed);
@@ -485,22 +489,26 @@ impl CliApp {
         }
     }
 
-    async fn output_stream(
-        &self,
-        mut stream: SendableRecordBatchStream,
-        path: &Path,
-    ) -> Result<()>
-where {
-        let mut writer = path_to_writer(path, stream.schema())?;
+    async fn output_stream<S, E>(&self, mut stream: S, path: &Path) -> Result<()>
+    where
+        S: Stream<Item = Result<RecordBatch, E>> + Unpin,
+        E: Error,
+    {
+        // We get the schema from the first batch and use that for creating the writer
+        if let Some(Ok(first_batch)) = stream.next().await {
+            let schema = first_batch.schema();
+            let mut writer = path_to_writer(path, schema)?;
+            writer.write(&first_batch)?;
 
-        while let Some(maybe_batch) = stream.next().await {
-            match maybe_batch {
-                Ok(batch) => writer.write(&batch)?,
-                Err(e) => return Err(eyre!("Error executing SQL: {e}")),
+            while let Some(maybe_batch) = stream.next().await {
+                match maybe_batch {
+                    Ok(batch) => writer.write(&batch)?,
+                    Err(e) => return Err(eyre!("Error executing SQL: {e}")),
+                }
             }
+            writer.close()?;
         }
 
-        writer.close()?;
         Ok(())
     }
 }
