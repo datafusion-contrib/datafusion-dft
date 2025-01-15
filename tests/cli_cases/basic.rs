@@ -413,17 +413,20 @@ fn test_more_than_one_command_with_output() {
 
 #[test]
 fn test_output_csv() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("test.csv");
+
     let sql = "SELECT 1".to_string();
     Command::cargo_bin("dft")
         .unwrap()
         .arg("-c")
         .arg(sql.clone())
         .arg("-o")
-        .arg("test.csv")
+        .arg(path.clone())
         .assert()
         .success();
 
-    let mut file = std::fs::File::open("test.csv").unwrap();
+    let mut file = std::fs::File::open(path).unwrap();
     let mut buffer = String::new();
     file.read_to_string(&mut buffer).unwrap();
 
@@ -433,17 +436,20 @@ fn test_output_csv() {
 
 #[test]
 fn test_output_json() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("test.json");
+
     let sql = "SELECT 1".to_string();
     Command::cargo_bin("dft")
         .unwrap()
         .arg("-c")
         .arg(sql.clone())
         .arg("-o")
-        .arg("test.json")
+        .arg(path.clone())
         .assert()
         .success();
 
-    let mut file = std::fs::File::open("test.json").unwrap();
+    let mut file = std::fs::File::open(path).unwrap();
     let mut buffer = String::new();
     file.read_to_string(&mut buffer).unwrap();
 
@@ -453,17 +459,20 @@ fn test_output_json() {
 
 #[test]
 fn test_output_parquet() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("test.parquet");
+
     let sql = "SELECT 1".to_string();
     Command::cargo_bin("dft")
         .unwrap()
         .arg("-c")
         .arg(sql.clone())
         .arg("-o")
-        .arg("test.parquet")
+        .arg(path.clone())
         .assert()
         .success();
 
-    let read_sql = "SELECT * FROM 'test.parquet'";
+    let read_sql = format!("SELECT * FROM '{}'", path.to_str().unwrap());
 
     let assert = Command::cargo_bin("dft")
         .unwrap()
