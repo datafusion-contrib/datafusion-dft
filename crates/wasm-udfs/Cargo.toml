@@ -1,0 +1,10 @@
+[package]
+name = "wasm-udfs"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+arrow = "51.0.0"
+paste = "1.0.15"
+wasmedge-bindgen = "0.4.1"
+wasmedge-bindgen-macro = "0.4.1"
