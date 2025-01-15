@@ -18,7 +18,7 @@
 //! Tests for the CLI (e.g. run from files)
 
 use assert_cmd::Command;
-use std::path::PathBuf;
+use std::{io::Read, path::PathBuf};
 
 use super::{assert_output_contains, contains_str, sql_in_file};
 
@@ -392,4 +392,101 @@ fn test_query_non_existent_local_file() {
         .arg(sql)
         .assert()
         .failure();
+}
+
+#[test]
+fn test_more_than_one_command_with_output() {
+    let sql = "SELECT 1".to_string();
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(sql.clone())
+        .arg("-c")
+        .arg(sql)
+        .arg("-o")
+        .arg("test.csv")
+        .assert()
+        .failure();
+    let expected = "Error: Output can only be saved for a single file or command";
+    assert.stderr(contains_str(expected));
+}
+
+#[test]
+fn test_output_csv() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("test.csv");
+
+    let sql = "SELECT 1".to_string();
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(sql.clone())
+        .arg("-o")
+        .arg(path.clone())
+        .assert()
+        .success();
+
+    let mut file = std::fs::File::open(path).unwrap();
+    let mut buffer = String::new();
+    file.read_to_string(&mut buffer).unwrap();
+
+    let expected = "Int64(1)\n1\n";
+    assert_eq!(buffer, expected);
+}
+
+#[test]
+fn test_output_json() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("test.json");
+
+    let sql = "SELECT 1".to_string();
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(sql.clone())
+        .arg("-o")
+        .arg(path.clone())
+        .assert()
+        .success();
+
+    let mut file = std::fs::File::open(path).unwrap();
+    let mut buffer = String::new();
+    file.read_to_string(&mut buffer).unwrap();
+
+    let expected = "{\"Int64(1)\":1}\n";
+    assert_eq!(buffer, expected);
+}
+
+#[test]
+fn test_output_parquet() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("test.parquet");
+
+    let sql = "SELECT 1".to_string();
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(sql.clone())
+        .arg("-o")
+        .arg(path.clone())
+        .assert()
+        .success();
+
+    let read_sql = format!("SELECT * FROM '{}'", path.to_str().unwrap());
+
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(read_sql)
+        .assert()
+        .success();
+
+    let expected = r#"
++----------+
+| Int64(1) |
++----------+
+| 1        |
++----------+"#;
+
+    assert.stdout(contains_str(expected));
 }

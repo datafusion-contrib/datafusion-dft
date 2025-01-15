@@ -20,12 +20,16 @@ use crate::args::DftArgs;
 use crate::execution::{local_benchmarks::LocalBenchmarkStats, AppExecution};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
-use datafusion::arrow::array::RecordBatch;
+use datafusion::arrow::array::{RecordBatch, RecordBatchWriter};
+use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::util::pretty::pretty_format_batches;
+use datafusion::arrow::{csv, json};
 use datafusion::sql::parser::DFParser;
 use futures::{Stream, StreamExt};
 use log::info;
+use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};
 use std::error::Error;
+use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 #[cfg(feature = "flightsql")]
@@ -53,6 +57,19 @@ impl CliApp {
         }
     }
 
+    fn validate_args(&self) -> color_eyre::Result<()> {
+        let more_than_one_command_or_file = (self.args.commands.len() > 1
+            || self.args.files.len() > 1)
+            && self.args.output.is_some();
+        if more_than_one_command_or_file {
+            return Err(eyre!(
+                "Output can only be saved for a single file or command"
+            ));
+        }
+
+        Ok(())
+    }
+
     /// Execute the provided sql, which was passed as an argument from CLI.
     ///
     /// Optionally, use the FlightSQL client for execution.
@@ -60,6 +77,8 @@ impl CliApp {
         if self.args.run_ddl {
             self.app_execution.execution_ctx().execute_ddl().await;
         }
+
+        self.validate_args()?;
 
         #[cfg(not(feature = "flightsql"))]
         match (
@@ -122,6 +141,8 @@ impl CliApp {
             // Execution cases
             (true, false, false, false, false) => self.execute_commands(&self.args.commands).await,
             (false, true, false, false, false) => self.execute_files(&self.args.files).await,
+
+            // FlightSQL execution cases
             (false, true, true, false, false) => {
                 self.flightsql_execute_files(&self.args.files).await
             }
@@ -240,7 +261,9 @@ impl CliApp {
             for endpoint in flight_info.endpoint {
                 if let Some(ticket) = endpoint.ticket {
                     let stream = client.do_get(ticket.into_request()).await?;
-                    if let Some(start) = start {
+                    if let Some(output_path) = &self.args.output {
+                        self.output_stream(stream, output_path).await?
+                    } else if let Some(start) = start {
                         self.exec_stream(stream).await;
                         let elapsed = start.elapsed();
                         println!("Query {i} executed in {:?}", elapsed);
@@ -371,7 +394,9 @@ impl CliApp {
                 .execution_ctx()
                 .execute_statement(statement)
                 .await?;
-            if let Some(start) = start {
+            if let Some(output_path) = &self.args.output {
+                self.output_stream(stream, output_path).await?;
+            } else if let Some(start) = start {
                 self.exec_stream(stream).await;
                 let elapsed = start.elapsed();
                 println!("Query {i} executed in {:?}", elapsed);
@@ -460,4 +485,83 @@ impl CliApp {
             }
         }
     }
+
+    async fn output_stream<S, E>(&self, mut stream: S, path: &Path) -> Result<()>
+    where
+        S: Stream<Item = Result<RecordBatch, E>> + Unpin,
+        E: Error,
+    {
+        // We get the schema from the first batch and use that for creating the writer
+        if let Some(Ok(first_batch)) = stream.next().await {
+            let schema = first_batch.schema();
+            let mut writer = path_to_writer(path, schema)?;
+            writer.write(&first_batch)?;
+
+            while let Some(maybe_batch) = stream.next().await {
+                match maybe_batch {
+                    Ok(batch) => writer.write(&batch)?,
+                    Err(e) => return Err(eyre!("Error executing SQL: {e}")),
+                }
+            }
+            writer.close()?;
+        }
+
+        Ok(())
+    }
+}
+
+/// We use an Enum for this because of limitations with using trait objects and the `close` method
+/// on a writer taking `self` as an argument which requires a size for the trait object which is
+/// not known at compile time.
+#[allow(clippy::large_enum_variant)]
+enum AnyWriter {
+    Csv(csv::writer::Writer<File>),
+    Json(json::writer::LineDelimitedWriter<File>),
+    Parquet(ArrowWriter<File>),
+}
+
+impl AnyWriter {
+    fn write(&mut self, batch: &RecordBatch) -> Result<()> {
+        match self {
+            AnyWriter::Csv(w) => Ok(w.write(batch)?),
+            AnyWriter::Json(w) => Ok(w.write(batch)?),
+            AnyWriter::Parquet(w) => Ok(w.write(batch)?),
+        }
+    }
+
+    fn close(self) -> Result<()> {
+        match self {
+            AnyWriter::Csv(w) => Ok(w.close()?),
+            AnyWriter::Json(w) => Ok(w.close()?),
+            AnyWriter::Parquet(w) => {
+                w.close()?;
+                Ok(())
+            }
+        }
+    }
+}
+
+fn path_to_writer(path: &Path, schema: SchemaRef) -> Result<AnyWriter> {
+    if let Some(extension) = path.extension() {
+        if let Some(e) = extension.to_ascii_lowercase().to_str() {
+            let file = std::fs::File::create(path)?;
+            return match e {
+                "csv" => Ok(AnyWriter::Csv(csv::writer::Writer::new(file))),
+                "json" => Ok(AnyWriter::Json(json::writer::LineDelimitedWriter::new(
+                    file,
+                ))),
+                "parquet" => {
+                    let props = WriterProperties::default();
+                    let writer = ArrowWriter::try_new(file, schema, Some(props))?;
+                    Ok(AnyWriter::Parquet(writer))
+                }
+                _ => {
+                    return Err(eyre!(
+                        "Only 'csv', 'parquet', and 'json' file types can be output"
+                    ))
+                }
+            };
+        }
+    }
+    Err(eyre!("Unable to parse extension"))
 }

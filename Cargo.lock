@@ -2022,6 +2022,7 @@ dependencies = [
  "num_cpus",
  "object_store",
  "parking_lot",
+ "parquet",
  "pin-project-lite",
  "predicates",
  "prost",

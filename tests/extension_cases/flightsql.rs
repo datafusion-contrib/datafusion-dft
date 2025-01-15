@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::time::Duration;
+use std::{io::Read, time::Duration};
 
 use assert_cmd::Command;
 use dft::test_utils::fixture::{TestFixture, TestFlightSqlServiceImpl};
@@ -524,5 +524,112 @@ pub async fn test_execute_custom_port() {
 +---------------------+
     "##;
     assert.stdout(contains_str(expected));
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_output_csv() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("test.csv");
+
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let cloned_path = path.clone();
+
+    tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("--flightsql")
+            .arg("-o")
+            .arg(cloned_path)
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+    let mut file = std::fs::File::open(path).unwrap();
+    let mut buffer = String::new();
+    file.read_to_string(&mut buffer).unwrap();
+
+    let expected = "Int64(1)\n1\n";
+    assert_eq!(buffer, expected);
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_output_json() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("test.json");
+
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let cloned_path = path.clone();
+
+    tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("--flightsql")
+            .arg("-o")
+            .arg(cloned_path)
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+    let mut file = std::fs::File::open(path).unwrap();
+    let mut buffer = String::new();
+    file.read_to_string(&mut buffer).unwrap();
+
+    let expected = "{\"Int64(1)\":1}\n";
+    assert_eq!(buffer, expected);
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_output_parquet() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("test.parquet");
+
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let cloned_path = path.clone();
+
+    let sql = "SELECT 1".to_string();
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(sql.clone())
+        .arg("-o")
+        .arg(cloned_path)
+        .assert()
+        .success();
+
+    let read_sql = format!("SELECT * FROM '{}'", path.to_str().unwrap());
+
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(read_sql)
+        .assert()
+        .success();
+
+    let expected = r#"
++----------+
+| Int64(1) |
++----------+
+| 1        |
++----------+"#;
+
+    assert.stdout(contains_str(expected));
+
     fixture.shutdown_and_wait().await;
 }
