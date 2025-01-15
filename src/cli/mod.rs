@@ -24,7 +24,6 @@ use datafusion::arrow::array::{RecordBatch, RecordBatchWriter};
 use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::arrow::{csv, json};
-use datafusion::execution::SendableRecordBatchStream;
 use datafusion::sql::parser::DFParser;
 use futures::{Stream, StreamExt};
 use log::info;
@@ -250,8 +249,6 @@ impl CliApp {
 
     #[cfg(feature = "flightsql")]
     async fn exec_from_flightsql(&self, sql: String, i: usize) -> color_eyre::Result<()> {
-        use std::sync::Arc;
-
         let client = self.app_execution.flightsql_client();
         let mut guard = client.lock().await;
         if let Some(client) = guard.as_mut() {
