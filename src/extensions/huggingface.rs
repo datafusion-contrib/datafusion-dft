@@ -30,7 +30,6 @@ pub struct HuggingFaceExtension {}
 
 impl HuggingFaceExtension {
     pub fn new() -> Self {
-        info!("HuggingFace!");
         Self {}
     }
 }
@@ -50,7 +49,6 @@ impl Extension for HuggingFaceExtension {
             return Ok(());
         };
 
-        info!("Huggingface configs exists");
         for huggingface_config in huggingface_configs {
             // I'm not that famliar with Huggingface so I'm not sure what permutations of config
             // values are supposed to work.
@@ -88,7 +86,7 @@ impl Extension for HuggingFaceExtension {
             let url = Url::parse(url_parts.join("/").as_str()).map_err(|e| {
                 datafusion_common::error::DataFusionError::External(e.to_string().into())
             })?;
-            info!("Registering store for huggingface url: {url}");
+            println!("Registering store for huggingface url: {url}");
             builder
                 .runtime_env()
                 .register_object_store(&url, Arc::new(store));

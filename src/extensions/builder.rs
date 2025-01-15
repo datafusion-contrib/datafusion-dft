@@ -163,17 +163,6 @@ impl DftSessionStateBuilder {
         Ok(self)
     }
 
-    /// Apply all enabled extensions to the `SessionContext`
-    pub async fn register_extensions(&mut self, config: ExecutionConfig) -> color_eyre::Result<()> {
-        let extensions = enabled_extensions();
-
-        for extension in extensions {
-            self.register_extension(config.clone(), extension).await?;
-        }
-
-        Ok(())
-    }
-
     /// Build the [`SessionState`] from the specified configuration
     pub fn build(self) -> datafusion_common::Result<SessionState> {
         let Self {
