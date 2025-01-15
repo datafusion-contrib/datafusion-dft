@@ -27,6 +27,8 @@ mod builder;
 mod deltalake;
 #[cfg(feature = "hudi")]
 mod hudi;
+#[cfg(feature = "huggingface")]
+mod huggingface;
 #[cfg(feature = "iceberg")]
 mod iceberg;
 #[cfg(feature = "s3")]
@@ -62,5 +64,7 @@ pub fn enabled_extensions() -> Vec<Arc<dyn Extension>> {
         Arc::new(hudi::HudiExtension::new()),
         #[cfg(feature = "iceberg")]
         Arc::new(iceberg::IcebergExtension::new()),
+        #[cfg(feature = "huggingface")]
+        Arc::new(huggingface::HuggingFaceExtension::new()),
     ]
 }
