@@ -19,6 +19,7 @@
 
 use crate::config::ExecutionConfig;
 use crate::extensions::{DftSessionStateBuilder, Extension};
+use datafusion_common::DataFusionError;
 use log::info;
 use std::sync::Arc;
 
@@ -53,27 +54,27 @@ impl Extension for HuggingFaceExtension {
             // I'm not that famliar with Huggingface so I'm not sure what permutations of config
             // values are supposed to work.
 
-            let mut base_url = String::from("https://huggingface.co/");
-            let mut url_parts = vec!["https://huggingface.co"];
+            // let mut base_url = String::from("https://huggingface.co/");
+            // let mut url_parts = vec!["https://huggingface.co"];
             let mut hf_builder = Huggingface::default();
             if let Some(repo_type) = &huggingface_config.repo_type {
                 hf_builder = hf_builder.repo_type(repo_type);
-                url_parts.push(repo_type)
+                // url_parts.push(repo_type)
             };
             if let Some(repo_id) = &huggingface_config.repo_id {
                 hf_builder = hf_builder.repo_id(repo_id);
-                url_parts.push(repo_id);
+                // url_parts.push(repo_id);
             };
             if let Some(revision) = &huggingface_config.revision {
                 hf_builder = hf_builder.revision(revision);
-                url_parts.push("tree");
-                url_parts.push(revision);
+                // url_parts.push("blob");
+                // url_parts.push(revision);
             };
             if let Some(root) = &huggingface_config.root {
                 hf_builder = hf_builder.root(root);
             };
             if let Some(token) = &huggingface_config.token {
-                hf_builder = hf_builder.repo_id(token);
+                hf_builder = hf_builder.token(token);
             };
 
             let operator = Operator::new(hf_builder)
@@ -83,9 +84,11 @@ impl Extension for HuggingFaceExtension {
                 .finish();
 
             let store = object_store_opendal::OpendalStore::new(operator);
-            let url = Url::parse(url_parts.join("/").as_str()).map_err(|e| {
-                datafusion_common::error::DataFusionError::External(e.to_string().into())
-            })?;
+            // let url = Url::parse(url_parts.join("/").as_str()).map_err(|e| {
+            //     datafusion_common::error::DataFusionError::External(e.to_string().into())
+            // })?;
+            let url = Url::try_from("hf://")
+                .map_err(|e| DataFusionError::External(e.to_string().into()))?;
             println!("Registering store for huggingface url: {url}");
             builder
                 .runtime_env()
