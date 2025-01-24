@@ -1,13 +1,13 @@
 [package]
 name = "dft"
-description = "Terminal based, extensible, interactive data analysis tool using SQL "
-homepage = "https://github.com/datafusion-contrib/datafusion-tui"
-repository = "https://github.com/datafusion-contrib/datafusion-tui"
+description = "An opinionated and batteries included DataFusion implementation"
+homepage = "https://github.com/datafusion-contrib/datafusion-dft"
+repository = "https://github.com/datafusion-contrib/datafusion-dft"
 readme = "README.md"
 authors = ["Matthew Turner <matthew.m.turner@outlook.com>"]
 license = "Apache-2.0"
 keywords = ["arrow", "query", "sql", "datafusion"]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 default-run = "dft"
 
