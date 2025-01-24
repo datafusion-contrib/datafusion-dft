@@ -30,8 +30,8 @@ futures = "0.3.30"
 http = "1"
 http-body = "1"
 hudi = { features = ["datafusion"], optional = true, git = "https://github.com/apache/hudi-rs", rev = "64b1dc11cb9f1ec9be472025ecc9a43cae49d6cb" }
-iceberg-catalog-rest = { git = "https://github.com/apache/iceberg-rust", rev = "16f9411dd3897134a401ece97d73cd33d6790bff", optional = true}
-iceberg-datafusion = { git = "https://github.com/apache/iceberg-rust", rev = "16f9411dd3897134a401ece97d73cd33d6790bff", optional = true }
+iceberg-catalog-rest = { version = "0.4", optional = true}
+iceberg-datafusion = { version = "0.4", optional = true }
 itertools = "0.13.0"
 lazy_static = "1.4.0"
 log = "0.4.22"

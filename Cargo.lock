@@ -2814,8 +2814,9 @@ dependencies = [
 
 [[package]]
 name = "iceberg"
-version = "0.3.0"
-source = "git+https://github.com/apache/iceberg-rust?rev=16f9411dd3897134a401ece97d73cd33d6790bff#16f9411dd3897134a401ece97d73cd33d6790bff"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4dcf75614057c573c1f0bb4904ad012d9aa65b5aebbabea7096d99e4f1a3fc9b"
 dependencies = [
  "anyhow",
  "apache-avro 0.17.0",
@@ -2838,6 +2839,7 @@ dependencies = [
  "itertools 0.13.0",
  "moka",
  "murmur3",
+ "num-bigint",
  "once_cell",
  "opendal 0.50.2",
  "ordered-float 4.6.0",
@@ -2856,12 +2858,14 @@ dependencies = [
  "typed-builder 0.20.0",
  "url",
  "uuid",
+ "zstd 0.13.2",
 ]
 
 [[package]]
 name = "iceberg-catalog-rest"
-version = "0.3.0"
-source = "git+https://github.com/apache/iceberg-rust?rev=16f9411dd3897134a401ece97d73cd33d6790bff#16f9411dd3897134a401ece97d73cd33d6790bff"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "59608aad36da6061f353bd12efa049bc12ea437032cd4cf67f03696d45557db9"
 dependencies = [
  "async-trait",
  "chrono",
@@ -2880,8 +2884,9 @@ dependencies = [
 
 [[package]]
 name = "iceberg-datafusion"
-version = "0.3.0"
-source = "git+https://github.com/apache/iceberg-rust?rev=16f9411dd3897134a401ece97d73cd33d6790bff#16f9411dd3897134a401ece97d73cd33d6790bff"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "389127b6db8b815e6f7e87b316c80c80058e361d1e9a514b6bb6c28781f371f0"
 dependencies = [
  "anyhow",
  "async-trait",
