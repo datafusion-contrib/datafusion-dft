@@ -1,0 +1,16 @@
+[package]
+name = "datafusion-ffi-table-providers"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+abi_stable = "0.11.3"
+datafusion-ffi = "44"
+iceberg = { version = "0.4.0", features = ["storage-fs", "storage-memory", "storage-s3"] }
+iceberg-catalog-rest = { version = "0.4.0", optional = true}
+iceberg-datafusion = {version = "0.4.0", optional = true}
+# hudi = { version = "0.2.0", features = ["datafusion"], optional = true }
+
+[features]
+# hudi = ["dep:hudi"]
+iceberg = ["dep:iceberg-catalog-rest", "dep:iceberg-datafusion"]
