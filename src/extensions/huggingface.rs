@@ -23,7 +23,7 @@ use datafusion_common::DataFusionError;
 use log::info;
 use std::sync::Arc;
 
-use opendal::{services::Huggingface, Builder, Operator};
+use opendal::{services::Huggingface, Operator};
 use url::Url;
 
 #[derive(Debug, Default)]
@@ -59,16 +59,9 @@ impl Extension for HuggingFaceExtension {
             let mut hf_builder = Huggingface::default();
             if let Some(repo_type) = &huggingface_config.repo_type {
                 hf_builder = hf_builder.repo_type(repo_type);
-                // url_parts.push(repo_type)
-            };
-            if let Some(repo_id) = &huggingface_config.repo_id {
-                hf_builder = hf_builder.repo_id(repo_id);
-                // url_parts.push(repo_id);
             };
             if let Some(revision) = &huggingface_config.revision {
                 hf_builder = hf_builder.revision(revision);
-                // url_parts.push("blob");
-                // url_parts.push(revision);
             };
             if let Some(root) = &huggingface_config.root {
                 hf_builder = hf_builder.root(root);
@@ -76,23 +69,33 @@ impl Extension for HuggingFaceExtension {
             if let Some(token) = &huggingface_config.token {
                 hf_builder = hf_builder.token(token);
             };
+            if let Some(repo_id) = &huggingface_config.repo_id {
+                hf_builder = hf_builder.repo_id(repo_id);
 
-            let operator = Operator::new(hf_builder)
-                .map_err(|e| {
-                    datafusion_common::error::DataFusionError::External(e.to_string().into())
-                })?
-                .finish();
+                let operator = Operator::new(hf_builder)
+                    .map_err(|e| {
+                        datafusion_common::error::DataFusionError::External(e.to_string().into())
+                    })?
+                    .finish();
 
-            let store = object_store_opendal::OpendalStore::new(operator);
-            // let url = Url::parse(url_parts.join("/").as_str()).map_err(|e| {
-            //     datafusion_common::error::DataFusionError::External(e.to_string().into())
-            // })?;
-            let url = Url::try_from("hf://")
-                .map_err(|e| DataFusionError::External(e.to_string().into()))?;
-            println!("Registering store for huggingface url: {url}");
-            builder
-                .runtime_env()
-                .register_object_store(&url, Arc::new(store));
+                let store = object_store_opendal::OpendalStore::new(operator);
+
+                // `repo_id` seems to always have a '/' to separate the organization and repo name
+                // but this causes issues with registering external tables and the URLs don't fully
+                // reflect the organization and repo name (it only shows the organization name).
+                // So we replace the '/' with a '-' so that the URL has both.
+                //
+                // An example URL to use is:
+                //      'hf://huggingfacetb-finemath/finemath-3plus/train-00000-of-00128.parquet'
+                //
+                // Where 'huggingfacetb' is the organization name and 'finemath' is the repo name
+                let url = Url::try_from(format!("hf://{}", repo_id.replace("/", "-")).as_str())
+                    .map_err(|e| DataFusionError::External(e.to_string().into()))?;
+                info!("Registering store for huggingface url: {url}");
+                builder
+                    .runtime_env()
+                    .register_object_store(&url, Arc::new(store));
+            };
         }
 
         Ok(())
