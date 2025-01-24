@@ -54,8 +54,6 @@ impl Extension for HuggingFaceExtension {
             // I'm not that famliar with Huggingface so I'm not sure what permutations of config
             // values are supposed to work.
 
-            // let mut base_url = String::from("https://huggingface.co/");
-            // let mut url_parts = vec!["https://huggingface.co"];
             let mut hf_builder = Huggingface::default();
             if let Some(repo_type) = &huggingface_config.repo_type {
                 hf_builder = hf_builder.repo_type(repo_type);
