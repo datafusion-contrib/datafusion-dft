@@ -93,4 +93,22 @@ impl TestConfigBuilder {
         ));
         self
     }
+
+    #[cfg(feature = "huggingface")]
+    pub fn with_huggingface(
+        &mut self,
+        repo_type: &str,
+        repo_id: &str,
+        revision: &str,
+    ) -> &mut Self {
+        self.config_text
+            .push_str("[[execution.object_store.huggingface]]\n");
+        self.config_text
+            .push_str(&format!("repo_type = '{repo_type}'\n"));
+        self.config_text
+            .push_str(&format!("repo_id = '{repo_id}'\n"));
+        self.config_text
+            .push_str(&format!("revision = '{revision}'\n"));
+        self
+    }
 }

@@ -153,10 +153,22 @@ impl S3Config {
     }
 }
 
+#[cfg(feature = "huggingface")]
+#[derive(Clone, Debug, Deserialize)]
+pub struct HuggingFaceConfig {
+    pub repo_type: Option<String>,
+    pub repo_id: Option<String>,
+    pub revision: Option<String>,
+    pub root: Option<String>,
+    pub token: Option<String>,
+}
+
 #[derive(Clone, Debug, Deserialize)]
 pub struct ObjectStoreConfig {
     #[cfg(feature = "s3")]
     pub s3: Option<Vec<S3Config>>,
+    #[cfg(feature = "huggingface")]
+    pub huggingface: Option<Vec<HuggingFaceConfig>>,
 }
 
 #[derive(Clone, Debug, Deserialize)]

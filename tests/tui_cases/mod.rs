@@ -60,10 +60,6 @@ impl<'app> TestApp<'app> {
         let execution_ctx =
             ExecutionContext::try_new(&state.config.execution, session_state, AppType::Tui)
                 .unwrap();
-        // let fut = execution_ctx.register_extensions();
-        // tokio::task::block_in_place(move || {
-        //     tokio::runtime::Handle::current().block_on(fut).unwrap()
-        // });
         let app_execution = AppExecution::new(execution_ctx);
         let args = DftArgs::default();
         let mut app = App::new(state, args, app_execution);

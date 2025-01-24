@@ -229,6 +229,25 @@ select * from foo where json_get(attributes, 'bar')::string='ham'
 
 [datafusion-function-json]: https://github.com/datafusion-contrib/datafusion-functions-json
 
+##### HuggingFace (`--features=huggingface`)
+
+Register tables from HuggingFace datasets.  For example use the following config:
+
+```toml
+[[execution.object_store.huggingface]]
+repo_type = "dataset"
+repo_id = "HuggingFaceTB/finemath"
+revision = "main"
+```
+
+and then you can register external tables like so:
+
+```sql
+CREATE EXTERNAL TABLE hf4 STORED AS PARQUET LOCATION 'hf://HuggingFaceTB-finemath/finemath-3plus/';
+```
+
+The "/" in the `repo_id` is replaced with a "-" for the base url that is registered with DataFusion to work better with its path parsing.
+
 
 ### Getting Started
 
