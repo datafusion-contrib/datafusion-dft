@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-//! DeltaLake integration: [DeltaLakeExtension]
+//! Iceberg integration: [IcebergExtension]
 
 use crate::config::ExecutionConfig;
 use crate::extensions::{DftSessionStateBuilder, Extension};
