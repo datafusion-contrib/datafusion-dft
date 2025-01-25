@@ -17,16 +17,16 @@
 
 use clap::Parser;
 use color_eyre::Result;
-use dft::args::DftArgs;
-use dft::cli::CliApp;
+use datafusion_dft::args::DftArgs;
+use datafusion_dft::cli::CliApp;
 #[cfg(feature = "flightsql")]
-use dft::execution::flightsql::FlightSQLContext;
-use dft::execution::{local::ExecutionContext, AppExecution, AppType};
-use dft::extensions::DftSessionStateBuilder;
+use datafusion_dft::execution::flightsql::FlightSQLContext;
+use datafusion_dft::execution::{local::ExecutionContext, AppExecution, AppType};
+use datafusion_dft::extensions::DftSessionStateBuilder;
 #[cfg(feature = "experimental-flightsql-server")]
-use dft::server::FlightSqlApp;
-use dft::telemetry;
-use dft::tui::{state, App};
+use datafusion_dft::server::FlightSqlApp;
+use datafusion_dft::telemetry;
+use datafusion_dft::tui::{state, App};
 #[cfg(feature = "experimental-flightsql-server")]
 use log::info;
 

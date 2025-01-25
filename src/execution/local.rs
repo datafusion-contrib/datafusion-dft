@@ -90,6 +90,7 @@ impl ExecutionContext {
             }
         }
 
+        #[allow(unused_mut)]
         let mut session_ctx = SessionContext::new_with_state(session_state);
 
         #[cfg(feature = "functions-json")]
