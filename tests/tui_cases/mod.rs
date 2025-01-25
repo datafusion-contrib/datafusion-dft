@@ -23,7 +23,7 @@ mod quit;
 
 use datafusion::arrow::array::RecordBatch;
 use datafusion::common::Result;
-use dft::{
+use datafusion_dft::{
     args::DftArgs,
     execution::{local::ExecutionContext, AppExecution, AppType},
     extensions::DftSessionStateBuilder,
