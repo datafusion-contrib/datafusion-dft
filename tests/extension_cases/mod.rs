@@ -23,8 +23,8 @@ mod deltalake;
 mod flightsql;
 #[cfg(feature = "functions-json")]
 mod functions_json;
-#[cfg(feature = "hudi")]
-mod hudi;
+// #[cfg(feature = "hudi")]
+// mod hudi;
 #[cfg(feature = "huggingface")]
 mod huggingface;
 #[cfg(feature = "s3")]

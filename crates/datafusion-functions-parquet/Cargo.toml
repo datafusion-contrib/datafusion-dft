@@ -1,7 +1,14 @@
 [package]
 name = "datafusion-functions-parquet"
+description = "DataFusion helper functions for working with Parquet files"
+homepage = "https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-functions-parquet"
+repository = "https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-functions-parquet"
+readme = "README.md"
+authors = ["Matthew Turner <matthew.m.turner@outlook.com>"]
+license = "Apache-2.0"
 version = "0.1.0"
 edition = "2021"
+keywords = ["parquet", "query", "sql", "datafusion"]
 
 [dependencies]
 arrow = { version = "53.0.0" }

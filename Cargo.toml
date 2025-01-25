@@ -1,13 +1,13 @@
 [package]
 name = "dft"
-description = "Terminal based, extensible, interactive data analysis tool using SQL "
-homepage = "https://github.com/datafusion-contrib/datafusion-tui"
-repository = "https://github.com/datafusion-contrib/datafusion-tui"
+description = "An opinionated and batteries included DataFusion implementation"
+homepage = "https://github.com/datafusion-contrib/datafusion-dft"
+repository = "https://github.com/datafusion-contrib/datafusion-dft"
 readme = "README.md"
 authors = ["Matthew Turner <matthew.m.turner@outlook.com>"]
 license = "Apache-2.0"
 keywords = ["arrow", "query", "sql", "datafusion"]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 default-run = "dft"
 
@@ -29,9 +29,9 @@ env_logger = "0.11.5"
 futures = "0.3.30"
 http = "1"
 http-body = "1"
-hudi = { features = ["datafusion"], optional = true, git = "https://github.com/apache/hudi-rs", rev = "64b1dc11cb9f1ec9be472025ecc9a43cae49d6cb" }
-iceberg-catalog-rest = { git = "https://github.com/apache/iceberg-rust", rev = "16f9411dd3897134a401ece97d73cd33d6790bff", optional = true}
-iceberg-datafusion = { git = "https://github.com/apache/iceberg-rust", rev = "16f9411dd3897134a401ece97d73cd33d6790bff", optional = true }
+# hudi = { features = ["datafusion"], optional = true, git = "https://github.com/apache/hudi-rs", rev = "64b1dc11cb9f1ec9be472025ecc9a43cae49d6cb" }
+iceberg-catalog-rest = { version = "0.4", optional = true}
+iceberg-datafusion = { version = "0.4", optional = true }
 itertools = "0.13.0"
 lazy_static = "1.4.0"
 log = "0.4.22"
@@ -70,7 +70,7 @@ url = "2.5.2"
 [features]
 default = ["functions-parquet"]
 deltalake = ["dep:deltalake"]
-hudi = ["dep:hudi"]
+# hudi = ["dep:hudi"]
 iceberg = ["dep:iceberg-datafusion", "dep:iceberg-catalog-rest"]
 flightsql = ["dep:arrow-flight", "dep:tonic"]
 experimental-flightsql-server = ["flightsql"]
