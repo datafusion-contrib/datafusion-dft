@@ -18,7 +18,7 @@
 use std::{io::Read, time::Duration};
 
 use assert_cmd::Command;
-use dft::test_utils::fixture::{TestFixture, TestFlightSqlServiceImpl};
+use datafusion_dft::test_utils::fixture::{TestFixture, TestFlightSqlServiceImpl};
 
 use crate::{
     cli_cases::{contains_str, sql_in_file},
