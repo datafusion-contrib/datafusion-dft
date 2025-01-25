@@ -22,8 +22,8 @@ use std::time::Duration;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::assert_batches_eq;
 use datafusion::execution::context::SessionContext;
-use dft::tui::execution::ExecutionResultsBatch;
-use dft::tui::AppEvent;
+use datafusion_dft::tui::execution::ExecutionResultsBatch;
+use datafusion_dft::tui::AppEvent;
 use itertools::Itertools;
 
 use crate::tui_cases::TestApp;

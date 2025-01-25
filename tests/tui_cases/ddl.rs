@@ -16,7 +16,7 @@
 // under the License.
 
 use datafusion::assert_batches_eq;
-use dft::tui::AppEvent;
+use datafusion_dft::tui::AppEvent;
 
 use crate::tui_cases::TestApp;
 

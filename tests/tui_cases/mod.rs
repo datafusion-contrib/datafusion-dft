@@ -23,7 +23,7 @@ mod quit;
 
 use datafusion::arrow::array::RecordBatch;
 use datafusion::common::Result;
-use dft::{
+use datafusion_dft::{
     args::DftArgs,
     execution::{local::ExecutionContext, AppExecution, AppType},
     extensions::DftSessionStateBuilder,
@@ -73,7 +73,7 @@ impl<'app> TestApp<'app> {
     }
 
     /// Return the app state
-    pub fn state(&self) -> &dft::tui::state::AppState {
+    pub fn state(&self) -> &datafusion_dft::tui::state::AppState {
         self.app.state()
     }
 

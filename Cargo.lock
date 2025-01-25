@@ -1464,6 +1464,59 @@ dependencies = [
 ]
 
 [[package]]
+name = "datafusion-dft"
+version = "0.2.0"
+dependencies = [
+ "arrow-flight",
+ "assert_cmd",
+ "async-trait",
+ "clap",
+ "color-eyre",
+ "crossterm",
+ "datafusion",
+ "datafusion-common",
+ "datafusion-functions-json",
+ "datafusion-functions-parquet",
+ "deltalake",
+ "directories",
+ "env_logger",
+ "futures",
+ "http",
+ "http-body",
+ "iceberg-catalog-rest",
+ "iceberg-datafusion",
+ "insta",
+ "itertools 0.13.0",
+ "lazy_static",
+ "log",
+ "metrics",
+ "metrics-exporter-prometheus",
+ "num_cpus",
+ "object_store",
+ "object_store_opendal",
+ "opendal 0.51.1",
+ "parking_lot",
+ "parquet",
+ "pin-project-lite",
+ "predicates",
+ "prost",
+ "ratatui",
+ "serde",
+ "strum 0.26.3",
+ "tempfile",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "toml",
+ "tonic",
+ "tower 0.5.2",
+ "tui-logger",
+ "tui-textarea",
+ "url",
+ "uuid",
+]
+
+[[package]]
 name = "datafusion-execution"
 version = "43.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1975,59 +2028,6 @@ checksum = "ab63b0e2bf4d5928aff72e83a7dace85d7bba5fe12dcc3c5a572d78caffd3f3c"
 dependencies = [
  "derive_builder_core",
  "syn 2.0.95",
-]
-
-[[package]]
-name = "dft"
-version = "0.2.0"
-dependencies = [
- "arrow-flight",
- "assert_cmd",
- "async-trait",
- "clap",
- "color-eyre",
- "crossterm",
- "datafusion",
- "datafusion-common",
- "datafusion-functions-json",
- "datafusion-functions-parquet",
- "deltalake",
- "directories",
- "env_logger",
- "futures",
- "http",
- "http-body",
- "iceberg-catalog-rest",
- "iceberg-datafusion",
- "insta",
- "itertools 0.13.0",
- "lazy_static",
- "log",
- "metrics",
- "metrics-exporter-prometheus",
- "num_cpus",
- "object_store",
- "object_store_opendal",
- "opendal 0.51.1",
- "parking_lot",
- "parquet",
- "pin-project-lite",
- "predicates",
- "prost",
- "ratatui",
- "serde",
- "strum 0.26.3",
- "tempfile",
- "tokio",
- "tokio-stream",
- "tokio-util",
- "toml",
- "tonic",
- "tower 0.5.2",
- "tui-logger",
- "tui-textarea",
- "url",
- "uuid",
 ]
 
 [[package]]

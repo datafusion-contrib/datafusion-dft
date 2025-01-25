@@ -1,5 +1,5 @@
 [package]
-name = "dft"
+name = "datafusion-dft"
 description = "An opinionated and batteries included DataFusion implementation"
 homepage = "https://github.com/datafusion-contrib/datafusion-dft"
 repository = "https://github.com/datafusion-contrib/datafusion-dft"
