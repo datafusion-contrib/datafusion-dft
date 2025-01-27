@@ -58,6 +58,7 @@ tui-logger = {version = "0.12", features = ["tracing-support"]}
 tui-textarea = { version = "0.6.1", features = ["search"] }
 url = { version = "2.5.2", optional = true }
 uuid = {version = "1.10.0" }
+wasmtime = "29.0.1"
 
 [dev-dependencies]
 assert_cmd = "2.0.16"

@@ -17,7 +17,7 @@
 
 //! Configuration management handling
 
-use std::path::PathBuf;
+use std::{collections::HashMap, path::PathBuf};
 
 use directories::{ProjectDirs, UserDirs};
 use lazy_static::lazy_static;
@@ -190,6 +190,8 @@ pub struct ExecutionConfig {
     pub dedicated_executor_threads: usize,
     #[serde(default = "default_iceberg_config")]
     pub iceberg: IcebergConfig,
+    #[serde(default = "default_wasm_udf")]
+    pub wasm_udf: WasmUdfConfig,
 }
 
 fn default_ddl_path() -> Option<PathBuf> {
@@ -240,6 +242,12 @@ fn default_iceberg_config() -> IcebergConfig {
     }
 }
 
+fn default_wasm_udf() -> WasmUdfConfig {
+    WasmUdfConfig {
+        module_functions: HashMap::new(),
+    }
+}
+
 impl Default for ExecutionConfig {
     fn default() -> Self {
         Self {
@@ -252,6 +260,7 @@ impl Default for ExecutionConfig {
             dedicated_executor_enabled: default_dedicated_executor_enabled(),
             dedicated_executor_threads: default_dedicated_executor_threads(),
             iceberg: default_iceberg_config(),
+            wasm_udf: default_wasm_udf(),
         }
     }
 }
@@ -265,6 +274,18 @@ pub struct RestCatalogConfig {
 #[derive(Clone, Debug, Deserialize)]
 pub struct IcebergConfig {
     pub rest_catalogs: Vec<RestCatalogConfig>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct WasmFuncDetails {
+    pub name: String,
+    pub input_types: String,
+    pub return_type: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct WasmUdfConfig {
+    pub module_functions: HashMap<PathBuf, Vec<WasmFuncDetails>>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]

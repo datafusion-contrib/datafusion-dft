@@ -25,6 +25,7 @@ use color_eyre::eyre::eyre;
 use datafusion::logical_expr::LogicalPlan;
 use futures::TryFutureExt;
 use log::{debug, error, info};
+use wasmtime::{Module, Store};
 
 use crate::config::ExecutionConfig;
 use color_eyre::eyre::{self, Result};
@@ -37,6 +38,7 @@ use tokio_stream::StreamExt;
 use super::executor::dedicated::DedicatedExecutor;
 use super::local_benchmarks::LocalBenchmarkStats;
 use super::stats::{ExecutionDurationStats, ExecutionStats};
+use super::wasm::udf_from_wasm_module;
 use super::AppType;
 
 /// Structure for executing queries locally
@@ -98,6 +100,27 @@ impl ExecutionContext {
 
         // Register Parquet Metadata Function
         let session_ctx = session_ctx.enable_url_table();
+
+        for (module_path, funcs) in &config.wasm_udf.module_functions {
+            let store = Store::<()>::default();
+            let module_bytes = std::fs::read(module_path)?;
+            let module = Module::from_binary(store.engine(), &module_bytes).unwrap();
+            for func_details in funcs {
+                let (input_types, output_types) = udf_signature_from_config(func_details);
+                let wasm_udf = udf_from_wasm_module(&module, &func_details.name);
+                session_ctx.register_udf(wasm_udf);
+            }
+        }
+        // for wasm_dir in &config.wasm_udf.function_directories {
+        //     if wasm_dir.is_dir() {
+        //         for entry in wasm_dir.read_dir()? {
+        //             // let udf = wasm_file_to_udf(entry?);
+        //             // session_ctx.register_udf()
+        //         }
+        //     } else {
+        //         error!("WASM directory {wasm_dir:?} is not a directory")
+        //     }
+        // }
 
         session_ctx.register_udtf(
             "parquet_metadata",
