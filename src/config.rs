@@ -279,7 +279,7 @@ pub struct IcebergConfig {
 #[derive(Clone, Debug, Deserialize)]
 pub struct WasmFuncDetails {
     pub name: String,
-    pub input_types: String,
+    pub input_types: Vec<String>,
     pub return_type: String,
 }
 
