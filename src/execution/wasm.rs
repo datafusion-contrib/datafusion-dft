@@ -20,7 +20,9 @@ use std::sync::Arc;
 use color_eyre::{eyre::eyre, Result};
 use datafusion::{
     arrow::{
-        array::{Array, ArrayRef, PrimitiveArray},
+        array::{
+            Array, ArrayRef, Float32Array, Float64Array, Int32Array, Int64Array, PrimitiveArray,
+        },
         datatypes::{self, ArrowPrimitiveType, DataType},
     },
     logical_expr::{ColumnarValue, ScalarUDF, Volatility},
@@ -110,6 +112,31 @@ fn create_wasm_func_params(vals: &[Arc<dyn Array>], row_idx: usize) -> DFResult<
         .collect()
 }
 
+/// Given a Vec of scalar results convert to the relevant Arrow Array type
+fn convert_wasm_vals_to_arrow(vals: Vec<Val>, return_type: &DataType) -> Arc<dyn Array> {
+    match return_type {
+        DataType::Int32 => {
+            Arc::new(vals.iter().map(|r| r.unwrap_i32()).collect::<Int32Array>()) as ArrayRef
+        }
+        DataType::Int64 => {
+            Arc::new(vals.iter().map(|r| r.unwrap_i64()).collect::<Int64Array>()) as ArrayRef
+        }
+        DataType::Float32 => Arc::new(
+            vals.iter()
+                .map(|r| r.unwrap_f32())
+                .collect::<Float32Array>(),
+        ) as ArrayRef,
+        DataType::Float64 => Arc::new(
+            vals.iter()
+                .map(|r| r.unwrap_f64())
+                .collect::<Float64Array>(),
+        ) as ArrayRef,
+        _ => panic!("unexpected type"),
+    }
+}
+
+// TODO: Confirm if this is called per row / batch / etc
+// TODO: Benchmark time for loading module and for extracting function
 fn create_wasm_udf_impl(
     module_bytes: Vec<u8>,
     func_name: String,
@@ -132,6 +159,8 @@ fn create_wasm_udf_impl(
         let vals = ColumnarValue::values_to_arrays(args)?;
         let val_count = vals.first().unwrap().len();
         let mut results: Vec<Val> = Vec::with_capacity(val_count);
+        // Need to resize because `Vec::with_capacity` doesnt set the length
+        results.resize(val_count, Val::null_extern_ref());
         for row_idx in 0..val_count {
             let params = create_wasm_func_params(&vals, row_idx)?;
             func.call(&mut store, &params, &mut results[row_idx..row_idx + 1])
@@ -141,9 +170,9 @@ fn create_wasm_udf_impl(
                     ))
                 })?;
         }
+        let return_vals = convert_wasm_vals_to_arrow(results, &return_type);
 
-        let first = vals.first().unwrap();
-        Ok(ColumnarValue::Array(Arc::clone(first)))
+        Ok(ColumnarValue::Array(return_vals))
     }
 }
 
