@@ -19,7 +19,7 @@ pub mod tabs;
 
 use crate::tui::state::tabs::sql::SQLTabState;
 use crate::tui::ui::SelectedTab;
-use log::{debug, error, info};
+use log::{debug, error};
 use std::path::PathBuf;
 
 use self::tabs::{history::HistoryTabState, logs::LogsTabState};
@@ -54,8 +54,7 @@ pub struct AppState<'app> {
 }
 
 pub fn initialize<'app>(config_path: PathBuf) -> AppState<'app> {
-    debug!("Initializing state");
-    debug!("Config path: {:?}", config_path);
+    debug!("Initializing state from config path: {:?}", config_path);
     let config = if config_path.exists() {
         debug!("Config exists");
         let maybe_config_contents = std::fs::read_to_string(config_path);
@@ -64,7 +63,7 @@ pub fn initialize<'app>(config_path: PathBuf) -> AppState<'app> {
                 toml::from_str(&config_contents);
             match maybe_parsed_config {
                 Ok(parsed_config) => {
-                    info!("Parsed config: {:?}", parsed_config);
+                    debug!("Parsed config: {:?}", parsed_config);
                     parsed_config
                 }
                 Err(err) => {

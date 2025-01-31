@@ -37,6 +37,7 @@ use tokio_stream::StreamExt;
 use super::executor::dedicated::DedicatedExecutor;
 use super::local_benchmarks::LocalBenchmarkStats;
 use super::stats::{ExecutionDurationStats, ExecutionStats};
+use super::wasm::create_wasm_udfs;
 use super::AppType;
 
 /// Structure for executing queries locally
@@ -98,6 +99,11 @@ impl ExecutionContext {
 
         // Register Parquet Metadata Function
         let session_ctx = session_ctx.enable_url_table();
+
+        let wasm_udfs = create_wasm_udfs(&config.wasm_udf)?;
+        for wasm_udf in wasm_udfs {
+            session_ctx.register_udf(wasm_udf);
+        }
 
         session_ctx.register_udtf(
             "parquet_metadata",
