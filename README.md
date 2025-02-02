@@ -227,6 +227,35 @@ select * from foo where json_get(attributes, 'bar')::string='ham'
 (show examples of using operators too)
 ```
 
+##### WASM UDF Functions (`--features=udfs-wasm`)
+
+Adds the ability to register WASM UDFs. Currently only UDFs with the data types `Int32`, `Int64`, `Float32`, or `Float64` in their signature are supported until we integrate more with WASM memory.
+
+```toml
+[[execution]]
+module_functions = {
+    "/path/to/wasm" = [
+        {
+            name = "funcName1",
+            input_types = [
+                "Int32",
+                "Int64",
+            ],
+            return_type = "Int32"
+        },
+        {
+            name = "funcName2",
+            input_types = [
+                "Float32",
+                "Float64",
+            ],
+            return_type = "Int32"
+        }
+
+    ]
+}
+```
+
 [datafusion-function-json]: https://github.com/datafusion-contrib/datafusion-functions-json
 
 ##### HuggingFace (`--features=huggingface`)

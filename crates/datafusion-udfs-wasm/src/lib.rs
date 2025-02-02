@@ -63,21 +63,6 @@ where
         .map(|arr| arr.value(row_ix))
 }
 
-// pub fn udf_signature_from_func_details(
-//     func_details: &WasmUdfDetails,
-// ) -> Result<(Vec<DataType>, DataType)> {
-//     let input_types: Result<Vec<DataType>> = func_details
-//         .input_types
-//         .iter()
-//         .map(|s| {
-//             let t: DataType = s.as_str().try_into()?;
-//             Ok(t)
-//         })
-//         .collect();
-//     let return_type: DataType = func_details.return_type.as_str().try_into()?;
-//     Ok((input_types?, return_type))
-// }
-
 fn validate_func(args: &[ColumnarValue], input_types: &[DataType]) -> Result<()> {
     // Check that there is at least one `ColumnarValue`.  Strictly speaking this might not be
     // needed, but for the immediate future I believe it will always be the case
@@ -224,48 +209,6 @@ pub fn try_create_wasm_udf(module_bytes: &[u8], udf_details: WasmUdfDetails) -> 
     );
     Ok(udf)
 }
-
-// pub fn create_wasm_udfs(wasm_udf_config: &WasmUdfConfig) -> Result<Vec<ScalarUDF>> {
-//     let mut created_udfs: Vec<ScalarUDF> = Vec::new();
-//     for (module_path, funcs) in &wasm_udf_config.module_functions {
-//         let mut store = Store::<()>::default();
-//         let module_bytes = std::fs::read(module_path)?;
-//         let module = Module::from_binary(store.engine(), &module_bytes).unwrap();
-//         for func_details in funcs {
-//             match udf_signature_from_func_details(func_details) {
-//                 Ok((input_types, return_type)) => {
-//                     let instance =
-//                         Instance::new(&mut store, &module, &[]).map_err(|e| eyre!("{e}"))?;
-//                     //  Check if the function exists in the WASM module before proceeding with the
-//                     //  UDF creation
-//                     if instance.get_func(&mut store, &func_details.name).is_none() {
-//                         error!("WASM function {} is missing in module", &func_details.name);
-//                     } else {
-//                         let udf_impl = create_wasm_udf_impl(
-//                             module_bytes.to_owned(),
-//                             func_details.name.to_string(),
-//                             input_types.clone(),
-//                             return_type.clone(),
-//                         );
-//                         info!("Registering WASM function {} with input {input_types:?} and return_type {return_type:?}", &func_details.name);
-//                         let udf = create_udf(
-//                             &func_details.name,
-//                             input_types,
-//                             return_type,
-//                             Volatility::Immutable,
-//                             Arc::new(udf_impl),
-//                         );
-//                         created_udfs.push(udf)
-//                     }
-//                 }
-//                 Err(_) => {
-//                     error!("Error parsing WASM UDF signature for {}", func_details.name);
-//                 }
-//             }
-//         }
-//     }
-//     Ok(created_udfs)
-// }
 
 #[cfg(test)]
 mod tests {
