@@ -68,7 +68,7 @@ pub fn udf_signature_from_func_details(
 fn validate_func(args: &[ColumnarValue], input_types: &[DataType]) -> DFResult<()> {
     // Check that there is at least one `ColumnarValue`.  Strictly speaking this might not be
     // needed, but for the immediate future I believe it will always be the case
-    if args.len() == 0 {
+    if args.is_empty() {
         return Err(DataFusionError::Execution(
             "There must be at least one argument".to_string(),
         ));

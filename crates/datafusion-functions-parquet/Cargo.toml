@@ -14,13 +14,13 @@ keywords = ["parquet", "query", "sql", "datafusion"]
 arrow = { version = "53.0.0" }
 async-trait = "0.1.41"
 datafusion = { version = "43.0.0", features = [
-    "avro",
-    "crypto_expressions",
-    "datetime_expressions",
-    "encoding_expressions",
-    "parquet",
-    "regex_expressions",
-    "unicode_expressions",
-    "compression",
+  "avro",
+  "crypto_expressions",
+  "datetime_expressions",
+  "encoding_expressions",
+  "parquet",
+  "regex_expressions",
+  "unicode_expressions",
+  "compression",
 ] }
 parquet = { version = "53.0.0", default-features = false }
