@@ -31,6 +31,7 @@ use datafusion::{
 use log::info;
 use wasmtime::{Instance, Module, Store, Val};
 
+/// Details necessary to create a DataFusion `ScalarUDF`
 pub struct WasmUdfDetails {
     name: String,
     input_types: Vec<DataType>,
@@ -146,6 +147,8 @@ fn create_wasm_udf_impl(
         validate_func(args, &input_types)?;
         // Load the function again
         let mut store = Store::<()>::default();
+        // TODO: Figure out if we actually need to load the binary again here or if we can use the
+        // one from `try_create_wasm_udf`
         let module = Module::from_binary(store.engine(), &module_bytes)
             .map_err(|e| DataFusionError::Internal(format!("Error loading module: {e:?}")))?;
         let instance = Instance::new(&mut store, &module, &[])
@@ -174,6 +177,8 @@ fn create_wasm_udf_impl(
     }
 }
 
+/// Attempts to create a `ScalarUDF` from the provided byte slice, which could be either a WASM
+/// binary or text format, and function details (name and signature).
 pub fn try_create_wasm_udf(module_bytes: &[u8], udf_details: WasmUdfDetails) -> Result<ScalarUDF> {
     let WasmUdfDetails {
         name,
@@ -181,7 +186,8 @@ pub fn try_create_wasm_udf(module_bytes: &[u8], udf_details: WasmUdfDetails) -> 
         return_type,
     } = udf_details;
     let mut store = Store::<()>::default();
-    let module = Module::from_binary(store.engine(), &module_bytes).unwrap();
+    let module = Module::new(store.engine(), &module_bytes)
+        .map_err(|_| DataFusionError::Execution("Unable to load WASM module".to_string()))?;
     let instance = Instance::new(&mut store, &module, &[])
         .map_err(|e| DataFusionError::Execution(e.to_string()))?;
     //  Check if the function exists in the WASM module before proceeding with the
@@ -213,7 +219,46 @@ pub fn try_create_wasm_udf(module_bytes: &[u8], udf_details: WasmUdfDetails) -> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use datafusion::common::assert_batches_eq;
+    use datafusion::prelude::*;
 
     #[test]
-    fn it_works() {}
+    fn descriptive_error_when_invalid_wasm() {
+        let bytes = b"invalid";
+        let input_types = vec![DataType::Int32];
+        let return_types = DataType::Int32;
+        let udf_details = WasmUdfDetails::new("my_func".to_string(), input_types, return_type);
+        let res = try_create_wasm_udf(bytes, udf_details);
+        res.inspect_err(|e| assert!(e.to_string().contains("Unable to load WASM module")));
+    }
+
+    #[test]
+    fn descriptive_error_when_missing_function_in_wasm() {
+        let bytes = std::fs::read("../test-wasm/wasm_examples.wasm").unwrap();
+        let input_types = vec![DataType::Int32];
+        let return_types = DataType::Int32;
+        let udf_details = WasmUdfDetails::new("missing_func".to_string(), input_types, return_type);
+        let res = try_create_wasm_udf(&bytes, udf_details);
+    }
+
+    #[tokio::test]
+    async fn udf_registers_and_computes_expected_result() {
+        let bytes = std::fs::read("../test-wasm/wasm_examples.wasm").unwrap();
+        let input_types = vec![DataType::Int32];
+        let return_types = DataType::Int32;
+        let udf_details = WasmUdfDetails::new("missing_func".to_string(), input_types, return_type);
+        let udf = try_create_wasm_udf(&bytes, udf_details).unwrap();
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(udf);
+
+        let ddl = "CREATE TABLE test AS VALUES (1,2), (3,4);";
+        ctx.sql(ddl).await.unwrap().collect().await.unwrap();
+
+        let udf_sql = "SELECT *, wasm_add(column1, column2) FROM test";
+        let res = ctx.sql(udf_sql).await.unwrap().collect().await.unwrap();
+
+        let expected = vec![""];
+        assert_batches_eq!(&res, &expected);
+    }
 }
