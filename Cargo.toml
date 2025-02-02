@@ -25,6 +25,7 @@ datafusion = "43.0.0"
 datafusion-common = "43.0.0"
 datafusion-functions-json = { version = "0.43.0", optional = true }
 datafusion-functions-parquet = { version = "0.1.0", path = "crates/datafusion-functions-parquet", optional = true }
+datafusion-udfs-wasm = { version = "0.1.0", path = "crates/datafusion-udfs-wasm", optional = true }
 deltalake = { version = "0.22.0", features = ["datafusion"], optional = true }
 directories = "5.0.1"
 env_logger = "0.11.5"
@@ -62,7 +63,6 @@ tui-logger = { version = "0.12", features = ["tracing-support"] }
 tui-textarea = { version = "0.6.1", features = ["search"] }
 url = { version = "2.5.2", optional = true }
 uuid = { version = "1.10.0" }
-wasmtime = { version = "29.0.1", optional = true }
 
 [dev-dependencies]
 assert_cmd = "2.0.16"
@@ -82,7 +82,7 @@ experimental-flightsql-server = ["flightsql"]
 s3 = ["object_store/aws", "url"]
 functions-json = ["dep:datafusion-functions-json"]
 functions-parquet = ["dep:datafusion-functions-parquet"]
-functions-wasm = ["dep:datafusion-functions-wasm"]
+udfs-wasm = ["dep:datafusion-udfs-wasm"]
 metrics = ["dep:metrics", "dep:metrics-exporter-prometheus"]
 huggingface = ["opendal", "object_store_opendal", "url"]
 
