@@ -218,7 +218,7 @@ jobs:
         run: |
           cargo test --features=huggingface extension_cases::huggingface
   test-udfs-wasm:
-    name: UDFs WASM
+    name: UDFs-WASM
     runs-on: ubuntu-latest
     strategy:
       matrix:

@@ -229,7 +229,7 @@ select * from foo where json_get(attributes, 'bar')::string='ham'
 
 ##### WASM UDF Functions (`--features=udfs-wasm`)
 
-Adds the ability to register WASM UDFs. Currently only UDFs with the data types `Int32`, `Int64`, `Float32`, or `Float64` in their signature are supported until we integrate more with WASM memory.
+Adds the ability to register WASM UDFs. Currently only UDFs with the data types `Int32`, `Int64`, `Float32`, or `Float64` in their signature are supported until we integrate more with WASM memory.  Further, the current implementation is row oriented, calling the WASM function for every single record.  The intent is to provide additional APIs leveraging WASM memory for more efficient WASM compute operations (i.e. vectorized functions and functions that operate on Arrow data over the C Data Interface / FFI).
 
 ```toml
 [[execution]]
