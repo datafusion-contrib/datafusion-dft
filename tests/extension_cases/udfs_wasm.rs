@@ -17,10 +17,7 @@
 
 use assert_cmd::Command;
 
-use crate::{
-    cli_cases::{contains_str, sql_in_file},
-    config::TestConfigBuilder,
-};
+use crate::{cli_cases::contains_str, config::TestConfigBuilder};
 
 #[tokio::test]
 async fn test_custom_config_benchmark_iterations() {

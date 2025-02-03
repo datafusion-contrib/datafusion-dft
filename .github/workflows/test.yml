@@ -217,3 +217,31 @@ jobs:
       - name: Run HuggingFace tests
         run: |
           cargo test --features=huggingface extension_cases::huggingface
+  test-udfs-wasm:
+    name: UDFs WASM
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64]
+        rust: [stable]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Cache Cargo
+        uses: actions/cache@v2
+        with:
+          path: /home/runner/.cargo
+          key: cargo-dft-cache-
+      - name: Cache Rust dependencies
+        uses: actions/cache@v2
+        with:
+          path: /home/runner/target
+          key: target-dft-cache-
+      - name: Setup Rust toolchain
+        run: |
+          rustup toolchain install ${{ matrix.rust }}
+          rustup default ${{ matrix.rust }}
+      - name: Run UDFs WASM tests
+        run: |
+          cargo test --features=udfs-wasm extension_cases::udfs_WASM
