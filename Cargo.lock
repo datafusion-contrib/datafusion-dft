@@ -1478,7 +1478,7 @@ dependencies = [
 
 [[package]]
 name = "datafusion-dft"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "arrow-flight",
  "assert_cmd",
