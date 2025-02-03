@@ -89,7 +89,6 @@ impl FlightSqlApp {
                 shutdown_future,
             );
 
-        #[cfg(feature = "metrics")]
         {
             let builder = PrometheusBuilder::new();
             let addr: SocketAddr = metrics_addr.parse()?;

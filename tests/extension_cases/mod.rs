@@ -47,12 +47,7 @@ pub struct TestExecution {
     execution: ExecutionContext,
 }
 
-// impl Default for TestExecution {
-//     fn default() -> Self {
-//         Self::new()
-//     }
-// }
-
+#[allow(dead_code)]
 impl TestExecution {
     pub async fn new() -> Self {
         let config = AppConfig::default();

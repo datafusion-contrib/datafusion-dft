@@ -161,34 +161,34 @@ jobs:
       - name: Run Deltalake tests
         run: |
           cargo test --features=deltalake extension_cases::deltalake
-  # test-hudi:
-  #   name: Hudi
-  #   runs-on: ubuntu-latest
-  #   strategy:
-  #     matrix:
-  #       arch: [amd64]
-  #       rust: [stable]
-  #   steps:
-  #     - uses: actions/checkout@v2
-  #       with:
-  #         submodules: true
-  #     - name: Cache Cargo
-  #       uses: actions/cache@v2
-  #       with:
-  #         path: /home/runner/.cargo
-  #         key: cargo-dft-cache-
-  #     - name: Cache Rust dependencies
-  #       uses: actions/cache@v2
-  #       with:
-  #         path: /home/runner/target
-  #         key: target-dft-cache-
-  #     - name: Setup Rust toolchain
-  #       run: |
-  #         rustup toolchain install ${{ matrix.rust }}
-  #         rustup default ${{ matrix.rust }}
-  #     - name: Run Hudi tests
-  #       run: |
-  #         cargo test --features=hudi extension_cases::hudi
+  test-hudi:
+    name: Hudi
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64]
+        rust: [stable]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Cache Cargo
+        uses: actions/cache@v2
+        with:
+          path: /home/runner/.cargo
+          key: cargo-dft-cache-
+      - name: Cache Rust dependencies
+        uses: actions/cache@v2
+        with:
+          path: /home/runner/target
+          key: target-dft-cache-
+      - name: Setup Rust toolchain
+        run: |
+          rustup toolchain install ${{ matrix.rust }}
+          rustup default ${{ matrix.rust }}
+      - name: Run Hudi tests
+        run: |
+          cargo test --features=hudi extension_cases::hudi
   test-huggingface:
     name: HuggingFace
     runs-on: ubuntu-latest
