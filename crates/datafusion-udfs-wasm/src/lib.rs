@@ -226,27 +226,34 @@ mod tests {
     fn descriptive_error_when_invalid_wasm() {
         let bytes = b"invalid";
         let input_types = vec![DataType::Int32];
-        let return_types = DataType::Int32;
+        let return_type = DataType::Int32;
         let udf_details = WasmUdfDetails::new("my_func".to_string(), input_types, return_type);
         let res = try_create_wasm_udf(bytes, udf_details);
-        res.inspect_err(|e| assert!(e.to_string().contains("Unable to load WASM module")));
+        if let Some(e) = res.err() {
+            assert!(e.to_string().contains("Unable to load WASM module"));
+        }
     }
 
     #[test]
     fn descriptive_error_when_missing_function_in_wasm() {
-        let bytes = std::fs::read("../test-wasm/wasm_examples.wasm").unwrap();
+        let bytes = std::fs::read("test-wasm/wasm_examples.wasm").unwrap();
         let input_types = vec![DataType::Int32];
-        let return_types = DataType::Int32;
+        let return_type = DataType::Int32;
         let udf_details = WasmUdfDetails::new("missing_func".to_string(), input_types, return_type);
         let res = try_create_wasm_udf(&bytes, udf_details);
+        if let Some(e) = res.err() {
+            assert!(e
+                .to_string()
+                .contains("WASM function missing_func is missing in module"));
+        }
     }
 
     #[tokio::test]
     async fn udf_registers_and_computes_expected_result() {
-        let bytes = std::fs::read("../test-wasm/wasm_examples.wasm").unwrap();
-        let input_types = vec![DataType::Int32];
-        let return_types = DataType::Int32;
-        let udf_details = WasmUdfDetails::new("missing_func".to_string(), input_types, return_type);
+        let bytes = std::fs::read("test-wasm/wasm_examples.wasm").unwrap();
+        let input_types = vec![DataType::Int64, DataType::Int64];
+        let return_type = DataType::Int64;
+        let udf_details = WasmUdfDetails::new("wasm_add".to_string(), input_types, return_type);
         let udf = try_create_wasm_udf(&bytes, udf_details).unwrap();
 
         let ctx = SessionContext::new();
@@ -258,7 +265,14 @@ mod tests {
         let udf_sql = "SELECT *, wasm_add(column1, column2) FROM test";
         let res = ctx.sql(udf_sql).await.unwrap().collect().await.unwrap();
 
-        let expected = vec![""];
-        assert_batches_eq!(&res, &expected);
+        let expected = vec![
+            "+---------+---------+-------------------------------------+",
+            "| column1 | column2 | wasm_add(test.column1,test.column2) |",
+            "+---------+---------+-------------------------------------+",
+            "| 1       | 2       | 3                                   |",
+            "| 3       | 4       | 7                                   |",
+            "+---------+---------+-------------------------------------+",
+        ];
+        assert_batches_eq!(&expected, &res);
     }
 }
