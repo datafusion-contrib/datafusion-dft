@@ -14,15 +14,18 @@ default-run = "dft"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-arrow-flight = { version = "53.0.0", features = ["flight-sql-experimental"] , optional = true }
+arrow-flight = { version = "53.0.0", features = [
+  "flight-sql-experimental",
+], optional = true }
 async-trait = "0.1.80"
-clap = { version = "4.5.1", features = ["derive"] }
+clap = { version = "4.5.27", features = ["derive"] }
 color-eyre = "0.6.3"
 crossterm = { version = "0.28.1", features = ["event-stream"] }
 datafusion = "43.0.0"
 datafusion-common = "43.0.0"
 datafusion-functions-json = { version = "0.43.0", optional = true }
 datafusion-functions-parquet = { version = "0.1.0", path = "crates/datafusion-functions-parquet", optional = true }
+datafusion-udfs-wasm = { version = "0.1.0", path = "crates/datafusion-udfs-wasm", optional = true }
 deltalake = { version = "0.22.0", features = ["datafusion"], optional = true }
 directories = "5.0.1"
 env_logger = "0.11.5"
@@ -35,15 +38,17 @@ iceberg-datafusion = { version = "0.4", optional = true }
 itertools = "0.13.0"
 lazy_static = "1.4.0"
 log = "0.4.22"
-metrics = {version = "0.24.0", optional = true }
-metrics-exporter-prometheus = {version = "0.16.0", optional = true }
+metrics = { version = "0.24.0", optional = true }
+metrics-exporter-prometheus = { version = "0.16.0", optional = true }
 num_cpus = "1.16.0"
 object_store = { version = "0.11.0", features = ["aws"], optional = true }
-opendal = { version = "0.51", features = ["services-huggingface"], optional = true }
-object_store_opendal = { version = "0.49", optional = true}
+opendal = { version = "0.51", features = [
+  "services-huggingface",
+], optional = true }
+object_store_opendal = { version = "0.49", optional = true }
 parking_lot = "0.12.3"
 parquet = "53.0.0"
-pin-project-lite = {version = "0.2.14" }
+pin-project-lite = { version = "0.2.14" }
 prost = "0.13.1"
 ratatui = "0.28.0"
 serde = { version = "1.0.197", features = ["derive"] }
@@ -53,11 +58,11 @@ tokio-stream = { version = "0.1.15", features = ["net"] }
 tokio-util = "0.7.10"
 toml = "0.8.12"
 tonic = { version = "0.12.3", optional = true }
-tower = {version = "0.5.0" }
-tui-logger = {version = "0.12", features = ["tracing-support"]}
+tower = { version = "0.5.0" }
+tui-logger = { version = "0.12", features = ["tracing-support"] }
 tui-textarea = { version = "0.6.1", features = ["search"] }
 url = { version = "2.5.2", optional = true }
-uuid = {version = "1.10.0" }
+uuid = { version = "1.10.0" }
 
 [dev-dependencies]
 assert_cmd = "2.0.16"
@@ -70,13 +75,15 @@ url = "2.5.2"
 [features]
 default = ["functions-parquet"]
 deltalake = ["dep:deltalake"]
-# hudi = ["dep:hudi"]
+hudi = ["dep:hudi"]
 iceberg = ["dep:iceberg-datafusion", "dep:iceberg-catalog-rest"]
 flightsql = ["dep:arrow-flight", "dep:tonic"]
 experimental-flightsql-server = ["flightsql", "dep:metrics", "dep:metrics-exporter-prometheus"]
 s3 = ["object_store/aws", "url"]
 functions-json = ["dep:datafusion-functions-json"]
 functions-parquet = ["dep:datafusion-functions-parquet"]
+udfs-wasm = ["dep:datafusion-udfs-wasm"]
+metrics = ["dep:metrics", "dep:metrics-exporter-prometheus"]
 huggingface = ["opendal", "object_store_opendal", "url"]
 
 [[bin]]

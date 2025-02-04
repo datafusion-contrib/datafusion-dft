@@ -23,6 +23,8 @@ pub mod flightsql_benchmarks;
 pub mod local;
 pub mod sql_utils;
 pub mod stats;
+#[cfg(feature = "udfs-wasm")]
+pub mod wasm;
 
 pub mod local_benchmarks;
 

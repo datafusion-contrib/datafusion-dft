@@ -1,0 +1,12 @@
+[package]
+name = "datafusion-udfs-wasm"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+datafusion = "43.0.0"
+log = "0.4.25"
+wasmtime = "29.0.1"
+
+[dev-dependencies]
+tokio = { version = "1.36.0", features = ["rt-multi-thread", "macros"] }

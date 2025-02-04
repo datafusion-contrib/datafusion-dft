@@ -111,4 +111,57 @@ impl TestConfigBuilder {
             .push_str(&format!("revision = '{revision}'\n"));
         self
     }
+
+    #[cfg(feature = "udfs-wasm")]
+    pub fn with_udfs_wasm(
+        &mut self,
+        module_path: &str,
+        function_name: &str,
+        input_types: &[&str],
+        return_type: &str,
+    ) -> &mut Self {
+        // Begin the wasm UDF section.
+        self.config_text.push_str("[execution.wasm_udf]\n");
+
+        // Start the inline table for module_functions.
+        self.config_text.push_str("module_functions = { ");
+
+        // Write the key (module path) and start its array of function definitions.
+        self.config_text
+            .push_str(&format!("\"{}\" = [", module_path));
+
+        // Start the function definition.
+        self.config_text.push_str("{ ");
+
+        // Write the function name.
+        self.config_text
+            .push_str(&format!("name = \"{}\", ", function_name));
+
+        // Write the input_types array.
+        self.config_text.push_str("input_types = [");
+        for (i, ty) in input_types.iter().enumerate() {
+            self.config_text.push_str(&format!("\"{}\"", ty));
+            if i < input_types.len() - 1 {
+                self.config_text.push_str(", ");
+            }
+        }
+        self.config_text.push_str("], ");
+
+        // Write the return type.
+        self.config_text
+            .push_str(&format!("return_type = \"{}\"", return_type));
+
+        // Close the function definition.
+        self.config_text.push_str(" }");
+
+        // Close the array for the module key.
+        self.config_text.push(']');
+
+        // Close the inline table (no trailing comma here!).
+        self.config_text.push_str(" }");
+
+        // Add a final newline.
+        self.config_text.push('\n');
+        self
+    }
 }

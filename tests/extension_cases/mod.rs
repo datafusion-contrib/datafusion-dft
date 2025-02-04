@@ -29,6 +29,8 @@ mod functions_json;
 mod huggingface;
 #[cfg(feature = "s3")]
 mod s3;
+#[cfg(feature = "udfs-wasm")]
+mod udfs_wasm;
 
 use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::util::pretty::pretty_format_batches;
