@@ -25,6 +25,7 @@ async fn test_custom_config_benchmark_iterations() {
     config_builder.with_udfs_wasm(
         "crates/datafusion-udfs-wasm/test-wasm/wasm_examples.wasm",
         "wasm_add",
+        "Row",
         &["Int64", "Int64"],
         "Int64",
     );

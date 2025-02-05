@@ -25,15 +25,15 @@ datafusion = "43.0.0"
 datafusion-common = "43.0.0"
 datafusion-functions-json = { version = "0.43.0", optional = true }
 datafusion-functions-parquet = { version = "0.1.0", path = "crates/datafusion-functions-parquet", optional = true }
-datafusion-udfs-wasm = { version = "0.1.0", path = "crates/datafusion-udfs-wasm", optional = true }
+datafusion-udfs-wasm = { version = "0.1.0", path = "crates/datafusion-udfs-wasm", features = ["serde"], optional = true }
 deltalake = { version = "0.22.0", features = ["datafusion"], optional = true }
 directories = "5.0.1"
 env_logger = "0.11.5"
 futures = "0.3.30"
 http = "1"
 http-body = "1"
-hudi = { version = "0.3.0", features = ["datafusion"], optional = true}
-iceberg-catalog-rest = { version = "0.4", optional = true}
+hudi = { version = "0.3.0", features = ["datafusion"], optional = true }
+iceberg-catalog-rest = { version = "0.4", optional = true }
 iceberg-datafusion = { version = "0.4", optional = true }
 itertools = "0.13.0"
 lazy_static = "1.4.0"
@@ -78,7 +78,11 @@ deltalake = ["dep:deltalake"]
 hudi = ["dep:hudi"]
 iceberg = ["dep:iceberg-datafusion", "dep:iceberg-catalog-rest"]
 flightsql = ["dep:arrow-flight", "dep:tonic"]
-experimental-flightsql-server = ["flightsql", "dep:metrics", "dep:metrics-exporter-prometheus"]
+experimental-flightsql-server = [
+  "flightsql",
+  "dep:metrics",
+  "dep:metrics-exporter-prometheus",
+]
 s3 = ["object_store/aws", "url"]
 functions-json = ["dep:datafusion-functions-json"]
 functions-parquet = ["dep:datafusion-functions-parquet"]

@@ -19,6 +19,7 @@
 
 use std::{collections::HashMap, path::PathBuf};
 
+use datafusion_udfs_wasm::WasmInputDataType;
 use directories::{ProjectDirs, UserDirs};
 use lazy_static::lazy_static;
 use log::info;
@@ -281,6 +282,7 @@ pub struct WasmFuncDetails {
     pub name: String,
     pub input_types: Vec<String>,
     pub return_type: String,
+    pub input_data_type: WasmInputDataType,
 }
 
 #[derive(Clone, Debug, Deserialize)]
