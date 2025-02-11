@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+pub mod arrow;
 pub mod native;
 
 use std::sync::Arc;
@@ -27,10 +28,13 @@ use datafusion::{
 };
 use log::info;
 use native::{array::create_array_wasm_udf_impl, row::create_row_wasm_udf_impl};
+#[cfg(feature = "serde")]
 use serde::Deserialize;
-use wasmtime::{Instance, Module, Store};
+use wasi_common::WasiCtx;
+use wasmtime::{Instance, Module, Store, TypedFunc};
 
-#[derive(Clone, Debug, Deserialize)]
+#[cfg_attr(feature = "serde", derive(Deserialize))]
+#[derive(Clone, Debug)]
 pub enum WasmInputDataType {
     Row,
     Array,
@@ -138,4 +142,21 @@ pub fn try_create_wasm_udf(module_bytes: &[u8], udf_details: WasmUdfDetails) -> 
 
     let udf = create_wasm_udf(module_bytes, udf_details)?;
     Ok(udf)
+}
+
+pub fn try_get_wasm_module_exported_fn<Params, Results>(
+    instance: &Instance,
+    store: &mut Store<WasiCtx>,
+    export_name: &str,
+) -> Result<TypedFunc<Params, Results>>
+where
+    Params: wasmtime::WasmParams,
+    Results: wasmtime::WasmResults,
+{
+    instance
+        .get_typed_func::<Params, Results>(store, export_name)
+        .map_err(|err| {
+            DataFusionError::Internal(
+                format!("Required export '{export_name:?}' could not be located in WASM module exports: {err:?}"))
+        })
 }

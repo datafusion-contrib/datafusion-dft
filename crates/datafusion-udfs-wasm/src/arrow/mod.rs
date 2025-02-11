@@ -15,5 +15,4 @@
 // specific language governing permissions and limitations
 // under the License.
 
-mod arrow;
-mod native;
+pub mod ipc;

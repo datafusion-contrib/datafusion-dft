@@ -17,7 +17,10 @@
 
 use std::sync::Arc;
 
-use crate::native;
+use crate::{
+    native::{self, array::create_array_wasm_udf_impl},
+    WasmInputDataType, WasmUdfDetails,
+};
 use datafusion::{
     arrow::{
         array::{
@@ -30,46 +33,14 @@ use datafusion::{
     prelude::create_udf,
 };
 use log::info;
-use serde::Deserialize;
 use wasmtime::{Instance, Module, Store, Val};
 
-pub const VALID_ARROW_DTYPES_FOR_PRIMITIVE_WASM: [DataType; 4] = [
-    DataType::Int32,
-    DataType::Int64,
-    DataType::Float32,
-    DataType::Float64,
-];
-
-#[derive(Clone, Debug, Deserialize)]
-pub enum WasmInputDataType {
-    Row,
-    Array,
-    Arrow,
-}
-
-/// Details necessary to create a DataFusion `ScalarUDF`
-pub struct WasmUdfDetails {
-    name: String,
-    input_data_type: WasmInputDataType,
-    input_types: Vec<DataType>,
-    return_type: DataType,
-}
-
-impl WasmUdfDetails {
-    pub fn new(
-        name: String,
-        input_types: Vec<DataType>,
-        return_type: DataType,
-        input_data_type: WasmInputDataType,
-    ) -> Self {
-        Self {
-            name,
-            input_types,
-            return_type,
-            input_data_type,
-        }
-    }
-}
+// pub const VALID_ARROW_DTYPES_FOR_PRIMITIVE_WASM: [DataType; 4] = [
+//     DataType::Int32,
+//     DataType::Int64,
+//     DataType::Float32,
+//     DataType::Float64,
+// ];
 
 fn get_arrow_value<T>(args: &[ArrayRef], row_ix: usize, col_ix: usize) -> Result<T::Native>
 where

@@ -7,6 +7,7 @@ edition = "2021"
 datafusion = "43.0.0"
 log = "0.4.25"
 serde = { version = "1.0.217", optional = true }
+wasi-common = "29.0.1"
 wasmtime = "29.0.1"
 
 [dev-dependencies]
