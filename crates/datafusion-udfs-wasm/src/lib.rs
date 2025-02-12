@@ -20,6 +20,7 @@ pub mod native;
 
 use std::sync::Arc;
 
+use arrow::ipc::create_arrow_ipc_wasm_udf_impl;
 use datafusion::{
     arrow::datatypes::DataType,
     common::{DataFusionError, Result},
@@ -27,7 +28,7 @@ use datafusion::{
     prelude::create_udf,
 };
 use log::info;
-use native::{array::create_array_wasm_udf_impl, row::create_row_wasm_udf_impl};
+use native::row::create_row_wasm_udf_impl;
 #[cfg(feature = "serde")]
 use serde::Deserialize;
 use wasi_common::WasiCtx;
@@ -37,8 +38,7 @@ use wasmtime::{Instance, Module, Store, TypedFunc};
 #[derive(Clone, Debug)]
 pub enum WasmInputDataType {
     Row,
-    Array,
-    Arrow,
+    ArrowIpc,
 }
 
 /// Details necessary to create a DataFusion `ScalarUDF`
@@ -97,8 +97,8 @@ fn create_wasm_udf(module_bytes: &[u8], udf_details: WasmUdfDetails) -> Result<S
             );
             Ok(udf)
         }
-        WasmInputDataType::Array => {
-            let udf_impl = create_array_wasm_udf_impl(
+        WasmInputDataType::ArrowIpc => {
+            let udf_impl = create_arrow_ipc_wasm_udf_impl(
                 module_bytes.to_owned(),
                 name.clone(),
                 input_types.clone(),

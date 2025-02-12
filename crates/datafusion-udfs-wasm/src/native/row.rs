@@ -17,10 +17,7 @@
 
 use std::sync::Arc;
 
-use crate::{
-    native::{self, array::create_array_wasm_udf_impl},
-    WasmInputDataType, WasmUdfDetails,
-};
+use crate::native;
 use datafusion::{
     arrow::{
         array::{
@@ -29,18 +26,9 @@ use datafusion::{
         datatypes::{self, ArrowPrimitiveType, DataType},
     },
     common::{DataFusionError, Result},
-    logical_expr::{ColumnarValue, ScalarUDF, Volatility},
-    prelude::create_udf,
+    logical_expr::ColumnarValue,
 };
-use log::info;
 use wasmtime::{Instance, Module, Store, Val};
-
-// pub const VALID_ARROW_DTYPES_FOR_PRIMITIVE_WASM: [DataType; 4] = [
-//     DataType::Int32,
-//     DataType::Int64,
-//     DataType::Float32,
-//     DataType::Float64,
-// ];
 
 fn get_arrow_value<T>(args: &[ArrayRef], row_ix: usize, col_ix: usize) -> Result<T::Native>
 where
@@ -110,61 +98,6 @@ fn convert_wasm_vals_to_arrow(vals: Vec<Val>, return_type: &DataType) -> Arc<dyn
     }
 }
 
-fn create_wasm_udf(module_bytes: &[u8], udf_details: WasmUdfDetails) -> Result<ScalarUDF> {
-    let WasmUdfDetails {
-        name,
-        input_types,
-        return_type,
-        input_data_type,
-    } = udf_details;
-    info!(
-        "Registering WASM function {} with input {input_types:?} and return_type {return_type:?}",
-        &name
-    );
-
-    // We need to call `create_udf` on each branch because each `impl Trait` creates a distinct
-    // opaque type so the type returned from each branch is different.  We could probably create a
-    // wrapper struct as a cleaner solution but using this for now.
-    let udf = match input_data_type {
-        WasmInputDataType::Row => {
-            let udf_impl = create_row_wasm_udf_impl(
-                module_bytes.to_owned(),
-                name.clone(),
-                input_types.clone(),
-                return_type.clone(),
-            );
-            let udf = create_udf(
-                &name,
-                input_types,
-                return_type,
-                Volatility::Immutable,
-                Arc::new(udf_impl),
-            );
-            Ok(udf)
-        }
-        WasmInputDataType::Array => {
-            let udf_impl = create_array_wasm_udf_impl(
-                module_bytes.to_owned(),
-                name.clone(),
-                input_types.clone(),
-                return_type.clone(),
-            );
-            let udf = create_udf(
-                &name,
-                input_types,
-                return_type,
-                Volatility::Immutable,
-                Arc::new(udf_impl),
-            );
-            Ok(udf)
-        }
-        _ => Err(DataFusionError::Execution(
-            "Unexpected WasmInputDataType".to_string(),
-        )),
-    }?;
-    Ok(udf)
-}
-
 // TODO: Confirm if this is called per row / batch / etc
 // TODO: Benchmark time for loading module and for extracting function
 pub fn create_row_wasm_udf_impl(
@@ -207,32 +140,10 @@ pub fn create_row_wasm_udf_impl(
     }
 }
 
-/// Attempts to create a `ScalarUDF` from the provided byte slice, which could be either a WASM
-/// binary or text format, and function details (name and signature).
-pub fn try_create_wasm_udf(module_bytes: &[u8], udf_details: WasmUdfDetails) -> Result<ScalarUDF> {
-    let mut store = Store::<()>::default();
-    let module = Module::new(store.engine(), module_bytes)
-        .map_err(|_| DataFusionError::Execution("Unable to load WASM module".to_string()))?;
-    let instance = Instance::new(&mut store, &module, &[])
-        .map_err(|e| DataFusionError::Execution(e.to_string()))?;
-
-    //  Check if the function exists in the WASM module before proceeding with the
-    //  UDF creation
-    instance
-        .get_func(&mut store, &udf_details.name)
-        .ok_or_else(|| {
-            DataFusionError::Execution(format!(
-                "WASM function {} is missing in module",
-                &udf_details.name
-            ))
-        })?;
-
-    let udf = create_wasm_udf(module_bytes, udf_details)?;
-    Ok(udf)
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::{try_create_wasm_udf, WasmInputDataType, WasmUdfDetails};
+
     use super::*;
     use datafusion::common::assert_batches_eq;
     use datafusion::prelude::*;
