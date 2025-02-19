@@ -254,6 +254,45 @@ pub fn create_arrow_ipc_wasm_udf_impl(
 
 #[cfg(test)]
 mod tests {
+    use crate::{try_create_wasm_udf, WasmInputDataType, WasmUdfDetails};
+
+    use super::*;
+    use datafusion::common::assert_batches_eq;
+    use datafusion::prelude::*;
+
+    #[tokio::test]
+    async fn udf_registers_and_computes_expected_result() {
+        let bytes = std::fs::read("test-wasm/wasm_examples.wasm").unwrap();
+        let input_types = vec![DataType::Int64, DataType::Int64];
+        let return_type = DataType::Int64;
+        let udf_details = WasmUdfDetails::new(
+            "arrow_func".to_string(),
+            input_types,
+            return_type,
+            WasmInputDataType::ArrowIpc,
+        );
+        let udf = try_create_wasm_udf(&bytes, udf_details).unwrap();
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(udf);
+
+        let ddl = "CREATE TABLE test AS VALUES (1,2), (3,4);";
+        ctx.sql(ddl).await.unwrap().collect().await.unwrap();
+
+        let udf_sql = "SELECT *, arrow_func(column1, column2) FROM test";
+        let res = ctx.sql(udf_sql).await.unwrap().collect().await.unwrap();
+
+        let expected = vec![
+            "+---------+---------+-------------------------------------+",
+            "| column1 | column2 | arrow_func(test.column1,test.column2) |",
+            "+---------+---------+-------------------------------------+",
+            "| 1       | 2       | 3                                   |",
+            "| 3       | 4       | 7                                   |",
+            "+---------+---------+-------------------------------------+",
+        ];
+        assert_batches_eq!(&expected, &res);
+    }
+
     // use super::*;
     // use datafusion::common::assert_batches_eq;
     // use datafusion::prelude::*;

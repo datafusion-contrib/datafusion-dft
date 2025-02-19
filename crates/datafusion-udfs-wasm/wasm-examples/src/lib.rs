@@ -91,11 +91,6 @@ pub fn arrow_func(ptr: *mut u8, len: i32) -> (*mut u8, i32) {
     unsafe {
         let output_slice = std::slice::from_raw_parts_mut(output_offset, output_len as usize);
         output_slice.copy_from_slice(&out_buf);
-        // let output_slice = std::slice::from_raw_parts_mut(
-        //     base_ptr.add(output_offset as usize),
-        //     output_len as usize,
-        // );
-        // output_slice.copy_from_slice(&out_buf);
     }
 
     // 7. Return (output_offset, output_len) so the host knows where to read
