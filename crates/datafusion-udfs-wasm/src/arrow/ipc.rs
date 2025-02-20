@@ -26,8 +26,8 @@ use datafusion::{
     common::{DataFusionError, Result},
     logical_expr::ColumnarValue,
 };
-use wasi_common::{sync::WasiCtxBuilder, WasiCtx};
-use wasmtime::{Engine, Instance, Linker, Module, Store, TypedFunc};
+use wasi_common::sync::WasiCtxBuilder;
+use wasmtime::{Engine, Instance, Module, Store, TypedFunc};
 
 use crate::try_get_wasm_module_exported_fn;
 
@@ -39,7 +39,10 @@ use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::scalar::ScalarValue;
 
 /// Convert &[ColumnarValue] into an Arrow IPC (stream) buffer in memory.
-pub fn columnar_values_to_ipc(columnar_values: &[ColumnarValue]) -> ArrowResult<Vec<u8>> {
+pub fn columnar_values_to_ipc(
+    columnar_values: &[ColumnarValue],
+    input_types: &[DataType],
+) -> ArrowResult<Vec<u8>> {
     // 1. Determine the maximum row count (length) among array columns
     let mut max_length = 1;
     for cv in columnar_values {
@@ -90,6 +93,19 @@ pub fn columnar_values_to_ipc(columnar_values: &[ColumnarValue]) -> ArrowResult<
                 arrays.push(arr);
             }
         }
+    }
+
+    // This should be caught by DataFusion automatically but we verify here just in case
+    let inputs_match = input_types
+        .iter()
+        .zip(&fields)
+        .fold(true, |_acc, (input_type, field)| {
+            input_type == field.data_type()
+        });
+    if !inputs_match {
+        return Err(ArrowError::SchemaError(
+            "Function args don't match definition".to_string(),
+        ));
     }
 
     // 3. Build a RecordBatch from these arrays
@@ -165,7 +181,6 @@ pub fn create_arrow_ipc_wasm_udf_impl(
 ) -> impl Fn(&[ColumnarValue]) -> Result<ColumnarValue> {
     move |args: &[ColumnarValue]| {
         let engine = Engine::default();
-        let linker: Linker<WasiCtx> = Linker::new(&engine);
         // Create a WASI context and put it in a Store; all instances in the store
         // share this context. `WasiCtxBuilder` provides a number of ways to
         // configure what the target program will have access to.
@@ -182,7 +197,7 @@ pub fn create_arrow_ipc_wasm_udf_impl(
         let dealloc: TypedFunc<(i32, i32), ()> =
             try_get_wasm_module_exported_fn(&instance, &mut store, "dealloc")?;
 
-        let func: TypedFunc<(i32, i32), (i32, i32)> =
+        let func: TypedFunc<(i32, i32), i64> =
             try_get_wasm_module_exported_fn(&instance, &mut store, &func_name)?;
 
         let memory =
@@ -192,7 +207,7 @@ pub fn create_arrow_ipc_wasm_udf_impl(
                     "Missing memory in module".to_string(),
                 ))?;
 
-        let ipc_bytes = columnar_values_to_ipc(args)?;
+        let ipc_bytes = columnar_values_to_ipc(args, &input_types)?;
         let input_offset = alloc
             .call(&mut store, ipc_bytes.len() as i32)
             .map_err(|e| {
@@ -208,11 +223,14 @@ pub fn create_arrow_ipc_wasm_udf_impl(
                 ))
             })?;
 
-        let (output_offset, output_len) = func
+        let details = func
             .call(&mut store, (input_offset, ipc_bytes.len() as i32))
             .map_err(|e| {
                 DataFusionError::Execution(format!("Error executing Arrow IPC WASM func: {}", e))
             })?;
+
+        let output_offset = (details >> 32) as i32;
+        let output_len = (details & 0xFFFF_FFFF) as i32;
 
         let output_len_usize = output_len as usize;
         let mut output_ipc_bytes = vec![0u8; output_len_usize];
@@ -283,86 +301,13 @@ mod tests {
         let res = ctx.sql(udf_sql).await.unwrap().collect().await.unwrap();
 
         let expected = vec![
-            "+---------+---------+-------------------------------------+",
+            "+---------+---------+---------------------------------------+",
             "| column1 | column2 | arrow_func(test.column1,test.column2) |",
-            "+---------+---------+-------------------------------------+",
-            "| 1       | 2       | 3                                   |",
-            "| 3       | 4       | 7                                   |",
-            "+---------+---------+-------------------------------------+",
+            "+---------+---------+---------------------------------------+",
+            "| 1       | 2       | 1                                     |",
+            "| 3       | 4       | 3                                     |",
+            "+---------+---------+---------------------------------------+",
         ];
         assert_batches_eq!(&expected, &res);
     }
-
-    // use super::*;
-    // use datafusion::common::assert_batches_eq;
-    // use datafusion::prelude::*;
-
-    // #[test]
-    // fn descriptive_error_when_invalid_wasm() {
-    //     let bytes = b"invalid";
-    //     let input_types = vec![DataType::Int32];
-    //     let return_type = DataType::Int32;
-    //     let udf_details = WasmUdfDetails::new(
-    //         "my_func".to_string(),
-    //         input_types,
-    //         return_type,
-    //         WasmInputDataType::Row,
-    //     );
-    //     let res = try_create_wasm_udf(bytes, udf_details);
-    //     if let Some(e) = res.err() {
-    //         assert!(e.to_string().contains("Unable to load WASM module"));
-    //     }
-    // }
-
-    // #[test]
-    // fn descriptive_error_when_missing_function_in_wasm() {
-    //     let bytes = std::fs::read("test-wasm/wasm_examples.wasm").unwrap();
-    //     let input_types = vec![DataType::Int32];
-    //     let return_type = DataType::Int32;
-    //     let udf_details = WasmUdfDetails::new(
-    //         "missing_func".to_string(),
-    //         input_types,
-    //         return_type,
-    //         WasmInputDataType::Row,
-    //     );
-    //     let res = try_create_wasm_udf(&bytes, udf_details);
-    //     if let Some(e) = res.err() {
-    //         assert!(e
-    //             .to_string()
-    //             .contains("WASM function missing_func is missing in module"));
-    //     }
-    // }
-
-    // #[tokio::test]
-    // async fn udf_registers_and_computes_expected_result() {
-    //     let bytes = std::fs::read("test-wasm/wasm_examples.wasm").unwrap();
-    //     let input_types = vec![DataType::Int64, DataType::Int64];
-    //     let return_type = DataType::Int64;
-    //     let udf_details = WasmUdfDetails::new(
-    //         "wasm_add".to_string(),
-    //         input_types,
-    //         return_type,
-    //         WasmInputDataType::Row,
-    //     );
-    //     let udf = try_create_wasm_udf(&bytes, udf_details).unwrap();
-    //
-    //     let ctx = SessionContext::new();
-    //     ctx.register_udf(udf);
-    //
-    //     let ddl = "CREATE TABLE test AS VALUES (1,2), (3,4);";
-    //     ctx.sql(ddl).await.unwrap().collect().await.unwrap();
-    //
-    //     let udf_sql = "SELECT *, wasm_add(column1, column2) FROM test";
-    //     let res = ctx.sql(udf_sql).await.unwrap().collect().await.unwrap();
-    //
-    //     let expected = vec![
-    //         "+---------+---------+-------------------------------------+",
-    //         "| column1 | column2 | wasm_add(test.column1,test.column2) |",
-    //         "+---------+---------+-------------------------------------+",
-    //         "| 1       | 2       | 3                                   |",
-    //         "| 3       | 4       | 7                                   |",
-    //         "+---------+---------+-------------------------------------+",
-    //     ];
-    //     assert_batches_eq!(&expected, &res);
-    // }
 }

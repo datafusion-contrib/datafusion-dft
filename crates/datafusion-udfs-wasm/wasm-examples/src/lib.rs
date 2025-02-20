@@ -2,7 +2,6 @@ use arrow::ipc::reader::StreamReader;
 use arrow::ipc::writer::StreamWriter;
 use arrow::record_batch::RecordBatch;
 use std::io::Cursor;
-// use std::{mem, os::raw::c_void};
 
 /// Allocate memory into the module's linear memory
 /// and return the offset to the start of the block.
@@ -33,7 +32,7 @@ pub fn wasm_add(left: i64, right: i64) -> i64 {
 }
 
 #[no_mangle]
-pub fn arrow_func(ptr: *mut u8, len: i32) -> (*mut u8, i32) {
+pub fn arrow_func(ptr: *mut u8, len: i32) -> u64 {
     // 1. Read the input (Arrow IPC bytes) from WASM memory
     let input_data = unsafe { Vec::from_raw_parts(ptr, len as usize, len as usize) };
 
@@ -80,9 +79,6 @@ pub fn arrow_func(ptr: *mut u8, len: i32) -> (*mut u8, i32) {
         writer.finish().expect("Failed to finish stream");
     }
 
-    // out_buf now contains our resulting Arrow IPC bytes
-    // let arrow_result_bytes = out_buf;
-
     // 5. Allocate memory inside the WASM module for the output
     let output_len = out_buf.len() as i32;
     let output_offset = alloc(output_len as usize);
@@ -94,65 +90,5 @@ pub fn arrow_func(ptr: *mut u8, len: i32) -> (*mut u8, i32) {
     }
 
     // 7. Return (output_offset, output_len) so the host knows where to read
-    (output_offset, output_len)
-}
-
-// #[no_mangle]
-// pub extern "C" fn arrow_func(input_offset: i32, input_len: i32) -> (i32, i32) {
-//     // 1. Read the input from Wasm memory
-//     let input_data = unsafe {
-//         // Pointer to the start of our static memory:
-//         let base_ptr = WASM_MEMORY.as_ptr();
-//         // Create a slice for the given offset/length
-//         std::slice::from_raw_parts(base_ptr.add(input_offset as usize), input_len as usize)
-//     };
-//
-//     let c = std::io::Cursor::new(input_data);
-//
-//     let reader = StreamReader::try_new(c, None).unwrap();
-//
-//     let mut batches = Vec::new();
-//     while let Some(batch) = reader.next() {
-//         batches.push(batch.unwrap());
-//     }
-//
-//     let only_first_col = batches.iter().map(|b| b.project(&[0]));
-//
-//     let mut stream_writer =
-//         StreamWriter::try_new(&mut WASM_MEMORY, &only_first_col[0].schema()).unwrap();
-//     for batch in batches {
-//         stream_writer.write(&batch).unwrap();
-//     }
-//     stream_writer.finish().unwrap();
-//
-//     // 3. Allocate memory for the output
-//     let output_len = arrow_result_bytes.len() as i32;
-//     let output_offset = alloc(output_len);
-//
-//     // 4. Write the output bytes back into Wasm memory
-//     unsafe {
-//         let base_ptr = WASM_MEMORY.as_mut_ptr();
-//         let output_slice = std::slice::from_raw_parts_mut(
-//             base_ptr.add(output_offset as usize),
-//             output_len as usize,
-//         );
-//         output_slice.copy_from_slice(&arrow_result_bytes);
-//     }
-//
-//     // 5. Return (output_offset, output_len).
-//     //    In Wasmtime, you can return multiple values by returning a tuple.
-//     //    If your environment doesn't support multi-value returns,
-//     //    return a single i64 and pack the offset + length yourself.
-//     (output_offset, output_len)
-// }
-//
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = wasm_add(2, 2);
-        assert_eq!(result, 4);
-    }
+    ((output_offset as u64) << 32) | (output_len as u64 & 0xFFFF_FFFF)
 }
