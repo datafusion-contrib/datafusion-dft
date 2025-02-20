@@ -19,6 +19,7 @@
 
 use std::{collections::HashMap, path::PathBuf};
 
+#[cfg(feature = "udfs-wasm")]
 use datafusion_udfs_wasm::WasmInputDataType;
 use directories::{ProjectDirs, UserDirs};
 use lazy_static::lazy_static;
@@ -191,6 +192,7 @@ pub struct ExecutionConfig {
     pub dedicated_executor_threads: usize,
     #[serde(default = "default_iceberg_config")]
     pub iceberg: IcebergConfig,
+    #[cfg(feature = "udfs-wasm")]
     #[serde(default = "default_wasm_udf")]
     pub wasm_udf: WasmUdfConfig,
 }
@@ -243,6 +245,7 @@ fn default_iceberg_config() -> IcebergConfig {
     }
 }
 
+#[cfg(feature = "udfs-wasm")]
 fn default_wasm_udf() -> WasmUdfConfig {
     WasmUdfConfig {
         module_functions: HashMap::new(),
@@ -261,6 +264,7 @@ impl Default for ExecutionConfig {
             dedicated_executor_enabled: default_dedicated_executor_enabled(),
             dedicated_executor_threads: default_dedicated_executor_threads(),
             iceberg: default_iceberg_config(),
+            #[cfg(feature = "udfs-wasm")]
             wasm_udf: default_wasm_udf(),
         }
     }
@@ -277,6 +281,7 @@ pub struct IcebergConfig {
     pub rest_catalogs: Vec<RestCatalogConfig>,
 }
 
+#[cfg(feature = "udfs-wasm")]
 #[derive(Clone, Debug, Deserialize)]
 pub struct WasmFuncDetails {
     pub name: String,
@@ -285,6 +290,7 @@ pub struct WasmFuncDetails {
     pub input_data_type: WasmInputDataType,
 }
 
+#[cfg(feature = "udfs-wasm")]
 #[derive(Clone, Debug, Deserialize)]
 pub struct WasmUdfConfig {
     pub module_functions: HashMap<PathBuf, Vec<WasmFuncDetails>>,
