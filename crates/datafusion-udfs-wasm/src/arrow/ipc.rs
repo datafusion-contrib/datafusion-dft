@@ -165,7 +165,7 @@ pub fn create_arrow_ipc_wasm_udf_impl(
 ) -> impl Fn(&[ColumnarValue]) -> Result<ColumnarValue> {
     move |args: &[ColumnarValue]| {
         let engine = Engine::default();
-        let mut linker: Linker<WasiCtx> = Linker::new(&engine);
+        let linker: Linker<WasiCtx> = Linker::new(&engine);
         // Create a WASI context and put it in a Store; all instances in the store
         // share this context. `WasiCtxBuilder` provides a number of ways to
         // configure what the target program will have access to.
@@ -180,7 +180,7 @@ pub fn create_arrow_ipc_wasm_udf_impl(
         let alloc: TypedFunc<i32, i32> =
             try_get_wasm_module_exported_fn(&instance, &mut store, "alloc")?;
         let dealloc: TypedFunc<(i32, i32), ()> =
-            try_get_wasm_module_exported_fn(&instance, &mut store, "alloc")?;
+            try_get_wasm_module_exported_fn(&instance, &mut store, "dealloc")?;
 
         let func: TypedFunc<(i32, i32), (i32, i32)> =
             try_get_wasm_module_exported_fn(&instance, &mut store, &func_name)?;

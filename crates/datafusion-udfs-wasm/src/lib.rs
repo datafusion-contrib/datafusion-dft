@@ -80,7 +80,7 @@ fn create_wasm_udf(module_bytes: &[u8], udf_details: WasmUdfDetails) -> Result<S
     // We need to call `create_udf` on each branch because each `impl Trait` creates a distinct
     // opaque type so the type returned from each branch is different.  We could probably create a
     // wrapper struct as a cleaner solution but using this for now.
-    let udf = match input_data_type {
+    match input_data_type {
         WasmInputDataType::Row => {
             let udf_impl = create_row_wasm_udf_impl(
                 module_bytes.to_owned(),
@@ -113,11 +113,7 @@ fn create_wasm_udf(module_bytes: &[u8], udf_details: WasmUdfDetails) -> Result<S
             );
             Ok(udf)
         }
-        _ => Err(DataFusionError::Execution(
-            "Unexpected WasmInputDataType".to_string(),
-        )),
-    }?;
-    Ok(udf)
+    }
 }
 
 /// Attempts to create a `ScalarUDF` from the provided byte slice, which could be either a WASM

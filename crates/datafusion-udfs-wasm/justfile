@@ -1,5 +1,6 @@
 install-deps:
     rustup target add wasm32-unknown-unknown
+    rustup target add wasm32-wasip1
 
 build-examples:
     cargo build --target=wasm32-unknown-unknown --release --manifest-path wasm-examples/Cargo.toml
