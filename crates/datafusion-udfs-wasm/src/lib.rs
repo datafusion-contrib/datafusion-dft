@@ -152,7 +152,7 @@ where
     instance
         .get_typed_func::<Params, Results>(store, export_name)
         .map_err(|err| {
-            DataFusionError::Internal(
-                format!("Required export '{export_name:?}' could not be located in WASM module exports: {err:?}"))
+            DataFusionError::External(
+                format!("Required export '{export_name:?}' could not be located in WASM module exports: {err:?}").into())
         })
 }

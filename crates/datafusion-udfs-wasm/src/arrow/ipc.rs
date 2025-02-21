@@ -411,6 +411,38 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn incorrect_function_signature() {
+        let bytes = std::fs::read("test-wasm/basic_wasm_example.wasm").unwrap();
+        let input_types = vec![DataType::Utf8, DataType::Utf8];
+        let return_type = DataType::Utf8;
+        let udf_details = WasmUdfDetails::new(
+            "wasm_add".to_string(),
+            input_types,
+            return_type,
+            WasmInputDataType::ArrowIpc,
+        );
+        let udf = try_create_wasm_udf(&bytes, udf_details).unwrap();
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(udf);
+
+        let ddl = "CREATE TABLE test AS VALUES ('a','b'), ('c', 'd');";
+        ctx.sql(ddl).await.unwrap().collect().await.unwrap();
+
+        let udf_sql = "SELECT *, wasm_add(column1, column2) FROM test";
+        let res = ctx.sql(udf_sql).await.unwrap().collect().await;
+
+        if let Err(e) = res {
+            assert_eq!(
+                &e.to_string(),
+                "External error: Required export '\"alloc\"' could not be located in WASM module exports: failed to find function export `alloc`"
+            )
+        } else {
+            panic!()
+        }
+    }
+
+    #[tokio::test]
     async fn udf_registers_and_returns_expected_result_for_alot_of_args() {
         let bytes = std::fs::read("test-wasm/wasm_examples.wasm").unwrap();
         let input_types = vec![
