@@ -192,11 +192,18 @@ pub fn create_arrow_ipc_wasm_udf_impl(
         let instance = Instance::new(&mut store, &module, &[])
             .map_err(|e| DataFusionError::Internal(format!("Error instantiating module: {e:?}")))?;
 
+        // `alloc` takes as argument a number of bytes to allocate and returns an offset to where
+        // those bytes start
         let alloc: TypedFunc<i32, i32> =
             try_get_wasm_module_exported_fn(&instance, &mut store, "alloc")?;
+        // `dealloc` takes as argument an offset to start at and the number of bytes to deallocate
+        // from that offset
         let dealloc: TypedFunc<(i32, i32), ()> =
             try_get_wasm_module_exported_fn(&instance, &mut store, "dealloc")?;
 
+        // `func` is the Arrow function implementation that takes as argument the offset and number
+        // of bytes to read from memory and returns an i64 that can be split into 2 i32s where the
+        // first i32 is the offset of the result and the second i32 is the number of results.
         let func: TypedFunc<(i32, i32), i64> =
             try_get_wasm_module_exported_fn(&instance, &mut store, &func_name)?;
 
@@ -265,6 +272,12 @@ pub fn create_arrow_ipc_wasm_udf_impl(
         let result = results.into_iter().next().ok_or_else(|| {
             DataFusionError::Execution("Error getting result columnar value".to_string())
         })?;
+        if result.data_type() != return_type {
+            return Err(DataFusionError::Execution(format!(
+                "Incorrect return type for {func_name}. Got {} expected {return_type} from config",
+                result.data_type()
+            )));
+        }
 
         Ok(result)
     }
@@ -279,7 +292,7 @@ mod tests {
     use datafusion::prelude::*;
 
     #[tokio::test]
-    async fn udf_registers_and_computes_expected_result() {
+    async fn udf_registers_and_computes_expected_result_for_numeric_type() {
         let bytes = std::fs::read("test-wasm/wasm_examples.wasm").unwrap();
         let input_types = vec![DataType::Int64, DataType::Int64];
         let return_type = DataType::Int64;
@@ -308,6 +321,132 @@ mod tests {
             "| 3       | 4       | 3                                     |",
             "+---------+---------+---------------------------------------+",
         ];
+        assert_batches_eq!(&expected, &res);
+    }
+
+    #[tokio::test]
+    async fn udf_registers_and_computes_expected_result_for_string_type() {
+        let bytes = std::fs::read("test-wasm/wasm_examples.wasm").unwrap();
+        let input_types = vec![DataType::Utf8, DataType::Utf8];
+        let return_type = DataType::Utf8;
+        let udf_details = WasmUdfDetails::new(
+            "arrow_func".to_string(),
+            input_types,
+            return_type,
+            WasmInputDataType::ArrowIpc,
+        );
+        let udf = try_create_wasm_udf(&bytes, udf_details).unwrap();
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(udf);
+
+        let ddl = "CREATE TABLE test AS VALUES ('a','b'), ('c', 'd');";
+        ctx.sql(ddl).await.unwrap().collect().await.unwrap();
+
+        let udf_sql = "SELECT *, arrow_func(column1, column2) FROM test";
+        let res = ctx.sql(udf_sql).await.unwrap().collect().await.unwrap();
+
+        let expected = vec![
+            "+---------+---------+---------------------------------------+",
+            "| column1 | column2 | arrow_func(test.column1,test.column2) |",
+            "+---------+---------+---------------------------------------+",
+            "| a       | b       | a                                     |",
+            "| c       | d       | c                                     |",
+            "+---------+---------+---------------------------------------+",
+        ];
+        assert_batches_eq!(&expected, &res);
+    }
+
+    #[tokio::test]
+    async fn udf_registers_and_returns_error_for_incorrect_return_type() {
+        let bytes = std::fs::read("test-wasm/wasm_examples.wasm").unwrap();
+        let input_types = vec![DataType::Utf8, DataType::Utf8];
+        let return_type = DataType::Int64;
+        let udf_details = WasmUdfDetails::new(
+            "arrow_func".to_string(),
+            input_types,
+            return_type,
+            WasmInputDataType::ArrowIpc,
+        );
+        let udf = try_create_wasm_udf(&bytes, udf_details).unwrap();
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(udf);
+
+        let ddl = "CREATE TABLE test AS VALUES ('a','b'), ('c', 'd');";
+        ctx.sql(ddl).await.unwrap().collect().await.unwrap();
+
+        let udf_sql = "SELECT *, arrow_func(column1, column2) FROM test";
+        let res = ctx.sql(udf_sql).await.unwrap().collect().await;
+        if let Err(e) = res {
+            assert_eq!(
+                &e.to_string(),
+                "Execution error: Incorrect return type for arrow_func. Got Utf8 expected Int64 from config"
+            )
+        } else {
+            panic!()
+        }
+    }
+
+    #[tokio::test]
+    async fn missing_function_expected_error() {
+        let bytes = std::fs::read("test-wasm/wasm_examples.wasm").unwrap();
+        let input_types = vec![DataType::Utf8, DataType::Utf8];
+        let return_type = DataType::Utf8;
+        let udf_details = WasmUdfDetails::new(
+            "missing_arrow_func".to_string(),
+            input_types,
+            return_type,
+            WasmInputDataType::ArrowIpc,
+        );
+        let res = try_create_wasm_udf(&bytes, udf_details);
+        if let Err(e) = res {
+            assert_eq!(
+                &e.to_string(),
+                "Execution error: WASM function missing_arrow_func is missing in module"
+            )
+        } else {
+            panic!()
+        }
+    }
+
+    #[tokio::test]
+    async fn udf_registers_and_returns_expected_result_for_alot_of_args() {
+        let bytes = std::fs::read("test-wasm/wasm_examples.wasm").unwrap();
+        let input_types = vec![
+            DataType::Utf8,
+            DataType::Utf8,
+            DataType::Utf8,
+            DataType::Utf8,
+            DataType::Utf8,
+        ];
+        let return_type = DataType::Utf8;
+        let udf_details = WasmUdfDetails::new(
+            "arrow_func".to_string(),
+            input_types,
+            return_type,
+            WasmInputDataType::ArrowIpc,
+        );
+        let udf = try_create_wasm_udf(&bytes, udf_details).unwrap();
+
+        let ctx = SessionContext::new();
+        ctx.register_udf(udf);
+
+        let ddl =
+            "CREATE TABLE test AS VALUES ('a','b', 'c', 'd', 'e'), ('c', 'd', 'e', 'f', 'g');";
+        ctx.sql(ddl).await.unwrap().collect().await.unwrap();
+
+        let udf_sql = "SELECT *, arrow_func(column1, column2, column3, column4, column5) FROM test";
+        let res = ctx.sql(udf_sql).await.unwrap().collect().await.unwrap();
+
+        let expected = vec![
+    "+---------+---------+---------+---------+---------+------------------------------------------------------------------------------+",
+    "| column1 | column2 | column3 | column4 | column5 | arrow_func(test.column1,test.column2,test.column3,test.column4,test.column5) |",
+    "+---------+---------+---------+---------+---------+------------------------------------------------------------------------------+",
+    "| a       | b       | c       | d       | e       | a                                                                            |",
+    "| c       | d       | e       | f       | g       | c                                                                            |",
+    "+---------+---------+---------+---------+---------+------------------------------------------------------------------------------+",
+];
         assert_batches_eq!(&expected, &res);
     }
 }
