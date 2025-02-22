@@ -17,7 +17,7 @@
 
 //! Configuration management handling
 
-use std::{collections::HashMap, path::PathBuf};
+use std::path::PathBuf;
 
 #[cfg(feature = "udfs-wasm")]
 use datafusion_udfs_wasm::WasmInputDataType;
@@ -25,6 +25,8 @@ use directories::{ProjectDirs, UserDirs};
 use lazy_static::lazy_static;
 use log::info;
 use serde::Deserialize;
+#[cfg(feature = "udfs-wasm")]
+use std::collections::HashMap;
 
 #[cfg(feature = "s3")]
 use color_eyre::Result;
