@@ -20,7 +20,7 @@ pub mod native;
 
 use std::sync::Arc;
 
-use arrow::ipc::create_arrow_ipc_wasm_udf_impl;
+use arrow::ipc::{create_arrow_ipc_wasm_udf_impl, ArrowIpcModule};
 use datafusion::{
     arrow::datatypes::DataType,
     common::{DataFusionError, Result},
@@ -98,6 +98,9 @@ fn create_wasm_udf(module_bytes: &[u8], udf_details: WasmUdfDetails) -> Result<S
             Ok(udf)
         }
         WasmInputDataType::ArrowIpc => {
+            // Check if all the function definitions are correct while making the UDF.  TODO:
+            // Investigate if this can only be called once.
+            ArrowIpcModule::try_new(module_bytes, &name)?;
             let udf_impl = create_arrow_ipc_wasm_udf_impl(
                 module_bytes.to_owned(),
                 name.clone(),
@@ -119,6 +122,7 @@ fn create_wasm_udf(module_bytes: &[u8], udf_details: WasmUdfDetails) -> Result<S
 /// Attempts to create a `ScalarUDF` from the provided byte slice, which could be either a WASM
 /// binary or text format, and function details (name and signature).
 pub fn try_create_wasm_udf(module_bytes: &[u8], udf_details: WasmUdfDetails) -> Result<ScalarUDF> {
+    // TODO: Can we Create the store / module once here and reuse that?
     let mut store = Store::<()>::default();
     let module = Module::new(store.engine(), module_bytes)
         .map_err(|_| DataFusionError::Execution("Unable to load WASM module".to_string()))?;
