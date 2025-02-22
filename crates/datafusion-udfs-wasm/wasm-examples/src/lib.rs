@@ -20,7 +20,7 @@ pub fn alloc(len: usize) -> *mut u8 {
     std::mem::forget(buf);
     // return the pointer so the runtime
     // can write data at this offset
-    return ptr;
+    ptr
 }
 
 #[no_mangle]
@@ -32,17 +32,17 @@ pub fn wasm_add(left: i64, right: i64) -> i64 {
 }
 
 #[no_mangle]
-pub fn arrow_func(ptr: *mut u8, len: i32) -> u64 {
+pub unsafe fn arrow_func(ptr: *mut u8, len: i32) -> u64 {
     // 1. Read the input (Arrow IPC bytes) from WASM memory
     let input_data = unsafe { Vec::from_raw_parts(ptr, len as usize, len as usize) };
 
     // 2. Parse the Arrow IPC data into RecordBatches
     let c = Cursor::new(input_data);
-    let mut reader =
+    let reader =
         StreamReader::try_new(c, None).expect("Failed to create StreamReader from Arrow IPC input");
 
     let mut batches: Vec<RecordBatch> = Vec::new();
-    while let Some(batch) = reader.next() {
+    for batch in reader {
         batches.push(batch.expect("Failed to read RecordBatch from Arrow stream"));
     }
 

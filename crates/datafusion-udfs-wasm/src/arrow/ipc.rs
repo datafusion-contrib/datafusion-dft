@@ -26,8 +26,8 @@ use datafusion::{
     common::{DataFusionError, Result},
     logical_expr::ColumnarValue,
 };
-use wasi_common::sync::WasiCtxBuilder;
-use wasmtime::{Engine, Instance, Module, Store, TypedFunc};
+use wasi_common::{sync::WasiCtxBuilder, WasiCtx};
+use wasmtime::{Engine, Instance, Memory, Module, Store, TypedFunc};
 
 use crate::try_get_wasm_module_exported_fn;
 
@@ -38,12 +38,110 @@ use datafusion::arrow::ipc::writer::StreamWriter;
 use datafusion::arrow::record_batch::RecordBatch;
 use datafusion::scalar::ScalarValue;
 
+struct ArrowIpcModule {
+    store: Store<WasiCtx>,
+    alloc_fn: TypedFunc<i32, i32>,
+    dealloc_fn: TypedFunc<(i32, i32), ()>,
+    func: TypedFunc<(i32, i32), i64>,
+    memory: Memory,
+}
+
+impl ArrowIpcModule {
+    fn try_new(module_bytes: &[u8], func_name: &str) -> Result<Self> {
+        let engine = Engine::default();
+        // Create a WASI context and put it in a Store; all instances in the store
+        // share this context. `WasiCtxBuilder` provides a number of ways to
+        // configure what the target program will have access to.
+        let wasi = WasiCtxBuilder::new().inherit_stderr().build();
+        let mut store = Store::new(&engine, wasi);
+
+        let module = Module::from_binary(store.engine(), module_bytes)
+            .map_err(|e| DataFusionError::Internal(format!("Error loading module: {e:?}")))?;
+        let instance = Instance::new(&mut store, &module, &[])
+            .map_err(|e| DataFusionError::Internal(format!("Error instantiating module: {e:?}")))?;
+
+        // `alloc` takes as argument a number of bytes to allocate and returns an offset to where
+        // those bytes start
+        let alloc: TypedFunc<i32, i32> =
+            try_get_wasm_module_exported_fn(&instance, &mut store, "alloc")?;
+        // `dealloc` takes as argument an offset to start at and the number of bytes to deallocate
+        // from that offset
+        let dealloc: TypedFunc<(i32, i32), ()> =
+            try_get_wasm_module_exported_fn(&instance, &mut store, "dealloc")?;
+
+        // `func` is the Arrow function implementation that takes as argument the offset and number
+        // of bytes to read from memory and returns an i64 that can be split into 2 i32s where the
+        // first i32 is the offset of the result and the second i32 is the number of results.
+        let func: TypedFunc<(i32, i32), i64> =
+            try_get_wasm_module_exported_fn(&instance, &mut store, func_name)?;
+
+        let memory =
+            instance
+                .get_memory(&mut store, "memory")
+                .ok_or(DataFusionError::Execution(
+                    "Missing memory in module".to_string(),
+                ))?;
+
+        Ok(Self {
+            store,
+            alloc_fn: alloc,
+            dealloc_fn: dealloc,
+            func,
+            memory,
+        })
+    }
+
+    fn alloc(&mut self, len: i32) -> Result<i32> {
+        self.alloc_fn.call(&mut self.store, len).map_err(|e| {
+            DataFusionError::Execution(format!("Unable to allocate WASM memory: {}", e))
+        })
+    }
+
+    fn dealloc(&mut self, offset: i32, len: i32) -> Result<()> {
+        self.dealloc_fn
+            .call(&mut self.store, (offset, len))
+            .map_err(|e| {
+                DataFusionError::Execution(format!("Unable to deallocate input buffer: {}", e))
+            })
+    }
+
+    fn execute(&mut self, offset: i32, length: i32) -> Result<i64> {
+        self.func
+            .call(&mut self.store, (offset, length))
+            .map_err(|e| {
+                DataFusionError::Execution(format!("Error executing Arrow IPC WASM func: {}", e))
+            })
+    }
+
+    fn write(&mut self, offset: usize, buffer: &[u8]) -> Result<()> {
+        self.memory
+            .write(&mut self.store, offset, buffer)
+            .map_err(|e| {
+                DataFusionError::Execution(format!(
+                    "Unable to write Arrow IPC to WASM memory: {}",
+                    e
+                ))
+            })
+    }
+
+    fn read(&mut self, offset: usize, buffer: &mut [u8]) -> Result<()> {
+        self.memory
+            .read(&mut self.store, offset, buffer)
+            .map_err(|e| {
+                DataFusionError::Execution(format!(
+                    "Unable to read Arrow IPC from WASM memory: {}",
+                    e
+                ))
+            })
+    }
+}
+
 /// Convert &[ColumnarValue] into an Arrow IPC (stream) buffer in memory.
 pub fn columnar_values_to_ipc(
     columnar_values: &[ColumnarValue],
     input_types: &[DataType],
 ) -> ArrowResult<Vec<u8>> {
-    // 1. Determine the maximum row count (length) among array columns
+    // Determine the maximum row count (length) among array columns
     let mut max_length = 1;
     for cv in columnar_values {
         if let ColumnarValue::Array(ref arr) = cv {
@@ -57,7 +155,8 @@ pub fn columnar_values_to_ipc(
     let mut fields = Vec::with_capacity(columnar_values.len());
     let mut arrays = Vec::with_capacity(columnar_values.len());
 
-    // 2. Convert each ColumnarValue into an Arrow Array of length == max_length
+    // TODO convert this into a function
+    // Convert each ColumnarValue into an Arrow Array of length == max_length
     for (i, cv) in columnar_values.iter().enumerate() {
         let field_name = format!("column_{i}");
         match cv {
@@ -180,94 +279,30 @@ pub fn create_arrow_ipc_wasm_udf_impl(
     return_type: DataType,
 ) -> impl Fn(&[ColumnarValue]) -> Result<ColumnarValue> {
     move |args: &[ColumnarValue]| {
-        let engine = Engine::default();
-        // Create a WASI context and put it in a Store; all instances in the store
-        // share this context. `WasiCtxBuilder` provides a number of ways to
-        // configure what the target program will have access to.
-        let wasi = WasiCtxBuilder::new().inherit_stderr().build();
-        let mut store = Store::new(&engine, wasi);
-
-        let module = Module::from_binary(store.engine(), &module_bytes)
-            .map_err(|e| DataFusionError::Internal(format!("Error loading module: {e:?}")))?;
-        let instance = Instance::new(&mut store, &module, &[])
-            .map_err(|e| DataFusionError::Internal(format!("Error instantiating module: {e:?}")))?;
-
-        // `alloc` takes as argument a number of bytes to allocate and returns an offset to where
-        // those bytes start
-        let alloc: TypedFunc<i32, i32> =
-            try_get_wasm_module_exported_fn(&instance, &mut store, "alloc")?;
-        // `dealloc` takes as argument an offset to start at and the number of bytes to deallocate
-        // from that offset
-        let dealloc: TypedFunc<(i32, i32), ()> =
-            try_get_wasm_module_exported_fn(&instance, &mut store, "dealloc")?;
-
-        // `func` is the Arrow function implementation that takes as argument the offset and number
-        // of bytes to read from memory and returns an i64 that can be split into 2 i32s where the
-        // first i32 is the offset of the result and the second i32 is the number of results.
-        let func: TypedFunc<(i32, i32), i64> =
-            try_get_wasm_module_exported_fn(&instance, &mut store, &func_name)?;
-
-        let memory =
-            instance
-                .get_memory(&mut store, "memory")
-                .ok_or(DataFusionError::Execution(
-                    "Missing memory in module".to_string(),
-                ))?;
-
+        let mut arrow_ipc_module = ArrowIpcModule::try_new(&module_bytes, &func_name)?;
+        // Convert to IPC and write to WASM memory
         let ipc_bytes = columnar_values_to_ipc(args, &input_types)?;
-        let input_offset = alloc
-            .call(&mut store, ipc_bytes.len() as i32)
-            .map_err(|e| {
-                DataFusionError::Execution(format!("Unable to allocate WASM memory: {}", e))
-            })?;
+        let input_offset = arrow_ipc_module.alloc(ipc_bytes.len() as i32)?;
+        arrow_ipc_module.write(input_offset as usize, &ipc_bytes)?;
 
-        memory
-            .write(&mut store, input_offset as usize, &ipc_bytes)
-            .map_err(|e| {
-                DataFusionError::Execution(format!(
-                    "Unable to write Arrow IPC to WASM memory: {}",
-                    e
-                ))
-            })?;
-
-        let details = func
-            .call(&mut store, (input_offset, ipc_bytes.len() as i32))
-            .map_err(|e| {
-                DataFusionError::Execution(format!("Error executing Arrow IPC WASM func: {}", e))
-            })?;
-
+        // Execute UDF and read output from WASM memory into host
+        let details = arrow_ipc_module.execute(input_offset, ipc_bytes.len() as i32)?;
         let output_offset = (details >> 32) as i32;
         let output_len = (details & 0xFFFF_FFFF) as i32;
-
         let output_len_usize = output_len as usize;
         let mut output_ipc_bytes = vec![0u8; output_len_usize];
-        memory
-            .read(&mut store, output_offset as usize, &mut output_ipc_bytes)
-            .map_err(|e| {
-                DataFusionError::Execution(format!(
-                    "Unable to read Arrow IPC from WASM memory: {}",
-                    e
-                ))
-            })?;
+        arrow_ipc_module.read(output_offset as usize, &mut output_ipc_bytes)?;
 
-        dealloc
-            .call(&mut store, (input_offset, ipc_bytes.len() as i32))
-            .map_err(|e| {
-                DataFusionError::Execution(format!("Unable to deallocate input buffer: {}", e))
-            })?;
+        // Cleanup allocations
+        arrow_ipc_module.dealloc(input_offset, ipc_bytes.len() as i32)?;
+        arrow_ipc_module.dealloc(output_offset, output_len)?;
 
-        dealloc
-            .call(&mut store, (output_offset, output_len))
-            .map_err(|e| {
-                DataFusionError::Execution(format!("Unable to deallocate output buffer: {}", e))
-            })?;
-
+        // Convert back to DataFusion type
         let reader = StreamReader::try_new(Cursor::new(output_ipc_bytes), None)?;
         let mut batches = Vec::new();
         for batch in reader {
             batches.push(batch?);
         }
-
         let results = try_record_batches_to_columnar_values(&batches)?;
         let result = results.into_iter().next().ok_or_else(|| {
             DataFusionError::Execution("Error getting result columnar value".to_string())

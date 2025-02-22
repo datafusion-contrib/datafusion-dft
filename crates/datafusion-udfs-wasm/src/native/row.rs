@@ -167,7 +167,7 @@ mod tests {
 
     #[test]
     fn descriptive_error_when_missing_function_in_wasm() {
-        let bytes = std::fs::read("test-wasm/wasm_examples.wasm").unwrap();
+        let bytes = std::fs::read("test-wasm/basic_wasm_example.wasm").unwrap();
         let input_types = vec![DataType::Int32];
         let return_type = DataType::Int32;
         let udf_details = WasmUdfDetails::new(
@@ -186,7 +186,7 @@ mod tests {
 
     #[tokio::test]
     async fn udf_registers_and_computes_expected_result() {
-        let bytes = std::fs::read("test-wasm/wasm_examples.wasm").unwrap();
+        let bytes = std::fs::read("test-wasm/basic_wasm_example.wasm").unwrap();
         let input_types = vec![DataType::Int64, DataType::Int64];
         let return_type = DataType::Int64;
         let udf_details = WasmUdfDetails::new(
