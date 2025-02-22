@@ -48,7 +48,7 @@ pub struct WasmUdfDetails {
     input_types: Vec<DataType>,
     return_type: DataType,
 }
-//
+
 impl WasmUdfDetails {
     pub fn new(
         name: String,
@@ -144,6 +144,7 @@ pub fn try_create_wasm_udf(module_bytes: &[u8], udf_details: WasmUdfDetails) -> 
     Ok(udf)
 }
 
+/// Checks for a function in a WASM module
 pub fn try_get_wasm_module_exported_fn<Params, Results>(
     instance: &Instance,
     store: &mut Store<WasiCtx>,
