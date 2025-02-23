@@ -19,7 +19,7 @@
 
 use crate::config::ExecutionConfig;
 use crate::extensions::{DftSessionStateBuilder, Extension};
-use datafusion_common::DataFusionError;
+use datafusion::common::DataFusionError;
 use log::info;
 use std::sync::Arc;
 
@@ -41,7 +41,7 @@ impl Extension for HuggingFaceExtension {
         &self,
         config: ExecutionConfig,
         builder: &mut DftSessionStateBuilder,
-    ) -> datafusion_common::Result<()> {
+    ) -> datafusion::common::Result<()> {
         let Some(object_store_config) = &config.object_store else {
             return Ok(());
         };
@@ -72,7 +72,7 @@ impl Extension for HuggingFaceExtension {
 
                 let operator = Operator::new(hf_builder)
                     .map_err(|e| {
-                        datafusion_common::error::DataFusionError::External(e.to_string().into())
+                        datafusion::common::error::DataFusionError::External(e.to_string().into())
                     })?
                     .finish();
 

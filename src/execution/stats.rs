@@ -382,7 +382,7 @@ impl From<PlanIOVisitor> for ExecutionIOStats {
 }
 
 impl ExecutionPlanVisitor for PlanIOVisitor {
-    type Error = datafusion_common::DataFusionError;
+    type Error = datafusion::common::DataFusionError;
 
     fn pre_visit(&mut self, plan: &dyn ExecutionPlan) -> color_eyre::Result<bool, Self::Error> {
         if is_io_plan(plan) {
@@ -712,7 +712,7 @@ impl From<PlanComputeVisitor> for ExecutionComputeStats {
 }
 
 impl ExecutionPlanVisitor for PlanComputeVisitor {
-    type Error = datafusion_common::DataFusionError;
+    type Error = datafusion::common::DataFusionError;
 
     fn pre_visit(&mut self, plan: &dyn ExecutionPlan) -> color_eyre::Result<bool, Self::Error> {
         if !is_io_plan(plan) {

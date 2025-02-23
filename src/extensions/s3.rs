@@ -39,7 +39,7 @@ impl Extension for AwsS3Extension {
         &self,
         config: ExecutionConfig,
         builder: &mut DftSessionStateBuilder,
-    ) -> datafusion_common::Result<()> {
+    ) -> datafusion::common::Result<()> {
         let Some(object_store_config) = &config.object_store else {
             return Ok(());
         };

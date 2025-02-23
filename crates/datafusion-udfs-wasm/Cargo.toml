@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-datafusion = "43.0.0"
+datafusion = "44.0.0"
 log = "0.4.25"
 serde = { version = "1.0.217", optional = true }
 wasi-common = "29.0.1"
