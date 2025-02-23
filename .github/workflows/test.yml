@@ -50,7 +50,7 @@ jobs:
           # All features except FlightSQL which requires being run on a single thread for determinism
           cargo test --features=deltalake
   test-flightsql:
-    name: FlightSQL
+    name: Extension / FlightSQL
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -81,7 +81,7 @@ jobs:
           # can connec to server in different test which breaks determinism.
           cargo test --features=flightsql extension_cases::flightsql -- --test-threads=1
   test-s3:
-    name: S3
+    name: Extension / S3
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -106,7 +106,7 @@ jobs:
         run: |
           cargo test --features=s3 extension_cases::s3
   test-functions-json:
-    name: Functions-JSON
+    name: Extension / Functions-JSON
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -134,7 +134,7 @@ jobs:
         run: |
           cargo test --features=functions-json extension_cases::functions_json
   test-deltalake:
-    name: Deltalake
+    name: Extension / Deltalake
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -162,7 +162,7 @@ jobs:
         run: |
           cargo test --features=deltalake extension_cases::deltalake
   test-hudi:
-    name: Hudi
+    name: Extension / Hudi
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -189,36 +189,8 @@ jobs:
       - name: Run Hudi tests
         run: |
           cargo test --features=hudi extension_cases::hudi
-  test-huggingface:
-    name: HuggingFace
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [amd64]
-        rust: [stable]
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: true
-      - name: Cache Cargo
-        uses: actions/cache@v2
-        with:
-          path: /home/runner/.cargo
-          key: cargo-dft-cache-
-      - name: Cache Rust dependencies
-        uses: actions/cache@v2
-        with:
-          path: /home/runner/target
-          key: target-dft-cache-
-      - name: Setup Rust toolchain
-        run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
-      - name: Run HuggingFace tests
-        run: |
-          cargo test --features=huggingface extension_cases::huggingface
   test-udfs-wasm:
-    name: UDFs-WASM
+    name: Extension / UDFs-WASM
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -245,3 +217,59 @@ jobs:
       - name: Run UDFs WASM tests
         run: |
           cargo test --features=udfs-wasm extension_cases::udfs_WASM
+  test-crate-functions-parquet:
+    name: Crate / Functions-Parquet
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64]
+        rust: [stable]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Cache Cargo
+        uses: actions/cache@v2
+        with:
+          path: /home/runner/.cargo
+          key: cargo-dft-cache-
+      - name: Cache Rust dependencies
+        uses: actions/cache@v2
+        with:
+          path: /home/runner/target
+          key: target-dft-cache-
+      - name: Setup Rust toolchain
+        run: |
+          rustup toolchain install ${{ matrix.rust }}
+          rustup default ${{ matrix.rust }}
+      - name: Run UDFs WASM tests
+        run: |
+          cargo test --manifest-path crates/datafusion-functions-parquet/Cargo.toml
+  test-crate-udfs-wasm:
+    name: Crate / UDFs-WASM
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64]
+        rust: [stable]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Cache Cargo
+        uses: actions/cache@v2
+        with:
+          path: /home/runner/.cargo
+          key: cargo-dft-cache-
+      - name: Cache Rust dependencies
+        uses: actions/cache@v2
+        with:
+          path: /home/runner/target
+          key: target-dft-cache-
+      - name: Setup Rust toolchain
+        run: |
+          rustup toolchain install ${{ matrix.rust }}
+          rustup default ${{ matrix.rust }}
+      - name: Run UDFs WASM tests
+        run: |
+          cargo test --manifest-path crates/datafusion-udfs-wasm/Cargo.toml

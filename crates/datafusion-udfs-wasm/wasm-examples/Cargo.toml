@@ -7,3 +7,4 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
+arrow = "53"

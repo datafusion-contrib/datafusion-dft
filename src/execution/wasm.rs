@@ -44,8 +44,12 @@ pub fn create_wasm_udfs(wasm_udf_config: &WasmUdfConfig) -> Result<Vec<ScalarUDF
         for func_details in funcs {
             match udf_signature_from_func_details(func_details) {
                 Ok((input_types, return_type)) => {
-                    let udf_details =
-                        WasmUdfDetails::new(func_details.name.clone(), input_types, return_type);
+                    let udf_details = WasmUdfDetails::new(
+                        func_details.name.clone(),
+                        input_types,
+                        return_type,
+                        func_details.input_data_type.clone(),
+                    );
                     let udf = try_create_wasm_udf(&module_bytes, udf_details)?;
                     created_udfs.push(udf)
                 }

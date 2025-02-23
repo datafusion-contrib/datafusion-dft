@@ -3,3 +3,6 @@ install-deps:
 
 build-examples:
     cargo build --target=wasm32-unknown-unknown --release --manifest-path wasm-examples/Cargo.toml
+
+copy-example-to-test: build-examples
+    cp wasm-examples/target/wasm32-unknown-unknown/release/wasm_examples.wasm test-wasm/

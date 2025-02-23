@@ -117,6 +117,7 @@ impl TestConfigBuilder {
         &mut self,
         module_path: &str,
         function_name: &str,
+        input_data_type: &str,
         input_types: &[&str],
         return_type: &str,
     ) -> &mut Self {
@@ -136,6 +137,9 @@ impl TestConfigBuilder {
         // Write the function name.
         self.config_text
             .push_str(&format!("name = \"{}\", ", function_name));
+
+        self.config_text
+            .push_str(&format!("input_data_type = \"{}\", ", input_data_type));
 
         // Write the input_types array.
         self.config_text.push_str("input_types = [");
