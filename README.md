@@ -229,7 +229,12 @@ select * from foo where json_get(attributes, 'bar')::string='ham'
 
 ##### WASM UDF Functions (`--features=udfs-wasm`)
 
-Adds the ability to register WASM UDFs. Currently only UDFs with the data types `Int32`, `Int64`, `Float32`, or `Float64` in their signature are supported until we integrate more with WASM memory.  Further, the current implementation is row oriented, calling the WASM function for every single record.  The intent is to provide additional APIs leveraging WASM memory for more efficient WASM compute operations (i.e. vectorized functions and functions that operate on Arrow data over the C Data Interface / FFI).
+Adds the ability to register WASM UDFs. Currently two different input types are supported:
+
+1. Row => WASM native types only (`Int32`, `Int64`, `Float32`, or `Float64`) and the UDF is called once per row.
+2. ArrowIpc => The input `ColumnarValue`'s are serialized to Arrow's IPC format and written to the WASM module's linear memory.
+
+More details can be found in [datafusion-udfs-wasm](https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-udfs-wasm).
 
 ```toml
 [[execution]]
@@ -237,6 +242,7 @@ module_functions = {
     "/path/to/wasm" = [
         {
             name = "funcName1",
+            input_data_type = "Row",
             input_types = [
                 "Int32",
                 "Int64",
@@ -245,6 +251,7 @@ module_functions = {
         },
         {
             name = "funcName2",
+            input_data_type = "ArrowIpc",
             input_types = [
                 "Float32",
                 "Float64",
