@@ -13,7 +13,7 @@ keywords = ["parquet", "query", "sql", "datafusion"]
 [dependencies]
 arrow = { version = "53.0.0" }
 async-trait = "0.1.41"
-datafusion = { version = "43.0.0", features = [
+datafusion = { version = "44.0.0", features = [
   "avro",
   "crypto_expressions",
   "datetime_expressions",

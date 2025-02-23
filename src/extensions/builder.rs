@@ -164,7 +164,7 @@ impl DftSessionStateBuilder {
     }
 
     /// Build the [`SessionState`] from the specified configuration
-    pub fn build(self) -> datafusion_common::Result<SessionState> {
+    pub fn build(self) -> datafusion::common::Result<SessionState> {
         let Self {
             app_type,
             execution_config,
