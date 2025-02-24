@@ -22,6 +22,7 @@ clap = { version = "4.5.27", features = ["derive"] }
 color-eyre = "0.6.3"
 crossterm = { version = "0.28.1", features = ["event-stream"] }
 datafusion = "43.0.0"
+datafusion-auth = { version = "0.1.0", path = "crates/datafusion-auth", optional = true }
 datafusion-common = "43.0.0"
 datafusion-functions-json = { version = "0.43.0", optional = true }
 datafusion-functions-parquet = { version = "0.1.0", path = "crates/datafusion-functions-parquet", optional = true }
@@ -89,6 +90,7 @@ functions-parquet = ["dep:datafusion-functions-parquet"]
 udfs-wasm = ["dep:datafusion-udfs-wasm"]
 metrics = ["dep:metrics", "dep:metrics-exporter-prometheus"]
 huggingface = ["opendal", "object_store_opendal", "url"]
+auth = ["dep:datafusion-auth"]
 
 [[bin]]
 name = "dft"

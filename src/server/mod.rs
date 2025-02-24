@@ -17,16 +17,22 @@
 
 pub mod services;
 
+use crate::config::AppConfig;
 use crate::execution::AppExecution;
 use crate::test_utils::trailers_layer::TrailersLayer;
+use arrow_flight::sql::server::FlightSqlService;
 use color_eyre::Result;
 use log::info;
 use metrics::{describe_counter, describe_histogram};
 use metrics_exporter_prometheus::{Matcher, PrometheusBuilder};
+use services::flightsql::FlightSqlServiceImpl;
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
+use tonic::transport::Server;
+use tower::layer::util::{Identity, Stack};
+use tower::Layer;
 
 const DEFAULT_TIMEOUT_SECONDS: u64 = 60;
 
@@ -46,6 +52,47 @@ fn initialize_metrics() {
     )
 }
 
+/// Utility function to combine two optional layers into one.
+/// If neither is present, returns an Identity layer.
+/// If only one is present, returns that layer.
+/// If both are present, returns them stacked.
+fn combine_layers<A, B>(layer_a: Option<A>, layer_b: Option<B>) -> impl Layer<FlightSqlServiceImpl>
+where
+    A: Layer<FlightSqlServiceImpl>, // adjust as needed
+    B: Layer<A::Service>,           // adjust as needed
+{
+    match (layer_a, layer_b) {
+        (Some(a), Some(b)) => Stack::new(b, a), // b applied first, then a
+        (Some(a), None) => a,
+        (None, Some(b)) => b,
+        (None, None) => Identity::new(),
+    }
+}
+
+fn add_server_layers(builder: Server, config: &AppConfig) -> Server {
+    match (
+        config.auth.server_basic_auth,
+        config.auth.server_bearer_token,
+    ) {
+        (Some(basic_auth), Some(bearer_token)) => {
+            let basic_auth =
+                datafusion_auth::basic_auth(&basic_auth.username, &basic_auth.password);
+            let bearer_layer = datafusion_auth::bearer_auth(&bearer_token);
+            builder.layer(basic_auth).layer(bearer_layer)
+        }
+        (Some(basic_auth), None) => {
+            let basic_auth =
+                datafusion_auth::basic_auth(&basic_auth.username, &basic_auth.password);
+            builder.layer(basic_auth)
+        }
+        (None, Some(bearer_token)) => {
+            let bearer_layer = datafusion_auth::bearer_auth(&bearer_token);
+            builder.layer(bearer_layer)
+        }
+        (None, None) => builder,
+    }
+}
+
 /// Creates and manages a running FlightSqlServer with a background task
 pub struct FlightSqlApp {
     /// channel to send shutdown command
@@ -60,9 +107,9 @@ pub struct FlightSqlApp {
 
 impl FlightSqlApp {
     /// create a new app for the flightsql server
-    #[allow(dead_code)]
     pub async fn try_new(
         app_execution: AppExecution,
+        config: AppConfig,
         addr: &str,
         metrics_addr: &str,
     ) -> Result<Self> {
@@ -80,6 +127,10 @@ impl FlightSqlApp {
             rx.await.ok();
         };
 
+        let server_builder = tonic::transport::Server::builder().timeout(server_timeout);
+        let server_with_layers = add_server_layers(server_builder, config);
+
+        // TODO: Only include layer for testing
         let serve_future = tonic::transport::Server::builder()
             .timeout(server_timeout)
             .layer(TrailersLayer)
