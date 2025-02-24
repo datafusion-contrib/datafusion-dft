@@ -1656,6 +1656,7 @@ dependencies = [
 name = "datafusion-auth"
 version = "0.1.0"
 dependencies = [
+ "datafusion",
  "http-body",
  "tower-http",
 ]

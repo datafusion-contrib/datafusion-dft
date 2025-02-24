@@ -22,6 +22,7 @@ use crate::execution::AppExecution;
 use crate::test_utils::trailers_layer::TrailersLayer;
 use arrow_flight::sql::server::FlightSqlService;
 use color_eyre::Result;
+use datafusion_auth::{Basic, Bearer, ValidateRequestHeaderLayer};
 use log::info;
 use metrics::{describe_counter, describe_histogram};
 use metrics_exporter_prometheus::{Matcher, PrometheusBuilder};
@@ -52,46 +53,32 @@ fn initialize_metrics() {
     )
 }
 
-/// Utility function to combine two optional layers into one.
-/// If neither is present, returns an Identity layer.
-/// If only one is present, returns that layer.
-/// If both are present, returns them stacked.
-fn combine_layers<A, B>(layer_a: Option<A>, layer_b: Option<B>) -> impl Layer<FlightSqlServiceImpl>
-where
-    A: Layer<FlightSqlServiceImpl>, // adjust as needed
-    B: Layer<A::Service>,           // adjust as needed
-{
-    match (layer_a, layer_b) {
-        (Some(a), Some(b)) => Stack::new(b, a), // b applied first, then a
-        (Some(a), None) => a,
-        (None, Some(b)) => b,
-        (None, None) => Identity::new(),
-    }
-}
+// struct AppLayer<ResBody> {
+//     basic_auth: Option<ValidateRequestHeaderLayer<Basic<ResBody>>>,
+//     bearer_token: Option<ValidateRequestHeaderLayer<Bearer<ResBody>>>,
+// }
 
-fn add_server_layers(builder: Server, config: &AppConfig) -> Server {
-    match (
-        config.auth.server_basic_auth,
-        config.auth.server_bearer_token,
-    ) {
-        (Some(basic_auth), Some(bearer_token)) => {
-            let basic_auth =
-                datafusion_auth::basic_auth(&basic_auth.username, &basic_auth.password);
-            let bearer_layer = datafusion_auth::bearer_auth(&bearer_token);
-            builder.layer(basic_auth).layer(bearer_layer)
-        }
-        (Some(basic_auth), None) => {
-            let basic_auth =
-                datafusion_auth::basic_auth(&basic_auth.username, &basic_auth.password);
-            builder.layer(basic_auth)
-        }
-        (None, Some(bearer_token)) => {
-            let bearer_layer = datafusion_auth::bearer_auth(&bearer_token);
-            builder.layer(bearer_layer)
-        }
-        (None, None) => builder,
-    }
-}
+// fn create_app_layer<S>(config: &AppConfig) -> AppLayer<S> {
+//     let basic_auth = if let Some(basic_auth) = config.auth.server_basic_auth {
+//         Some(datafusion_auth::basic_auth(
+//             &basic_auth.username,
+//             &basic_auth.password,
+//         ))
+//     } else {
+//         None
+//     };
+//
+//     let bearer_token = if let Some(bearer_token) = config.auth.server_bearer_token {
+//         Some(datafusion_auth::bearer_auth(&bearer_token))
+//     } else {
+//         None
+//     };
+//
+//     AppLayer {
+//         basic_auth,
+//         bearer_token,
+//     }
+// }
 
 /// Creates and manages a running FlightSqlServer with a background task
 pub struct FlightSqlApp {
@@ -128,7 +115,7 @@ impl FlightSqlApp {
         };
 
         let server_builder = tonic::transport::Server::builder().timeout(server_timeout);
-        let server_with_layers = add_server_layers(server_builder, config);
+        // let server_with_layers = add_server_layers(server_builder, config);
 
         // TODO: Only include layer for testing
         let serve_future = tonic::transport::Server::builder()
