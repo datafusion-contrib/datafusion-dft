@@ -20,19 +20,17 @@ pub mod services;
 use crate::config::AppConfig;
 use crate::execution::AppExecution;
 use crate::test_utils::trailers_layer::TrailersLayer;
-use arrow_flight::sql::server::FlightSqlService;
 use color_eyre::Result;
-use datafusion_auth::{Basic, Bearer, ValidateRequestHeaderLayer};
 use log::info;
 use metrics::{describe_counter, describe_histogram};
 use metrics_exporter_prometheus::{Matcher, PrometheusBuilder};
 use services::flightsql::FlightSqlServiceImpl;
+use std::future::Future;
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 use tonic::transport::Server;
-use tower::layer::util::{Identity, Stack};
 use tower::Layer;
 
 const DEFAULT_TIMEOUT_SECONDS: u64 = 60;
@@ -53,32 +51,60 @@ fn initialize_metrics() {
     )
 }
 
-// struct AppLayer<ResBody> {
-//     basic_auth: Option<ValidateRequestHeaderLayer<Basic<ResBody>>>,
-//     bearer_token: Option<ValidateRequestHeaderLayer<Bearer<ResBody>>>,
-// }
+fn create_server_handle(
+    config: AppConfig,
+    flightsql: FlightSqlServiceImpl,
+    listener: TcpListener,
+    shutdown_future: impl Future<Output = ()> + Send,
+) -> JoinHandle<std::result::Result<(), tonic::transport::Error>> {
+    let server_timeout = Duration::from_secs(DEFAULT_TIMEOUT_SECONDS);
+    let server_builder = Server::builder().timeout(server_timeout);
 
-// fn create_app_layer<S>(config: &AppConfig) -> AppLayer<S> {
-//     let basic_auth = if let Some(basic_auth) = config.auth.server_basic_auth {
-//         Some(datafusion_auth::basic_auth(
-//             &basic_auth.username,
-//             &basic_auth.password,
-//         ))
-//     } else {
-//         None
-//     };
-//
-//     let bearer_token = if let Some(bearer_token) = config.auth.server_bearer_token {
-//         Some(datafusion_auth::bearer_auth(&bearer_token))
-//     } else {
-//         None
-//     };
-//
-//     AppLayer {
-//         basic_auth,
-//         bearer_token,
-//     }
-// }
+    // TODO: Only include layer for testing
+    match (
+        config.auth.server_basic_auth,
+        config.auth.server_bearer_token,
+    ) {
+        (Some(basic), Some(token)) => {
+            let f = server_builder
+                .layer(TrailersLayer)
+                .add_service(flightsql.service())
+                .serve_with_incoming_shutdown(
+                    tokio_stream::wrappers::TcpListenerStream::new(listener),
+                    shutdown_future,
+                );
+
+            tokio::task::spawn(f)
+        }
+        (Some(basic), None) => {
+            let f = server_builder
+                .add_service(flightsql.service())
+                .serve_with_incoming_shutdown(
+                    tokio_stream::wrappers::TcpListenerStream::new(listener),
+                    shutdown_future,
+                );
+            tokio::task::spawn(f)
+        }
+        (None, Some(token)) => {
+            let f = server_builder
+                .add_service(flightsql.service())
+                .serve_with_incoming_shutdown(
+                    tokio_stream::wrappers::TcpListenerStream::new(listener),
+                    shutdown_future,
+                );
+            tokio::task::spawn(f)
+        }
+        (None, None) => {
+            let f = server_builder
+                .add_service(flightsql.service())
+                .serve_with_incoming_shutdown(
+                    tokio_stream::wrappers::TcpListenerStream::new(listener),
+                    shutdown_future,
+                );
+            tokio::task::spawn(f)
+        }
+    }
+}
 
 /// Creates and manages a running FlightSqlServer with a background task
 pub struct FlightSqlApp {
@@ -107,25 +133,11 @@ impl FlightSqlApp {
 
         // prepare the shutdown channel
         let (tx, rx) = tokio::sync::oneshot::channel();
-
-        let server_timeout = Duration::from_secs(DEFAULT_TIMEOUT_SECONDS);
-
         let shutdown_future = async move {
             rx.await.ok();
         };
 
-        let server_builder = tonic::transport::Server::builder().timeout(server_timeout);
-        // let server_with_layers = add_server_layers(server_builder, config);
-
-        // TODO: Only include layer for testing
-        let serve_future = tonic::transport::Server::builder()
-            .timeout(server_timeout)
-            .layer(TrailersLayer)
-            .add_service(flightsql.service())
-            .serve_with_incoming_shutdown(
-                tokio_stream::wrappers::TcpListenerStream::new(listener),
-                shutdown_future,
-            );
+        let handle = create_server_handle(config, flightsql, listener, shutdown_future);
 
         {
             let builder = PrometheusBuilder::new();
@@ -145,9 +157,6 @@ impl FlightSqlApp {
 
             initialize_metrics();
         }
-
-        // Run the server in its own background task
-        let handle = tokio::task::spawn(serve_future);
 
         let app = Self {
             shutdown: Some(tx),

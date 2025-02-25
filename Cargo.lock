@@ -1658,6 +1658,7 @@ version = "0.1.0"
 dependencies = [
  "datafusion",
  "http-body",
+ "tower 0.5.2",
  "tower-http",
 ]
 

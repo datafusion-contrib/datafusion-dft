@@ -19,6 +19,7 @@
 
 use std::path::PathBuf;
 
+use datafusion_auth::BasicAuth;
 #[cfg(feature = "udfs-wasm")]
 use datafusion_udfs_wasm::WasmInputDataType;
 use directories::{ProjectDirs, UserDirs};
@@ -362,12 +363,6 @@ fn default_editor_config() -> EditorConfig {
 #[cfg(feature = "auth")]
 fn default_auth_config() -> AuthConfig {
     AuthConfig::default()
-}
-
-#[cfg(feature = "auth")]
-struct BasicAuth {
-    pub username: String,
-    pub password: String,
 }
 
 #[cfg(feature = "auth")]
