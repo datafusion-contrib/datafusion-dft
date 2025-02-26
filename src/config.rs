@@ -19,7 +19,6 @@
 
 use std::path::PathBuf;
 
-use datafusion_auth::BasicAuth;
 #[cfg(feature = "udfs-wasm")]
 use datafusion_udfs_wasm::WasmInputDataType;
 use directories::{ProjectDirs, UserDirs};
@@ -366,10 +365,17 @@ fn default_auth_config() -> AuthConfig {
 }
 
 #[cfg(feature = "auth")]
-#[derive(Default)]
+#[derive(Default, Deserialize)]
 struct AuthConfig {
     pub client_basic_auth: Option<BasicAuth>,
     pub client_bearer_token: Option<String>,
     pub server_basic_auth: Option<BasicAuth>,
     pub server_bearer_token: Option<String>,
+}
+
+#[cfg(feature = "auth")]
+#[derive(Default, Deserialize)]
+struct BasicAuth {
+    pub username: String,
+    pub password: String,
 }

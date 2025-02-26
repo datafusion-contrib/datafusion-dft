@@ -64,6 +64,7 @@ tui-logger = { version = "0.12", features = ["tracing-support"] }
 tui-textarea = { version = "0.6.1", features = ["search"] }
 url = { version = "2.5.2", optional = true }
 uuid = { version = "1.10.0" }
+tower-http = { version = "0.6.2", features = ["auth"], optional = true }
 
 [dev-dependencies]
 assert_cmd = "2.0.16"
@@ -90,7 +91,7 @@ functions-parquet = ["dep:datafusion-functions-parquet"]
 udfs-wasm = ["dep:datafusion-udfs-wasm"]
 metrics = ["dep:metrics", "dep:metrics-exporter-prometheus"]
 huggingface = ["opendal", "object_store_opendal", "url"]
-auth = ["dep:datafusion-auth"]
+auth = ["dep:datafusion-auth", "dep:tower-http"]
 
 [[bin]]
 name = "dft"

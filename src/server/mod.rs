@@ -29,9 +29,11 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::net::TcpListener;
+use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 use tonic::transport::Server;
 use tower::Layer;
+use tower_http::validate_request::ValidateRequestHeaderLayer;
 
 const DEFAULT_TIMEOUT_SECONDS: u64 = 60;
 
@@ -55,54 +57,77 @@ fn create_server_handle(
     config: AppConfig,
     flightsql: FlightSqlServiceImpl,
     listener: TcpListener,
-    shutdown_future: impl Future<Output = ()> + Send,
+    rx: oneshot::Receiver<()>,
+    // shutdown_future: impl Future<Output = ()> + Send,
 ) -> JoinHandle<std::result::Result<(), tonic::transport::Error>> {
     let server_timeout = Duration::from_secs(DEFAULT_TIMEOUT_SECONDS);
-    let server_builder = Server::builder().timeout(server_timeout);
+    let mut server_builder = Server::builder().timeout(server_timeout);
+    let shutdown_future = async move {
+        rx.await.ok();
+    };
 
-    // TODO: Only include layer for testing
-    match (
-        config.auth.server_basic_auth,
-        config.auth.server_bearer_token,
-    ) {
-        (Some(basic), Some(token)) => {
-            let f = server_builder
-                .layer(TrailersLayer)
-                .add_service(flightsql.service())
-                .serve_with_incoming_shutdown(
-                    tokio_stream::wrappers::TcpListenerStream::new(listener),
-                    shutdown_future,
-                );
+    // TODO: onlu include TrailersLayer for testing
+    if cfg!(feature = "auth") {
+        match (
+            config.auth.server_basic_auth,
+            config.auth.server_bearer_token,
+        ) {
+            (Some(basic), Some(token)) => {
+                let basic_auth_layer =
+                    ValidateRequestHeaderLayer::basic(&basic.username, &basic.password);
+                let bearer_auth_layer = ValidateRequestHeaderLayer::bearer(&token);
+                let f = server_builder
+                    .layer(basic_auth_layer)
+                    .layer(bearer_auth_layer)
+                    .add_service(flightsql.service())
+                    .serve_with_incoming_shutdown(
+                        tokio_stream::wrappers::TcpListenerStream::new(listener),
+                        shutdown_future,
+                    );
 
-            tokio::task::spawn(f)
+                tokio::task::spawn(f)
+            }
+            (Some(basic), None) => {
+                let basic_auth_layer =
+                    ValidateRequestHeaderLayer::basic(&basic.username, &basic.password);
+                let f = server_builder
+                    .layer(basic_auth_layer)
+                    .add_service(flightsql.service())
+                    .serve_with_incoming_shutdown(
+                        tokio_stream::wrappers::TcpListenerStream::new(listener),
+                        shutdown_future,
+                    );
+                tokio::task::spawn(f)
+            }
+            (None, Some(token)) => {
+                let bearer_auth_layer = ValidateRequestHeaderLayer::bearer(&token);
+                let f = server_builder
+                    .layer(bearer_auth_layer)
+                    .add_service(flightsql.service())
+                    .serve_with_incoming_shutdown(
+                        tokio_stream::wrappers::TcpListenerStream::new(listener),
+                        shutdown_future,
+                    );
+                tokio::task::spawn(f)
+            }
+            (None, None) => {
+                let f = server_builder
+                    .add_service(flightsql.service())
+                    .serve_with_incoming_shutdown(
+                        tokio_stream::wrappers::TcpListenerStream::new(listener),
+                        shutdown_future,
+                    );
+                tokio::task::spawn(f)
+            }
         }
-        (Some(basic), None) => {
-            let f = server_builder
-                .add_service(flightsql.service())
-                .serve_with_incoming_shutdown(
-                    tokio_stream::wrappers::TcpListenerStream::new(listener),
-                    shutdown_future,
-                );
-            tokio::task::spawn(f)
-        }
-        (None, Some(token)) => {
-            let f = server_builder
-                .add_service(flightsql.service())
-                .serve_with_incoming_shutdown(
-                    tokio_stream::wrappers::TcpListenerStream::new(listener),
-                    shutdown_future,
-                );
-            tokio::task::spawn(f)
-        }
-        (None, None) => {
-            let f = server_builder
-                .add_service(flightsql.service())
-                .serve_with_incoming_shutdown(
-                    tokio_stream::wrappers::TcpListenerStream::new(listener),
-                    shutdown_future,
-                );
-            tokio::task::spawn(f)
-        }
+    } else {
+        let f = server_builder
+            .add_service(flightsql.service())
+            .serve_with_incoming_shutdown(
+                tokio_stream::wrappers::TcpListenerStream::new(listener),
+                shutdown_future,
+            );
+        tokio::task::spawn(f)
     }
 }
 
@@ -133,11 +158,7 @@ impl FlightSqlApp {
 
         // prepare the shutdown channel
         let (tx, rx) = tokio::sync::oneshot::channel();
-        let shutdown_future = async move {
-            rx.await.ok();
-        };
-
-        let handle = create_server_handle(config, flightsql, listener, shutdown_future);
+        let handle = create_server_handle(config, flightsql, listener, rx);
 
         {
             let builder = PrometheusBuilder::new();
