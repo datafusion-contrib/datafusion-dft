@@ -78,6 +78,7 @@ pub struct AppConfig {
     #[serde(default = "default_editor_config")]
     pub editor: EditorConfig,
     #[cfg(feature = "auth")]
+    #[serde(default = "default_auth_config")]
     pub auth: AuthConfig,
 }
 
@@ -365,8 +366,8 @@ fn default_auth_config() -> AuthConfig {
 }
 
 #[cfg(feature = "auth")]
-#[derive(Default, Deserialize)]
-struct AuthConfig {
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct AuthConfig {
     pub client_basic_auth: Option<BasicAuth>,
     pub client_bearer_token: Option<String>,
     pub server_basic_auth: Option<BasicAuth>,
@@ -374,8 +375,8 @@ struct AuthConfig {
 }
 
 #[cfg(feature = "auth")]
-#[derive(Default, Deserialize)]
-struct BasicAuth {
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct BasicAuth {
     pub username: String,
     pub password: String,
 }

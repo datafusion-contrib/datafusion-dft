@@ -54,7 +54,7 @@ fn initialize_metrics() {
 }
 
 fn create_server_handle(
-    config: AppConfig,
+    config: &AppConfig,
     flightsql: FlightSqlServiceImpl,
     listener: TcpListener,
     rx: oneshot::Receiver<()>,
@@ -69,8 +69,8 @@ fn create_server_handle(
     // TODO: onlu include TrailersLayer for testing
     if cfg!(feature = "auth") {
         match (
-            config.auth.server_basic_auth,
-            config.auth.server_bearer_token,
+            &config.auth.server_basic_auth,
+            &config.auth.server_bearer_token,
         ) {
             (Some(basic), Some(token)) => {
                 let basic_auth_layer =
@@ -147,7 +147,7 @@ impl FlightSqlApp {
     /// create a new app for the flightsql server
     pub async fn try_new(
         app_execution: AppExecution,
-        config: AppConfig,
+        config: &AppConfig,
         addr: &str,
         metrics_addr: &str,
     ) -> Result<Self> {
