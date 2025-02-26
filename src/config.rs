@@ -77,6 +77,9 @@ pub struct AppConfig {
     pub flightsql: FlightSQLConfig,
     #[serde(default = "default_editor_config")]
     pub editor: EditorConfig,
+    #[cfg(feature = "auth")]
+    #[serde(default = "default_auth_config")]
+    pub auth: AuthConfig,
 }
 
 fn default_execution_config() -> ExecutionConfig {
@@ -355,4 +358,25 @@ pub struct EditorConfig {
 
 fn default_editor_config() -> EditorConfig {
     EditorConfig::default()
+}
+
+#[cfg(feature = "auth")]
+fn default_auth_config() -> AuthConfig {
+    AuthConfig::default()
+}
+
+#[cfg(feature = "auth")]
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct AuthConfig {
+    pub client_basic_auth: Option<BasicAuth>,
+    pub client_bearer_token: Option<String>,
+    pub server_basic_auth: Option<BasicAuth>,
+    pub server_bearer_token: Option<String>,
+}
+
+#[cfg(feature = "auth")]
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct BasicAuth {
+    pub username: String,
+    pub password: String,
 }
