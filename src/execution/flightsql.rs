@@ -58,6 +58,11 @@ impl FlightSQLContext {
         match channel {
             Ok(c) => {
                 let mut client = FlightSqlServiceClient::new(c);
+                // TODO: Look into setting both bearer and basic, which requires comma separating
+                // them in the same `Authorization` header key (https://www.rfc-editor.org/rfc/rfc7230#section-3.2.2)
+                //
+                // Although that is for HTTP/1.1 and GRPC uses HTTP/2 - so maybe it has changed.
+                // To be tested later with the Tower auth layers to see what they support.
                 if let Some(token) = &self.config.auth.client_bearer_token {
                     println!("Setting token to {token}");
                     client.set_token(token.to_string());
