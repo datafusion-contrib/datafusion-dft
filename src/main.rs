@@ -105,7 +105,7 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
         #[cfg(feature = "flightsql")]
         {
             if cli.flightsql {
-                let flightsql_ctx = FlightSQLContext::new(state.config.flightsql.clone());
+                let flightsql_ctx = FlightSQLContext::new(state.config.clone());
                 flightsql_ctx
                     .create_client(cli.flightsql_host.clone())
                     .await?;

@@ -16,6 +16,7 @@
 // under the License.
 
 use arrow_flight::sql::client::FlightSqlServiceClient;
+use base64::engine::{general_purpose::STANDARD, Engine as _};
 use datafusion::sql::parser::DFParser;
 use log::{error, info, warn};
 
@@ -24,7 +25,7 @@ use tokio::sync::Mutex;
 use tokio_stream::StreamExt;
 use tonic::{transport::Channel, IntoRequest};
 
-use crate::config::FlightSQLConfig;
+use crate::config::{AppConfig, BasicAuth};
 
 use crate::execution::flightsql_benchmarks::FlightSQLBenchmarkStats;
 
@@ -32,12 +33,12 @@ pub type FlightSQLClient = Mutex<Option<FlightSqlServiceClient<Channel>>>;
 
 #[derive(Default)]
 pub struct FlightSQLContext {
-    config: FlightSQLConfig,
+    config: AppConfig,
     flightsql_client: FlightSQLClient,
 }
 
 impl FlightSQLContext {
-    pub fn new(config: FlightSQLConfig) -> Self {
+    pub fn new(config: AppConfig) -> Self {
         Self {
             config,
             flightsql_client: Mutex::new(None),
@@ -50,13 +51,22 @@ impl FlightSQLContext {
 
     /// Create FlightSQL client from users FlightSQL config
     pub async fn create_client(&self, cli_host: Option<String>) -> Result<()> {
-        let final_url = cli_host.unwrap_or(self.config.connection_url.clone());
+        let final_url = cli_host.unwrap_or(self.config.flightsql.connection_url.clone());
         let url = Box::leak(final_url.into_boxed_str());
         info!("Connecting to FlightSQL host: {}", url);
         let channel = Channel::from_static(url).connect().await;
         match channel {
             Ok(c) => {
-                let client = FlightSqlServiceClient::new(c);
+                let mut client = FlightSqlServiceClient::new(c);
+                if let Some(token) = &self.config.auth.client_bearer_token {
+                    println!("Setting token to {token}");
+                    client.set_token(token.to_string());
+                } else if let Some(BasicAuth { username, password }) =
+                    &self.config.auth.client_basic_auth
+                {
+                    let encoded_basic = STANDARD.encode(format!("{username}:{password}"));
+                    client.set_header("Authorization", format!("Basic {encoded_basic}"))
+                }
                 let mut guard = self.flightsql_client.lock().await;
                 *guard = Some(client);
                 Ok(())
@@ -73,7 +83,7 @@ impl FlightSQLContext {
         query: &str,
         cli_iterations: Option<usize>,
     ) -> Result<FlightSQLBenchmarkStats> {
-        let iterations = cli_iterations.unwrap_or(self.config.benchmark_iterations);
+        let iterations = cli_iterations.unwrap_or(self.config.flightsql.benchmark_iterations);
         let mut rows_returned = Vec::with_capacity(iterations);
         let mut get_flight_info_durations = Vec::with_capacity(iterations);
         let mut ttfb_durations = Vec::with_capacity(iterations);
