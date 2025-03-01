@@ -16,6 +16,7 @@
 // under the License.
 
 use arrow_flight::sql::client::FlightSqlServiceClient;
+#[cfg(feature = "auth")]
 use base64::engine::{general_purpose::STANDARD, Engine as _};
 use datafusion::sql::parser::DFParser;
 use log::{error, info, warn};
@@ -63,14 +64,16 @@ impl FlightSQLContext {
                 //
                 // Although that is for HTTP/1.1 and GRPC uses HTTP/2 - so maybe it has changed.
                 // To be tested later with the Tower auth layers to see what they support.
-                if let Some(token) = &self.config.auth.client_bearer_token {
-                    println!("Setting token to {token}");
-                    client.set_token(token.to_string());
-                } else if let Some(BasicAuth { username, password }) =
-                    &self.config.auth.client_basic_auth
+                #[cfg(feature = "auth")]
                 {
-                    let encoded_basic = STANDARD.encode(format!("{username}:{password}"));
-                    client.set_header("Authorization", format!("Basic {encoded_basic}"))
+                    if let Some(token) = &self.config.auth.client_bearer_token {
+                        client.set_token(token.to_string());
+                    } else if let Some(BasicAuth { username, password }) =
+                        &self.config.auth.client_basic_auth
+                    {
+                        let encoded_basic = STANDARD.encode(format!("{username}:{password}"));
+                        client.set_header("Authorization", format!("Basic {encoded_basic}"))
+                    }
                 }
                 let mut guard = self.flightsql_client.lock().await;
                 *guard = Some(client);
