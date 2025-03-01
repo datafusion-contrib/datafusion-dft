@@ -18,8 +18,8 @@
 //! [`DftSessionStateBuilder`] for configuring DataFusion [`SessionState`]
 
 use color_eyre::eyre;
+use datafusion::catalog::MemoryCatalogProviderList;
 use datafusion::catalog::{CatalogProvider, CatalogProviderList, TableProviderFactory};
-use datafusion::catalog_common::MemoryCatalogProviderList;
 use datafusion::execution::context::SessionState;
 use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::execution::session_state::SessionStateBuilder;
