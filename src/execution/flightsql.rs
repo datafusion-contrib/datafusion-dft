@@ -26,7 +26,9 @@ use tokio::sync::Mutex;
 use tokio_stream::StreamExt;
 use tonic::{transport::Channel, IntoRequest};
 
-use crate::config::{AppConfig, BasicAuth};
+use crate::config::AppConfig;
+#[cfg(feature = "auth")]
+use crate::config::BasicAuth;
 
 use crate::execution::flightsql_benchmarks::FlightSQLBenchmarkStats;
 
