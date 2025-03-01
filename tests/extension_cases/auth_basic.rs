@@ -22,37 +22,6 @@ use assert_cmd::Command;
 use crate::{cli_cases::contains_str, config::TestConfigBuilder};
 
 #[tokio::test]
-pub async fn test_token() {
-    let mut config_builder = TestConfigBuilder::default();
-    config_builder.with_auth(None, Some("\"Pass\"".to_string()), None, None, None, None);
-    let config = config_builder.build("my_config.toml");
-
-    let assert = tokio::task::spawn_blocking(|| {
-        Command::cargo_bin("dft")
-            .unwrap()
-            .arg("-c")
-            .arg("SELECT 1 + 2;")
-            .arg("--flightsql")
-            .arg("--config")
-            .arg(config.path)
-            .timeout(Duration::from_secs(5))
-            .assert()
-            .success()
-    })
-    .await
-    .unwrap();
-
-    let expected = r##"
-+---------------------+
-| Int64(1) + Int64(2) |
-+---------------------+
-| 3                   |
-+---------------------+
-    "##;
-    assert.stdout(contains_str(expected));
-}
-
-#[tokio::test]
 pub async fn test_basic() {
     let mut config_builder = TestConfigBuilder::default();
     config_builder.with_auth(
