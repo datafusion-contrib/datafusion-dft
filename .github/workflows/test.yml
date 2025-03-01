@@ -300,7 +300,7 @@ jobs:
           rustup default ${{ matrix.rust }}
       - name: Start FlightSQL Server
         run: |
-          cargo r --features=experimental-flightsql-server,auth -- --serve --config data/configs/flightsql_basic.toml
+          cargo r --features=experimental-flightsql-server,auth -- --serve --config data/configs/flightsql_basic.toml &
       - name: Run auth tests
         run: |
           cargo t --features=flightsql,auth extension_cases::auth_basic
@@ -331,7 +331,7 @@ jobs:
           rustup default ${{ matrix.rust }}
       - name: Start FlightSQL Server
         run: |
-          cargo r --features=experimental-flightsql-server,auth -- --serve --config data/configs/flightsql_bearer.toml
+          cargo r --features=experimental-flightsql-server,auth -- --serve --config data/configs/flightsql_bearer.toml &
       - name: Run auth tests
         run: |
           cargo t --features=flightsql,auth extension_cases::auth_bearer
