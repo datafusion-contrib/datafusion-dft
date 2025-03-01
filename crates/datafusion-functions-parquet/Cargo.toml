@@ -11,16 +11,7 @@ edition = "2021"
 keywords = ["parquet", "query", "sql", "datafusion"]
 
 [dependencies]
-arrow = { version = "53.0.0" }
+arrow = { version = "54.1.0" }
 async-trait = "0.1.41"
-datafusion = { version = "43.0.0", features = [
-  "avro",
-  "crypto_expressions",
-  "datetime_expressions",
-  "encoding_expressions",
-  "parquet",
-  "regex_expressions",
-  "unicode_expressions",
-  "compression",
-] }
-parquet = { version = "53.0.0", default-features = false }
+datafusion = { version = "45.0.0" }
+parquet = { version = "54.1.0", default-features = false }

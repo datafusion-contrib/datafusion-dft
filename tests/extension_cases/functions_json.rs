@@ -34,7 +34,7 @@ CREATE TABLE test_table (
 /// Ensure one of the functions `json_contains` function is properly registered
 #[tokio::test(flavor = "multi_thread")]
 async fn test_basic() {
-    let mut execution = TestExecution::new().await.with_setup(TEST_TABLE).await;
+    let execution = TestExecution::new().await.with_setup(TEST_TABLE).await;
 
     let actual = execution
         .run_and_format("SELECT id, json_contains(json_col, 'b') as json_contains FROM test_table")
@@ -56,7 +56,7 @@ async fn test_basic() {
 /// ensure the json operators like -> are properly registered
 #[tokio::test(flavor = "multi_thread")]
 async fn test_operators() {
-    let mut execution = TestExecution::new().await.with_setup(TEST_TABLE).await;
+    let execution = TestExecution::new().await.with_setup(TEST_TABLE).await;
 
     let actual = execution
         .run_and_format("SELECT id, json_col->'a' as json_col_a FROM test_table")

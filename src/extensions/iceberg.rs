@@ -19,7 +19,7 @@
 
 use crate::config::ExecutionConfig;
 use crate::extensions::{DftSessionStateBuilder, Extension};
-use datafusion_common::DataFusionError;
+use datafusion::common::DataFusionError;
 use iceberg_catalog_rest::{RestCatalog, RestCatalogConfig};
 use iceberg_datafusion::{IcebergCatalogProvider, IcebergTableProviderFactory};
 use std::sync::Arc;
@@ -39,7 +39,7 @@ impl Extension for IcebergExtension {
         &self,
         config: ExecutionConfig,
         builder: &mut DftSessionStateBuilder,
-    ) -> datafusion_common::Result<()> {
+    ) -> datafusion::common::Result<()> {
         for cfg in config.iceberg.rest_catalogs {
             let rest_catalog_config = RestCatalogConfig::builder().uri(cfg.addr).build();
             let rest_catalog = RestCatalog::new(rest_catalog_config);
