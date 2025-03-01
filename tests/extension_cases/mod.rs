@@ -34,8 +34,8 @@ mod udfs_wasm;
 
 use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::util::pretty::pretty_format_batches;
+use datafusion::common::Result;
 use datafusion::sql::parser::DFParser;
-use datafusion_common::Result;
 use datafusion_dft::execution::local::ExecutionContext;
 use datafusion_dft::extensions::DftSessionStateBuilder;
 use datafusion_dft::{config::AppConfig, execution::AppType};

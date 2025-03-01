@@ -21,8 +21,8 @@ use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 
 use datafusion::catalog::Session;
+use datafusion::catalog::TableFunctionImpl;
 use datafusion::common::{plan_err, Column};
-use datafusion::datasource::function::TableFunctionImpl;
 use datafusion::datasource::TableProvider;
 use datafusion::error::Result;
 use datafusion::logical_expr::Expr;
