@@ -284,6 +284,19 @@ CREATE EXTERNAL TABLE hf4 STORED AS PARQUET LOCATION 'hf://HuggingFaceTB-finemat
 
 The "/" in the `repo_id` is replaced with a "-" for the base url that is registered with DataFusion to work better with its path parsing.
 
+##### Auth (`--features=auth`)
+
+Adds auth to the FlightSQL implementation so you can require a bearer token or username / password when running `dft` as a server or adds the relevant auth headers when using `dft` as a FlightSQL client.
+
+```toml
+[auth]
+server_bearer_token = "MyToken"
+client_bearer_token = "MyToken"
+server_basic_auth.username = "User"
+server_basic_auth.password = "Pass"
+client_basic_auth.username = "User"
+client_basic_auth.password = "Pass"
+```
 
 ### Getting Started
 
