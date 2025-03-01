@@ -86,6 +86,7 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
         let app_execution = AppExecution::new(execution_ctx);
         let app = FlightSqlApp::try_new(
             app_execution,
+            &state.config,
             &cli.flightsql_host
                 .unwrap_or(DEFAULT_SERVER_ADDRESS.to_string()),
             &state.config.flightsql.server_metrics_port,
@@ -104,7 +105,7 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
         #[cfg(feature = "flightsql")]
         {
             if cli.flightsql {
-                let flightsql_ctx = FlightSQLContext::new(state.config.flightsql.clone());
+                let flightsql_ctx = FlightSQLContext::new(state.config.clone());
                 flightsql_ctx
                     .create_client(cli.flightsql_host.clone())
                     .await?;

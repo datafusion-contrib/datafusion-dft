@@ -82,7 +82,7 @@ impl FlightSqlServiceImpl {
                         let ticket = TicketStatementQuery {
                             statement_handle: uuid.to_string().into(),
                         };
-                        info!("created ticket handle: {:?}", ticket.statement_handle);
+                        debug!("created ticket handle: {:?}", ticket.statement_handle);
                         let mut bytes: Vec<u8> = Vec::new();
                         if ticket.encode(&mut bytes).is_ok() {
                             let info = FlightInfo::new()

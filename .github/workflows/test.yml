@@ -273,3 +273,68 @@ jobs:
       - name: Run UDFs WASM tests
         run: |
           cargo test --manifest-path crates/datafusion-udfs-wasm/Cargo.toml
+  test-auth-basic:
+    name: Extension / Auth-Basic
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64]
+        rust: [stable]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Cache Cargo
+        uses: actions/cache@v2
+        with:
+          path: /home/runner/.cargo
+          key: cargo-dft-cache-
+      - name: Cache Rust dependencies
+        uses: actions/cache@v2
+        with:
+          path: /home/runner/target
+          key: target-dft-cache-
+      - name: Setup Rust toolchain
+        run: |
+          rustup toolchain install ${{ matrix.rust }}
+          rustup default ${{ matrix.rust }}
+      - name: Start FlightSQL Server
+        run: |
+          cargo r --features=experimental-flightsql-server,auth -- --serve --config data/configs/flightsql_basic.toml &
+      - name: Run auth tests
+        run: |
+          cargo t --features=flightsql,auth extension_cases::auth_basic
+  test-auth-bearer:
+    name: Extension / Auth-Bearer
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64]
+        rust: [stable]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Cache Cargo
+        uses: actions/cache@v2
+        with:
+          path: /home/runner/.cargo
+          key: cargo-dft-cache-
+      - name: Cache Rust dependencies
+        uses: actions/cache@v2
+        with:
+          path: /home/runner/target
+          key: target-dft-cache-
+      - name: Setup Rust toolchain
+        run: |
+          rustup toolchain install ${{ matrix.rust }}
+          rustup default ${{ matrix.rust }}
+      - name: Start FlightSQL Server
+        run: |
+          cargo r --features=experimental-flightsql-server,auth -- --serve --config data/configs/flightsql_bearer.toml &
+      - name: Run auth tests
+        run: |
+          cargo t --features=flightsql,auth extension_cases::auth_bearer
+
+
+
