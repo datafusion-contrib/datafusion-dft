@@ -19,7 +19,7 @@ pub mod services;
 
 use crate::config::AppConfig;
 use crate::execution::AppExecution;
-use color_eyre::Result;
+use color_eyre::{eyre::eyre, Result};
 use log::info;
 use metrics::{describe_counter, describe_histogram};
 use metrics_exporter_prometheus::{Matcher, PrometheusBuilder};
@@ -56,7 +56,7 @@ fn create_server_handle(
     listener: TcpListener,
     rx: oneshot::Receiver<()>,
     // shutdown_future: impl Future<Output = ()> + Send,
-) -> JoinHandle<std::result::Result<(), tonic::transport::Error>> {
+) -> Result<JoinHandle<std::result::Result<(), tonic::transport::Error>>> {
     let server_timeout = Duration::from_secs(DEFAULT_TIMEOUT_SECONDS);
     let mut server_builder = Server::builder().timeout(server_timeout);
     let shutdown_future = async move {
@@ -69,21 +69,7 @@ fn create_server_handle(
             &config.auth.server_basic_auth,
             &config.auth.server_bearer_token,
         ) {
-            (Some(basic), Some(token)) => {
-                let basic_auth_layer =
-                    ValidateRequestHeaderLayer::basic(&basic.username, &basic.password);
-                let bearer_auth_layer = ValidateRequestHeaderLayer::bearer(token);
-                let f = server_builder
-                    .layer(basic_auth_layer)
-                    .layer(bearer_auth_layer)
-                    .add_service(flightsql.service())
-                    .serve_with_incoming_shutdown(
-                        tokio_stream::wrappers::TcpListenerStream::new(listener),
-                        shutdown_future,
-                    );
-
-                tokio::task::spawn(f)
-            }
+            (Some(_), Some(_)) => Err(eyre!("Only one auth type can be used at a time")),
             (Some(basic), None) => {
                 let basic_auth_layer =
                     ValidateRequestHeaderLayer::basic(&basic.username, &basic.password);
@@ -94,7 +80,7 @@ fn create_server_handle(
                         tokio_stream::wrappers::TcpListenerStream::new(listener),
                         shutdown_future,
                     );
-                tokio::task::spawn(f)
+                Ok(tokio::task::spawn(f))
             }
             (None, Some(token)) => {
                 let bearer_auth_layer = ValidateRequestHeaderLayer::bearer(token);
@@ -105,7 +91,7 @@ fn create_server_handle(
                         tokio_stream::wrappers::TcpListenerStream::new(listener),
                         shutdown_future,
                     );
-                tokio::task::spawn(f)
+                Ok(tokio::task::spawn(f))
             }
             (None, None) => {
                 let f = server_builder
@@ -114,7 +100,7 @@ fn create_server_handle(
                         tokio_stream::wrappers::TcpListenerStream::new(listener),
                         shutdown_future,
                     );
-                tokio::task::spawn(f)
+                Ok(tokio::task::spawn(f))
             }
         }
     } else {
@@ -124,7 +110,7 @@ fn create_server_handle(
                 tokio_stream::wrappers::TcpListenerStream::new(listener),
                 shutdown_future,
             );
-        tokio::task::spawn(f)
+        Ok(tokio::task::spawn(f))
     }
 }
 
@@ -155,7 +141,7 @@ impl FlightSqlApp {
 
         // prepare the shutdown channel
         let (tx, rx) = tokio::sync::oneshot::channel();
-        let handle = create_server_handle(config, flightsql, listener, rx);
+        let handle = create_server_handle(config, flightsql, listener, rx)?;
 
         {
             let builder = PrometheusBuilder::new();

@@ -168,4 +168,47 @@ impl TestConfigBuilder {
         self.config_text.push('\n');
         self
     }
+
+    #[cfg(feature = "auth")]
+    pub fn with_auth(
+        &mut self,
+        server_bearer: Option<String>,
+        client_bearer: Option<String>,
+        server_basic_username: Option<String>,
+        server_basic_password: Option<String>,
+        client_basic_username: Option<String>,
+        client_basic_password: Option<String>,
+    ) -> &mut Self {
+        self.config_text.push_str("[auth]\n");
+        if let Some(server_bearer) = server_bearer {
+            self.config_text
+                .push_str(&format!("server_bearer_token = {server_bearer}\n"));
+        }
+        if let Some(client_bearer) = client_bearer {
+            self.config_text
+                .push_str(&format!("client_bearer_token = {client_bearer}\n"));
+        }
+        if let Some(server_basic_username) = server_basic_username {
+            self.config_text.push_str(&format!(
+                "server_basic_username = {server_basic_username}\n"
+            ));
+        }
+        if let Some(server_basic_password) = server_basic_password {
+            self.config_text.push_str(&format!(
+                "server_basic_password = {server_basic_password}\n"
+            ));
+        }
+        if let Some(client_basic_username) = client_basic_username {
+            self.config_text.push_str(&format!(
+                "client_basic_auth.username = {client_basic_username}\n"
+            ));
+        }
+        if let Some(client_basic_password) = client_basic_password {
+            self.config_text.push_str(&format!(
+                "client_basic_auth.password = {client_basic_password}\n"
+            ));
+        }
+
+        self
+    }
 }
