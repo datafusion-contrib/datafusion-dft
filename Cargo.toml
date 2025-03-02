@@ -23,6 +23,7 @@ clap = { version = "4.5.27", features = ["derive"] }
 color-eyre = "0.6.3"
 crossterm = { version = "0.28.1", features = ["event-stream"] }
 datafusion = { version = "45.0.0" }
+datafusion-app = { version = "0.1.0", path = "crates/datafusion-app" }
 datafusion-auth = { version = "0.1.0", path = "crates/datafusion-auth", optional = true }
 datafusion-functions-json = { version = "0.45", optional = true }
 datafusion-functions-parquet = { version = "0.1.0", path = "crates/datafusion-functions-parquet", optional = true }

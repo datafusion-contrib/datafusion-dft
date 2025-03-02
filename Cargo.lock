@@ -1595,6 +1595,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "datafusion-app"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "color-eyre",
+ "datafusion",
+ "datafusion-functions-parquet",
+ "directories",
+ "futures",
+ "itertools 0.13.0",
+ "log",
+ "num_cpus",
+ "parking_lot",
+ "serde",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
 name = "datafusion-auth"
 version = "0.1.0"
 dependencies = [
@@ -1675,6 +1694,7 @@ dependencies = [
  "color-eyre",
  "crossterm",
  "datafusion",
+ "datafusion-app",
  "datafusion-auth",
  "datafusion-functions-json",
  "datafusion-functions-parquet",

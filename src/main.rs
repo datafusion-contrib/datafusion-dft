@@ -17,12 +17,12 @@
 
 use clap::Parser;
 use color_eyre::Result;
+use datafusion_app::extensions::DftSessionStateBuilder;
+#[cfg(feature = "flightsql")]
+use datafusion_app::flightsql::FlightSQLContext;
+use datafusion_app::{local::ExecutionContext, AppExecution, AppType};
 use datafusion_dft::args::DftArgs;
 use datafusion_dft::cli::CliApp;
-#[cfg(feature = "flightsql")]
-use datafusion_dft::execution::flightsql::FlightSQLContext;
-use datafusion_dft::execution::{local::ExecutionContext, AppExecution, AppType};
-use datafusion_dft::extensions::DftSessionStateBuilder;
 #[cfg(feature = "experimental-flightsql-server")]
 use datafusion_dft::server::FlightSqlApp;
 use datafusion_dft::telemetry;

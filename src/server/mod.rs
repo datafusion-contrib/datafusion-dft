@@ -18,8 +18,8 @@
 pub mod services;
 
 use crate::config::AppConfig;
-use crate::execution::AppExecution;
 use color_eyre::{eyre::eyre, Result};
+use datafusion_app::AppExecution;
 use log::info;
 use metrics::{describe_counter, describe_histogram};
 use metrics_exporter_prometheus::{Matcher, PrometheusBuilder};

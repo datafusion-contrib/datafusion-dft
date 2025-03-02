@@ -19,11 +19,11 @@
 
 use std::path::PathBuf;
 
+use datafusion_app::config::ExecutionConfig;
 #[cfg(feature = "udfs-wasm")]
 use datafusion_udfs_wasm::WasmInputDataType;
 use directories::{ProjectDirs, UserDirs};
 use lazy_static::lazy_static;
-use log::info;
 use serde::Deserialize;
 #[cfg(feature = "udfs-wasm")]
 use std::collections::HashMap;
@@ -160,146 +160,146 @@ impl S3Config {
     }
 }
 
-#[cfg(feature = "huggingface")]
-#[derive(Clone, Debug, Deserialize)]
-pub struct HuggingFaceConfig {
-    pub repo_type: Option<String>,
-    pub repo_id: Option<String>,
-    pub revision: Option<String>,
-    pub root: Option<String>,
-    pub token: Option<String>,
-}
+// #[cfg(feature = "huggingface")]
+// #[derive(Clone, Debug, Deserialize)]
+// pub struct HuggingFaceConfig {
+//     pub repo_type: Option<String>,
+//     pub repo_id: Option<String>,
+//     pub revision: Option<String>,
+//     pub root: Option<String>,
+//     pub token: Option<String>,
+// }
 
-#[derive(Clone, Debug, Deserialize)]
-pub struct ObjectStoreConfig {
-    #[cfg(feature = "s3")]
-    pub s3: Option<Vec<S3Config>>,
-    #[cfg(feature = "huggingface")]
-    pub huggingface: Option<Vec<HuggingFaceConfig>>,
-}
+// #[derive(Clone, Debug, Deserialize)]
+// pub struct ObjectStoreConfig {
+//     #[cfg(feature = "s3")]
+//     pub s3: Option<Vec<S3Config>>,
+//     #[cfg(feature = "huggingface")]
+//     pub huggingface: Option<Vec<HuggingFaceConfig>>,
+// }
 
-#[derive(Clone, Debug, Deserialize)]
-pub struct ExecutionConfig {
-    pub object_store: Option<ObjectStoreConfig>,
-    #[serde(default = "default_ddl_path")]
-    pub ddl_path: Option<PathBuf>,
-    #[serde(default = "default_benchmark_iterations")]
-    pub benchmark_iterations: usize,
-    #[serde(default = "default_cli_batch_size")]
-    pub cli_batch_size: usize,
-    #[serde(default = "default_tui_batch_size")]
-    pub tui_batch_size: usize,
-    #[serde(default = "default_flightsql_server_batch_size")]
-    pub flightsql_server_batch_size: usize,
-    #[serde(default = "default_dedicated_executor_enabled")]
-    pub dedicated_executor_enabled: bool,
-    #[serde(default = "default_dedicated_executor_threads")]
-    pub dedicated_executor_threads: usize,
-    #[serde(default = "default_iceberg_config")]
-    pub iceberg: IcebergConfig,
-    #[cfg(feature = "udfs-wasm")]
-    #[serde(default = "default_wasm_udf")]
-    pub wasm_udf: WasmUdfConfig,
-}
+// #[derive(Clone, Debug, Deserialize)]
+// pub struct ExecutionConfig {
+//     pub object_store: Option<ObjectStoreConfig>,
+//     #[serde(default = "default_ddl_path")]
+//     pub ddl_path: Option<PathBuf>,
+//     #[serde(default = "default_benchmark_iterations")]
+//     pub benchmark_iterations: usize,
+//     #[serde(default = "default_cli_batch_size")]
+//     pub cli_batch_size: usize,
+//     #[serde(default = "default_tui_batch_size")]
+//     pub tui_batch_size: usize,
+//     #[serde(default = "default_flightsql_server_batch_size")]
+//     pub flightsql_server_batch_size: usize,
+//     #[serde(default = "default_dedicated_executor_enabled")]
+//     pub dedicated_executor_enabled: bool,
+//     #[serde(default = "default_dedicated_executor_threads")]
+//     pub dedicated_executor_threads: usize,
+//     #[serde(default = "default_iceberg_config")]
+//     pub iceberg: IcebergConfig,
+//     #[cfg(feature = "udfs-wasm")]
+//     #[serde(default = "default_wasm_udf")]
+//     pub wasm_udf: WasmUdfConfig,
+// }
 
-fn default_ddl_path() -> Option<PathBuf> {
-    info!("Creating default ExecutionConfig");
-    if let Some(user_dirs) = directories::UserDirs::new() {
-        let ddl_path = user_dirs
-            .home_dir()
-            .join(".config")
-            .join("dft")
-            .join("ddl.sql");
-        Some(ddl_path)
-    } else {
-        None
-    }
-}
+// fn default_ddl_path() -> Option<PathBuf> {
+//     info!("Creating default ExecutionConfig");
+//     if let Some(user_dirs) = directories::UserDirs::new() {
+//         let ddl_path = user_dirs
+//             .home_dir()
+//             .join(".config")
+//             .join("dft")
+//             .join("ddl.sql");
+//         Some(ddl_path)
+//     } else {
+//         None
+//     }
+// }
 
-fn default_benchmark_iterations() -> usize {
-    10
-}
+// fn default_benchmark_iterations() -> usize {
+//     10
+// }
 
-fn default_cli_batch_size() -> usize {
-    8092
-}
+// fn default_cli_batch_size() -> usize {
+//     8092
+// }
+//
+// fn default_tui_batch_size() -> usize {
+//     100
+// }
+//
+// fn default_flightsql_server_batch_size() -> usize {
+//     8092
+// }
 
-fn default_tui_batch_size() -> usize {
-    100
-}
+// fn default_dedicated_executor_enabled() -> bool {
+//     false
+// }
 
-fn default_flightsql_server_batch_size() -> usize {
-    8092
-}
+// fn default_dedicated_executor_threads() -> usize {
+//     // By default we slightly over provision CPUs.  For example, if you have N CPUs available we
+//     // have N CPUs for the [`DedicatedExecutor`] and 1 for the main / IO runtime.
+//     //
+//     // Ref: https://github.com/datafusion-contrib/datafusion-dft/pull/247#discussion_r1848270250
+//     num_cpus::get()
+// }
 
-fn default_dedicated_executor_enabled() -> bool {
-    false
-}
+// fn default_iceberg_config() -> IcebergConfig {
+//     IcebergConfig {
+//         rest_catalogs: Vec::new(),
+//     }
+// }
+//
+// #[cfg(feature = "udfs-wasm")]
+// fn default_wasm_udf() -> WasmUdfConfig {
+//     WasmUdfConfig {
+//         module_functions: HashMap::new(),
+//     }
+// }
 
-fn default_dedicated_executor_threads() -> usize {
-    // By default we slightly over provision CPUs.  For example, if you have N CPUs available we
-    // have N CPUs for the [`DedicatedExecutor`] and 1 for the main / IO runtime.
-    //
-    // Ref: https://github.com/datafusion-contrib/datafusion-dft/pull/247#discussion_r1848270250
-    num_cpus::get()
-}
+// impl Default for ExecutionConfig {
+//     fn default() -> Self {
+//         Self {
+//             object_store: None,
+//             ddl_path: default_ddl_path(),
+//             benchmark_iterations: default_benchmark_iterations(),
+//             cli_batch_size: default_cli_batch_size(),
+//             tui_batch_size: default_tui_batch_size(),
+//             flightsql_server_batch_size: default_flightsql_server_batch_size(),
+//             dedicated_executor_enabled: default_dedicated_executor_enabled(),
+//             dedicated_executor_threads: default_dedicated_executor_threads(),
+//             iceberg: default_iceberg_config(),
+//             #[cfg(feature = "udfs-wasm")]
+//             wasm_udf: default_wasm_udf(),
+//         }
+//     }
+// }
 
-fn default_iceberg_config() -> IcebergConfig {
-    IcebergConfig {
-        rest_catalogs: Vec::new(),
-    }
-}
+// #[derive(Clone, Debug, Deserialize)]
+// pub struct RestCatalogConfig {
+//     pub name: String,
+//     pub addr: String,
+// }
+//
+// #[derive(Clone, Debug, Deserialize)]
+// pub struct IcebergConfig {
+//     pub rest_catalogs: Vec<RestCatalogConfig>,
+// }
 
-#[cfg(feature = "udfs-wasm")]
-fn default_wasm_udf() -> WasmUdfConfig {
-    WasmUdfConfig {
-        module_functions: HashMap::new(),
-    }
-}
-
-impl Default for ExecutionConfig {
-    fn default() -> Self {
-        Self {
-            object_store: None,
-            ddl_path: default_ddl_path(),
-            benchmark_iterations: default_benchmark_iterations(),
-            cli_batch_size: default_cli_batch_size(),
-            tui_batch_size: default_tui_batch_size(),
-            flightsql_server_batch_size: default_flightsql_server_batch_size(),
-            dedicated_executor_enabled: default_dedicated_executor_enabled(),
-            dedicated_executor_threads: default_dedicated_executor_threads(),
-            iceberg: default_iceberg_config(),
-            #[cfg(feature = "udfs-wasm")]
-            wasm_udf: default_wasm_udf(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct RestCatalogConfig {
-    pub name: String,
-    pub addr: String,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-pub struct IcebergConfig {
-    pub rest_catalogs: Vec<RestCatalogConfig>,
-}
-
-#[cfg(feature = "udfs-wasm")]
-#[derive(Clone, Debug, Deserialize)]
-pub struct WasmFuncDetails {
-    pub name: String,
-    pub input_types: Vec<String>,
-    pub return_type: String,
-    pub input_data_type: WasmInputDataType,
-}
-
-#[cfg(feature = "udfs-wasm")]
-#[derive(Clone, Debug, Deserialize)]
-pub struct WasmUdfConfig {
-    pub module_functions: HashMap<PathBuf, Vec<WasmFuncDetails>>,
-}
+// #[cfg(feature = "udfs-wasm")]
+// #[derive(Clone, Debug, Deserialize)]
+// pub struct WasmFuncDetails {
+//     pub name: String,
+//     pub input_types: Vec<String>,
+//     pub return_type: String,
+//     pub input_data_type: WasmInputDataType,
+// }
+//
+// #[cfg(feature = "udfs-wasm")]
+// #[derive(Clone, Debug, Deserialize)]
+// pub struct WasmUdfConfig {
+//     pub module_functions: HashMap<PathBuf, Vec<WasmFuncDetails>>,
+// }
 
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct InteractionConfig {

@@ -1,8 +1,6 @@
 pub mod args;
 pub mod cli;
 pub mod config;
-pub mod execution;
-pub mod extensions;
 #[cfg(feature = "experimental-flightsql-server")]
 pub mod server;
 pub mod telemetry;
