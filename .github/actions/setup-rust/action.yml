@@ -26,6 +26,7 @@ runs:
   using: "composite"
   steps:
     - name: Setup Rust toolchain
+      shell: bash
       run: |
         rustup show
         rustup self update
