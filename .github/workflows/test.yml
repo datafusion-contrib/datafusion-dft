@@ -44,9 +44,11 @@ jobs:
           key: target-dft-cache-
       - name: Setup Rust toolchain
         run: |
-          rustup toolchain install stable
+          rustup show
+          rustup self update
+          rustup show
+          rustup install stable
           rustup default stable
-      # No tests yet
       - name: Run tests (ex-FlightSQL)
         run: |
           cargo test
@@ -287,6 +289,13 @@ jobs:
         with:
           path: /home/runner/target
           key: target-dft-cache-
+      - name: Setup Rust toolchain
+        run: |
+          rustup show
+          rustup self update
+          rustup show
+          rustup install stable
+          rustup default stable
       - name: Start FlightSQL Server
         run: |
           cargo r --features=experimental-flightsql-server,auth -- --serve --config data/configs/flightsql_basic.toml &
@@ -314,6 +323,13 @@ jobs:
         with:
           path: /home/runner/target
           key: target-dft-cache-
+      - name: Setup Rust toolchain
+        run: |
+          rustup show
+          rustup self update
+          rustup show
+          rustup install stable
+          rustup default stable
       - name: Start FlightSQL Server
         run: |
           cargo r --features=experimental-flightsql-server,auth -- --serve --config data/configs/flightsql_bearer.toml &
