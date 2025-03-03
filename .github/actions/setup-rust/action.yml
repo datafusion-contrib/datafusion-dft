@@ -31,6 +31,4 @@ runs:
         rustup self update
         rustup install stable
         rustup default stable
-    - name: Add clippy (optional)
-      if: ${{ inputs.add_clippy == 'true' }}
-      run: rustup component add clippy
+        rustup component add clippy

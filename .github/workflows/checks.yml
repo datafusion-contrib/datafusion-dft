@@ -29,8 +29,6 @@ jobs:
       - uses: actions/checkout@v2
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
-        with:
-          add_clippy: "false"
       - name: Run
         run: cargo fmt --all -- --check
   clippy:
@@ -54,10 +52,8 @@ jobs:
         with:
           path: /home/runner/.cargo
           key: cargo-S3-cache-
-      - name: Setup Rust Toolchain with Clippy
+      - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
-        with:
-          add_clippy: "true"
       - name: Cache Rust dependencies
         uses: actions/cache@v4
         with:
