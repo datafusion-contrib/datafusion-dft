@@ -286,7 +286,10 @@ jobs:
           key: target-dft-cache-
       - name: Setup Rust toolchain
         run: |
-          rustup toolchain install stable
+          rustup show
+          rustup self update
+          rustup show
+          rustup install stable
           rustup default stable
       - name: Start FlightSQL Server
         run: |
@@ -316,7 +319,10 @@ jobs:
           key: target-dft-cache-
       - name: Setup Rust toolchain
         run: |
-          rustup toolchain install stable
+          rustup show
+          rustup self update
+          rustup show
+          rustup install stable
           rustup default stable
       - name: Start FlightSQL Server
         run: |
@@ -324,6 +330,3 @@ jobs:
       - name: Run auth tests
         run: |
           cargo t --features=flightsql,auth extension_cases::auth_bearer
-
-
-
