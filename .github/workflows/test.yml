@@ -267,7 +267,6 @@ jobs:
           cargo test --manifest-path crates/datafusion-udfs-wasm/Cargo.toml
   test-auth-basic:
     name: Extension / Auth-Basic
-    needs: rust-setup
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -301,7 +300,6 @@ jobs:
           cargo t --features=flightsql,auth extension_cases::auth_basic
   test-auth-bearer:
     name: Extension / Auth-Bearer
-    needs: rust-setup
     runs-on: ubuntu-latest
     strategy:
       matrix:
