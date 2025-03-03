@@ -19,6 +19,9 @@ name: Tests
 on: [push, pull_request]
 
 jobs:
+  rust-setup:
+    uses: ./.github/workflows/setup-rust.yml
+
   test:
     name: Core
     runs-on: ubuntu-latest
@@ -46,8 +49,7 @@ jobs:
       # No tests yet
       - name: Run tests (ex-FlightSQL)
         run: |
-          # All features except FlightSQL which requires being run on a single thread for determinism
-          cargo test --features=deltalake
+          cargo test
   test-flightsql:
     name: Extension / FlightSQL
     runs-on: ubuntu-latest
@@ -266,6 +268,7 @@ jobs:
           cargo test --manifest-path crates/datafusion-udfs-wasm/Cargo.toml
   test-auth-basic:
     name: Extension / Auth-Basic
+    needs: rust-setup
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -284,13 +287,6 @@ jobs:
         with:
           path: /home/runner/target
           key: target-dft-cache-
-      - name: Setup Rust toolchain
-        run: |
-          rustup show
-          rustup self update
-          rustup show
-          rustup install stable
-          rustup default stable
       - name: Start FlightSQL Server
         run: |
           cargo r --features=experimental-flightsql-server,auth -- --serve --config data/configs/flightsql_basic.toml &
@@ -299,6 +295,7 @@ jobs:
           cargo t --features=flightsql,auth extension_cases::auth_basic
   test-auth-bearer:
     name: Extension / Auth-Bearer
+    needs: rust-setup
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -317,13 +314,6 @@ jobs:
         with:
           path: /home/runner/target
           key: target-dft-cache-
-      - name: Setup Rust toolchain
-        run: |
-          rustup show
-          rustup self update
-          rustup show
-          rustup install stable
-          rustup default stable
       - name: Start FlightSQL Server
         run: |
           cargo r --features=experimental-flightsql-server,auth -- --serve --config data/configs/flightsql_bearer.toml &

@@ -1,0 +1,17 @@
+name: Setup Rust
+
+on:
+  workflow_call:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Rust toolchain
+        run: |
+          rustup show
+          rustup self update
+          rustup show
+          rustup install stable
+          rustup default stable
+
