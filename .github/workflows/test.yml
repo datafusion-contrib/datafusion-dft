@@ -19,9 +19,6 @@ name: Tests
 on: [push, pull_request]
 
 jobs:
-  rust-setup:
-    uses: ./.github/workflows/setup-rust.yml
-
   test:
     name: Core
     runs-on: ubuntu-latest

@@ -25,14 +25,15 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v2
       - name: Setup toolchain
         run: |
-          rustup toolchain install stable
+          rustup show
+          rustup self update
+          rustup show
+          rustup install stable
           rustup default stable
-          rustup component add rustfmt
       - name: Run
         run: cargo fmt --all -- --check
   clippy:
@@ -41,7 +42,6 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     container:
       image: ${{ matrix.arch }}/rust
       env:
@@ -64,9 +64,11 @@ jobs:
           key: target-S3-cache-
       - name: Setup Rust toolchain
         run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
-          rustup component add rustfmt clippy
+          rustup show
+          rustup self update
+          rustup show
+          rustup install stable
+          rustup default stable
       - name: Run clippy
         run: |
           cargo clippy --all-features --workspace -- -D warnings
