@@ -53,12 +53,12 @@ jobs:
         with:
           submodules: true
       - name: Cache Cargo
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: /home/runner/.cargo
           key: cargo-S3-cache-
       - name: Cache Rust dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: /home/runner/target
           key: target-S3-cache-
