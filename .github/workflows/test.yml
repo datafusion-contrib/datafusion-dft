@@ -25,7 +25,6 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -42,8 +41,8 @@ jobs:
           key: target-dft-cache-
       - name: Setup Rust toolchain
         run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
+          rustup toolchain install stable
+          rustup default stable
       # No tests yet
       - name: Run tests (ex-FlightSQL)
         run: |
@@ -55,7 +54,6 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -72,8 +70,8 @@ jobs:
           key: target-dft-cache-
       - name: Setup Rust toolchain
         run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
+          rustup toolchain install stable
+          rustup default stable
       - name: Run FlightSQL tests
         run: |
           # Single thread needed because we spin up a server that listens on port and we need each
@@ -86,7 +84,6 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v3
 
@@ -111,7 +108,6 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -128,8 +124,8 @@ jobs:
           key: target-dft-cache-
       - name: Setup Rust toolchain
         run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
+          rustup toolchain install stable
+          rustup default stable
       - name: Run Functions-JSON tests
         run: |
           cargo test --features=functions-json extension_cases::functions_json
@@ -139,7 +135,6 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -156,8 +151,8 @@ jobs:
           key: target-dft-cache-
       - name: Setup Rust toolchain
         run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
+          rustup toolchain install stable
+          rustup default stable
       - name: Run Deltalake tests
         run: |
           cargo test --features=deltalake extension_cases::deltalake
@@ -167,7 +162,6 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -184,8 +178,8 @@ jobs:
           key: target-dft-cache-
       - name: Setup Rust toolchain
         run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
+          rustup toolchain install stable
+          rustup default stable
       - name: Run Hudi tests
         run: |
           cargo test --features=hudi extension_cases::hudi
@@ -195,7 +189,6 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -212,8 +205,8 @@ jobs:
           key: target-dft-cache-
       - name: Setup Rust toolchain
         run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
+          rustup toolchain install stable
+          rustup default stable
       - name: Run UDFs WASM tests
         run: |
           cargo test --features=udfs-wasm extension_cases::udfs_WASM
@@ -223,7 +216,6 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -240,8 +232,8 @@ jobs:
           key: target-dft-cache-
       - name: Setup Rust toolchain
         run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
+          rustup toolchain install stable
+          rustup default stable
       - name: Run UDFs WASM tests
         run: |
           cargo test --manifest-path crates/datafusion-functions-parquet/Cargo.toml
@@ -251,7 +243,6 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -268,8 +259,8 @@ jobs:
           key: target-dft-cache-
       - name: Setup Rust toolchain
         run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
+          rustup toolchain install stable
+          rustup default stable
       - name: Run UDFs WASM tests
         run: |
           cargo test --manifest-path crates/datafusion-udfs-wasm/Cargo.toml
@@ -279,7 +270,6 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -296,8 +286,8 @@ jobs:
           key: target-dft-cache-
       - name: Setup Rust toolchain
         run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
+          rustup toolchain install stable
+          rustup default stable
       - name: Start FlightSQL Server
         run: |
           cargo r --features=experimental-flightsql-server,auth -- --serve --config data/configs/flightsql_basic.toml &
@@ -310,7 +300,6 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v2
         with:
@@ -327,8 +316,8 @@ jobs:
           key: target-dft-cache-
       - name: Setup Rust toolchain
         run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
+          rustup toolchain install stable
+          rustup default stable
       - name: Start FlightSQL Server
         run: |
           cargo r --features=experimental-flightsql-server,auth -- --serve --config data/configs/flightsql_bearer.toml &
