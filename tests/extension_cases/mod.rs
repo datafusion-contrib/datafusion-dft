@@ -40,9 +40,8 @@ use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::common::Result;
 use datafusion::sql::parser::DFParser;
-use datafusion_dft::execution::local::ExecutionContext;
-use datafusion_dft::extensions::DftSessionStateBuilder;
-use datafusion_dft::{config::AppConfig, execution::AppType};
+use datafusion_app::{extensions::DftSessionStateBuilder, local::ExecutionContext, AppType};
+use datafusion_dft::config::AppConfig;
 use futures::{StreamExt, TryStreamExt};
 use log::debug;
 
