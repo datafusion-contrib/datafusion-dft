@@ -13,11 +13,17 @@ datafusion = "45.0.0"
 datafusion-auth = { version = "0.1.0", path = "../datafusion-auth", optional = true }
 datafusion-functions-json = { version = "0.45", optional = true }
 datafusion-functions-parquet = { version = "0.1.0", path = "..//datafusion-functions-parquet", optional = true }
-datafusion-udfs-wasm = { version = "0.1.0", path = "../datafusion-udfs-wasm", features = ["serde"], optional = true }
-deltalake = { git = "https://github.com/delta-io/delta-rs", rev = "d8995e64c305dc795f62d33ce2a4614b335944ff", features = ["datafusion"], optional = true }
+datafusion-udfs-wasm = { version = "0.1.0", path = "../datafusion-udfs-wasm", features = [
+  "serde",
+], optional = true }
+deltalake = { git = "https://github.com/delta-io/delta-rs", rev = "d8995e64c305dc795f62d33ce2a4614b335944ff", features = [
+  "datafusion",
+], optional = true }
 directories = "5.0.1"
 futures = "0.3.30"
-hudi = { git = "https://github.com/apache/hudi-rs", rev = "eab36e2d3ea39372c52d2bf6fe41c9aa406c0bea", features = ["datafusion"], optional = true }
+hudi = { git = "https://github.com/apache/hudi-rs", rev = "eab36e2d3ea39372c52d2bf6fe41c9aa406c0bea", features = [
+  "datafusion",
+], optional = true }
 iceberg-catalog-rest = { git = "https://github.com/apache/iceberg-rust", rev = "210134573569be0b6e49464aca076cb122e33e24", optional = true }
 iceberg-datafusion = { git = "https://github.com/apache/iceberg-rust", rev = "210134573569be0b6e49464aca076cb122e33e24", optional = true }
 itertools = "0.13.0"
@@ -42,10 +48,15 @@ default = ["functions-parquet"]
 deltalake = ["dep:deltalake"]
 hudi = ["dep:hudi"]
 iceberg = ["dep:iceberg-datafusion", "dep:iceberg-catalog-rest"]
-flightsql = ["dep:arrow-flight", "dep:tonic", "dep:datafusion-auth", "dep:tower-http", "dep:base64"]
+flightsql = [
+  "dep:arrow-flight",
+  "dep:tonic",
+  "dep:datafusion-auth",
+  "dep:tower-http",
+  "dep:base64",
+]
 s3 = ["object_store/aws", "url"]
 functions-json = ["dep:datafusion-functions-json"]
 functions-parquet = ["dep:datafusion-functions-parquet"]
 udfs-wasm = ["dep:datafusion-udfs-wasm"]
 huggingface = ["opendal", "object_store_opendal", "url"]
-

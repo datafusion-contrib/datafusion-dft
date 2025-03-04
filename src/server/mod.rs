@@ -30,6 +30,7 @@ use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 use tonic::transport::Server;
+#[cfg(feature = "flightsql")]
 use tower_http::validate_request::ValidateRequestHeaderLayer;
 
 const DEFAULT_TIMEOUT_SECONDS: u64 = 60;
