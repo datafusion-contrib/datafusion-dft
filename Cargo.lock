@@ -1601,16 +1601,19 @@ dependencies = [
  "async-trait",
  "color-eyre",
  "datafusion",
+ "datafusion-functions-json",
  "datafusion-functions-parquet",
  "directories",
  "futures",
  "itertools 0.13.0",
  "log",
  "num_cpus",
+ "object_store",
  "parking_lot",
  "serde",
  "tokio",
  "tokio-stream",
+ "url",
 ]
 
 [[package]]

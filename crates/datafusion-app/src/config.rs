@@ -132,6 +132,51 @@ fn default_wasm_udf() -> WasmUdfConfig {
     }
 }
 
+#[cfg(feature = "s3")]
+#[derive(Clone, Debug, Deserialize)]
+pub struct S3Config {
+    bucket_name: String,
+    object_store_url: Option<String>,
+    aws_access_key_id: Option<String>,
+    aws_secret_access_key: Option<String>,
+    _aws_default_region: Option<String>,
+    aws_endpoint: Option<String>,
+    aws_session_token: Option<String>,
+    aws_allow_http: Option<bool>,
+}
+
+#[cfg(feature = "s3")]
+impl S3Config {
+    pub fn object_store_url(&self) -> &Option<String> {
+        &self.object_store_url
+    }
+}
+
+#[cfg(feature = "s3")]
+impl S3Config {
+    pub fn to_object_store(&self) -> Result<AmazonS3> {
+        let mut builder = AmazonS3Builder::new();
+        builder = builder.with_bucket_name(&self.bucket_name);
+        if let Some(access_key) = &self.aws_access_key_id {
+            builder = builder.with_access_key_id(access_key)
+        }
+        if let Some(secret) = &self.aws_secret_access_key {
+            builder = builder.with_secret_access_key(secret)
+        }
+        if let Some(endpoint) = &self.aws_endpoint {
+            builder = builder.with_endpoint(endpoint);
+        }
+        if let Some(token) = &self.aws_session_token {
+            builder = builder.with_token(token)
+        }
+        if let Some(allow_http) = &self.aws_allow_http {
+            builder = builder.with_allow_http(*allow_http)
+        }
+
+        Ok(builder.build()?)
+    }
+}
+
 #[cfg(feature = "huggingface")]
 #[derive(Clone, Debug, Deserialize)]
 pub struct HuggingFaceConfig {
