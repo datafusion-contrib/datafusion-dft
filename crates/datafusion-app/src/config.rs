@@ -229,6 +229,7 @@ pub struct FlightSQLConfig {
     pub auth: AuthConfig,
 }
 
+#[cfg(feature = "flightsql")]
 impl FlightSQLConfig {
     pub fn new(connection_url: String, benchmark_iterations: usize, auth: AuthConfig) -> Self {
         Self {
