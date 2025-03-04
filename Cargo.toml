@@ -79,10 +79,10 @@ url = "2.5.2"
 # When addding a new feature, also add it to the features tested list in CI (`.github/workflows/rust.yml`)
 [features]
 default = ["functions-parquet"]
-deltalake = ["dep:deltalake"]
-hudi = ["dep:hudi"]
-iceberg = ["dep:iceberg-datafusion", "dep:iceberg-catalog-rest"]
-flightsql = ["dep:arrow-flight", "dep:tonic"]
+deltalake = ["datafusion-app/deltalake"]
+hudi = ["datafusion-app/hudi"]
+iceberg = ["datafusion-app/iceberg"]
+flightsql = ["datafusion-app/flightsql"]
 experimental-flightsql-server = [
   "flightsql",
   "dep:metrics",
@@ -91,9 +91,9 @@ experimental-flightsql-server = [
 s3 = ["datafusion-app/s3", "url"]
 functions-json = ["datafusion-app/functions-json"]
 functions-parquet = ["datafusion-app/functions-parquet"]
-udfs-wasm = ["dep:datafusion-udfs-wasm"]
+udfs-wasm = ["datafusion-app/udfs-wasm"]
 metrics = ["dep:metrics", "dep:metrics-exporter-prometheus"]
-huggingface = ["opendal", "object_store_opendal", "url"]
+huggingface = ["datafusion-app/huggingface"]
 auth = ["dep:datafusion-auth", "dep:tower-http", "dep:base64"]
 
 [[bin]]
