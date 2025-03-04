@@ -30,24 +30,9 @@ use tonic::{transport::Channel, IntoRequest};
 #[cfg(feature = "auth")]
 use crate::config::BasicAuth;
 
-use crate::flightsql_benchmarks::FlightSQLBenchmarkStats;
+use crate::{config::FlightSQLConfig, flightsql_benchmarks::FlightSQLBenchmarkStats};
 
 pub type FlightSQLClient = Mutex<Option<FlightSqlServiceClient<Channel>>>;
-
-#[derive(Default)]
-pub struct FlightSQLConfig {
-    connection_url: String,
-    benchmark_iterations: usize,
-}
-
-impl FlightSQLConfig {
-    pub fn new(connection_url: String, benchmark_iterations: usize) -> Self {
-        Self {
-            connection_url,
-            benchmark_iterations,
-        }
-    }
-}
 
 #[derive(Default)]
 pub struct FlightSQLContext {

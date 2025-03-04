@@ -32,6 +32,8 @@ use std::collections::HashMap;
 use color_eyre::Result;
 // #[cfg(feature = "s3")]
 // use object_store::aws::{AmazonS3, AmazonS3Builder};
+#[cfg(feature = "auth")]
+use datafusion_app::config::{AuthConfig, BasicAuth};
 
 lazy_static! {
     pub static ref PROJECT_NAME: String = env!("CARGO_CRATE_NAME").to_uppercase().to_string();
@@ -365,18 +367,18 @@ fn default_auth_config() -> AuthConfig {
     AuthConfig::default()
 }
 
-#[cfg(feature = "auth")]
-#[derive(Clone, Debug, Default, Deserialize)]
-pub struct AuthConfig {
-    pub client_basic_auth: Option<BasicAuth>,
-    pub client_bearer_token: Option<String>,
-    pub server_basic_auth: Option<BasicAuth>,
-    pub server_bearer_token: Option<String>,
-}
-
-#[cfg(feature = "auth")]
-#[derive(Clone, Debug, Default, Deserialize)]
-pub struct BasicAuth {
-    pub username: String,
-    pub password: String,
-}
+// #[cfg(feature = "auth")]
+// #[derive(Clone, Debug, Default, Deserialize)]
+// pub struct AuthConfig {
+//     pub client_basic_auth: Option<BasicAuth>,
+//     pub client_bearer_token: Option<String>,
+//     pub server_basic_auth: Option<BasicAuth>,
+//     pub server_bearer_token: Option<String>,
+// }
+//
+// #[cfg(feature = "auth")]
+// #[derive(Clone, Debug, Default, Deserialize)]
+// pub struct BasicAuth {
+//     pub username: String,
+//     pub password: String,
+// }

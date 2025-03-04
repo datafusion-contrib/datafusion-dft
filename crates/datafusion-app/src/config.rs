@@ -220,3 +220,36 @@ pub struct WasmFuncDetails {
 pub struct WasmUdfConfig {
     pub module_functions: HashMap<PathBuf, Vec<WasmFuncDetails>>,
 }
+
+#[derive(Default)]
+pub struct FlightSQLConfig {
+    pub connection_url: String,
+    pub benchmark_iterations: usize,
+    pub auth: AuthConfig,
+}
+
+impl FlightSQLConfig {
+    pub fn new(connection_url: String, benchmark_iterations: usize, auth: AuthConfig) -> Self {
+        Self {
+            connection_url,
+            benchmark_iterations,
+            auth,
+        }
+    }
+}
+
+#[cfg(feature = "auth")]
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct AuthConfig {
+    pub client_basic_auth: Option<BasicAuth>,
+    pub client_bearer_token: Option<String>,
+    pub server_basic_auth: Option<BasicAuth>,
+    pub server_bearer_token: Option<String>,
+}
+
+#[cfg(feature = "auth")]
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct BasicAuth {
+    pub username: String,
+    pub password: String,
+}

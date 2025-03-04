@@ -18,8 +18,6 @@
 use clap::Parser;
 use color_eyre::Result;
 use datafusion_app::extensions::DftSessionStateBuilder;
-#[cfg(feature = "flightsql")]
-use datafusion_app::flightsql::{FlightSQLConfig, FlightSQLContext};
 use datafusion_app::{local::ExecutionContext, AppExecution, AppType};
 use datafusion_dft::args::DftArgs;
 use datafusion_dft::cli::CliApp;
@@ -29,6 +27,11 @@ use datafusion_dft::telemetry;
 use datafusion_dft::tui::{state, App};
 #[cfg(feature = "experimental-flightsql-server")]
 use log::info;
+#[cfg(feature = "flightsql")]
+use {
+    datafusion_app::config::{AuthConfig, FlightSQLConfig},
+    datafusion_app::flightsql::FlightSQLContext,
+};
 
 #[allow(unused_mut)]
 fn main() -> Result<()> {
@@ -105,9 +108,16 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
         #[cfg(feature = "flightsql")]
         {
             if cli.flightsql {
+                let auth = AuthConfig {
+                    client_basic_auth: state.config.auth.client_basic_auth,
+                    client_bearer_token: state.config.auth.client_bearer_token,
+                    server_basic_auth: state.config.auth.server_basic_auth,
+                    server_bearer_token: state.config.auth.server_bearer_token,
+                };
                 let flightsql_cfg = FlightSQLConfig::new(
                     state.config.flightsql.connection_url,
                     state.config.flightsql.benchmark_iterations,
+                    auth,
                 );
                 let flightsql_ctx = FlightSQLContext::new(flightsql_cfg);
                 flightsql_ctx

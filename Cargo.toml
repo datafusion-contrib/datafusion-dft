@@ -94,7 +94,7 @@ functions-parquet = ["datafusion-app/functions-parquet"]
 udfs-wasm = ["datafusion-app/udfs-wasm", "dep:datafusion-udfs-wasm"]
 metrics = ["dep:metrics", "dep:metrics-exporter-prometheus"]
 huggingface = ["datafusion-app/huggingface"]
-auth = ["dep:datafusion-auth", "dep:tower-http", "dep:base64"]
+auth = ["datafusion-app/auth", "dep:tower-http", "dep:base64"]
 
 [[bin]]
 name = "dft"

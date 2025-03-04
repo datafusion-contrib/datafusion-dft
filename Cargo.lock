@@ -1600,8 +1600,10 @@ version = "0.1.0"
 dependencies = [
  "arrow-flight",
  "async-trait",
+ "base64 0.22.1",
  "color-eyre",
  "datafusion",
+ "datafusion-auth",
  "datafusion-functions-json",
  "datafusion-functions-parquet",
  "datafusion-udfs-wasm",
@@ -1622,6 +1624,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tonic",
+ "tower-http 0.6.2",
  "url",
 ]
 
