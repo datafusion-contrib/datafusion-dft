@@ -216,9 +216,9 @@ impl Default for DisplayConfig {
 //     }
 // }
 
-// fn default_benchmark_iterations() -> usize {
-//     10
-// }
+fn default_benchmark_iterations() -> usize {
+    10
+}
 
 // fn default_cli_batch_size() -> usize {
 //     8092

@@ -1708,8 +1708,6 @@ dependencies = [
  "datafusion",
  "datafusion-app",
  "datafusion-auth",
- "datafusion-functions-json",
- "datafusion-functions-parquet",
  "datafusion-udfs-wasm",
  "directories",
  "env_logger",

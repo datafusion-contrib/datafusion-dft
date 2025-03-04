@@ -19,7 +19,7 @@ use clap::Parser;
 use color_eyre::Result;
 use datafusion_app::extensions::DftSessionStateBuilder;
 #[cfg(feature = "flightsql")]
-use datafusion_app::flightsql::FlightSQLContext;
+use datafusion_app::flightsql::{FlightSQLConfig, FlightSQLContext};
 use datafusion_app::{local::ExecutionContext, AppExecution, AppType};
 use datafusion_dft::args::DftArgs;
 use datafusion_dft::cli::CliApp;
@@ -105,7 +105,11 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
         #[cfg(feature = "flightsql")]
         {
             if cli.flightsql {
-                let flightsql_ctx = FlightSQLContext::new(state.config.clone());
+                let flightsql_cfg = FlightSQLConfig::new(
+                    state.config.flightsql.connection_url,
+                    state.config.flightsql.benchmark_iterations,
+                );
+                let flightsql_ctx = FlightSQLContext::new(flightsql_cfg);
                 flightsql_ctx
                     .create_client(cli.flightsql_host.clone())
                     .await?;

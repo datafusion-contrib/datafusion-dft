@@ -26,22 +26,37 @@ use tokio::sync::Mutex;
 use tokio_stream::StreamExt;
 use tonic::{transport::Channel, IntoRequest};
 
-use crate::config::AppConfig;
+// use crate::config::AppConfig;
 #[cfg(feature = "auth")]
 use crate::config::BasicAuth;
 
-use crate::execution::flightsql_benchmarks::FlightSQLBenchmarkStats;
+use crate::flightsql_benchmarks::FlightSQLBenchmarkStats;
 
 pub type FlightSQLClient = Mutex<Option<FlightSqlServiceClient<Channel>>>;
 
 #[derive(Default)]
+pub struct FlightSQLConfig {
+    connection_url: String,
+    benchmark_iterations: usize,
+}
+
+impl FlightSQLConfig {
+    pub fn new(connection_url: String, benchmark_iterations: usize) -> Self {
+        Self {
+            connection_url,
+            benchmark_iterations,
+        }
+    }
+}
+
+#[derive(Default)]
 pub struct FlightSQLContext {
-    config: AppConfig,
+    config: FlightSQLConfig,
     flightsql_client: FlightSQLClient,
 }
 
 impl FlightSQLContext {
-    pub fn new(config: AppConfig) -> Self {
+    pub fn new(config: FlightSQLConfig) -> Self {
         Self {
             config,
             flightsql_client: Mutex::new(None),
@@ -54,7 +69,7 @@ impl FlightSQLContext {
 
     /// Create FlightSQL client from users FlightSQL config
     pub async fn create_client(&self, cli_host: Option<String>) -> Result<()> {
-        let final_url = cli_host.unwrap_or(self.config.flightsql.connection_url.clone());
+        let final_url = cli_host.unwrap_or(self.config.connection_url.clone());
         let url = Box::leak(final_url.into_boxed_str());
         info!("Connecting to FlightSQL host: {}", url);
         let channel = Channel::from_static(url).connect().await;
@@ -93,7 +108,7 @@ impl FlightSQLContext {
         query: &str,
         cli_iterations: Option<usize>,
     ) -> Result<FlightSQLBenchmarkStats> {
-        let iterations = cli_iterations.unwrap_or(self.config.flightsql.benchmark_iterations);
+        let iterations = cli_iterations.unwrap_or(self.config.benchmark_iterations);
         let mut rows_returned = Vec::with_capacity(iterations);
         let mut get_flight_info_durations = Vec::with_capacity(iterations);
         let mut ttfb_durations = Vec::with_capacity(iterations);

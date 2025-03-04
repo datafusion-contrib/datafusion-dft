@@ -25,8 +25,8 @@ crossterm = { version = "0.28.1", features = ["event-stream"] }
 datafusion = { version = "45.0.0" }
 datafusion-app = { version = "0.1.0", path = "crates/datafusion-app" }
 datafusion-auth = { version = "0.1.0", path = "crates/datafusion-auth", optional = true }
-datafusion-functions-json = { version = "0.45", optional = true }
-datafusion-functions-parquet = { version = "0.1.0", path = "crates/datafusion-functions-parquet", optional = true }
+# datafusion-functions-json = { version = "0.45", optional = true }
+# datafusion-functions-parquet = { version = "0.1.0", path = "crates/datafusion-functions-parquet", optional = true }
 datafusion-udfs-wasm = { version = "0.1.0", path = "crates/datafusion-udfs-wasm", features = ["serde"], optional = true }
 # deltalake = { git = "https://github.com/delta-io/delta-rs", rev = "d8995e64c305dc795f62d33ce2a4614b335944ff", features = ["datafusion"], optional = true }
 directories = "5.0.1"
@@ -91,7 +91,7 @@ experimental-flightsql-server = [
 s3 = ["datafusion-app/s3", "url"]
 functions-json = ["datafusion-app/functions-json"]
 functions-parquet = ["datafusion-app/functions-parquet"]
-udfs-wasm = ["datafusion-app/udfs-wasm"]
+udfs-wasm = ["datafusion-app/udfs-wasm", "dep:datafusion-udfs-wasm"]
 metrics = ["dep:metrics", "dep:metrics-exporter-prometheus"]
 huggingface = ["datafusion-app/huggingface"]
 auth = ["dep:datafusion-auth", "dep:tower-http", "dep:base64"]
