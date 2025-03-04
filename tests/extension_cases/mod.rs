@@ -25,9 +25,9 @@ mod flightsql;
 mod functions_json;
 // #[cfg(feature = "hudi")]
 // mod hudi;
-#[cfg(feature = "auth")]
+#[cfg(feature = "flightsql")]
 mod auth_basic;
-#[cfg(feature = "auth")]
+#[cfg(feature = "flightsql")]
 mod auth_bearer;
 #[cfg(feature = "huggingface")]
 mod huggingface;

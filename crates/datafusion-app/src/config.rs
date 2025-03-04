@@ -221,6 +221,7 @@ pub struct WasmUdfConfig {
     pub module_functions: HashMap<PathBuf, Vec<WasmFuncDetails>>,
 }
 
+#[cfg(feature = "flightsql")]
 #[derive(Default)]
 pub struct FlightSQLConfig {
     pub connection_url: String,
@@ -238,7 +239,7 @@ impl FlightSQLConfig {
     }
 }
 
-#[cfg(feature = "auth")]
+#[cfg(feature = "flightsql")]
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct AuthConfig {
     pub client_basic_auth: Option<BasicAuth>,
@@ -247,7 +248,7 @@ pub struct AuthConfig {
     pub server_bearer_token: Option<String>,
 }
 
-#[cfg(feature = "auth")]
+#[cfg(feature = "flightsql")]
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct BasicAuth {
     pub username: String,

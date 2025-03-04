@@ -64,7 +64,7 @@ fn create_server_handle(
     };
 
     // TODO: onlu include TrailersLayer for testing
-    if cfg!(feature = "auth") {
+    if cfg!(feature = "flightsql") {
         match (
             &config.auth.server_basic_auth,
             &config.auth.server_bearer_token,

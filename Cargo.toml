@@ -92,9 +92,7 @@ s3 = ["datafusion-app/s3", "url"]
 functions-json = ["datafusion-app/functions-json"]
 functions-parquet = ["datafusion-app/functions-parquet"]
 udfs-wasm = ["datafusion-app/udfs-wasm", "dep:datafusion-udfs-wasm"]
-metrics = ["dep:metrics", "dep:metrics-exporter-prometheus"]
 huggingface = ["datafusion-app/huggingface"]
-auth = ["datafusion-app/auth", "dep:tower-http", "dep:base64"]
 
 [[bin]]
 name = "dft"

@@ -32,7 +32,7 @@ use std::collections::HashMap;
 use color_eyre::Result;
 // #[cfg(feature = "s3")]
 // use object_store::aws::{AmazonS3, AmazonS3Builder};
-#[cfg(feature = "auth")]
+#[cfg(feature = "flightsql")]
 use datafusion_app::config::{AuthConfig, BasicAuth};
 
 lazy_static! {
@@ -79,7 +79,7 @@ pub struct AppConfig {
     pub flightsql: FlightSQLConfig,
     #[serde(default = "default_editor_config")]
     pub editor: EditorConfig,
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "flightsql")]
     #[serde(default = "default_auth_config")]
     pub auth: AuthConfig,
 }
@@ -362,12 +362,12 @@ fn default_editor_config() -> EditorConfig {
     EditorConfig::default()
 }
 
-#[cfg(feature = "auth")]
+#[cfg(feature = "flightsql")]
 fn default_auth_config() -> AuthConfig {
     AuthConfig::default()
 }
 
-// #[cfg(feature = "auth")]
+// #[cfg(feature = "flightsql")]
 // #[derive(Clone, Debug, Default, Deserialize)]
 // pub struct AuthConfig {
 //     pub client_basic_auth: Option<BasicAuth>,
