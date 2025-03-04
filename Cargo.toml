@@ -28,16 +28,16 @@ datafusion-auth = { version = "0.1.0", path = "crates/datafusion-auth", optional
 datafusion-functions-json = { version = "0.45", optional = true }
 datafusion-functions-parquet = { version = "0.1.0", path = "crates/datafusion-functions-parquet", optional = true }
 datafusion-udfs-wasm = { version = "0.1.0", path = "crates/datafusion-udfs-wasm", features = ["serde"], optional = true }
-deltalake = { git = "https://github.com/delta-io/delta-rs", rev = "d8995e64c305dc795f62d33ce2a4614b335944ff", features = ["datafusion"], optional = true }
+# deltalake = { git = "https://github.com/delta-io/delta-rs", rev = "d8995e64c305dc795f62d33ce2a4614b335944ff", features = ["datafusion"], optional = true }
 directories = "5.0.1"
 env_logger = "0.11.5"
 futures = "0.3.30"
 home = "=0.5.9"
 http = "1"
 http-body = "1"
-hudi = { git = "https://github.com/apache/hudi-rs", rev = "eab36e2d3ea39372c52d2bf6fe41c9aa406c0bea", features = ["datafusion"], optional = true }
-iceberg-catalog-rest = { git = "https://github.com/apache/iceberg-rust", rev = "210134573569be0b6e49464aca076cb122e33e24", optional = true }
-iceberg-datafusion = { git = "https://github.com/apache/iceberg-rust", rev = "210134573569be0b6e49464aca076cb122e33e24", optional = true }
+# hudi = { git = "https://github.com/apache/hudi-rs", rev = "eab36e2d3ea39372c52d2bf6fe41c9aa406c0bea", features = ["datafusion"], optional = true }
+# iceberg-catalog-rest = { git = "https://github.com/apache/iceberg-rust", rev = "210134573569be0b6e49464aca076cb122e33e24", optional = true }
+# iceberg-datafusion = { git = "https://github.com/apache/iceberg-rust", rev = "210134573569be0b6e49464aca076cb122e33e24", optional = true }
 itertools = "0.13.0"
 lazy_static = "1.4.0"
 log = "0.4.22"
