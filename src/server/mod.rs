@@ -18,8 +18,8 @@
 pub mod services;
 
 use crate::config::AppConfig;
-use crate::execution::AppExecution;
 use color_eyre::{eyre::eyre, Result};
+use datafusion_app::AppExecution;
 use log::info;
 use metrics::{describe_counter, describe_histogram};
 use metrics_exporter_prometheus::{Matcher, PrometheusBuilder};
@@ -30,6 +30,7 @@ use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 use tonic::transport::Server;
+#[cfg(feature = "flightsql")]
 use tower_http::validate_request::ValidateRequestHeaderLayer;
 
 const DEFAULT_TIMEOUT_SECONDS: u64 = 60;
@@ -64,7 +65,7 @@ fn create_server_handle(
     };
 
     // TODO: onlu include TrailersLayer for testing
-    if cfg!(feature = "auth") {
+    if cfg!(feature = "flightsql") {
         match (
             &config.auth.server_basic_auth,
             &config.auth.server_bearer_token,

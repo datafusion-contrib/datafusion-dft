@@ -169,7 +169,7 @@ impl TestConfigBuilder {
         self
     }
 
-    #[cfg(feature = "auth")]
+    #[cfg(feature = "flightsql")]
     pub fn with_auth(
         &mut self,
         server_bearer: Option<String>,

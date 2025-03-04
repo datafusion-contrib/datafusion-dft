@@ -1595,6 +1595,40 @@ dependencies = [
 ]
 
 [[package]]
+name = "datafusion-app"
+version = "0.1.0"
+dependencies = [
+ "arrow-flight",
+ "async-trait",
+ "base64 0.22.1",
+ "color-eyre",
+ "datafusion",
+ "datafusion-auth",
+ "datafusion-functions-json",
+ "datafusion-functions-parquet",
+ "datafusion-udfs-wasm",
+ "deltalake",
+ "directories",
+ "futures",
+ "hudi",
+ "iceberg-catalog-rest",
+ "iceberg-datafusion",
+ "itertools 0.13.0",
+ "log",
+ "num_cpus",
+ "object_store",
+ "object_store_opendal",
+ "opendal",
+ "parking_lot",
+ "serde",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tower-http 0.6.2",
+ "url",
+]
+
+[[package]]
 name = "datafusion-auth"
 version = "0.1.0"
 dependencies = [
@@ -1675,20 +1709,15 @@ dependencies = [
  "color-eyre",
  "crossterm",
  "datafusion",
+ "datafusion-app",
  "datafusion-auth",
- "datafusion-functions-json",
- "datafusion-functions-parquet",
  "datafusion-udfs-wasm",
- "deltalake",
  "directories",
  "env_logger",
  "futures",
  "home",
  "http",
  "http-body",
- "hudi",
- "iceberg-catalog-rest",
- "iceberg-datafusion",
  "insta",
  "itertools 0.13.0",
  "lazy_static",

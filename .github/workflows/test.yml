@@ -25,55 +25,47 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v2
         with:
           submodules: true
       - name: Cache Cargo
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: /home/runner/.cargo
           key: cargo-dft-cache-
       - name: Cache Rust dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: /home/runner/target
           key: target-dft-cache-
-      - name: Setup Rust toolchain
-        run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
-      # No tests yet
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
       - name: Run tests (ex-FlightSQL)
         run: |
-          # All features except FlightSQL which requires being run on a single thread for determinism
-          cargo test --features=deltalake
+          cargo test
   test-flightsql:
     name: Extension / FlightSQL
     runs-on: ubuntu-latest
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v2
         with:
           submodules: true
       - name: Cache Cargo
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: /home/runner/.cargo
           key: cargo-dft-cache-
       - name: Cache Rust dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: /home/runner/target
           key: target-dft-cache-
-      - name: Setup Rust toolchain
-        run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
       - name: Run FlightSQL tests
         run: |
           # Single thread needed because we spin up a server that listens on port and we need each
@@ -86,17 +78,16 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v3
-
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
       - name: Start LocalStack
         uses: LocalStack/setup-localstack@v0.2.3
         with:
           image-tag: 'latest'
           install-awslocal: 'true'
           configuration: DEBUG=1
-
       - name: Run Tests against LocalStack
         run: |
           awslocal s3 mb s3://test
@@ -111,25 +102,22 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v2
         with:
           submodules: true
       - name: Cache Cargo
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: /home/runner/.cargo
           key: cargo-dft-cache-
       - name: Cache Rust dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: /home/runner/target
           key: target-dft-cache-
-      - name: Setup Rust toolchain
-        run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
       - name: Run Functions-JSON tests
         run: |
           cargo test --features=functions-json extension_cases::functions_json
@@ -139,25 +127,22 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v2
         with:
           submodules: true
       - name: Cache Cargo
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: /home/runner/.cargo
           key: cargo-dft-cache-
       - name: Cache Rust dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: /home/runner/target
           key: target-dft-cache-
-      - name: Setup Rust toolchain
-        run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
       - name: Run Deltalake tests
         run: |
           cargo test --features=deltalake extension_cases::deltalake
@@ -167,25 +152,22 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v2
         with:
           submodules: true
       - name: Cache Cargo
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: /home/runner/.cargo
           key: cargo-dft-cache-
       - name: Cache Rust dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: /home/runner/target
           key: target-dft-cache-
-      - name: Setup Rust toolchain
-        run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
       - name: Run Hudi tests
         run: |
           cargo test --features=hudi extension_cases::hudi
@@ -195,25 +177,22 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v2
         with:
           submodules: true
       - name: Cache Cargo
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: /home/runner/.cargo
           key: cargo-dft-cache-
       - name: Cache Rust dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: /home/runner/target
           key: target-dft-cache-
-      - name: Setup Rust toolchain
-        run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
       - name: Run UDFs WASM tests
         run: |
           cargo test --features=udfs-wasm extension_cases::udfs_WASM
@@ -223,25 +202,22 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v2
         with:
           submodules: true
       - name: Cache Cargo
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: /home/runner/.cargo
           key: cargo-dft-cache-
       - name: Cache Rust dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: /home/runner/target
           key: target-dft-cache-
-      - name: Setup Rust toolchain
-        run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
       - name: Run UDFs WASM tests
         run: |
           cargo test --manifest-path crates/datafusion-functions-parquet/Cargo.toml
@@ -251,25 +227,22 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v2
         with:
           submodules: true
       - name: Cache Cargo
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: /home/runner/.cargo
           key: cargo-dft-cache-
       - name: Cache Rust dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: /home/runner/target
           key: target-dft-cache-
-      - name: Setup Rust toolchain
-        run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
       - name: Run UDFs WASM tests
         run: |
           cargo test --manifest-path crates/datafusion-udfs-wasm/Cargo.toml
@@ -279,62 +252,53 @@ jobs:
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v2
         with:
           submodules: true
       - name: Cache Cargo
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: /home/runner/.cargo
           key: cargo-dft-cache-
       - name: Cache Rust dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: /home/runner/target
           key: target-dft-cache-
-      - name: Setup Rust toolchain
-        run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
       - name: Start FlightSQL Server
         run: |
-          cargo r --features=experimental-flightsql-server,auth -- --serve --config data/configs/flightsql_basic.toml &
+          cargo r --features=experimental-flightsql-server -- --serve --config data/configs/flightsql_basic.toml &
       - name: Run auth tests
         run: |
-          cargo t --features=flightsql,auth extension_cases::auth_basic
+          cargo t --features=flightsql extension_cases::auth_basic
   test-auth-bearer:
     name: Extension / Auth-Bearer
     runs-on: ubuntu-latest
     strategy:
       matrix:
         arch: [amd64]
-        rust: [stable]
     steps:
       - uses: actions/checkout@v2
         with:
           submodules: true
       - name: Cache Cargo
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: /home/runner/.cargo
           key: cargo-dft-cache-
       - name: Cache Rust dependencies
-        uses: actions/cache@v2
+        uses: actions/cache@v4
         with:
           path: /home/runner/target
           key: target-dft-cache-
-      - name: Setup Rust toolchain
-        run: |
-          rustup toolchain install ${{ matrix.rust }}
-          rustup default ${{ matrix.rust }}
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
       - name: Start FlightSQL Server
         run: |
-          cargo r --features=experimental-flightsql-server,auth -- --serve --config data/configs/flightsql_bearer.toml &
+          cargo r --features=experimental-flightsql-server -- --serve --config data/configs/flightsql_bearer.toml &
       - name: Run auth tests
         run: |
-          cargo t --features=flightsql,auth extension_cases::auth_bearer
-
-
-
+          cargo t --features=flightsql extension_cases::auth_bearer

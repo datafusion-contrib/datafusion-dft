@@ -17,9 +17,9 @@
 
 use std::time::Duration;
 
-use crate::execution::local_benchmarks::is_all_same;
+use crate::local_benchmarks::is_all_same;
 
-use super::local_benchmarks::DurationsSummary;
+use crate::local_benchmarks::DurationsSummary;
 
 pub struct FlightSQLBenchmarkStats {
     query: String,

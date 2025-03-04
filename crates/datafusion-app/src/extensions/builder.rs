@@ -28,7 +28,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use crate::{config::ExecutionConfig, execution::AppType};
+use crate::{config::ExecutionConfig, AppType};
 
 use super::{enabled_extensions, Extension};
 

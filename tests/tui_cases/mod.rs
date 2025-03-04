@@ -23,10 +23,11 @@ mod quit;
 
 use datafusion::arrow::array::RecordBatch;
 use datafusion::common::Result;
+use datafusion_app::{
+    extensions::DftSessionStateBuilder, local::ExecutionContext, AppExecution, AppType,
+};
 use datafusion_dft::{
     args::DftArgs,
-    execution::{local::ExecutionContext, AppExecution, AppType},
-    extensions::DftSessionStateBuilder,
     tui::{state::initialize, App, AppEvent},
 };
 use tempfile::{tempdir, TempDir};
