@@ -270,10 +270,10 @@ jobs:
         uses: ./.github/actions/setup-rust
       - name: Start FlightSQL Server
         run: |
-          cargo r --features=experimental-flightsql-server,auth -- --serve --config data/configs/flightsql_basic.toml &
+          cargo r --features=experimental-flightsql-server -- --serve --config data/configs/flightsql_basic.toml &
       - name: Run auth tests
         run: |
-          cargo t --features=flightsql,auth extension_cases::auth_basic
+          cargo t --features=flightsql extension_cases::auth_basic
   test-auth-bearer:
     name: Extension / Auth-Bearer
     runs-on: ubuntu-latest
@@ -298,7 +298,7 @@ jobs:
         uses: ./.github/actions/setup-rust
       - name: Start FlightSQL Server
         run: |
-          cargo r --features=experimental-flightsql-server,auth -- --serve --config data/configs/flightsql_bearer.toml &
+          cargo r --features=experimental-flightsql-server -- --serve --config data/configs/flightsql_bearer.toml &
       - name: Run auth tests
         run: |
-          cargo t --features=flightsql,auth extension_cases::auth_bearer
+          cargo t --features=flightsql extension_cases::auth_bearer
