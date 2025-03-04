@@ -82,7 +82,7 @@ default = ["functions-parquet"]
 deltalake = ["datafusion-app/deltalake"]
 hudi = ["datafusion-app/hudi"]
 iceberg = ["datafusion-app/iceberg"]
-flightsql = ["datafusion-app/flightsql"]
+flightsql = ["datafusion-app/flightsql", "dep:tonic", "dep:arrow-flight"]
 experimental-flightsql-server = [
   "flightsql",
   "dep:metrics",
