@@ -17,18 +17,19 @@
 
 use clap::Parser;
 use color_eyre::Result;
+use datafusion_app::extensions::DftSessionStateBuilder;
+use datafusion_app::{local::ExecutionContext, AppExecution, AppType};
 use datafusion_dft::args::DftArgs;
 use datafusion_dft::cli::CliApp;
-#[cfg(feature = "flightsql")]
-use datafusion_dft::execution::flightsql::FlightSQLContext;
-use datafusion_dft::execution::{local::ExecutionContext, AppExecution, AppType};
-use datafusion_dft::extensions::DftSessionStateBuilder;
-#[cfg(feature = "experimental-flightsql-server")]
-use datafusion_dft::server::FlightSqlApp;
 use datafusion_dft::telemetry;
 use datafusion_dft::tui::{state, App};
-#[cfg(feature = "experimental-flightsql-server")]
-use log::info;
+#[cfg(feature = "flightsql")]
+use {
+    datafusion_app::config::{AuthConfig, FlightSQLConfig},
+    datafusion_app::flightsql::FlightSQLContext,
+    datafusion_dft::server::FlightSqlApp,
+    log::info,
+};
 
 #[allow(unused_mut)]
 fn main() -> Result<()> {
@@ -48,7 +49,7 @@ fn main() -> Result<()> {
 }
 
 fn should_init_env_logger(cli: &DftArgs) -> bool {
-    #[cfg(feature = "experimental-flightsql-server")]
+    #[cfg(feature = "flightsql")]
     if cli.serve {
         return true;
     }
@@ -67,7 +68,7 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
         .with_execution_config(state.config.execution.clone())
         .with_extensions()
         .await?;
-    #[cfg(feature = "experimental-flightsql-server")]
+    #[cfg(feature = "flightsql")]
     if cli.serve {
         // FlightSQL Server mode: start a FlightSQL server
         const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1:50051";
@@ -105,7 +106,18 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
         #[cfg(feature = "flightsql")]
         {
             if cli.flightsql {
-                let flightsql_ctx = FlightSQLContext::new(state.config.clone());
+                let auth = AuthConfig {
+                    client_basic_auth: state.config.auth.client_basic_auth,
+                    client_bearer_token: state.config.auth.client_bearer_token,
+                    server_basic_auth: state.config.auth.server_basic_auth,
+                    server_bearer_token: state.config.auth.server_bearer_token,
+                };
+                let flightsql_cfg = FlightSQLConfig::new(
+                    state.config.flightsql.connection_url,
+                    state.config.flightsql.benchmark_iterations,
+                    auth,
+                );
+                let flightsql_ctx = FlightSQLContext::new(flightsql_cfg);
                 flightsql_ctx
                     .create_client(cli.flightsql_host.clone())
                     .await?;

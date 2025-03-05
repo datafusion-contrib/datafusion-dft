@@ -17,9 +17,9 @@
 
 //! Tests for the TUI (e.g. user application with keyboard commands)
 
+use datafusion_app::extensions::DftSessionStateBuilder;
+use datafusion_app::{local::ExecutionContext, AppExecution, AppType};
 use datafusion_dft::args::DftArgs;
-use datafusion_dft::execution::{local::ExecutionContext, AppExecution, AppType};
-use datafusion_dft::extensions::DftSessionStateBuilder;
 use datafusion_dft::tui::state::initialize;
 use datafusion_dft::tui::{App, AppEvent};
 use ratatui::crossterm::event;

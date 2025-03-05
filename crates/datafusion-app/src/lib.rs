@@ -15,18 +15,19 @@
 // specific language governing permissions and limitations
 // under the License.
 
+pub mod config;
 pub mod executor;
+pub mod extensions;
 #[cfg(feature = "flightsql")]
 pub mod flightsql;
 #[cfg(feature = "flightsql")]
 pub mod flightsql_benchmarks;
 pub mod local;
+pub mod local_benchmarks;
 pub mod sql_utils;
 pub mod stats;
 #[cfg(feature = "udfs-wasm")]
 pub mod wasm;
-
-pub mod local_benchmarks;
 
 pub use stats::{collect_plan_io_stats, ExecutionStats};
 

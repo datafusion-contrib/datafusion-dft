@@ -20,7 +20,7 @@ use std::time::Duration;
 
 use ratatui::widgets::TableState;
 
-use crate::execution::stats::ExecutionStats;
+use datafusion_app::stats::ExecutionStats;
 
 #[derive(Debug)]
 pub enum Context {

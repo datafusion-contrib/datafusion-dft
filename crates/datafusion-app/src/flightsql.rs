@@ -16,7 +16,7 @@
 // under the License.
 
 use arrow_flight::sql::client::FlightSqlServiceClient;
-#[cfg(feature = "auth")]
+#[cfg(feature = "flightsql")]
 use base64::engine::{general_purpose::STANDARD, Engine as _};
 use datafusion::sql::parser::DFParser;
 use log::{error, info, warn};
@@ -26,22 +26,22 @@ use tokio::sync::Mutex;
 use tokio_stream::StreamExt;
 use tonic::{transport::Channel, IntoRequest};
 
-use crate::config::AppConfig;
-#[cfg(feature = "auth")]
+// use crate::config::AppConfig;
+#[cfg(feature = "flightsql")]
 use crate::config::BasicAuth;
 
-use crate::execution::flightsql_benchmarks::FlightSQLBenchmarkStats;
+use crate::{config::FlightSQLConfig, flightsql_benchmarks::FlightSQLBenchmarkStats};
 
 pub type FlightSQLClient = Mutex<Option<FlightSqlServiceClient<Channel>>>;
 
 #[derive(Default)]
 pub struct FlightSQLContext {
-    config: AppConfig,
+    config: FlightSQLConfig,
     flightsql_client: FlightSQLClient,
 }
 
 impl FlightSQLContext {
-    pub fn new(config: AppConfig) -> Self {
+    pub fn new(config: FlightSQLConfig) -> Self {
         Self {
             config,
             flightsql_client: Mutex::new(None),
@@ -54,7 +54,7 @@ impl FlightSQLContext {
 
     /// Create FlightSQL client from users FlightSQL config
     pub async fn create_client(&self, cli_host: Option<String>) -> Result<()> {
-        let final_url = cli_host.unwrap_or(self.config.flightsql.connection_url.clone());
+        let final_url = cli_host.unwrap_or(self.config.connection_url.clone());
         let url = Box::leak(final_url.into_boxed_str());
         info!("Connecting to FlightSQL host: {}", url);
         let channel = Channel::from_static(url).connect().await;
@@ -66,7 +66,7 @@ impl FlightSQLContext {
                 //
                 // Although that is for HTTP/1.1 and GRPC uses HTTP/2 - so maybe it has changed.
                 // To be tested later with the Tower auth layers to see what they support.
-                #[cfg(feature = "auth")]
+                #[cfg(feature = "flightsql")]
                 {
                     if let Some(token) = &self.config.auth.client_bearer_token {
                         client.set_token(token.to_string());
@@ -93,7 +93,7 @@ impl FlightSQLContext {
         query: &str,
         cli_iterations: Option<usize>,
     ) -> Result<FlightSQLBenchmarkStats> {
-        let iterations = cli_iterations.unwrap_or(self.config.flightsql.benchmark_iterations);
+        let iterations = cli_iterations.unwrap_or(self.config.benchmark_iterations);
         let mut rows_returned = Vec::with_capacity(iterations);
         let mut get_flight_info_durations = Vec::with_capacity(iterations);
         let mut ttfb_durations = Vec::with_capacity(iterations);

@@ -23,20 +23,17 @@ clap = { version = "4.5.27", features = ["derive"] }
 color-eyre = "0.6.3"
 crossterm = { version = "0.28.1", features = ["event-stream"] }
 datafusion = { version = "45.0.0" }
+datafusion-app = { version = "0.1.0", path = "crates/datafusion-app" }
 datafusion-auth = { version = "0.1.0", path = "crates/datafusion-auth", optional = true }
-datafusion-functions-json = { version = "0.45", optional = true }
-datafusion-functions-parquet = { version = "0.1.0", path = "crates/datafusion-functions-parquet", optional = true }
-datafusion-udfs-wasm = { version = "0.1.0", path = "crates/datafusion-udfs-wasm", features = ["serde"], optional = true }
-deltalake = { git = "https://github.com/delta-io/delta-rs", rev = "d8995e64c305dc795f62d33ce2a4614b335944ff", features = ["datafusion"], optional = true }
+datafusion-udfs-wasm = { version = "0.1.0", path = "crates/datafusion-udfs-wasm", features = [
+  "serde",
+], optional = true }
 directories = "5.0.1"
 env_logger = "0.11.5"
 futures = "0.3.30"
 home = "=0.5.9"
 http = "1"
 http-body = "1"
-hudi = { git = "https://github.com/apache/hudi-rs", rev = "eab36e2d3ea39372c52d2bf6fe41c9aa406c0bea", features = ["datafusion"], optional = true }
-iceberg-catalog-rest = { git = "https://github.com/apache/iceberg-rust", rev = "210134573569be0b6e49464aca076cb122e33e24", optional = true }
-iceberg-datafusion = { git = "https://github.com/apache/iceberg-rust", rev = "210134573569be0b6e49464aca076cb122e33e24", optional = true }
 itertools = "0.13.0"
 lazy_static = "1.4.0"
 log = "0.4.22"
@@ -78,22 +75,15 @@ url = "2.5.2"
 # When addding a new feature, also add it to the features tested list in CI (`.github/workflows/rust.yml`)
 [features]
 default = ["functions-parquet"]
-deltalake = ["dep:deltalake"]
-hudi = ["dep:hudi"]
-iceberg = ["dep:iceberg-datafusion", "dep:iceberg-catalog-rest"]
-flightsql = ["dep:arrow-flight", "dep:tonic"]
-experimental-flightsql-server = [
-  "flightsql",
-  "dep:metrics",
-  "dep:metrics-exporter-prometheus",
-]
-s3 = ["object_store/aws", "url"]
-functions-json = ["dep:datafusion-functions-json"]
-functions-parquet = ["dep:datafusion-functions-parquet"]
-udfs-wasm = ["dep:datafusion-udfs-wasm"]
-metrics = ["dep:metrics", "dep:metrics-exporter-prometheus"]
-huggingface = ["opendal", "object_store_opendal", "url"]
-auth = ["dep:datafusion-auth", "dep:tower-http", "dep:base64"]
+deltalake = ["datafusion-app/deltalake"]
+hudi = ["datafusion-app/hudi"]
+iceberg = ["datafusion-app/iceberg"]
+flightsql = ["datafusion-app/flightsql", "dep:tonic", "dep:arrow-flight", "dep:metrics", "dep:metrics-exporter-prometheus", "dep:tower-http"]
+s3 = ["datafusion-app/s3", "url"]
+functions-json = ["datafusion-app/functions-json"]
+functions-parquet = ["datafusion-app/functions-parquet"]
+udfs-wasm = ["datafusion-app/udfs-wasm", "dep:datafusion-udfs-wasm"]
+huggingface = ["datafusion-app/huggingface"]
 
 [[bin]]
 name = "dft"
