@@ -326,7 +326,7 @@ pub struct FlightSQLConfig {
     pub connection_url: String,
     #[serde(default = "default_benchmark_iterations")]
     pub benchmark_iterations: usize,
-    #[cfg(feature = "experimental-flightsql-server")]
+    #[cfg(feature = "flightsql")]
     #[serde(default = "default_server_metrics_port")]
     pub server_metrics_port: String,
 }
@@ -337,7 +337,7 @@ impl Default for FlightSQLConfig {
         Self {
             connection_url: default_connection_url(),
             benchmark_iterations: default_benchmark_iterations(),
-            #[cfg(feature = "experimental-flightsql-server")]
+            #[cfg(feature = "flightsql")]
             server_metrics_port: default_server_metrics_port(),
         }
     }
@@ -348,7 +348,7 @@ pub fn default_connection_url() -> String {
     "http://localhost:50051".to_string()
 }
 
-#[cfg(feature = "experimental-flightsql-server")]
+#[cfg(feature = "flightsql")]
 fn default_server_metrics_port() -> String {
     "0.0.0.0:9000".to_string()
 }

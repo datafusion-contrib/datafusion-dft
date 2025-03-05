@@ -67,7 +67,7 @@ pub struct DftArgs {
     #[clap(long, short, help = "Only show how long the query took to run")]
     pub time: bool,
 
-    #[cfg(feature = "experimental-flightsql-server")]
+    #[cfg(feature = "flightsql")]
     #[clap(long, help = "Start a FlightSQL server")]
     pub serve: bool,
 
@@ -92,7 +92,7 @@ pub struct DftArgs {
     #[clap(short = 'n', help = "Set the number of benchmark iterations to run")]
     pub benchmark_iterations: Option<usize>,
 
-    #[cfg(any(feature = "flightsql", feature = "experimental-flightsql-server"))]
+    #[cfg(any(feature = "flightsql", feature = "flightsql"))]
     #[clap(long, help = "Set the host and port to be used for FlightSQL")]
     pub flightsql_host: Option<String>,
 
