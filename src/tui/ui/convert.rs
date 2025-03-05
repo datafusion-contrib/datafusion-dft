@@ -19,7 +19,8 @@ use color_eyre::{eyre::eyre, Result};
 use datafusion::arrow::{
     array::{
         BooleanArray, Date32Array, Date64Array, Float16Array, Float32Array, Float64Array,
-        Int16Array, Int32Array, Int64Array, Int8Array, ListArray, RecordBatch, StringArray,
+        Int16Array, Int32Array, Int64Array, Int8Array, LargeStringArray, ListArray,
+        RecordBatch, StringArray, StringViewArray,
         TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray,
         TimestampSecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
     },
@@ -84,6 +85,8 @@ pub fn record_batch_to_table_row_cells(record_batch: &RecordBatch) -> Result<Vec
     for arr in record_batch.columns() {
         match arr.data_type() {
             DataType::Utf8 => convert_array_values_to_cells!(rows, arr, StringArray),
+            DataType::LargeUtf8 => convert_array_values_to_cells!(rows, arr, LargeStringArray),
+            DataType::Utf8View => convert_array_values_to_cells!(rows, arr, StringViewArray),
             DataType::Int8 => convert_array_values_to_cells!(rows, arr, Int8Array),
             DataType::Int16 => convert_array_values_to_cells!(rows, arr, Int16Array),
             DataType::Int32 => convert_array_values_to_cells!(rows, arr, Int32Array),
