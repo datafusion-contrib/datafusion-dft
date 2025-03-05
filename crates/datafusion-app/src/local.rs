@@ -39,7 +39,6 @@ use super::local_benchmarks::LocalBenchmarkStats;
 use super::stats::{ExecutionDurationStats, ExecutionStats};
 #[cfg(feature = "udfs-wasm")]
 use super::wasm::create_wasm_udfs;
-use super::AppType;
 
 /// Structure for executing queries locally
 ///
@@ -73,23 +72,17 @@ impl std::fmt::Debug for ExecutionContext {
 
 impl ExecutionContext {
     /// Construct a new `ExecutionContext` with the specified configuration
-    pub fn try_new(
-        config: &ExecutionConfig,
-        session_state: SessionState,
-        app_type: AppType,
-    ) -> Result<Self> {
+    pub fn try_new(config: &ExecutionConfig, session_state: SessionState) -> Result<Self> {
         let mut executor = None;
-        if let AppType::FlightSQLServer = app_type {
-            if config.dedicated_executor_enabled {
-                // Ideally we would only use `enable_time` but we are still doing
-                // some network requests as part of planning / execution which require network
-                // functionality.
+        if config.dedicated_executor_enabled {
+            // Ideally we would only use `enable_time` but we are still doing
+            // some network requests as part of planning / execution which require network
+            // functionality.
 
-                let runtime_builder = tokio::runtime::Builder::new_multi_thread();
-                let dedicated_executor =
-                    DedicatedExecutor::new("cpu_runtime", config.clone(), runtime_builder);
-                executor = Some(dedicated_executor)
-            }
+            let runtime_builder = tokio::runtime::Builder::new_multi_thread();
+            let dedicated_executor =
+                DedicatedExecutor::new("cpu_runtime", config.clone(), runtime_builder);
+            executor = Some(dedicated_executor)
         }
 
         #[allow(unused_mut)]

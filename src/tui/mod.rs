@@ -40,8 +40,8 @@ use tokio_util::sync::CancellationToken;
 
 use self::execution::{ExecutionError, ExecutionResultsBatch, TuiExecution};
 use self::handlers::{app_event_handler, crossterm_event_handler};
-use crate::args::DftArgs;
-use datafusion_app::{sql_utils::clean_sql, AppExecution};
+use crate::{args::DftArgs, execution::AppExecution};
+use datafusion_app::sql_utils::clean_sql;
 
 #[derive(Debug)]
 pub enum AppEvent {

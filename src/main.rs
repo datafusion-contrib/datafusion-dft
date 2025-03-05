@@ -18,11 +18,14 @@
 use clap::Parser;
 use color_eyre::Result;
 use datafusion_app::extensions::DftSessionStateBuilder;
-use datafusion_app::{local::ExecutionContext, AppExecution, AppType};
-use datafusion_dft::args::DftArgs;
-use datafusion_dft::cli::CliApp;
-use datafusion_dft::telemetry;
-use datafusion_dft::tui::{state, App};
+use datafusion_app::{local::ExecutionContext, AppType};
+use datafusion_dft::{
+    args::DftArgs,
+    cli::CliApp,
+    execution::AppExecution,
+    telemetry,
+    tui::{state, App},
+};
 #[cfg(feature = "flightsql")]
 use {
     datafusion_app::config::{AuthConfig, FlightSQLConfig},

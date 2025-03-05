@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use crate::execution::AppExecution;
 use arrow_flight::encode::FlightDataEncoderBuilder;
 use arrow_flight::error::FlightError;
 use arrow_flight::flight_service_server::{FlightService, FlightServiceServer};
@@ -23,7 +24,7 @@ use arrow_flight::sql::{Any, CommandStatementQuery, SqlInfo, TicketStatementQuer
 use arrow_flight::{FlightDescriptor, FlightEndpoint, FlightInfo, Ticket};
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::sql::parser::DFParser;
-use datafusion_app::{local::ExecutionContext, AppExecution};
+use datafusion_app::local::ExecutionContext;
 use futures::{StreamExt, TryStreamExt};
 use log::{debug, error, info};
 use metrics::{counter, histogram};

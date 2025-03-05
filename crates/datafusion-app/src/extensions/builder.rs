@@ -28,7 +28,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use crate::{config::ExecutionConfig, AppType};
+use crate::config::ExecutionConfig;
 
 use super::{enabled_extensions, Extension};
 
@@ -51,7 +51,6 @@ use super::{enabled_extensions, Extension};
 ///   <https://github.com/apache/datafusion/issues/12554>
 //#[derive(Debug)]
 pub struct DftSessionStateBuilder {
-    app_type: Option<AppType>,
     execution_config: Option<ExecutionConfig>,
     session_config: SessionConfig,
     table_factories: Option<HashMap<String, Arc<dyn TableProviderFactory>>>,
@@ -85,17 +84,11 @@ impl DftSessionStateBuilder {
 
         Self {
             session_config,
-            app_type: None,
             execution_config: None,
             table_factories: None,
             catalog_providers: None,
             runtime_env: None,
         }
-    }
-
-    pub fn with_app_type(mut self, app_type: AppType) -> Self {
-        self.app_type = Some(app_type);
-        self
     }
 
     pub fn with_execution_config(mut self, app_type: ExecutionConfig) -> Self {
@@ -166,7 +159,6 @@ impl DftSessionStateBuilder {
     /// Build the [`SessionState`] from the specified configuration
     pub fn build(self) -> datafusion::common::Result<SessionState> {
         let Self {
-            app_type,
             execution_config,
             mut session_config,
             table_factories,
@@ -175,21 +167,7 @@ impl DftSessionStateBuilder {
             ..
         } = self;
 
-        let app_type = app_type.unwrap_or(AppType::Cli);
         let execution_config = execution_config.unwrap_or_default();
-
-        match app_type {
-            AppType::Cli => {
-                session_config = session_config.with_batch_size(execution_config.cli_batch_size);
-            }
-            AppType::Tui => {
-                session_config = session_config.with_batch_size(execution_config.tui_batch_size);
-            }
-            AppType::FlightSQLServer => {
-                session_config =
-                    session_config.with_batch_size(execution_config.flightsql_server_batch_size);
-            }
-        }
 
         let mut builder = SessionStateBuilder::new()
             .with_default_features()

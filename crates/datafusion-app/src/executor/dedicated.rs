@@ -376,7 +376,7 @@ impl Drop for State {
 
 #[cfg(test)]
 mod tests {
-    use crate::execution::executor::io::spawn_io;
+    use crate::executor::io::spawn_io;
 
     use super::*;
     use std::{
