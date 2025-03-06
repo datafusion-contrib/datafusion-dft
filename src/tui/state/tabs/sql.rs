@@ -84,7 +84,7 @@ impl SQLTabState<'_> {
         let ddl_empty_text = vec!["Write your DDL here.".to_string()];
         let mut ddl_textarea = TextArea::new(ddl_empty_text);
         ddl_textarea.set_style(Style::default().fg(tailwind::WHITE));
-        if config.editor.experimental_syntax_highlighting {
+        if config.tui.editor.experimental_syntax_highlighting {
             textarea.set_search_pattern(keyword_regex()).unwrap();
             textarea.set_search_style(keyword_style());
             ddl_textarea.set_search_pattern(keyword_regex()).unwrap();
@@ -159,7 +159,7 @@ impl SQLTabState<'_> {
     pub fn clear_editor(&mut self, config: &AppConfig) {
         let mut textarea = TextArea::new(vec!["".to_string()]);
         textarea.set_style(Style::default().fg(tailwind::WHITE));
-        if config.editor.experimental_syntax_highlighting {
+        if config.tui.editor.experimental_syntax_highlighting {
             textarea.set_search_pattern(keyword_regex()).unwrap();
             textarea.set_search_style(keyword_style());
         };

@@ -17,7 +17,7 @@
 
 //! [`DftSessionStateBuilder`] for configuring DataFusion [`SessionState`]
 
-use color_eyre::eyre;
+use color_eyre::{eyre, Result};
 use datafusion::catalog::MemoryCatalogProviderList;
 use datafusion::catalog::{CatalogProvider, CatalogProviderList, TableProviderFactory};
 use datafusion::execution::context::SessionState;
@@ -73,34 +73,45 @@ impl Debug for DftSessionStateBuilder {
 
 impl Default for DftSessionStateBuilder {
     fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl DftSessionStateBuilder {
-    /// Create a new builder
-    pub fn new() -> Self {
-        let session_config = SessionConfig::default().with_information_schema(true);
-
         Self {
-            session_config,
+            session_config: SessionConfig::default().with_information_schema(true),
             execution_config: None,
             table_factories: None,
             catalog_providers: None,
             runtime_env: None,
         }
     }
+}
 
-    pub fn with_execution_config(mut self, app_type: ExecutionConfig) -> Self {
-        self.execution_config = Some(app_type);
-        self
+impl DftSessionStateBuilder {
+    /// Create a new builder
+    pub fn try_new(config: Option<ExecutionConfig>) -> Result<Self> {
+        let session_config = if let Some(cfg) = config.unwrap_or_default().datafusion {
+            SessionConfig::from_string_hash_map(&cfg)?
+        } else {
+            SessionConfig::default().with_information_schema(true)
+        };
+
+        let builder = Self {
+            session_config,
+            execution_config: None,
+            table_factories: None,
+            catalog_providers: None,
+            runtime_env: None,
+        };
+        Ok(builder)
     }
 
-    /// Set the `batch_size` on the [`SessionConfig`]
-    pub fn with_batch_size(mut self, batch_size: usize) -> Self {
-        self.session_config = self.session_config.with_batch_size(batch_size);
-        self
-    }
+    // pub fn with_execution_config(mut self, app_type: ExecutionConfig) -> Self {
+    //     self.execution_config = Some(app_type);
+    //     self
+    // }
+
+    // // Set the `batch_size` on the [`SessionConfig`]
+    // pub fn with_batch_size(mut self, batch_size: usize) -> Self {
+    //     self.session_config = self.session_config.with_batch_size(batch_size);
+    //     self
+    // }
 
     /// Add a table factory to the list of factories on this builder
     pub fn add_table_factory(&mut self, name: &str, factory: Arc<dyn TableProviderFactory>) {
@@ -160,14 +171,12 @@ impl DftSessionStateBuilder {
     pub fn build(self) -> datafusion::common::Result<SessionState> {
         let Self {
             execution_config,
-            mut session_config,
+            session_config,
             table_factories,
             catalog_providers,
             runtime_env,
             ..
         } = self;
-
-        let execution_config = execution_config.unwrap_or_default();
 
         let mut builder = SessionStateBuilder::new()
             .with_default_features()

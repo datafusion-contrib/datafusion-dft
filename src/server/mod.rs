@@ -67,8 +67,8 @@ fn create_server_handle(
     // TODO: onlu include TrailersLayer for testing
     if cfg!(feature = "flightsql") {
         match (
-            &config.auth.server_basic_auth,
-            &config.auth.server_bearer_token,
+            &config.flightsql_server.auth.basic_auth,
+            &config.flightsql_server.auth.bearer_token,
         ) {
             (Some(_), Some(_)) => Err(eyre!("Only one auth type can be used at a time")),
             (Some(basic), None) => {

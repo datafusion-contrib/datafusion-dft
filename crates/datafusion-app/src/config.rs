@@ -21,10 +21,8 @@ use std::path::PathBuf;
 
 #[cfg(feature = "udfs-wasm")]
 use datafusion_udfs_wasm::WasmInputDataType;
-// use directories::{ProjectDirs, UserDirs};
 use log::info;
 use serde::Deserialize;
-#[cfg(feature = "udfs-wasm")]
 use std::collections::HashMap;
 
 #[cfg(feature = "s3")]
@@ -39,12 +37,14 @@ pub struct ExecutionConfig {
     pub ddl_path: Option<PathBuf>,
     #[serde(default = "default_benchmark_iterations")]
     pub benchmark_iterations: usize,
-    #[serde(default = "default_cli_batch_size")]
-    pub cli_batch_size: usize,
-    #[serde(default = "default_tui_batch_size")]
-    pub tui_batch_size: usize,
-    #[serde(default = "default_flightsql_server_batch_size")]
-    pub flightsql_server_batch_size: usize,
+    #[serde(default)]
+    pub datafusion: Option<HashMap<String, String>>,
+    // #[serde(default = "default_cli_batch_size")]
+    // pub cli_batch_size: usize,
+    // #[serde(default = "default_tui_batch_size")]
+    // pub tui_batch_size: usize,
+    // #[serde(default = "default_flightsql_server_batch_size")]
+    // pub flightsql_server_batch_size: usize,
     #[serde(default = "default_dedicated_executor_enabled")]
     pub dedicated_executor_enabled: bool,
     #[serde(default = "default_dedicated_executor_threads")]
@@ -62,9 +62,10 @@ impl Default for ExecutionConfig {
             object_store: None,
             ddl_path: default_ddl_path(),
             benchmark_iterations: default_benchmark_iterations(),
-            cli_batch_size: default_cli_batch_size(),
-            tui_batch_size: default_tui_batch_size(),
-            flightsql_server_batch_size: default_flightsql_server_batch_size(),
+            datafusion: None,
+            // cli_batch_size: default_cli_batch_size(),
+            // tui_batch_size: default_tui_batch_size(),
+            // flightsql_server_batch_size: default_flightsql_server_batch_size(),
             dedicated_executor_enabled: default_dedicated_executor_enabled(),
             dedicated_executor_threads: default_dedicated_executor_threads(),
             iceberg: default_iceberg_config(),
@@ -243,10 +244,8 @@ impl FlightSQLConfig {
 #[cfg(feature = "flightsql")]
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct AuthConfig {
-    pub client_basic_auth: Option<BasicAuth>,
-    pub client_bearer_token: Option<String>,
-    pub server_basic_auth: Option<BasicAuth>,
-    pub server_bearer_token: Option<String>,
+    pub basic_auth: Option<BasicAuth>,
+    pub bearer_token: Option<String>,
 }
 
 #[cfg(feature = "flightsql")]

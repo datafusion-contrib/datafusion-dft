@@ -78,7 +78,7 @@ impl FlightSQLTabState<'_> {
         // TODO: Enable vim mode from config?
         let mut textarea = TextArea::new(empty_text);
         textarea.set_style(Style::default().fg(tailwind::WHITE));
-        if config.editor.experimental_syntax_highlighting {
+        if config.tui.editor.experimental_syntax_highlighting {
             textarea.set_search_pattern(sql::keyword_regex()).unwrap();
             textarea.set_search_style(sql::keyword_style());
         };
@@ -131,7 +131,7 @@ impl FlightSQLTabState<'_> {
     pub fn clear_editor(&mut self, config: &AppConfig) {
         let mut textarea = TextArea::new(vec!["".to_string()]);
         textarea.set_style(Style::default().fg(tailwind::WHITE));
-        if config.editor.experimental_syntax_highlighting {
+        if config.tui.editor.experimental_syntax_highlighting {
             textarea.set_search_pattern(sql::keyword_regex()).unwrap();
             textarea.set_search_style(sql::keyword_style());
         };

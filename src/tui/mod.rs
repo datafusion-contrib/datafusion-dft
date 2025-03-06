@@ -153,10 +153,10 @@ impl<'app> App<'app> {
         if ui {
             ratatui::crossterm::terminal::enable_raw_mode()?;
             ratatui::crossterm::execute!(std::io::stdout(), EnterAlternateScreen, cursor::Hide)?;
-            if self.state.config.interaction.mouse {
+            if self.state.config.tui.interaction.mouse {
                 ratatui::crossterm::execute!(std::io::stdout(), event::EnableMouseCapture)?;
             }
-            if self.state.config.interaction.paste {
+            if self.state.config.tui.interaction.paste {
                 ratatui::crossterm::execute!(std::io::stdout(), event::EnableBracketedPaste)?;
             }
         }
@@ -186,10 +186,10 @@ impl<'app> App<'app> {
     pub fn exit(&mut self) -> Result<()> {
         self.stop()?;
         if crossterm::terminal::is_raw_mode_enabled()? {
-            if self.state.config.interaction.paste {
+            if self.state.config.tui.interaction.paste {
                 crossterm::execute!(std::io::stdout(), event::DisableBracketedPaste)?;
             }
-            if self.state.config.interaction.mouse {
+            if self.state.config.tui.interaction.mouse {
                 crossterm::execute!(std::io::stdout(), event::DisableMouseCapture)?;
             }
             crossterm::execute!(std::io::stdout(), LeaveAlternateScreen, cursor::Show)?;
@@ -221,7 +221,7 @@ impl<'app> App<'app> {
     /// terminal events and triggering render events based on user configured rates.
     fn start_app_event_loop(&mut self) {
         let render_delay =
-            std::time::Duration::from_secs_f64(1.0 / self.state.config.display.frame_rate);
+            std::time::Duration::from_secs_f64(1.0 / self.state.config.tui.display.frame_rate);
         debug!("Render delay: {:?}", render_delay);
         // TODO-V1: Add this to config
         self.cancel();
