@@ -107,10 +107,12 @@ pub struct FlightSQLClientConfig {
 
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct AppConfig {
+    #[serde(default)]
+    pub shared: ExecutionConfig,
     pub cli: CliConfig,
     pub tui: TuiConfig,
     #[cfg(feature = "flightsql")]
-    pub flightsql_client: FlightSQLServerConfig,
+    pub flightsql_client: FlightSQLClientConfig,
     #[cfg(feature = "flightsql")]
     pub flightsql_server: FlightSQLServerConfig,
 }
@@ -126,11 +128,6 @@ fn default_display_config() -> DisplayConfig {
 fn default_interaction_config() -> InteractionConfig {
     InteractionConfig::default()
 }
-
-// #[cfg(feature = "flightsql")]
-// fn default_flightsql_config() -> FlightSQLConfig {
-//     FlightSQLConfig::default()
-// }
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct DisplayConfig {
@@ -148,6 +145,7 @@ impl Default for DisplayConfig {
     }
 }
 
+#[cfg(feature = "flightsql")]
 fn default_benchmark_iterations() -> usize {
     10
 }

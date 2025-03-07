@@ -35,7 +35,7 @@ use wasi_common::WasiCtx;
 use wasmtime::{Instance, Module, Store, TypedFunc};
 
 #[cfg_attr(feature = "serde", derive(Deserialize))]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum WasmInputDataType {
     Row,
     ArrowIpc,

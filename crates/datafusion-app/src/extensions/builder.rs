@@ -87,7 +87,7 @@ impl DftSessionStateBuilder {
     /// Create a new builder
     pub fn try_new(config: Option<ExecutionConfig>) -> Result<Self> {
         let session_config = if let Some(cfg) = config.unwrap_or_default().datafusion {
-            SessionConfig::from_string_hash_map(&cfg)?
+            SessionConfig::from_string_hash_map(&cfg)?.with_information_schema(true)
         } else {
             SessionConfig::default().with_information_schema(true)
         };
@@ -101,17 +101,6 @@ impl DftSessionStateBuilder {
         };
         Ok(builder)
     }
-
-    // pub fn with_execution_config(mut self, app_type: ExecutionConfig) -> Self {
-    //     self.execution_config = Some(app_type);
-    //     self
-    // }
-
-    // // Set the `batch_size` on the [`SessionConfig`]
-    // pub fn with_batch_size(mut self, batch_size: usize) -> Self {
-    //     self.session_config = self.session_config.with_batch_size(batch_size);
-    //     self
-    // }
 
     /// Add a table factory to the list of factories on this builder
     pub fn add_table_factory(&mut self, name: &str, factory: Arc<dyn TableProviderFactory>) {
@@ -170,7 +159,6 @@ impl DftSessionStateBuilder {
     /// Build the [`SessionState`] from the specified configuration
     pub fn build(self) -> datafusion::common::Result<SessionState> {
         let Self {
-            execution_config,
             session_config,
             table_factories,
             catalog_providers,

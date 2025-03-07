@@ -26,9 +26,50 @@ use serde::Deserialize;
 use std::collections::HashMap;
 
 #[cfg(feature = "s3")]
-use color_eyre::Result;
-#[cfg(feature = "s3")]
-use object_store::aws::{AmazonS3, AmazonS3Builder};
+use {
+    color_eyre::Result,
+    object_store::aws::{AmazonS3, AmazonS3Builder},
+};
+
+// Merges a shared config with a priority config. If a field is present in the priority config that
+// it replaces the entire field from the shared config.
+//
+// TODO: Implement full merge so that nested fields can be maintained from the shared config and
+// only selected fields are overwritten.
+pub fn merge_configs(shared: ExecutionConfig, priority: ExecutionConfig) -> ExecutionConfig {
+    // Baseline is the shared config
+    let mut merged = shared;
+
+    if let Some(object_store_config) = priority.object_store {
+        merged.object_store = Some(object_store_config)
+    }
+    if let Some(ddl_path) = priority.ddl_path {
+        merged.ddl_path = Some(ddl_path)
+    }
+    if let Some(datafusion) = priority.datafusion {
+        merged.datafusion = Some(datafusion)
+    }
+
+    if merged.benchmark_iterations != priority.benchmark_iterations {
+        merged.benchmark_iterations = priority.benchmark_iterations;
+    }
+    if merged.dedicated_executor_enabled != priority.dedicated_executor_enabled {
+        merged.dedicated_executor_enabled = priority.dedicated_executor_enabled
+    }
+    if merged.dedicated_executor_threads != priority.dedicated_executor_threads {
+        merged.dedicated_executor_threads = priority.dedicated_executor_threads
+    }
+    if merged.iceberg != priority.iceberg {
+        merged.iceberg = priority.iceberg
+    }
+
+    #[cfg(feature = "udfs-wasm")]
+    if merged.wasm_udf != priority.wasm_udf {
+        merged.wasm_udf = priority.wasm_udf
+    }
+
+    merged
+}
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ExecutionConfig {
@@ -39,12 +80,6 @@ pub struct ExecutionConfig {
     pub benchmark_iterations: usize,
     #[serde(default)]
     pub datafusion: Option<HashMap<String, String>>,
-    // #[serde(default = "default_cli_batch_size")]
-    // pub cli_batch_size: usize,
-    // #[serde(default = "default_tui_batch_size")]
-    // pub tui_batch_size: usize,
-    // #[serde(default = "default_flightsql_server_batch_size")]
-    // pub flightsql_server_batch_size: usize,
     #[serde(default = "default_dedicated_executor_enabled")]
     pub dedicated_executor_enabled: bool,
     #[serde(default = "default_dedicated_executor_threads")]
@@ -63,9 +98,6 @@ impl Default for ExecutionConfig {
             ddl_path: default_ddl_path(),
             benchmark_iterations: default_benchmark_iterations(),
             datafusion: None,
-            // cli_batch_size: default_cli_batch_size(),
-            // tui_batch_size: default_tui_batch_size(),
-            // flightsql_server_batch_size: default_flightsql_server_batch_size(),
             dedicated_executor_enabled: default_dedicated_executor_enabled(),
             dedicated_executor_threads: default_dedicated_executor_threads(),
             iceberg: default_iceberg_config(),
@@ -87,21 +119,6 @@ fn default_ddl_path() -> Option<PathBuf> {
     } else {
         None
     }
-}
-
-// TODO - Move this root dft
-fn default_cli_batch_size() -> usize {
-    8092
-}
-
-// TODO - Move this root dft
-fn default_tui_batch_size() -> usize {
-    100
-}
-
-// TODO - Move this root dft
-fn default_flightsql_server_batch_size() -> usize {
-    8092
 }
 
 fn default_benchmark_iterations() -> usize {
@@ -196,19 +213,19 @@ pub struct ObjectStoreConfig {
     pub huggingface: Option<Vec<HuggingFaceConfig>>,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct RestCatalogConfig {
     pub name: String,
     pub addr: String,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct IcebergConfig {
     pub rest_catalogs: Vec<RestCatalogConfig>,
 }
 
 #[cfg(feature = "udfs-wasm")]
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct WasmFuncDetails {
     pub name: String,
     pub input_types: Vec<String>,
@@ -217,7 +234,7 @@ pub struct WasmFuncDetails {
 }
 
 #[cfg(feature = "udfs-wasm")]
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
 pub struct WasmUdfConfig {
     pub module_functions: HashMap<PathBuf, Vec<WasmFuncDetails>>,
 }

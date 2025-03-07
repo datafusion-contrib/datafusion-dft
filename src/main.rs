@@ -17,8 +17,8 @@
 
 use clap::Parser;
 use color_eyre::Result;
-use datafusion_app::extensions::DftSessionStateBuilder;
 use datafusion_app::local::ExecutionContext;
+use datafusion_app::{config::merge_configs, extensions::DftSessionStateBuilder};
 use datafusion_dft::{
     args::DftArgs,
     cli::CliApp,
@@ -68,8 +68,12 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
     let state = state::initialize(cli.config_path());
     #[cfg(feature = "flightsql")]
     if cli.serve {
+        let merged_exec_config = merge_configs(
+            state.config.shared.clone(),
+            state.config.flightsql_server.execution.clone(),
+        );
         let session_state_builder =
-            DftSessionStateBuilder::try_new(Some(state.config.flightsql_server.execution.clone()))?
+            DftSessionStateBuilder::try_new(Some(merged_exec_config.clone()))?
                 .with_extensions()
                 .await?;
         // FlightSQL Server mode: start a FlightSQL server
@@ -78,8 +82,7 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
         let session_state = session_state_builder
             // .with_app_type(AppType::FlightSQLServer)
             .build()?;
-        let execution_ctx =
-            ExecutionContext::try_new(&state.config.flightsql_server.execution, session_state)?;
+        let execution_ctx = ExecutionContext::try_new(&merged_exec_config, session_state)?;
         if cli.run_ddl {
             execution_ctx.execute_ddl().await;
         }
@@ -96,14 +99,18 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
         return Ok(());
     }
     if !cli.files.is_empty() || !cli.commands.is_empty() {
+        let merged_exec_config = merge_configs(
+            state.config.shared.clone(),
+            state.config.cli.execution.clone(),
+        );
         let session_state_builder =
-            DftSessionStateBuilder::try_new(Some(state.config.cli.execution.clone()))?
+            DftSessionStateBuilder::try_new(Some(merged_exec_config.clone()))?
                 .with_extensions()
                 .await?;
 
         // CLI mode: executing commands from files or CLI arguments
         let session_state = session_state_builder.build()?;
-        let execution_ctx = ExecutionContext::try_new(&state.config.cli.execution, session_state)?;
+        let execution_ctx = ExecutionContext::try_new(&merged_exec_config, session_state)?;
         #[allow(unused_mut)]
         let mut app_execution = AppExecution::new(execution_ctx);
         #[cfg(feature = "flightsql")]
@@ -128,8 +135,12 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
         let app = CliApp::new(app_execution, cli.clone());
         app.execute_files_or_commands().await?;
     } else {
+        let merged_exec_config = merge_configs(
+            state.config.shared.clone(),
+            state.config.tui.execution.clone(),
+        );
         let session_state_builder =
-            DftSessionStateBuilder::try_new(Some(state.config.tui.execution.clone()))?
+            DftSessionStateBuilder::try_new(Some(merged_exec_config.clone()))?
                 .with_extensions()
                 .await?;
         let session_state = session_state_builder.build()?;
@@ -137,7 +148,7 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
         // TUI mode: running the TUI
         telemetry::initialize_logs()?; // use alternate logging for TUI
         let state = state::initialize(cli.config_path());
-        let execution_ctx = ExecutionContext::try_new(&state.config.tui.execution, session_state)?;
+        let execution_ctx = ExecutionContext::try_new(&merged_exec_config, session_state)?;
         let app_execution = AppExecution::new(execution_ctx);
         let app = App::new(state, cli, app_execution);
         app.run_app().await?;
