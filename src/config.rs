@@ -83,8 +83,6 @@ pub struct FlightSQLServerConfig {
     pub execution: ExecutionConfig,
     #[serde(default = "default_connection_url")]
     pub connection_url: String,
-    #[serde(default = "default_benchmark_iterations")]
-    pub benchmark_iterations: usize,
     #[cfg(feature = "flightsql")]
     #[serde(default = "default_server_metrics_port")]
     pub server_metrics_port: String,
@@ -95,8 +93,6 @@ pub struct FlightSQLServerConfig {
 #[cfg(feature = "flightsql")]
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct FlightSQLClientConfig {
-    #[serde(default = "default_execution_config")]
-    pub execution: ExecutionConfig,
     #[serde(default = "default_connection_url")]
     pub connection_url: String,
     #[serde(default = "default_benchmark_iterations")]
@@ -114,8 +110,10 @@ pub struct AppConfig {
     #[serde(default)]
     pub tui: TuiConfig,
     #[cfg(feature = "flightsql")]
+    #[serde(default)]
     pub flightsql_client: FlightSQLClientConfig,
     #[cfg(feature = "flightsql")]
+    #[serde(default)]
     pub flightsql_server: FlightSQLServerConfig,
 }
 

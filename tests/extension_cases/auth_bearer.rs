@@ -24,7 +24,7 @@ use crate::{cli_cases::contains_str, config::TestConfigBuilder};
 #[tokio::test]
 pub async fn test_token() {
     let mut config_builder = TestConfigBuilder::default();
-    config_builder.with_auth(None, Some("\"Pass\"".to_string()), None, None, None, None);
+    config_builder.with_client_auth(Some("\"Pass\"".to_string()), None, None);
     let config = config_builder.build("my_config.toml");
 
     let assert = tokio::task::spawn_blocking(|| {

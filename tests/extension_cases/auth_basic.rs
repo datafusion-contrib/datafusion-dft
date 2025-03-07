@@ -24,10 +24,7 @@ use crate::{cli_cases::contains_str, config::TestConfigBuilder};
 #[tokio::test]
 pub async fn test_basic() {
     let mut config_builder = TestConfigBuilder::default();
-    config_builder.with_auth(
-        None,
-        None,
-        None,
+    config_builder.with_client_auth(
         None,
         Some("\"User\"".to_string()),
         Some("\"Pass\"".to_string()),
