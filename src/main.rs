@@ -116,6 +116,7 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
         #[cfg(feature = "flightsql")]
         {
             if cli.flightsql {
+                println!("Config: {:?}", &state.config);
                 let auth = AuthConfig {
                     basic_auth: state.config.flightsql_client.auth.basic_auth,
                     bearer_token: state.config.flightsql_client.auth.bearer_token,

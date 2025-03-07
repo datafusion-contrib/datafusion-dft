@@ -77,21 +77,31 @@ pub struct TuiConfig {
 }
 
 #[cfg(feature = "flightsql")]
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct FlightSQLServerConfig {
     #[serde(default = "default_execution_config")]
     pub execution: ExecutionConfig,
     #[serde(default = "default_connection_url")]
     pub connection_url: String,
-    #[cfg(feature = "flightsql")]
     #[serde(default = "default_server_metrics_port")]
     pub server_metrics_port: String,
     #[serde(default = "default_auth_config")]
     pub auth: AuthConfig,
 }
 
+impl Default for FlightSQLServerConfig {
+    fn default() -> Self {
+        Self {
+            execution: default_execution_config(),
+            connection_url: default_connection_url(),
+            server_metrics_port: default_server_metrics_port(),
+            auth: default_auth_config(),
+        }
+    }
+}
+
 #[cfg(feature = "flightsql")]
-#[derive(Clone, Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Deserialize)]
 pub struct FlightSQLClientConfig {
     #[serde(default = "default_connection_url")]
     pub connection_url: String,
@@ -99,6 +109,16 @@ pub struct FlightSQLClientConfig {
     pub benchmark_iterations: usize,
     #[serde(default = "default_auth_config")]
     pub auth: AuthConfig,
+}
+
+impl Default for FlightSQLClientConfig {
+    fn default() -> Self {
+        Self {
+            connection_url: default_connection_url(),
+            benchmark_iterations: default_benchmark_iterations(),
+            auth: default_auth_config(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -166,27 +186,27 @@ fn default_paste() -> bool {
     false
 }
 
-#[cfg(feature = "flightsql")]
-#[derive(Clone, Debug, Deserialize)]
-pub struct FlightSQLConfig {
-    #[serde(default = "default_connection_url")]
-    pub connection_url: String,
-    #[serde(default = "default_benchmark_iterations")]
-    pub benchmark_iterations: usize,
-    #[serde(default = "default_server_metrics_port")]
-    pub server_metrics_port: String,
-}
-
-#[cfg(feature = "flightsql")]
-impl Default for FlightSQLConfig {
-    fn default() -> Self {
-        Self {
-            connection_url: default_connection_url(),
-            benchmark_iterations: default_benchmark_iterations(),
-            server_metrics_port: default_server_metrics_port(),
-        }
-    }
-}
+// #[cfg(feature = "flightsql")]
+// #[derive(Clone, Debug, Deserialize)]
+// pub struct FlightSQLConfig {
+//     #[serde(default = "default_connection_url")]
+//     pub connection_url: String,
+//     #[serde(default = "default_benchmark_iterations")]
+//     pub benchmark_iterations: usize,
+//     #[serde(default = "default_server_metrics_port")]
+//     pub server_metrics_port: String,
+// }
+//
+// #[cfg(feature = "flightsql")]
+// impl Default for FlightSQLConfig {
+//     fn default() -> Self {
+//         Self {
+//             connection_url: default_connection_url(),
+//             benchmark_iterations: default_benchmark_iterations(),
+//             server_metrics_port: default_server_metrics_port(),
+//         }
+//     }
+// }
 
 #[cfg(feature = "flightsql")]
 pub fn default_connection_url() -> String {
