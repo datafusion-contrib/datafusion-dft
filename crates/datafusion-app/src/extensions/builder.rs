@@ -86,7 +86,7 @@ impl Default for DftSessionStateBuilder {
 impl DftSessionStateBuilder {
     /// Create a new builder
     pub fn try_new(config: Option<ExecutionConfig>) -> Result<Self> {
-        let session_config = if let Some(cfg) = config.unwrap_or_default().datafusion {
+        let session_config = if let Some(cfg) = config.clone().unwrap_or_default().datafusion {
             SessionConfig::from_string_hash_map(&cfg)?.with_information_schema(true)
         } else {
             SessionConfig::default().with_information_schema(true)
@@ -94,7 +94,7 @@ impl DftSessionStateBuilder {
 
         let builder = Self {
             session_config,
-            execution_config: None,
+            execution_config: config,
             table_factories: None,
             catalog_providers: None,
             runtime_env: None,
@@ -149,8 +149,9 @@ impl DftSessionStateBuilder {
         let extensions = enabled_extensions();
 
         for extension in extensions {
-            let execution_config = self.execution_config.clone().unwrap_or_default();
-            self.register_extension(execution_config, extension).await?;
+            let execution_config = self.execution_config.clone();
+            self.register_extension(execution_config.unwrap_or_default(), extension)
+                .await?;
         }
 
         Ok(self)

@@ -61,9 +61,10 @@ impl TestConfigBuilder {
         secret_key: &str,
         allow_http: bool,
     ) -> &mut Self {
-        self.config_text.push_str(&format!("[{app}]\n"));
         self.config_text
-            .push_str(&format!("[[execution.object_store.{}]]\n", store));
+            .push_str(&format!("[{app}.execution.object_store]\n"));
+        self.config_text
+            .push_str(&format!("[[{app}.execution.object_store.{}]]\n", store));
         self.config_text
             .push_str(&format!("bucket_name = '{}'\n", bucket_name));
         self.config_text

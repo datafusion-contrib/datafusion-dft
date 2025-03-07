@@ -73,6 +73,7 @@ pub fn merge_configs(shared: ExecutionConfig, priority: ExecutionConfig) -> Exec
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ExecutionConfig {
+    #[serde(default)]
     pub object_store: Option<ObjectStoreConfig>,
     #[serde(default = "default_ddl_path")]
     pub ddl_path: Option<PathBuf>,
