@@ -18,8 +18,9 @@
 //! Tests for the TUI (e.g. user application with keyboard commands)
 
 use datafusion_app::extensions::DftSessionStateBuilder;
-use datafusion_app::{local::ExecutionContext, AppExecution, AppType};
+use datafusion_app::local::ExecutionContext;
 use datafusion_dft::args::DftArgs;
+use datafusion_dft::execution::AppExecution;
 use datafusion_dft::tui::state::initialize;
 use datafusion_dft::tui::{App, AppEvent};
 use ratatui::crossterm::event;
@@ -107,16 +108,16 @@ impl<'app> TestApp<'app> {
         let config_path = tempdir().unwrap();
         let state = initialize(config_path.path().to_path_buf());
 
-        let session_state = DftSessionStateBuilder::new()
-            .with_app_type(AppType::Tui)
-            .with_extensions()
-            .await
-            .unwrap()
-            .build()
-            .unwrap();
-        let execution =
-            ExecutionContext::try_new(&state.config.execution, session_state, AppType::Tui)
+        let session_state =
+            DftSessionStateBuilder::try_new(Some(state.config.tui.execution.clone()))
+                .unwrap()
+                .with_extensions()
+                .await
+                .unwrap()
+                .build()
                 .unwrap();
+        let execution =
+            ExecutionContext::try_new(&state.config.tui.execution, session_state).unwrap();
         let args = DftArgs::default();
         let app_execution = AppExecution::new(execution);
         let app = App::new(state, args, app_execution);

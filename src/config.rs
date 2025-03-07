@@ -109,7 +109,9 @@ pub struct FlightSQLClientConfig {
 pub struct AppConfig {
     #[serde(default)]
     pub shared: ExecutionConfig,
+    #[serde(default)]
     pub cli: CliConfig,
+    #[serde(default)]
     pub tui: TuiConfig,
     #[cfg(feature = "flightsql")]
     pub flightsql_client: FlightSQLClientConfig,

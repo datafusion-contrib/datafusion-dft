@@ -41,8 +41,8 @@ impl TestConfigBuilder {
         TestConfig { dir: tempdir, path }
     }
 
-    pub fn with_ddl_path(&mut self, ddl_path: PathBuf) -> &mut Self {
-        self.config_text.push_str("[execution]\n");
+    pub fn with_ddl_path(&mut self, app: &str, ddl_path: PathBuf) -> &mut Self {
+        self.config_text.push_str(&format!("[{app}.execution]\n"));
         let param = format!("ddl_path = '{}'\n", ddl_path.display());
         self.config_text.push_str(&param);
         self
@@ -52,6 +52,7 @@ impl TestConfigBuilder {
     #[allow(clippy::too_many_arguments)]
     pub fn with_s3_object_store(
         &mut self,
+        app: &str,
         store: &str,
         bucket_name: &str,
         object_store_url: &str,
@@ -60,6 +61,7 @@ impl TestConfigBuilder {
         secret_key: &str,
         allow_http: bool,
     ) -> &mut Self {
+        self.config_text.push_str(&format!("[{app}]\n"));
         self.config_text
             .push_str(&format!("[[execution.object_store.{}]]\n", store));
         self.config_text
@@ -77,9 +79,9 @@ impl TestConfigBuilder {
         self
     }
 
-    pub fn with_benchmark_iterations(&mut self, iterations: u64) -> &mut Self {
+    pub fn with_benchmark_iterations(&mut self, app: &str, iterations: u64) -> &mut Self {
         self.config_text.push_str(&format!(
-            "[execution]\nbenchmark_iterations = {}\n",
+            "[{app}.execution]\nbenchmark_iterations = {}\n",
             iterations
         ));
         self

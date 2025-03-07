@@ -40,7 +40,7 @@ use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::common::Result;
 use datafusion::sql::parser::DFParser;
-use datafusion_app::{extensions::DftSessionStateBuilder, local::ExecutionContext, AppType};
+use datafusion_app::{extensions::DftSessionStateBuilder, local::ExecutionContext};
 use datafusion_dft::config::AppConfig;
 use futures::{StreamExt, TryStreamExt};
 use log::debug;
@@ -55,15 +55,14 @@ impl TestExecution {
     pub async fn new() -> Self {
         let config = AppConfig::default();
 
-        let session_state = DftSessionStateBuilder::new()
-            .with_app_type(AppType::Cli)
+        let session_state = DftSessionStateBuilder::try_new(Some(config.cli.execution.clone()))
+            .unwrap()
             .with_extensions()
             .await
             .unwrap()
             .build()
             .unwrap();
-        let execution =
-            ExecutionContext::try_new(&config.execution, session_state, AppType::Cli).unwrap();
+        let execution = ExecutionContext::try_new(&config.cli.execution, session_state).unwrap();
         Self { execution }
     }
 
