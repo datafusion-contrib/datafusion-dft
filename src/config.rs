@@ -89,6 +89,7 @@ pub struct FlightSQLServerConfig {
     pub auth: AuthConfig,
 }
 
+#[cfg(feature = "flightsql")]
 impl Default for FlightSQLServerConfig {
     fn default() -> Self {
         Self {
@@ -111,6 +112,7 @@ pub struct FlightSQLClientConfig {
     pub auth: AuthConfig,
 }
 
+#[cfg(feature = "flightsql")]
 impl Default for FlightSQLClientConfig {
     fn default() -> Self {
         Self {
