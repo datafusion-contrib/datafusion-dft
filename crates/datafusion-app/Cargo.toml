@@ -44,11 +44,7 @@ url = { version = "2.5.2", optional = true }
 [features]
 default = ["functions-parquet"]
 deltalake = ["dep:deltalake"]
-flightsql = [
-  "dep:arrow-flight",
-  "dep:base64",
-  "dep:tonic",
-]
+flightsql = ["dep:arrow-flight", "dep:base64", "dep:tonic"]
 functions-json = ["dep:datafusion-functions-json"]
 functions-parquet = ["dep:datafusion-functions-parquet"]
 hudi = ["dep:hudi"]
