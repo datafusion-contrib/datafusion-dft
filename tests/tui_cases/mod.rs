@@ -23,11 +23,10 @@ mod quit;
 
 use datafusion::arrow::array::RecordBatch;
 use datafusion::common::Result;
-use datafusion_app::{
-    extensions::DftSessionStateBuilder, local::ExecutionContext, AppExecution, AppType,
-};
+use datafusion_app::{extensions::DftSessionStateBuilder, local::ExecutionContext};
 use datafusion_dft::{
     args::DftArgs,
+    execution::AppExecution,
     tui::{state::initialize, App, AppEvent},
 };
 use tempfile::{tempdir, TempDir};
@@ -46,21 +45,21 @@ struct TestApp<'app> {
     app: App<'app>,
 }
 
-impl<'app> TestApp<'app> {
+impl TestApp<'_> {
     /// Create a new [`TestApp`] instance configured with a temporary directory
     async fn new() -> Self {
         let config_path = tempdir().unwrap();
         let state = initialize(config_path.path().to_path_buf());
-        let session_state = DftSessionStateBuilder::new()
-            .with_app_type(AppType::Tui)
-            .with_extensions()
-            .await
-            .unwrap()
-            .build()
-            .unwrap();
-        let execution_ctx =
-            ExecutionContext::try_new(&state.config.execution, session_state, AppType::Tui)
+        let session_state =
+            DftSessionStateBuilder::try_new(Some(state.config.tui.execution.clone()))
+                .unwrap()
+                .with_extensions()
+                .await
+                .unwrap()
+                .build()
                 .unwrap();
+        let execution_ctx =
+            ExecutionContext::try_new(&state.config.tui.execution, session_state).unwrap();
         let app_execution = AppExecution::new(execution_ctx);
         let args = DftArgs::default();
         let mut app = App::new(state, args, app_execution);

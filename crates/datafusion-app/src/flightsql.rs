@@ -68,10 +68,10 @@ impl FlightSQLContext {
                 // To be tested later with the Tower auth layers to see what they support.
                 #[cfg(feature = "flightsql")]
                 {
-                    if let Some(token) = &self.config.auth.client_bearer_token {
+                    if let Some(token) = &self.config.auth.bearer_token {
                         client.set_token(token.to_string());
                     } else if let Some(BasicAuth { username, password }) =
-                        &self.config.auth.client_basic_auth
+                        &self.config.auth.basic_auth
                     {
                         let encoded_basic = STANDARD.encode(format!("{username}:{password}"));
                         client.set_header("Authorization", format!("Basic {encoded_basic}"))

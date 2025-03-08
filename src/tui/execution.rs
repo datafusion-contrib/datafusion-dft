@@ -17,6 +17,7 @@
 
 //! [`AppExecution`]: Handles executing queries for the TUI application.
 
+use crate::execution::AppExecution;
 use crate::tui::AppEvent;
 use color_eyre::eyre::Result;
 use datafusion::arrow::array::RecordBatch;
@@ -25,7 +26,6 @@ use datafusion::arrow::error::ArrowError;
 use datafusion::execution::context::SessionContext;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::execute_stream;
-use datafusion_app::AppExecution;
 use futures::StreamExt;
 use log::{error, info};
 use std::sync::Arc;

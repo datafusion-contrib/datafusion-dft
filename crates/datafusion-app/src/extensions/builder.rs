@@ -17,7 +17,7 @@
 
 //! [`DftSessionStateBuilder`] for configuring DataFusion [`SessionState`]
 
-use color_eyre::eyre;
+use color_eyre::{eyre, Result};
 use datafusion::catalog::MemoryCatalogProviderList;
 use datafusion::catalog::{CatalogProvider, CatalogProviderList, TableProviderFactory};
 use datafusion::execution::context::SessionState;
@@ -28,7 +28,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 
-use crate::{config::ExecutionConfig, AppType};
+use crate::config::ExecutionConfig;
 
 use super::{enabled_extensions, Extension};
 
@@ -51,7 +51,6 @@ use super::{enabled_extensions, Extension};
 ///   <https://github.com/apache/datafusion/issues/12554>
 //#[derive(Debug)]
 pub struct DftSessionStateBuilder {
-    app_type: Option<AppType>,
     execution_config: Option<ExecutionConfig>,
     session_config: SessionConfig,
     table_factories: Option<HashMap<String, Arc<dyn TableProviderFactory>>>,
@@ -74,39 +73,33 @@ impl Debug for DftSessionStateBuilder {
 
 impl Default for DftSessionStateBuilder {
     fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl DftSessionStateBuilder {
-    /// Create a new builder
-    pub fn new() -> Self {
-        let session_config = SessionConfig::default().with_information_schema(true);
-
         Self {
-            session_config,
-            app_type: None,
+            session_config: SessionConfig::default().with_information_schema(true),
             execution_config: None,
             table_factories: None,
             catalog_providers: None,
             runtime_env: None,
         }
     }
+}
 
-    pub fn with_app_type(mut self, app_type: AppType) -> Self {
-        self.app_type = Some(app_type);
-        self
-    }
+impl DftSessionStateBuilder {
+    /// Create a new builder
+    pub fn try_new(config: Option<ExecutionConfig>) -> Result<Self> {
+        let session_config = if let Some(cfg) = config.clone().unwrap_or_default().datafusion {
+            SessionConfig::from_string_hash_map(&cfg)?.with_information_schema(true)
+        } else {
+            SessionConfig::default().with_information_schema(true)
+        };
 
-    pub fn with_execution_config(mut self, app_type: ExecutionConfig) -> Self {
-        self.execution_config = Some(app_type);
-        self
-    }
-
-    /// Set the `batch_size` on the [`SessionConfig`]
-    pub fn with_batch_size(mut self, batch_size: usize) -> Self {
-        self.session_config = self.session_config.with_batch_size(batch_size);
-        self
+        let builder = Self {
+            session_config,
+            execution_config: config,
+            table_factories: None,
+            catalog_providers: None,
+            runtime_env: None,
+        };
+        Ok(builder)
     }
 
     /// Add a table factory to the list of factories on this builder
@@ -156,8 +149,9 @@ impl DftSessionStateBuilder {
         let extensions = enabled_extensions();
 
         for extension in extensions {
-            let execution_config = self.execution_config.clone().unwrap_or_default();
-            self.register_extension(execution_config, extension).await?;
+            let execution_config = self.execution_config.clone();
+            self.register_extension(execution_config.unwrap_or_default(), extension)
+                .await?;
         }
 
         Ok(self)
@@ -166,30 +160,12 @@ impl DftSessionStateBuilder {
     /// Build the [`SessionState`] from the specified configuration
     pub fn build(self) -> datafusion::common::Result<SessionState> {
         let Self {
-            app_type,
-            execution_config,
-            mut session_config,
+            session_config,
             table_factories,
             catalog_providers,
             runtime_env,
             ..
         } = self;
-
-        let app_type = app_type.unwrap_or(AppType::Cli);
-        let execution_config = execution_config.unwrap_or_default();
-
-        match app_type {
-            AppType::Cli => {
-                session_config = session_config.with_batch_size(execution_config.cli_batch_size);
-            }
-            AppType::Tui => {
-                session_config = session_config.with_batch_size(execution_config.tui_batch_size);
-            }
-            AppType::FlightSQLServer => {
-                session_config =
-                    session_config.with_batch_size(execution_config.flightsql_server_batch_size);
-            }
-        }
 
         let mut builder = SessionStateBuilder::new()
             .with_default_features()

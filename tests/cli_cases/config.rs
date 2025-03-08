@@ -32,7 +32,7 @@ fn test_custom_config() {
     file.write_all(ddl.as_bytes()).unwrap();
     file.flush().unwrap();
     let mut config_builder = TestConfigBuilder::default();
-    config_builder.with_ddl_path(ddl_path);
+    config_builder.with_ddl_path("cli", ddl_path);
     let config = config_builder.build("my_config.toml");
 
     let assert = Command::cargo_bin("dft")
@@ -64,7 +64,7 @@ fn test_custom_config_multiple_ddl() {
     file.write_all(ddl.as_bytes()).unwrap();
     file.flush().unwrap();
     let mut config_builder = TestConfigBuilder::default();
-    config_builder.with_ddl_path(ddl_path);
+    config_builder.with_ddl_path("cli", ddl_path);
     let config = config_builder.build("my_config.toml");
 
     let assert = Command::cargo_bin("dft")
@@ -91,7 +91,7 @@ fn test_custom_config_multiple_ddl() {
 #[test]
 fn test_custom_config_benchmark_iterations() {
     let mut config_builder = TestConfigBuilder::default();
-    config_builder.with_benchmark_iterations(5);
+    config_builder.with_benchmark_iterations("cli", 5);
     let config = config_builder.build("my_config.toml");
 
     let assert = Command::cargo_bin("dft")

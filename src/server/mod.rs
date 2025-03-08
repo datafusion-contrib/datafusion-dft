@@ -18,8 +18,8 @@
 pub mod services;
 
 use crate::config::AppConfig;
+use crate::execution::AppExecution;
 use color_eyre::{eyre::eyre, Result};
-use datafusion_app::AppExecution;
 use log::info;
 use metrics::{describe_counter, describe_histogram};
 use metrics_exporter_prometheus::{Matcher, PrometheusBuilder};
@@ -67,8 +67,8 @@ fn create_server_handle(
     // TODO: onlu include TrailersLayer for testing
     if cfg!(feature = "flightsql") {
         match (
-            &config.auth.server_basic_auth,
-            &config.auth.server_bearer_token,
+            &config.flightsql_server.auth.basic_auth,
+            &config.flightsql_server.auth.bearer_token,
         ) {
             (Some(_), Some(_)) => Err(eyre!("Only one auth type can be used at a time")),
             (Some(basic), None) => {

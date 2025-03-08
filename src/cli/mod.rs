@@ -16,7 +16,7 @@
 // under the License.
 //! [`CliApp`]: Command Line User Interface
 
-use crate::args::DftArgs;
+use crate::{args::DftArgs, execution::AppExecution};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use datafusion::arrow::array::{RecordBatch, RecordBatchWriter};
@@ -24,7 +24,7 @@ use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::arrow::{csv, json};
 use datafusion::sql::parser::DFParser;
-use datafusion_app::{local_benchmarks::LocalBenchmarkStats, AppExecution};
+use datafusion_app::local_benchmarks::LocalBenchmarkStats;
 use futures::{Stream, StreamExt};
 use log::info;
 use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};

@@ -30,7 +30,7 @@ async fn test_huggingface_single_repo() {
     file.write_all(ddl.as_bytes()).unwrap();
     file.flush().unwrap();
     let mut config_builder = TestConfigBuilder::default();
-    config_builder.with_ddl_path(ddl_path);
+    config_builder.with_ddl_path("cli", ddl_path);
     config_builder.with_huggingface("dataset", "HuggingFaceTB/finemath", "main");
     let config = config_builder.build("my_config.toml");
 
@@ -79,7 +79,7 @@ async fn test_huggingface_multiple_repos() {
     file.write_all(ddl.as_bytes()).unwrap();
     file.flush().unwrap();
     let mut config_builder = TestConfigBuilder::default();
-    config_builder.with_ddl_path(ddl_path);
+    config_builder.with_ddl_path("cli", ddl_path);
     config_builder.with_huggingface("dataset", "HuggingFaceTB/finemath", "main");
     config_builder.with_huggingface("dataset", "deepmind/code_contests", "main");
     let config = config_builder.build("my_config.toml");

@@ -30,8 +30,9 @@ async fn test_s3_basic() {
     file.write_all(ddl.as_bytes()).unwrap();
     file.flush().unwrap();
     let mut config_builder = TestConfigBuilder::default();
-    config_builder.with_ddl_path(ddl_path);
+    config_builder.with_ddl_path("cli", ddl_path);
     config_builder.with_s3_object_store(
+        "cli",
         "s3",
         "test",
         "s3://test",

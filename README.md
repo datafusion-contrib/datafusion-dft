@@ -125,9 +125,27 @@ This feature is experimental and does not currently implement all FlightSQL endp
 
 ### Installation
 
-Currently, the only supported packaging is on [crates.io](https://crates.io/search?q=datafusion-tui).  If you already have Rust installed it can be installed by running `cargo install datafusion-tui`.  If rust is not installed you can download following the directions [here](https://www.rust-lang.org/tools/install).
+Currently, the only supported packaging is on [crates.io](https://crates.io/search?q=datafusion-dft).  If you already have Rust installed it can be installed by running `cargo install datafusion-tui`.  If rust is not installed you can download following the directions [here](https://www.rust-lang.org/tools/install).
 
 Once installed you can run `dft` to start the application.
+
+#### Configuration
+
+`dft` is configuration through a TOML file with default location of `~/.config/dft/config.toml`.  Within the config there is a shared configuration that can be used across all apps and app specific configuration.  The shared and app specific configs are merged to come up with a final configuration that is used.  DataFusion's execution configuration can be fully customized as part of this.
+
+The sections for configuring each app are shown below.
+```toml
+[shared]
+
+[cli]
+
+[tui]
+
+[flightsql_client]
+
+[flightsql_server]
+
+```
 
 #### Internal Optional Features (Workspace Features)
 
@@ -140,6 +158,44 @@ Includes functions from [datafusion-function-parquet] for querying Parquet files
 ```sql
 SELECT * FROM parquet_metadata('my_parquet_file.parquet')
 ```
+
+##### WASM UDF Functions (`--features=udfs-wasm`)
+
+Adds the ability to register WASM UDFs. Currently two different input types are supported:
+
+1. Row => WASM native types only (`Int32`, `Int64`, `Float32`, or `Float64`) and the UDF is called once per row.
+2. ArrowIpc => The input `ColumnarValue`'s are serialized to Arrow's IPC format and written to the WASM module's linear memory.
+
+More details can be found in [datafusion-udfs-wasm](https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-udfs-wasm).
+
+```toml
+[[execution]]
+module_functions = {
+    "/path/to/wasm" = [
+        {
+            name = "funcName1",
+            input_data_type = "Row",
+            input_types = [
+                "Int32",
+                "Int64",
+            ],
+            return_type = "Int32"
+        },
+        {
+            name = "funcName2",
+            input_data_type = "ArrowIpc",
+            input_types = [
+                "Float32",
+                "Float64",
+            ],
+            return_type = "Int32"
+        }
+
+    ]
+}
+```
+
+
 
 #### External Optional Features (Rust Crate Features)
 
@@ -225,42 +281,6 @@ Adds functions from [datafusion-function-json] for querying JSON strings in Data
 ```sql
 select * from foo where json_get(attributes, 'bar')::string='ham'
 (show examples of using operators too)
-```
-
-##### WASM UDF Functions (`--features=udfs-wasm`)
-
-Adds the ability to register WASM UDFs. Currently two different input types are supported:
-
-1. Row => WASM native types only (`Int32`, `Int64`, `Float32`, or `Float64`) and the UDF is called once per row.
-2. ArrowIpc => The input `ColumnarValue`'s are serialized to Arrow's IPC format and written to the WASM module's linear memory.
-
-More details can be found in [datafusion-udfs-wasm](https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-udfs-wasm).
-
-```toml
-[[execution]]
-module_functions = {
-    "/path/to/wasm" = [
-        {
-            name = "funcName1",
-            input_data_type = "Row",
-            input_types = [
-                "Int32",
-                "Int64",
-            ],
-            return_type = "Int32"
-        },
-        {
-            name = "funcName2",
-            input_data_type = "ArrowIpc",
-            input_types = [
-                "Float32",
-                "Float64",
-            ],
-            return_type = "Int32"
-        }
-
-    ]
-}
 ```
 
 [datafusion-function-json]: https://github.com/datafusion-contrib/datafusion-functions-json
@@ -394,7 +414,7 @@ The `dft` configuration is stored in `~/.config/dft/config.toml`.  All configura
 
 #### Execution Config
 
-The execution config is where you can define query execution properties.  You can configure the `ObjectStore`s that you want to use in your queries and path of a DDL file that you want to run on startup.  For example, if you have an S3 bucket you want to query you could define it like so:
+The execution config is where you can define query execution properties for each app (so the below would each expect to be in a relevant app section like `shared`, `tui`, `cli`, or `flightsql_server` (The FlightSQL client doesnt actually execute so doesnt have an execution config).  You can configure the `ObjectStore`s that you want to use in your queries and path of a DDL file that you want to run on startup.  For example, if you have an S3 bucket you want to query you could define it like so:
 
 ```toml
 [[execution.object_store.s3]]
@@ -437,7 +457,7 @@ flightsql_server_batch_size = 8092
 The display config is where you can define the frame rate of the TUI.
 
 ```toml
-[display]
+[tui.display]
 frame_rate = 60
 ```
 
@@ -446,17 +466,21 @@ frame_rate = 60
 The interaction config is where mouse and paste behavior can be defined.  This is not currently implemented.
 
 ```toml
-[interaction]
+[tui.interaction]
 mouse = true
 paste = true
 ```
 
 #### FlightSQL Config
 
-The FlightSQL config is where you can define the connection URL for the FlightSQL server.
+The FlightSQL config is where you can define the connection URL for the FlightSQL client & server.
 
 ```toml
-[flightsql]
+[flightsql_client]
+connection_url = "http://localhost:50051"
+benchmark_iterations = 10
+
+[flightsql_server]
 connection_url = "http://localhost:50051"
 server_metrics_port = "0.0.0.0:9000"
 ```
@@ -468,7 +492,7 @@ The editor config is where you can set your preferred editor settings.
 Currently only syntax highlighting is supported.  It is experimental because currently the regex that is used to determine keywords only works in simple cases.
 
 ```toml
-[editor]
+[tui.editor]
 experimental_syntax_highlighting = true
 ```
 

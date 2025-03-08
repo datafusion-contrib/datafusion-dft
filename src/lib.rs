@@ -1,6 +1,7 @@
 pub mod args;
 pub mod cli;
 pub mod config;
+pub mod execution;
 #[cfg(feature = "flightsql")]
 pub mod server;
 pub mod telemetry;
