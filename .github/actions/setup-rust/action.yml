@@ -33,3 +33,7 @@ runs:
         rustup install stable
         rustup default stable
         rustup component add clippy
+    - name: Install Cargo tools
+      shell: bash
+      run: |
+        cargo install taplo
