@@ -1,3 +1,3 @@
 [auth]
-server_basic_auth.username = "User"
 server_basic_auth.password = "Pass"
+server_basic_auth.username = "User"
