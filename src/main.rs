@@ -19,6 +19,7 @@ use clap::Parser;
 use color_eyre::Result;
 use datafusion_app::local::ExecutionContext;
 use datafusion_app::{config::merge_configs, extensions::DftSessionStateBuilder};
+use datafusion_dft::args::Command;
 use datafusion_dft::{
     args::DftArgs,
     cli::CliApp,
@@ -52,7 +53,7 @@ fn main() -> Result<()> {
 
 fn should_init_env_logger(cli: &DftArgs) -> bool {
     #[cfg(feature = "flightsql")]
-    if cli.serve {
+    if let Some(Command::ServeFlightSql) = cli.command {
         return true;
     }
     if !cli.files.is_empty() || !cli.commands.is_empty() {
@@ -67,7 +68,7 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
     }
     let state = state::initialize(cli.config_path());
     #[cfg(feature = "flightsql")]
-    if cli.serve {
+    if let Some(Command::ServeFlightSql) = cli.command {
         let merged_exec_config = merge_configs(
             state.config.shared.clone(),
             state.config.flightsql_server.execution.clone(),

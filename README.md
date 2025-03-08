@@ -156,7 +156,7 @@ This feature is still in it's early stages and is expected to evolve.  Once it h
 
 ## `dft` FlightSQL Server
 
-The `dft` FlightSQL server (feature flag `flightsql`) is a Flight service that can be used to execute SQL queries against DataFusion.  The server is started by running `dft --serve` and can optionally run your configured DDL with the `--run-ddl` parameter.  Prometheus metrics are automatically exported as part of this.
+The `dft` FlightSQL server (feature flag `flightsql`) is a Flight service that can be used to execute SQL queries against DataFusion.  The server is started by running `dft serve-flight-sql` and can optionally run your configured DDL with the `--run-ddl` parameter.  Prometheus metrics are automatically exported as part of this.
 
 This feature is experimental and does not currently implement all FlightSQL endpoints.  Endpoints will be added in tandem with adding more features to the FlightSQL clients within the TUI and CLI.
 
