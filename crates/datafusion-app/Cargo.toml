@@ -11,7 +11,6 @@ async-trait = "0.1.80"
 base64 = { version = "0.22.1", optional = true }
 color-eyre = "0.6.3"
 datafusion = "45.0.0"
-datafusion-auth = { version = "0.1.0", path = "../datafusion-auth", optional = true }
 datafusion-functions-json = { version = "0.45", optional = true }
 datafusion-functions-parquet = { version = "0.1.0", path = "..//datafusion-functions-parquet", optional = true }
 datafusion-udfs-wasm = { version = "0.1.0", path = "../datafusion-udfs-wasm", features = [
@@ -40,7 +39,6 @@ serde = { version = "1.0.197", features = ["derive"] }
 tokio = { version = "1.36.0", features = ["macros", "rt-multi-thread"] }
 tokio-stream = { version = "0.1.15", features = ["net"] }
 tonic = { version = "0.12.3", optional = true }
-tower-http = { version = "0.6.2", features = ["auth"], optional = true }
 url = { version = "2.5.2", optional = true }
 
 [features]
@@ -49,9 +47,7 @@ deltalake = ["dep:deltalake"]
 flightsql = [
   "dep:arrow-flight",
   "dep:base64",
-  "dep:datafusion-auth",
   "dep:tonic",
-  "dep:tower-http",
 ]
 functions-json = ["dep:datafusion-functions-json"]
 functions-parquet = ["dep:datafusion-functions-parquet"]
