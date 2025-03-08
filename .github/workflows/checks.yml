@@ -33,6 +33,19 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Run taplo
         run: taplo format --check
+  unused-deps:
+    name: Unused Dependencies
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
+      - name: Run cargo machete
+        run: cargo machete
+
   clippy:
     name: Clippy
     runs-on: ubuntu-latest

@@ -1603,7 +1603,6 @@ dependencies = [
  "base64 0.22.1",
  "color-eyre",
  "datafusion",
- "datafusion-auth",
  "datafusion-functions-json",
  "datafusion-functions-parquet",
  "datafusion-udfs-wasm",
@@ -1624,18 +1623,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tonic",
- "tower-http 0.6.2",
  "url",
-]
-
-[[package]]
-name = "datafusion-auth"
-version = "0.1.0"
-dependencies = [
- "datafusion",
- "http-body",
- "tower 0.5.2",
- "tower-http 0.5.2",
 ]
 
 [[package]]
@@ -1702,20 +1690,15 @@ version = "0.2.2"
 dependencies = [
  "arrow-flight",
  "assert_cmd",
- "async-trait",
- "base64 0.22.1",
- "chrono",
  "clap",
  "color-eyre",
  "crossterm",
  "datafusion",
  "datafusion-app",
- "datafusion-auth",
  "datafusion-udfs-wasm",
  "directories",
  "env_logger",
  "futures",
- "home",
  "http",
  "http-body",
  "insta",
@@ -1724,11 +1707,6 @@ dependencies = [
  "log",
  "metrics",
  "metrics-exporter-prometheus",
- "num_cpus",
- "object_store",
- "object_store_opendal",
- "opendal",
- "parking_lot",
  "parquet",
  "pin-project-lite",
  "predicates",
@@ -1743,7 +1721,7 @@ dependencies = [
  "toml",
  "tonic",
  "tower 0.5.2",
- "tower-http 0.6.2",
+ "tower-http",
  "tui-logger",
  "tui-textarea",
  "url",
@@ -6157,24 +6135,6 @@ dependencies = [
  "pin-project-lite",
  "sync_wrapper",
  "tokio",
- "tower-layer",
- "tower-service",
-]
-
-[[package]]
-name = "tower-http"
-version = "0.5.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e9cd434a998747dd2c4276bc96ee2e0c7a2eadf3cae88e52be55a05fa9053f5"
-dependencies = [
- "base64 0.21.7",
- "bitflags 2.9.0",
- "bytes",
- "http",
- "http-body",
- "http-body-util",
- "mime",
- "pin-project-lite",
  "tower-layer",
  "tower-service",
 ]
