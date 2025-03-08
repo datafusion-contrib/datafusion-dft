@@ -59,8 +59,8 @@ Some of the current and planned features are:
   - `ObjectStore` explorer. I.e. able to list files in `ObjectStore`
 - `TableProviderFactory` data sources
   - Deltalake
-  - Iceberg (TODO)
-  - Hudi (TODO)
+  - Iceberg
+  - Hudi
 - Preloading DDL from `~/.config/dft/ddl.sql` (or a user defined path) for local database available on startup
 - Benchmarking local and FlightSQL queries with breakdown of query execution time
 - "Catalog File" support - see [#122](https://github.com/datafusion-contrib/datafusion-tui/issues/122)
