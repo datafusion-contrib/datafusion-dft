@@ -18,10 +18,11 @@
 use color_eyre::{eyre::eyre, Result};
 use datafusion::arrow::{
     array::{
-        BooleanArray, Date32Array, Date64Array, Float16Array, Float32Array, Float64Array,
-        Int16Array, Int32Array, Int64Array, Int8Array, ListArray, RecordBatch, StringArray,
-        TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray,
-        TimestampSecondArray, UInt16Array, UInt32Array, UInt64Array, UInt8Array,
+        BinaryArray, BinaryViewArray, BooleanArray, Date32Array, Date64Array, Float16Array,
+        Float32Array, Float64Array, Int16Array, Int32Array, Int64Array, Int8Array,
+        LargeBinaryArray, ListArray, RecordBatch, StringArray, TimestampMicrosecondArray,
+        TimestampMillisecondArray, TimestampNanosecondArray, TimestampSecondArray, UInt16Array,
+        UInt32Array, UInt64Array, UInt8Array,
     },
     datatypes::{DataType, TimeUnit},
 };
@@ -36,6 +37,19 @@ macro_rules! convert_array_values_to_cells {
         if let Some(a) = $arr.as_any().downcast_ref::<$typ>() {
             for i in 0..$rows.len() {
                 let cell = Cell::from(a.value(i).to_string())
+                    .bg(tailwind::BLACK)
+                    .fg(tailwind::WHITE);
+                $rows[i].push(cell);
+            }
+        }
+    };
+}
+
+macro_rules! convert_binary_array_values_to_cells {
+    ($rows:expr, $arr:expr, $typ:ty) => {
+        if let Some(a) = $arr.as_any().downcast_ref::<$typ>() {
+            for i in 0..$rows.len() {
+                let cell = Cell::from(format!("{:?}", a.value(i)))
                     .bg(tailwind::BLACK)
                     .fg(tailwind::WHITE);
                 $rows[i].push(cell);
@@ -84,6 +98,15 @@ pub fn record_batch_to_table_row_cells(record_batch: &RecordBatch) -> Result<Vec
     for arr in record_batch.columns() {
         match arr.data_type() {
             DataType::Utf8 => convert_array_values_to_cells!(rows, arr, StringArray),
+            DataType::LargeUtf8 => convert_array_values_to_cells!(rows, arr, StringArray),
+            DataType::Utf8View => convert_array_values_to_cells!(rows, arr, StringArray),
+            DataType::Binary => convert_binary_array_values_to_cells!(rows, arr, BinaryArray),
+            DataType::LargeBinary => {
+                convert_binary_array_values_to_cells!(rows, arr, LargeBinaryArray)
+            }
+            DataType::BinaryView => {
+                convert_binary_array_values_to_cells!(rows, arr, BinaryViewArray)
+            }
             DataType::Int8 => convert_array_values_to_cells!(rows, arr, Int8Array),
             DataType::Int16 => convert_array_values_to_cells!(rows, arr, Int16Array),
             DataType::Int32 => convert_array_values_to_cells!(rows, arr, Int32Array),
