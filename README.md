@@ -70,13 +70,36 @@ Some of the current and planned features are:
 ### Limitations
 
 Currently `dft` does not display wide result sets well (because the widget library that we use does not support horizontal scrolling - we are working with them to see what we can do about this).  As a result, when working with wide data sets its best to be selective with the columns that you would like to view in the ouput.
+
+## User Guide
+
+### Installation
+
+Currently, the only supported packaging is on [crates.io](https://crates.io/search?q=datafusion-dft).  If you already have Rust installed it can be installed by running `cargo install datafusion-tui`.  If rust is not installed you can download following the directions [here](https://www.rust-lang.org/tools/install).
+
+Once installed you can run `dft` to start the application.
+
+#### Configuration
+
+`dft` is configuration through a TOML file with default location of `~/.config/dft/config.toml`.  Within the config there is a shared configuration that can be used across all apps and app specific configuration.  The shared and app specific configs are merged to come up with a final configuration that is used.  DataFusion's execution configuration can be fully customized as part of this.
+
+The sections for configuring each app are shown below.
+```toml
+[shared]
+
+[cli]
+
+[tui]
+
+[flightsql_client]
+
+[flightsql_server]
+
+```
   
 ## `dft` CLI
 
-The `dft` CLI is a scriptable interface to the `tui` engine for executing
-queries from files or the command line. The CLI is used in a similar manner to
-`datafusion-cli` but with the added benefit of supporting multiple pre-integrated
-data sources.
+The `dft` CLI is a scriptable interface to the `tui` engine for executing queries from files or the command line. The CLI is used in a similar manner to `datafusion-cli` but with the added benefit of supporting multiple pre-integrated data sources.
 
 ### Example: Run the contents of `query.sql` 
 
@@ -93,6 +116,22 @@ $ dft -c "SELECT 1+2"
 #### FlightSQL
 
 Both of the commands above support the `--flightsql` parameter to run the SQL with your configured FlightSQL client.  You can also configure the host used for creating FlightSQL client per command with `--flightsql-host` - for example `--flightsql-host "http://127.0.0.1:50052"`.
+
+##### Auth
+
+Auth is built into the FlightSQL implementation so you can require a bearer token or username / password when running `dft` as a server or adds the relevant auth headers when using `dft` as a FlightSQL client.
+
+```toml
+[flightsql_server.auth]
+bearer_token = "MyToken"
+basic_auth.username = "User"
+basic_auth.password = "Pass"
+
+[flightsql_client.auth]
+bearer_token = "MyToken"
+basic_auth.username = "User"
+basic_auth.password = "Pass"
+```
 
 #### DDL
 
@@ -121,31 +160,6 @@ The `dft` FlightSQL server (feature flag `flightsql`) is a Flight service that c
 
 This feature is experimental and does not currently implement all FlightSQL endpoints.  Endpoints will be added in tandem with adding more features to the FlightSQL clients within the TUI and CLI.
 
-## User Guide
-
-### Installation
-
-Currently, the only supported packaging is on [crates.io](https://crates.io/search?q=datafusion-dft).  If you already have Rust installed it can be installed by running `cargo install datafusion-tui`.  If rust is not installed you can download following the directions [here](https://www.rust-lang.org/tools/install).
-
-Once installed you can run `dft` to start the application.
-
-#### Configuration
-
-`dft` is configuration through a TOML file with default location of `~/.config/dft/config.toml`.  Within the config there is a shared configuration that can be used across all apps and app specific configuration.  The shared and app specific configs are merged to come up with a final configuration that is used.  DataFusion's execution configuration can be fully customized as part of this.
-
-The sections for configuring each app are shown below.
-```toml
-[shared]
-
-[cli]
-
-[tui]
-
-[flightsql_client]
-
-[flightsql_server]
-
-```
 
 #### Internal Optional Features (Workspace Features)
 
@@ -194,8 +208,6 @@ module_functions = {
     ]
 }
 ```
-
-
 
 #### External Optional Features (Rust Crate Features)
 
@@ -304,19 +316,6 @@ CREATE EXTERNAL TABLE hf4 STORED AS PARQUET LOCATION 'hf://HuggingFaceTB-finemat
 
 The "/" in the `repo_id` is replaced with a "-" for the base url that is registered with DataFusion to work better with its path parsing.
 
-##### Auth (`--features=auth`)
-
-Adds auth to the FlightSQL implementation so you can require a bearer token or username / password when running `dft` as a server or adds the relevant auth headers when using `dft` as a FlightSQL client.
-
-```toml
-[auth]
-server_bearer_token = "MyToken"
-client_bearer_token = "MyToken"
-server_basic_auth.username = "User"
-server_basic_auth.password = "Pass"
-client_basic_auth.username = "User"
-client_basic_auth.password = "Pass"
-```
 
 ### Getting Started
 
