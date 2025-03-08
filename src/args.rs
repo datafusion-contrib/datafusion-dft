@@ -18,7 +18,7 @@
 //! Command line argument parsing: [`DftArgs`]
 
 use crate::config::get_data_dir;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use std::path::{Path, PathBuf};
 
 const LONG_ABOUT: &str = "
@@ -67,10 +67,6 @@ pub struct DftArgs {
     #[clap(long, short, help = "Only show how long the query took to run")]
     pub time: bool,
 
-    #[cfg(feature = "flightsql")]
-    #[clap(long, help = "Start a FlightSQL server")]
-    pub serve: bool,
-
     #[clap(long, short, help = "Benchmark the provided query")]
     pub bench: bool,
 
@@ -102,10 +98,16 @@ pub struct DftArgs {
         help = "Path to save output to. Type is inferred from file suffix"
     )]
     pub output: Option<PathBuf>,
+
+    #[command(subcommand)]
+    pub command: Option<Command>,
 }
 
 impl DftArgs {
     pub fn config_path(&self) -> PathBuf {
+        if let Some(Command::ServeFlightSql { config: Some(cfg) }) = &self.command {
+            return Path::new(cfg).to_path_buf();
+        }
         if let Some(config) = self.config.as_ref() {
             Path::new(config).to_path_buf()
         } else {
@@ -114,6 +116,15 @@ impl DftArgs {
             config
         }
     }
+}
+
+#[derive(Clone, Debug, Subcommand)]
+pub enum Command {
+    /// Start a FlightSQL server
+    ServeFlightSql {
+        #[clap(short, long)]
+        config: Option<String>,
+    },
 }
 
 fn parse_valid_file(file: &str) -> std::result::Result<PathBuf, String> {
