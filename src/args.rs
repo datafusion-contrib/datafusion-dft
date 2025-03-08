@@ -105,6 +105,9 @@ pub struct DftArgs {
 
 impl DftArgs {
     pub fn config_path(&self) -> PathBuf {
+        if let Some(Command::ServeFlightSql { config: Some(cfg) }) = &self.command {
+            return Path::new(cfg).to_path_buf();
+        }
         if let Some(config) = self.config.as_ref() {
             Path::new(config).to_path_buf()
         } else {
@@ -118,7 +121,10 @@ impl DftArgs {
 #[derive(Clone, Debug, Subcommand)]
 pub enum Command {
     /// Start a FlightSQL server
-    ServeFlightSql,
+    ServeFlightSql {
+        #[clap(short, long)]
+        config: Option<String>,
+    },
 }
 
 fn parse_valid_file(file: &str) -> std::result::Result<PathBuf, String> {
