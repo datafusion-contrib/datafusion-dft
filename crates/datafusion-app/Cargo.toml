@@ -16,7 +16,7 @@ datafusion-functions-parquet = { version = "0.1.0", path = "..//datafusion-funct
 datafusion-udfs-wasm = { version = "0.1.0", path = "../datafusion-udfs-wasm", features = [
   "serde",
 ], optional = true }
-datafusion-table-providers = { version = "0.2.4", path = "/Users/rich/Documents/github.com/datafusion-contrib/datafusion-table-providers", features = ["mysql"], optional = true }
+datafusion-table-providers = { git = "https://github.com/jychen7/datafusion-table-providers", branch = "datafusion-45", features = ["mysql"], optional = true }
 deltalake = { git = "https://github.com/delta-io/delta-rs", rev = "d8995e64c305dc795f62d33ce2a4614b335944ff", features = [
   "datafusion",
 ], optional = true }
