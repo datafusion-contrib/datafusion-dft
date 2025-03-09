@@ -34,6 +34,7 @@ use object_store::aws::{AmazonS3, AmazonS3Builder};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ExecutionConfig {
+    pub database: Option<DatabaseConfig>,
     pub object_store: Option<ObjectStoreConfig>,
     #[serde(default = "default_ddl_path")]
     pub ddl_path: Option<PathBuf>,
@@ -59,6 +60,7 @@ pub struct ExecutionConfig {
 impl Default for ExecutionConfig {
     fn default() -> Self {
         Self {
+            database: None,
             object_store: None,
             ddl_path: default_ddl_path(),
             benchmark_iterations: default_benchmark_iterations(),
@@ -193,6 +195,81 @@ pub struct ObjectStoreConfig {
     pub s3: Option<Vec<S3Config>>,
     #[cfg(feature = "huggingface")]
     pub huggingface: Option<Vec<HuggingFaceConfig>>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct DatabaseConfig {
+    #[cfg(feature = "mysql")]
+    pub mysql: Option<Vec<MySQLConfig>>,
+}
+
+#[cfg(feature = "mysql")]
+#[derive(Clone, Debug, Deserialize)]
+pub struct MySQLConfig {
+    #[serde(default = "default_mysql_name")]
+    pub name: String,
+    #[serde(default = "default_mysql_host")]
+    pub host: String,
+    #[serde(default = "default_mysql_port")]
+    pub port: u16,
+    #[serde(default = "default_mysql_user")]
+    pub user: String,
+    #[serde(default = "default_mysql_password")]
+    pub password: String,
+    #[serde(default = "default_mysql_database")]
+    pub database: String,
+    #[serde(default = "default_mysql_sslmode")]
+    pub sslmode: String,
+}
+
+#[cfg(feature = "mysql")]
+fn default_mysql_name() -> String {
+    "mysql".to_string()
+}
+
+#[cfg(feature = "mysql")]
+fn default_mysql_host() -> String {
+    "127.0.0.1".to_string()
+}
+
+#[cfg(feature = "mysql")]
+fn default_mysql_port() -> u16 {
+    3306
+}
+
+#[cfg(feature = "mysql")]
+fn default_mysql_user() -> String {
+    "root".to_string()
+}
+
+#[cfg(feature = "mysql")]
+fn default_mysql_password() -> String {
+    "".to_string()
+}
+
+#[cfg(feature = "mysql")]
+fn default_mysql_database() -> String {
+    "".to_string()
+}
+
+#[cfg(feature = "mysql")]
+fn default_mysql_sslmode() -> String {
+    "disabled".to_string()
+}
+
+#[cfg(feature = "mysql")]
+impl Default for MySQLConfig {
+    fn default() -> Self {
+        Self {
+            name: default_mysql_name(),
+            host: default_mysql_host(),
+            port: default_mysql_port(),
+            user: default_mysql_user(),
+            password: default_mysql_password(),
+            database: default_mysql_database(),
+            sslmode: default_mysql_sslmode(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Deserialize)]

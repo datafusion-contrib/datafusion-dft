@@ -33,7 +33,8 @@ mod huggingface;
 mod iceberg;
 #[cfg(feature = "s3")]
 mod s3;
-
+#[cfg(feature = "mysql")]
+mod mysql;
 pub use builder::DftSessionStateBuilder;
 
 #[async_trait::async_trait]
@@ -66,5 +67,7 @@ pub fn enabled_extensions() -> Vec<Arc<dyn Extension>> {
         Arc::new(iceberg::IcebergExtension::new()),
         #[cfg(feature = "huggingface")]
         Arc::new(huggingface::HuggingFaceExtension::new()),
+        #[cfg(feature = "mysql")]
+        Arc::new(mysql::MysqlExtension::new()),
     ]
 }
