@@ -16,6 +16,7 @@
 // under the License.
 //! [`CliApp`]: Command Line User Interface
 
+use crate::config::AppConfig;
 use crate::{args::DftArgs, execution::AppExecution};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
@@ -24,6 +25,9 @@ use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::arrow::{csv, json};
 use datafusion::sql::parser::DFParser;
+use datafusion_app::config::merge_configs;
+use datafusion_app::extensions::DftSessionStateBuilder;
+use datafusion_app::local::ExecutionContext;
 use datafusion_app::local_benchmarks::LocalBenchmarkStats;
 use futures::{Stream, StreamExt};
 use log::info;
@@ -33,7 +37,14 @@ use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 #[cfg(feature = "flightsql")]
-use {datafusion_app::flightsql_benchmarks::FlightSQLBenchmarkStats, tonic::IntoRequest};
+use {
+    datafusion_app::{
+        config::{AuthConfig, FlightSQLConfig},
+        flightsql::FlightSQLContext,
+        flightsql_benchmarks::FlightSQLBenchmarkStats,
+    },
+    tonic::IntoRequest,
+};
 
 const LOCAL_BENCHMARK_HEADER_ROW: &str =
     "query,runs,logical_planning_min,logical_planning_max,logical_planning_mean,logical_planning_median,logical_planning_percent_of_total,physical_planning_min,physical_planning_max,physical_planning,mean,physical_planning_median,physical_planning_percent_of_total,execution_min,execution_max,execution_execution_mean,execution_median,execution_percent_of_total,total_min,total_max,total_mean,total_median,total_percent_of_total";
@@ -564,4 +575,39 @@ fn path_to_writer(path: &Path, schema: SchemaRef) -> Result<AnyWriter> {
         }
     }
     Err(eyre!("Unable to parse extension"))
+}
+
+pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
+    let merged_exec_config = merge_configs(config.shared.clone(), config.cli.execution.clone());
+    let session_state_builder = DftSessionStateBuilder::try_new(Some(merged_exec_config.clone()))?
+        .with_extensions()
+        .await?;
+
+    // CLI mode: executing commands from files or CLI arguments
+    let session_state = session_state_builder.build()?;
+    let execution_ctx = ExecutionContext::try_new(&merged_exec_config, session_state)?;
+    #[allow(unused_mut)]
+    let mut app_execution = AppExecution::new(execution_ctx);
+    #[cfg(feature = "flightsql")]
+    {
+        if cli.flightsql {
+            let auth = AuthConfig {
+                basic_auth: config.flightsql_client.auth.basic_auth,
+                bearer_token: config.flightsql_client.auth.bearer_token,
+            };
+            let flightsql_cfg = FlightSQLConfig::new(
+                config.flightsql_client.connection_url,
+                config.flightsql_client.benchmark_iterations,
+                auth,
+            );
+            let flightsql_ctx = FlightSQLContext::new(flightsql_cfg);
+            flightsql_ctx
+                .create_client(cli.flightsql_host.clone())
+                .await?;
+            app_execution.with_flightsql_ctx(flightsql_ctx);
+        }
+    }
+    let app = CliApp::new(app_execution, cli.clone());
+    app.execute_files_or_commands().await?;
+    Ok(())
 }

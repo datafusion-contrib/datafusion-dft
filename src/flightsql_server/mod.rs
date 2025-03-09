@@ -17,9 +17,13 @@
 
 pub mod services;
 
+use crate::args::DftArgs;
 use crate::config::AppConfig;
 use crate::execution::AppExecution;
 use color_eyre::{eyre::eyre, Result};
+use datafusion_app::config::merge_configs;
+use datafusion_app::extensions::DftSessionStateBuilder;
+use datafusion_app::local::ExecutionContext;
 use log::info;
 use metrics::{describe_counter, describe_histogram};
 use metrics_exporter_prometheus::{Matcher, PrometheusBuilder};
@@ -194,4 +198,33 @@ impl FlightSqlApp {
             panic!("Server task not found");
         }
     }
+}
+
+pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
+    let merged_exec_config = merge_configs(
+        config.shared.clone(),
+        config.flightsql_server.execution.clone(),
+    );
+    let session_state_builder = DftSessionStateBuilder::try_new(Some(merged_exec_config.clone()))?
+        .with_extensions()
+        .await?;
+    // FlightSQL Server mode: start a FlightSQL server
+    const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1:50051";
+    info!("Starting FlightSQL server on {}", DEFAULT_SERVER_ADDRESS);
+    let session_state = session_state_builder.build()?;
+    let execution_ctx = ExecutionContext::try_new(&merged_exec_config, session_state)?;
+    if cli.run_ddl {
+        execution_ctx.execute_ddl().await;
+    }
+    let app_execution = AppExecution::new(execution_ctx);
+    let app = FlightSqlApp::try_new(
+        app_execution,
+        &config,
+        &cli.flightsql_host
+            .unwrap_or(DEFAULT_SERVER_ADDRESS.to_string()),
+        &config.flightsql_server.server_metrics_port,
+    )
+    .await?;
+    app.run_app().await;
+    Ok(())
 }

@@ -20,8 +20,9 @@
 use datafusion_app::extensions::DftSessionStateBuilder;
 use datafusion_app::local::ExecutionContext;
 use datafusion_dft::args::DftArgs;
+use datafusion_dft::config::create_config;
 use datafusion_dft::execution::AppExecution;
-use datafusion_dft::tui::state::initialize;
+use datafusion_dft::tui::state::AppState;
 use datafusion_dft::tui::{App, AppEvent};
 use ratatui::crossterm::event;
 use tempfile::{tempdir, TempDir};
@@ -102,11 +103,12 @@ struct TestApp<'app> {
     app: App<'app>,
 }
 
-impl<'app> TestApp<'app> {
+impl TestApp<'_> {
     /// Create a new [`TestApp`] instance configured with a temporary directory
     async fn new() -> Self {
         let config_path = tempdir().unwrap();
-        let state = initialize(config_path.path().to_path_buf());
+        let config = create_config(config_path.path().to_path_buf());
+        let state = AppState::new(config);
 
         let session_state =
             DftSessionStateBuilder::try_new(Some(state.config.tui.execution.clone()))

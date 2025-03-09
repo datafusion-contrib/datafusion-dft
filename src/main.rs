@@ -17,23 +17,9 @@
 
 use clap::Parser;
 use color_eyre::Result;
-use datafusion_app::local::ExecutionContext;
-use datafusion_app::{config::merge_configs, extensions::DftSessionStateBuilder};
-use datafusion_dft::args::Command;
-use datafusion_dft::{
-    args::DftArgs,
-    cli::CliApp,
-    execution::AppExecution,
-    telemetry,
-    tui::{state, App},
-};
 #[cfg(feature = "flightsql")]
-use {
-    datafusion_app::config::{AuthConfig, FlightSQLConfig},
-    datafusion_app::flightsql::FlightSQLContext,
-    datafusion_dft::server::FlightSqlApp,
-    log::info,
-};
+use datafusion_dft::{args::Command, flightsql_server};
+use datafusion_dft::{args::DftArgs, cli, config::create_config, tui};
 
 fn main() -> Result<()> {
     let cli = DftArgs::parse();
@@ -66,93 +52,16 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
     if should_init_env_logger(&cli) {
         env_logger::init();
     }
-    let state = state::initialize(cli.config_path());
+    let cfg = create_config(cli.config_path());
+
     #[cfg(feature = "flightsql")]
     if let Some(Command::ServeFlightSql { .. }) = cli.command {
-        let merged_exec_config = merge_configs(
-            state.config.shared.clone(),
-            state.config.flightsql_server.execution.clone(),
-        );
-        let session_state_builder =
-            DftSessionStateBuilder::try_new(Some(merged_exec_config.clone()))?
-                .with_extensions()
-                .await?;
-        // FlightSQL Server mode: start a FlightSQL server
-        const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1:50051";
-        info!("Starting FlightSQL server on {}", DEFAULT_SERVER_ADDRESS);
-        let session_state = session_state_builder
-            // .with_app_type(AppType::FlightSQLServer)
-            .build()?;
-        let execution_ctx = ExecutionContext::try_new(&merged_exec_config, session_state)?;
-        if cli.run_ddl {
-            execution_ctx.execute_ddl().await;
-        }
-        let app_execution = AppExecution::new(execution_ctx);
-        let app = FlightSqlApp::try_new(
-            app_execution,
-            &state.config,
-            &cli.flightsql_host
-                .unwrap_or(DEFAULT_SERVER_ADDRESS.to_string()),
-            &state.config.flightsql_server.server_metrics_port,
-        )
-        .await?;
-        app.run_app().await;
-        return Ok(());
+        flightsql_server::try_run(cli.clone(), cfg.clone()).await?;
     }
     if !cli.files.is_empty() || !cli.commands.is_empty() {
-        let merged_exec_config = merge_configs(
-            state.config.shared.clone(),
-            state.config.cli.execution.clone(),
-        );
-        let session_state_builder =
-            DftSessionStateBuilder::try_new(Some(merged_exec_config.clone()))?
-                .with_extensions()
-                .await?;
-
-        // CLI mode: executing commands from files or CLI arguments
-        let session_state = session_state_builder.build()?;
-        let execution_ctx = ExecutionContext::try_new(&merged_exec_config, session_state)?;
-        #[allow(unused_mut)]
-        let mut app_execution = AppExecution::new(execution_ctx);
-        #[cfg(feature = "flightsql")]
-        {
-            if cli.flightsql {
-                let auth = AuthConfig {
-                    basic_auth: state.config.flightsql_client.auth.basic_auth,
-                    bearer_token: state.config.flightsql_client.auth.bearer_token,
-                };
-                let flightsql_cfg = FlightSQLConfig::new(
-                    state.config.flightsql_client.connection_url,
-                    state.config.flightsql_client.benchmark_iterations,
-                    auth,
-                );
-                let flightsql_ctx = FlightSQLContext::new(flightsql_cfg);
-                flightsql_ctx
-                    .create_client(cli.flightsql_host.clone())
-                    .await?;
-                app_execution.with_flightsql_ctx(flightsql_ctx);
-            }
-        }
-        let app = CliApp::new(app_execution, cli.clone());
-        app.execute_files_or_commands().await?;
+        cli::try_run(cli, cfg).await?;
     } else {
-        let merged_exec_config = merge_configs(
-            state.config.shared.clone(),
-            state.config.tui.execution.clone(),
-        );
-        let session_state_builder =
-            DftSessionStateBuilder::try_new(Some(merged_exec_config.clone()))?
-                .with_extensions()
-                .await?;
-        let session_state = session_state_builder.build()?;
-
-        // TUI mode: running the TUI
-        telemetry::initialize_logs()?; // use alternate logging for TUI
-        let state = state::initialize(cli.config_path());
-        let execution_ctx = ExecutionContext::try_new(&merged_exec_config, session_state)?;
-        let app_execution = AppExecution::new(execution_ctx);
-        let app = App::new(state, cli, app_execution);
-        app.run_app().await?;
+        tui::try_run(cli, cfg).await?;
     }
 
     Ok(())
