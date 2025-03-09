@@ -17,6 +17,7 @@ version = "0.2.2"
 arrow-flight = { version = "54.1.0", features = [
   "flight-sql-experimental",
 ], optional = true }
+axum = "0.8.1"
 clap = { version = "4.5.27", features = ["derive"] }
 color-eyre = "0.6.3"
 crossterm = { version = "0.28.1", features = ["event-stream"] }
