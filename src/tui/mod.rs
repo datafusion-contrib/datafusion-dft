@@ -23,6 +23,9 @@ pub mod ui;
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use crossterm::event as ct;
+use datafusion_app::config::merge_configs;
+use datafusion_app::extensions::DftSessionStateBuilder;
+use datafusion_app::local::ExecutionContext;
 use futures::FutureExt;
 use log::{debug, error, info, trace};
 use ratatui::backend::CrosstermBackend;
@@ -31,6 +34,7 @@ use ratatui::crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{prelude::*, style::palette::tailwind, widgets::*};
+use state::AppState;
 use std::sync::Arc;
 use strum::IntoEnumIterator;
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
@@ -40,6 +44,8 @@ use tokio_util::sync::CancellationToken;
 
 use self::execution::{ExecutionError, ExecutionResultsBatch, TuiExecution};
 use self::handlers::{app_event_handler, crossterm_event_handler};
+use crate::config::AppConfig;
+use crate::telemetry;
 use crate::{args::DftArgs, execution::AppExecution};
 use datafusion_app::sql_utils::clean_sql;
 
@@ -356,4 +362,21 @@ impl App<'_> {
         }
         app.exit()
     }
+}
+
+pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
+    let merged_exec_config = merge_configs(config.shared.clone(), config.tui.execution.clone());
+    let session_state_builder = DftSessionStateBuilder::try_new(Some(merged_exec_config.clone()))?
+        .with_extensions()
+        .await?;
+    let session_state = session_state_builder.build()?;
+
+    // TUI mode: running the TUI
+    telemetry::initialize_logs()?; // use alternate logging for TUI
+    let state = AppState::new(config);
+    let execution_ctx = ExecutionContext::try_new(&merged_exec_config, session_state)?;
+    let app_execution = AppExecution::new(execution_ctx);
+    let app = App::new(state, cli, app_execution);
+    app.run_app().await?;
+    Ok(())
 }

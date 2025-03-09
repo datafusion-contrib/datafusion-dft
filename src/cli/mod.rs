@@ -16,6 +16,7 @@
 // under the License.
 //! [`CliApp`]: Command Line User Interface
 
+use crate::config::AppConfig;
 use crate::{args::DftArgs, execution::AppExecution};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
@@ -24,6 +25,10 @@ use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::arrow::{csv, json};
 use datafusion::sql::parser::DFParser;
+use datafusion_app::config::{merge_configs, AuthConfig, FlightSQLConfig};
+use datafusion_app::extensions::DftSessionStateBuilder;
+use datafusion_app::flightsql::FlightSQLContext;
+use datafusion_app::local::ExecutionContext;
 use datafusion_app::local_benchmarks::LocalBenchmarkStats;
 use futures::{Stream, StreamExt};
 use log::info;
@@ -564,4 +569,39 @@ fn path_to_writer(path: &Path, schema: SchemaRef) -> Result<AnyWriter> {
         }
     }
     Err(eyre!("Unable to parse extension"))
+}
+
+pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
+    let merged_exec_config = merge_configs(config.shared.clone(), config.cli.execution.clone());
+    let session_state_builder = DftSessionStateBuilder::try_new(Some(merged_exec_config.clone()))?
+        .with_extensions()
+        .await?;
+
+    // CLI mode: executing commands from files or CLI arguments
+    let session_state = session_state_builder.build()?;
+    let execution_ctx = ExecutionContext::try_new(&merged_exec_config, session_state)?;
+    #[allow(unused_mut)]
+    let mut app_execution = AppExecution::new(execution_ctx);
+    #[cfg(feature = "flightsql")]
+    {
+        if cli.flightsql {
+            let auth = AuthConfig {
+                basic_auth: config.flightsql_client.auth.basic_auth,
+                bearer_token: config.flightsql_client.auth.bearer_token,
+            };
+            let flightsql_cfg = FlightSQLConfig::new(
+                config.flightsql_client.connection_url,
+                config.flightsql_client.benchmark_iterations,
+                auth,
+            );
+            let flightsql_ctx = FlightSQLContext::new(flightsql_cfg);
+            flightsql_ctx
+                .create_client(cli.flightsql_host.clone())
+                .await?;
+            app_execution.with_flightsql_ctx(flightsql_ctx);
+        }
+    }
+    let app = CliApp::new(app_execution, cli.clone());
+    app.execute_files_or_commands().await?;
+    Ok(())
 }
