@@ -18,7 +18,7 @@
 use clap::Parser;
 use color_eyre::Result;
 #[cfg(feature = "flightsql")]
-use datafusion_dft::{args::Command, flightsql_server};
+use datafusion_dft::{args::Command, flightsql_server, http_server};
 use datafusion_dft::{args::DftArgs, cli, config::create_config, tui};
 
 fn main() -> Result<()> {
@@ -58,6 +58,11 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
     if let Some(Command::ServeFlightSql { .. }) = cli.command {
         flightsql_server::try_run(cli.clone(), cfg.clone()).await?;
     }
+    #[cfg(feature = "http")]
+    if let Some(Command::ServeHttp { .. }) = cli.command {
+        http_server::try_run(cli.clone(), cfg.clone()).await?;
+    }
+
     if !cli.files.is_empty() || !cli.commands.is_empty() {
         cli::try_run(cli, cfg).await?;
     } else {
