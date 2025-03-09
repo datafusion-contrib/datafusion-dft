@@ -124,6 +124,10 @@ impl Default for FlightSQLClientConfig {
     }
 }
 
+#[cfg(feature = "http")]
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct HttpServerConfig {}
+
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct AppConfig {
     #[serde(default)]
@@ -138,6 +142,9 @@ pub struct AppConfig {
     #[cfg(feature = "flightsql")]
     #[serde(default)]
     pub flightsql_server: FlightSQLServerConfig,
+    #[cfg(feature = "http")]
+    #[serde(default)]
+    pub http_server: HttpServerConfig,
 }
 
 fn default_execution_config() -> ExecutionConfig {
