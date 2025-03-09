@@ -17,8 +17,9 @@
 
 use clap::Parser;
 use color_eyre::Result;
-use datafusion_dft::args::Command;
-use datafusion_dft::{args::DftArgs, cli, config::create_config, flightsql_server, tui};
+#[cfg(feature = "flightsql")]
+use datafusion_dft::{args::Command, flightsql_server};
+use datafusion_dft::{args::DftArgs, cli, config::create_config, tui};
 
 fn main() -> Result<()> {
     let cli = DftArgs::parse();

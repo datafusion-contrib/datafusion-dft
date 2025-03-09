@@ -25,9 +25,8 @@ use datafusion::arrow::datatypes::SchemaRef;
 use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::arrow::{csv, json};
 use datafusion::sql::parser::DFParser;
-use datafusion_app::config::{merge_configs, AuthConfig, FlightSQLConfig};
+use datafusion_app::config::merge_configs;
 use datafusion_app::extensions::DftSessionStateBuilder;
-use datafusion_app::flightsql::FlightSQLContext;
 use datafusion_app::local::ExecutionContext;
 use datafusion_app::local_benchmarks::LocalBenchmarkStats;
 use futures::{Stream, StreamExt};
@@ -38,7 +37,14 @@ use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 #[cfg(feature = "flightsql")]
-use {datafusion_app::flightsql_benchmarks::FlightSQLBenchmarkStats, tonic::IntoRequest};
+use {
+    datafusion_app::{
+        config::{AuthConfig, FlightSQLConfig},
+        flightsql::FlightSQLContext,
+        flightsql_benchmarks::FlightSQLBenchmarkStats,
+    },
+    tonic::IntoRequest,
+};
 
 const LOCAL_BENCHMARK_HEADER_ROW: &str =
     "query,runs,logical_planning_min,logical_planning_max,logical_planning_mean,logical_planning_median,logical_planning_percent_of_total,physical_planning_min,physical_planning_max,physical_planning,mean,physical_planning_median,physical_planning_percent_of_total,execution_min,execution_max,execution_execution_mean,execution_median,execution_percent_of_total,total_min,total_max,total_mean,total_median,total_percent_of_total";
