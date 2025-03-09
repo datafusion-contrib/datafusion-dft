@@ -120,6 +120,12 @@ impl DftArgs {
 
 #[derive(Clone, Debug, Subcommand)]
 pub enum Command {
+    /// Start a HTTP server
+    ServeHttp {
+        #[clap(short, long)]
+        config: Option<String>,
+    },
+
     /// Start a FlightSQL server
     ServeFlightSql {
         #[clap(short, long)]

@@ -22,6 +22,7 @@ use std::path::PathBuf;
 use datafusion_app::config::ExecutionConfig;
 use directories::{ProjectDirs, UserDirs};
 use lazy_static::lazy_static;
+use log::{debug, error};
 use serde::Deserialize;
 
 #[cfg(feature = "flightsql")]
@@ -188,28 +189,6 @@ fn default_paste() -> bool {
     false
 }
 
-// #[cfg(feature = "flightsql")]
-// #[derive(Clone, Debug, Deserialize)]
-// pub struct FlightSQLConfig {
-//     #[serde(default = "default_connection_url")]
-//     pub connection_url: String,
-//     #[serde(default = "default_benchmark_iterations")]
-//     pub benchmark_iterations: usize,
-//     #[serde(default = "default_server_metrics_port")]
-//     pub server_metrics_port: String,
-// }
-//
-// #[cfg(feature = "flightsql")]
-// impl Default for FlightSQLConfig {
-//     fn default() -> Self {
-//         Self {
-//             connection_url: default_connection_url(),
-//             benchmark_iterations: default_benchmark_iterations(),
-//             server_metrics_port: default_server_metrics_port(),
-//         }
-//     }
-// }
-
 #[cfg(feature = "flightsql")]
 pub fn default_connection_url() -> String {
     "http://localhost:50051".to_string()
@@ -232,4 +211,30 @@ fn default_editor_config() -> EditorConfig {
 #[cfg(feature = "flightsql")]
 fn default_auth_config() -> AuthConfig {
     AuthConfig::default()
+}
+
+pub fn create_config(config_path: PathBuf) -> AppConfig {
+    if config_path.exists() {
+        debug!("Config exists");
+        let maybe_config_contents = std::fs::read_to_string(config_path);
+        if let Ok(config_contents) = maybe_config_contents {
+            let maybe_parsed_config: std::result::Result<AppConfig, toml::de::Error> =
+                toml::from_str(&config_contents);
+            match maybe_parsed_config {
+                Ok(parsed_config) => {
+                    debug!("Parsed config: {:?}", parsed_config);
+                    parsed_config
+                }
+                Err(err) => {
+                    error!("Error parsing config: {:?}", err);
+                    AppConfig::default()
+                }
+            }
+        } else {
+            AppConfig::default()
+        }
+    } else {
+        debug!("No config, using default");
+        AppConfig::default()
+    }
 }

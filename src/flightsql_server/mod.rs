@@ -195,3 +195,5 @@ impl FlightSqlApp {
         }
     }
 }
+
+// pub fn run_flightsql_server(state: AppState) {}
