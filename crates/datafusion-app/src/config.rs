@@ -21,7 +21,6 @@ use std::path::PathBuf;
 
 #[cfg(feature = "udfs-wasm")]
 use datafusion_udfs_wasm::WasmInputDataType;
-use log::info;
 use serde::Deserialize;
 use std::collections::HashMap;
 
@@ -109,7 +108,6 @@ impl Default for ExecutionConfig {
 }
 
 fn default_ddl_path() -> Option<PathBuf> {
-    info!("Creating default ExecutionConfig");
     if let Some(user_dirs) = directories::UserDirs::new() {
         let ddl_path = user_dirs
             .home_dir()
@@ -241,7 +239,7 @@ pub struct WasmUdfConfig {
 }
 
 #[cfg(feature = "flightsql")]
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct FlightSQLConfig {
     pub connection_url: String,
     pub benchmark_iterations: usize,
@@ -259,14 +257,12 @@ impl FlightSQLConfig {
     }
 }
 
-#[cfg(feature = "flightsql")]
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct AuthConfig {
     pub basic_auth: Option<BasicAuth>,
     pub bearer_token: Option<String>,
 }
 
-#[cfg(feature = "flightsql")]
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct BasicAuth {
     pub username: String,
