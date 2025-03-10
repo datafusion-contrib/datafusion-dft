@@ -2,10 +2,7 @@ pub mod args;
 pub mod cli;
 pub mod config;
 pub mod execution;
-#[cfg(feature = "flightsql")]
-pub mod flightsql_server;
-#[cfg(feature = "http")]
-pub mod http_server;
+pub mod server;
 pub mod telemetry;
 pub mod test_utils;
 pub mod tui;

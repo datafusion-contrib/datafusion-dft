@@ -17,8 +17,8 @@
 
 use clap::Parser;
 use color_eyre::Result;
-#[cfg(feature = "flightsql")]
-use datafusion_dft::{args::Command, flightsql_server, http_server};
+#[cfg(any(feature = "flightsql", feature = "http"))]
+use datafusion_dft::{args::Command, server};
 use datafusion_dft::{args::DftArgs, cli, config::create_config, tui};
 
 fn main() -> Result<()> {
@@ -42,6 +42,11 @@ fn should_init_env_logger(cli: &DftArgs) -> bool {
     if let Some(Command::ServeFlightSql { .. }) = cli.command {
         return true;
     }
+    #[cfg(feature = "http")]
+    if let Some(Command::ServeHttp { .. }) = cli.command {
+        return true;
+    }
+
     if !cli.files.is_empty() || !cli.commands.is_empty() {
         return true;
     }
@@ -56,11 +61,13 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
 
     #[cfg(feature = "flightsql")]
     if let Some(Command::ServeFlightSql { .. }) = cli.command {
-        flightsql_server::try_run(cli.clone(), cfg.clone()).await?;
+        server::flightsql::try_run(cli.clone(), cfg.clone()).await?;
+        return Ok(());
     }
     #[cfg(feature = "http")]
     if let Some(Command::ServeHttp { .. }) = cli.command {
-        http_server::try_run(cli.clone(), cfg.clone()).await?;
+        server::http::try_run(cli.clone(), cfg.clone()).await?;
+        return Ok(());
     }
 
     if !cli.files.is_empty() || !cli.commands.is_empty() {

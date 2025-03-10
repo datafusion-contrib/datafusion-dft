@@ -14,10 +14,3 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-
-use crate::{args::DftArgs, config::AppConfig};
-use color_eyre::Result;
-
-pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
-    Ok(())
-}

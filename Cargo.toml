@@ -75,7 +75,7 @@ flightsql = [
 ]
 functions-json = ["datafusion-app/functions-json"]
 functions-parquet = ["datafusion-app/functions-parquet"]
-http = ["axum"]
+http = ["axum", "dep:metrics", "dep:metrics-exporter-prometheus", "dep:tower-http"]
 hudi = ["datafusion-app/hudi"]
 huggingface = ["datafusion-app/huggingface"]
 iceberg = ["datafusion-app/iceberg"]
