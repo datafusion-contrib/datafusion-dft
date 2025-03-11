@@ -34,7 +34,7 @@ use crate::{config::FlightSQLConfig, flightsql_benchmarks::FlightSQLBenchmarkSta
 
 pub type FlightSQLClient = Mutex<Option<FlightSqlServiceClient<Channel>>>;
 
-#[derive(Clone, Default)]
+#[derive(Default)]
 pub struct FlightSQLContext {
     config: FlightSQLConfig,
     flightsql_client: FlightSQLClient,
