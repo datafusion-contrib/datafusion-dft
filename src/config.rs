@@ -135,6 +135,8 @@ pub struct HttpServerConfig {
     pub server_metrics_port: String,
     #[serde(default = "default_auth_config")]
     pub auth: AuthConfig,
+    #[serde(default = "default_timeout_seconds")]
+    pub timeout_seconds: u64,
 }
 
 #[cfg(feature = "http")]
@@ -145,6 +147,7 @@ impl Default for HttpServerConfig {
             connection_url: default_connection_url(),
             server_metrics_port: default_server_metrics_port(),
             auth: default_auth_config(),
+            timeout_seconds: default_timeout_seconds(),
         }
     }
 }
@@ -239,6 +242,11 @@ fn default_editor_config() -> EditorConfig {
 #[cfg(any(feature = "flightsql", feature = "http"))]
 fn default_auth_config() -> AuthConfig {
     AuthConfig::default()
+}
+
+#[cfg(feature = "http")]
+fn default_timeout_seconds() -> u64 {
+    10
 }
 
 pub fn create_config(config_path: PathBuf) -> AppConfig {

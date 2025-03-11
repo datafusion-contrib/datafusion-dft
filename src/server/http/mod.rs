@@ -69,14 +69,19 @@ pub struct HttpApp {
 
 impl HttpApp {
     /// create a new app for the flightsql server
-    pub async fn try_new(execution: AppExecution, addr: &str, metrics_addr: &str) -> Result<Self> {
+    pub async fn try_new(
+        execution: AppExecution,
+        config: AppConfig,
+        addr: &str,
+        metrics_addr: &str,
+    ) -> Result<Self> {
         info!("Listening to HTTP on {addr}");
         let listener = TcpListener::bind(addr).await.unwrap();
 
         // prepare the shutdown channel
         let state = execution.execution_ctx().clone();
 
-        let router = create_router(state);
+        let router = create_router(state, config.http_server);
 
         let metrics_addr: SocketAddr = metrics_addr.parse()?;
         try_start_metrics_server(metrics_addr)?;
@@ -114,6 +119,7 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
     let app_execution = AppExecution::new(execution_ctx);
     let app = HttpApp::try_new(
         app_execution,
+        config.clone(),
         &cli.host.unwrap_or(DEFAULT_SERVER_ADDRESS.to_string()),
         &config.http_server.server_metrics_port,
     )

@@ -31,20 +31,22 @@ use log::error;
 use tokio_stream::StreamExt;
 use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
 
-const DEFAULT_TIMEOUT_SECONDS: u64 = 10;
+use crate::config::HttpServerConfig;
 
-pub fn create_router(execution: ExecutionContext) -> Router {
+pub fn create_router(execution: ExecutionContext, config: HttpServerConfig) -> Router {
     Router::new()
         .route(
             "/",
             get(|State(_): State<ExecutionContext>| async { "Hello, from DFT!" }),
         )
         .route("/sql", get(execute_sql))
+        .route("/catalog", get(execute_sql))
+        .route("/{catalog}/{schema}/{table}", get(execute_sql))
         .layer((
             TraceLayer::new_for_http(),
             // Graceful shutdown will wait for outstanding requests to complete. Add a timeout so
             // requests don't hang forever.
-            TimeoutLayer::new(Duration::from_secs(DEFAULT_TIMEOUT_SECONDS)),
+            TimeoutLayer::new(Duration::from_secs(config.timeout_seconds)),
         ))
         .with_state(execution)
 }
