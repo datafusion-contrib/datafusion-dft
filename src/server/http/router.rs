@@ -19,17 +19,19 @@ use std::{io::Cursor, time::Duration};
 
 use axum::{
     body::Body,
-    extract::State,
+    extract::{Path, State},
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{get, post},
     Router,
 };
 use datafusion::arrow::json::ArrayWriter;
 use datafusion_app::local::ExecutionContext;
 use http::{HeaderValue, StatusCode};
 use log::error;
+use serde::Deserialize;
 use tokio_stream::StreamExt;
 use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
+use tracing::info;
 
 use crate::config::HttpServerConfig;
 
@@ -39,9 +41,9 @@ pub fn create_router(execution: ExecutionContext, config: HttpServerConfig) -> R
             "/",
             get(|State(_): State<ExecutionContext>| async { "Hello, from DFT!" }),
         )
-        .route("/sql", get(execute_sql))
-        .route("/catalog", get(execute_sql))
-        .route("/{catalog}/{schema}/{table}", get(execute_sql))
+        .route("/sql", post(post_sql_handler))
+        .route("/catalog", get(get_catalog_handler))
+        .route("/table/:catalog/:schema/:table", get(get_table_handler))
         .layer((
             TraceLayer::new_for_http(),
             // Graceful shutdown will wait for outstanding requests to complete. Add a timeout so
@@ -51,8 +53,37 @@ pub fn create_router(execution: ExecutionContext, config: HttpServerConfig) -> R
         .with_state(execution)
 }
 
-async fn execute_sql(State(state): State<ExecutionContext>) -> Response {
-    let results = state.execute_sql("SELECT 1, 2").await;
+async fn post_sql_handler(state: State<ExecutionContext>, query: String) -> Response {
+    execute_sql(state, query).await
+}
+
+async fn get_catalog_handler(state: State<ExecutionContext>) -> Response {
+    execute_sql(state, "SHOW TABLES".to_string()).await
+}
+
+#[derive(Deserialize)]
+struct GetTableParams {
+    catalog: String,
+    schema: String,
+    table: String,
+}
+
+async fn get_table_handler(
+    state: State<ExecutionContext>,
+    Path(params): Path<GetTableParams>,
+) -> Response {
+    let GetTableParams {
+        catalog,
+        schema,
+        table,
+    } = params;
+    let sql = format!("SELECT * FROM \"{catalog}\".\"{schema}\".\"{table}\"");
+    execute_sql(state, sql).await
+}
+
+async fn execute_sql(State(state): State<ExecutionContext>, sql: String) -> Response {
+    info!("Executing sql: {sql}");
+    let results = state.execute_sql(&sql).await;
     match results {
         Ok(mut batch_stream) => {
             let mut buf: Cursor<Vec<u8>> = Cursor::new(Vec::new());
