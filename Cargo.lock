@@ -1777,6 +1777,8 @@ dependencies = [
  "tonic",
  "tower 0.5.2",
  "tower-http",
+ "tracing",
+ "tracing-subscriber",
  "tui-logger",
  "tui-textarea",
  "url",
@@ -6221,10 +6223,13 @@ dependencies = [
  "bitflags 2.9.0",
  "bytes",
  "http",
+ "http-body",
  "mime",
  "pin-project-lite",
+ "tokio",
  "tower-layer",
  "tower-service",
+ "tracing",
 ]
 
 [[package]]

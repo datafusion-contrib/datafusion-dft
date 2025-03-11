@@ -20,6 +20,7 @@ use color_eyre::Result;
 #[cfg(any(feature = "flightsql", feature = "http"))]
 use datafusion_dft::{args::Command, server};
 use datafusion_dft::{args::DftArgs, cli, config::create_config, tui};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 fn main() -> Result<()> {
     let cli = DftArgs::parse();
@@ -42,10 +43,6 @@ fn should_init_env_logger(cli: &DftArgs) -> bool {
     if let Some(Command::ServeFlightSql { .. }) = cli.command {
         return true;
     }
-    #[cfg(feature = "http")]
-    if let Some(Command::ServeHttp { .. }) = cli.command {
-        return true;
-    }
 
     if !cli.files.is_empty() || !cli.commands.is_empty() {
         return true;
@@ -65,6 +62,18 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
         return Ok(());
     }
     #[cfg(feature = "http")]
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                format!(
+                    "{}=debug,tower_http=debug,axum=trace",
+                    env!("CARGO_CRATE_NAME")
+                )
+                .into()
+            }),
+        )
+        .with(tracing_subscriber::fmt::layer().without_time())
+        .init();
     if let Some(Command::ServeHttp { .. }) = cli.command {
         server::http::try_run(cli.clone(), cfg.clone()).await?;
         return Ok(());
