@@ -137,6 +137,8 @@ pub struct HttpServerConfig {
     pub auth: AuthConfig,
     #[serde(default = "default_timeout_seconds")]
     pub timeout_seconds: u64,
+    #[serde(default = "default_result_limit")]
+    pub result_limit: usize,
 }
 
 #[cfg(feature = "http")]
@@ -148,6 +150,7 @@ impl Default for HttpServerConfig {
             server_metrics_port: default_server_metrics_port(),
             auth: default_auth_config(),
             timeout_seconds: default_timeout_seconds(),
+            result_limit: default_result_limit(),
         }
     }
 }
@@ -247,6 +250,11 @@ fn default_auth_config() -> AuthConfig {
 #[cfg(feature = "http")]
 fn default_timeout_seconds() -> u64 {
     10
+}
+
+#[cfg(feature = "http")]
+fn default_result_limit() -> usize {
+    1000
 }
 
 pub fn create_config(config_path: PathBuf) -> AppConfig {

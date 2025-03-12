@@ -24,8 +24,8 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use datafusion::arrow::json::ArrayWriter;
-use datafusion_app::local::ExecutionContext;
+use datafusion::{arrow::json::ArrayWriter, execution::SendableRecordBatchStream};
+use datafusion_app::local::{ExecutionContext, ExecutionOptions, ExecutionResult};
 use http::{HeaderValue, StatusCode};
 use log::error;
 use serde::Deserialize;
@@ -35,11 +35,24 @@ use tracing::info;
 
 use crate::config::HttpServerConfig;
 
+#[derive(Clone)]
+struct ExecutionState {
+    execution: ExecutionContext,
+    config: HttpServerConfig,
+}
+
+impl ExecutionState {
+    pub fn new(execution: ExecutionContext, config: HttpServerConfig) -> Self {
+        Self { execution, config }
+    }
+}
+
 pub fn create_router(execution: ExecutionContext, config: HttpServerConfig) -> Router {
+    let state = ExecutionState::new(execution, config);
     Router::new()
         .route(
             "/",
-            get(|State(_): State<ExecutionContext>| async { "Hello, from DFT!" }),
+            get(|State(_): State<ExecutionState>| async { "Hello, from DFT!" }),
         )
         .route("/sql", post(post_sql_handler))
         .route("/catalog", get(get_catalog_handler))
@@ -48,17 +61,19 @@ pub fn create_router(execution: ExecutionContext, config: HttpServerConfig) -> R
             TraceLayer::new_for_http(),
             // Graceful shutdown will wait for outstanding requests to complete. Add a timeout so
             // requests don't hang forever.
-            TimeoutLayer::new(Duration::from_secs(config.timeout_seconds)),
+            TimeoutLayer::new(Duration::from_secs(state.config.timeout_seconds)),
         ))
-        .with_state(execution)
+        .with_state(state)
 }
 
-async fn post_sql_handler(state: State<ExecutionContext>, query: String) -> Response {
-    execute_sql(state, query).await
+async fn post_sql_handler(state: State<ExecutionState>, query: String) -> Response {
+    let opts = ExecutionOptions::new(Some(state.config.result_limit));
+    execute_sql_with_opts(state, query, opts).await
 }
 
-async fn get_catalog_handler(state: State<ExecutionContext>) -> Response {
-    execute_sql(state, "SHOW TABLES".to_string()).await
+async fn get_catalog_handler(state: State<ExecutionState>) -> Response {
+    let opts = ExecutionOptions::new(None);
+    execute_sql_with_opts(state, "SHOW TABLES".to_string(), opts).await
 }
 
 #[derive(Deserialize)]
@@ -69,7 +84,7 @@ struct GetTableParams {
 }
 
 async fn get_table_handler(
-    state: State<ExecutionContext>,
+    state: State<ExecutionState>,
     Path(params): Path<GetTableParams>,
 ) -> Response {
     let GetTableParams {
@@ -78,52 +93,22 @@ async fn get_table_handler(
         table,
     } = params;
     let sql = format!("SELECT * FROM \"{catalog}\".\"{schema}\".\"{table}\"");
-    execute_sql(state, sql).await
+    let opts = ExecutionOptions::new(Some(state.config.result_limit));
+    execute_sql_with_opts(state, sql, opts).await
 }
 
-async fn execute_sql(State(state): State<ExecutionContext>, sql: String) -> Response {
+async fn execute_sql_with_opts(
+    State(state): State<ExecutionState>,
+    sql: String,
+    opts: ExecutionOptions,
+) -> Response {
     info!("Executing sql: {sql}");
-    let results = state.execute_sql(&sql).await;
+    let results = state.execution.execute_sql_with_opts(&sql, opts).await;
     match results {
-        Ok(mut batch_stream) => {
-            let mut buf: Cursor<Vec<u8>> = Cursor::new(Vec::new());
-            let mut writer = ArrayWriter::new(&mut buf);
-
-            while let Some(maybe_batch) = batch_stream.next().await {
-                match maybe_batch {
-                    Ok(batch) => {
-                        if let Err(e) = writer.write(&batch) {
-                            error!("Error serializing result batches: {}", e);
-                            return (StatusCode::INTERNAL_SERVER_ERROR, "Serialization error")
-                                .into_response();
-                        }
-                    }
-                    Err(e) => {
-                        error!("Error executing query: {}", e);
-                        return (StatusCode::INTERNAL_SERVER_ERROR, "Query execution error")
-                            .into_response();
-                    }
-                }
-            }
-
-            if let Err(e) = writer.finish() {
-                error!("Error finalizing JSON writer: {}", e);
-                return (StatusCode::INTERNAL_SERVER_ERROR, "Finalization error").into_response();
-            }
-
-            match String::from_utf8(buf.into_inner()) {
-                Ok(json) => {
-                    let mut res = Response::new(Body::new(json));
-                    res.headers_mut()
-                        .insert("content-type", HeaderValue::from_static("application/json"));
-                    res
-                }
-                Err(_) => {
-                    (StatusCode::INTERNAL_SERVER_ERROR, "UTF-8 conversion error").into_response()
-                }
-            }
+        Ok(ExecutionResult::RecordBatchStream(Ok(batch_stream))) => {
+            batch_stream_to_response(batch_stream).await
         }
-        Err(e) => {
+        Err(e) | Ok(ExecutionResult::RecordBatchStream(Err(e))) => {
             error!("Error executing SQL: {}", e);
             (
                 StatusCode::BAD_REQUEST,
@@ -131,5 +116,42 @@ async fn execute_sql(State(state): State<ExecutionContext>, sql: String) -> Resp
             )
                 .into_response()
         }
+    }
+}
+
+async fn batch_stream_to_response(batch_stream: SendableRecordBatchStream) -> Response {
+    let mut buf: Cursor<Vec<u8>> = Cursor::new(Vec::new());
+    let mut writer = ArrayWriter::new(&mut buf);
+    let mut batch_stream = batch_stream;
+    while let Some(maybe_batch) = batch_stream.next().await {
+        match maybe_batch {
+            Ok(batch) => {
+                if let Err(e) = writer.write(&batch) {
+                    error!("Error serializing result batches: {}", e);
+                    return (StatusCode::INTERNAL_SERVER_ERROR, "Serialization error")
+                        .into_response();
+                }
+            }
+            Err(e) => {
+                error!("Error executing query: {}", e);
+                return (StatusCode::INTERNAL_SERVER_ERROR, "Query execution error")
+                    .into_response();
+            }
+        }
+    }
+
+    if let Err(e) = writer.finish() {
+        error!("Error finalizing JSON writer: {}", e);
+        return (StatusCode::INTERNAL_SERVER_ERROR, "Finalization error").into_response();
+    }
+
+    match String::from_utf8(buf.into_inner()) {
+        Ok(json) => {
+            let mut res = Response::new(Body::new(json));
+            res.headers_mut()
+                .insert("content-type", HeaderValue::from_static("application/json"));
+            res
+        }
+        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "UTF-8 conversion error").into_response(),
     }
 }
