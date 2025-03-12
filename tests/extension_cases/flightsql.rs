@@ -507,7 +507,7 @@ pub async fn test_execute_custom_port() {
             .arg("-c")
             .arg("SELECT 1 + 2;")
             .arg("--flightsql")
-            .arg("--flightsql-host")
+            .arg("--host")
             .arg("http://localhost:50052")
             .timeout(Duration::from_secs(5))
             .assert()

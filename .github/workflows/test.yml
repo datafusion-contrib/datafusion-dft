@@ -329,4 +329,4 @@ jobs:
           cargo r --features=http -- serve-http &
       - name: Run auth tests
         run: |
-          cargo t --features=http server
+          cargo t --features=http server::test
