@@ -302,3 +302,31 @@ jobs:
       - name: Run auth tests
         run: |
           cargo t --features=flightsql extension_cases::auth_bearer
+  test-http-server:
+    name: Extension / HTTP Server
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cargo
+          key: cargo-dft-cache-
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/target
+          key: target-dft-cache-
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
+      - name: Start FlightSQL Server
+        run: |
+          cargo r --features=http -- serve-http &
+      - name: Run auth tests
+        run: |
+          cargo t --features=http server

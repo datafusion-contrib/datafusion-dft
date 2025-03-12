@@ -68,6 +68,7 @@ datafusion-udfs-wasm = { version = "0.1.0", path = "crates/datafusion-udfs-wasm"
 ] }
 insta = { version = "1.40.0", features = ["yaml"] }
 predicates = "3.1.2"
+reqwest = { version = "0.12.14", features = ["json"] }
 tempfile = "3.2.0"
 url = "2.5.2"
 
