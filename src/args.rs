@@ -88,9 +88,9 @@ pub struct DftArgs {
     #[clap(short = 'n', help = "Set the number of benchmark iterations to run")]
     pub benchmark_iterations: Option<usize>,
 
-    #[cfg(any(feature = "flightsql", feature = "flightsql"))]
-    #[clap(long, help = "Set the host and port to be used for FlightSQL")]
-    pub flightsql_host: Option<String>,
+    #[cfg(any(feature = "flightsql", feature = "http"))]
+    #[clap(long, help = "Set the host and port to be used for server")]
+    pub host: Option<String>,
 
     #[clap(
         long,
@@ -120,6 +120,11 @@ impl DftArgs {
 
 #[derive(Clone, Debug, Subcommand)]
 pub enum Command {
+    /// Start a HTTP server
+    ServeHttp {
+        #[clap(short, long)]
+        config: Option<String>,
+    },
     /// Start a FlightSQL server
     ServeFlightSql {
         #[clap(short, long)]

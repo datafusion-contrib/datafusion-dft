@@ -4,7 +4,7 @@
 1. Text User Interface (TUI): An IDE for DataFusion developers and users that provides a local database experience with utilities to analyze / benchmark queries.
 2. Command Line Interface (CLI): Scriptable engine for executing queries from files.
 
-Additionally, it provides a FlightSQL server implementation leveraging the same execution engine behind the TUI and CLI.  This allows users to iterate quickly develop a database and then seamlessly deploy it.
+Additionally, it provides a FlightSQL & HTTP server implementations leveraging the same execution engine behind the TUI and CLI.  This allows users to iterate quickly develop a database and then seamlessly deploy applications built on it.
 
 `dft` is inspired by  [`datafusion-cli`], but has some differences:
 1. `dft` TUI focuses on more complete and interactive experience for users.
@@ -69,13 +69,13 @@ Some of the current and planned features are:
 
 ### Limitations
 
-Currently `dft` does not display wide result sets well (because the widget library that we use does not support horizontal scrolling - we are working with them to see what we can do about this).  As a result, when working with wide data sets its best to be selective with the columns that you would like to view in the ouput.
+Currently `dft`'s TUI application does not display wide result sets well (because the widget library that we use does not support horizontal scrolling - we are working with them to see what we can do about this).  As a result, when working with wide data sets its best to be selective with the columns that you would like to view in the ouput.
 
 ## User Guide
 
 ### Installation
 
-Currently, the only supported packaging is on [crates.io](https://crates.io/search?q=datafusion-dft).  If you already have Rust installed it can be installed by running `cargo install datafusion-tui`.  If rust is not installed you can download following the directions [here](https://www.rust-lang.org/tools/install).
+Currently, the only supported packaging is on [crates.io](https://crates.io/search?q=datafusion-dft).  If you already have Rust installed it can be installed by running `cargo install datafusion-dft`.  If rust is not installed you can download following the directions [here](https://www.rust-lang.org/tools/install).
 
 Once installed you can run `dft` to start the application.
 
@@ -159,6 +159,18 @@ This feature is still in it's early stages and is expected to evolve.  Once it h
 The `dft` FlightSQL server (feature flag `flightsql`) is a Flight service that can be used to execute SQL queries against DataFusion.  The server is started by running `dft serve-flight-sql` and can optionally run your configured DDL with the `--run-ddl` parameter.  Prometheus metrics are automatically exported as part of this.
 
 This feature is experimental and does not currently implement all FlightSQL endpoints.  Endpoints will be added in tandem with adding more features to the FlightSQL clients within the TUI and CLI.
+
+## `dft` HTTP Server
+
+The `dft` HTTP server (feature flag `http`) is a server that exposes REST endpoints to access DataFusion.  The server is started by running `dft serve-http` and can optionally run your configured DDL with the `--run-ddl` parameter.  Prometheus metrics are automatically exported as part of this.
+
+The current endpoints provided are:
+
+`/sql` => Make POST requests with a SQL in the body
+`/catalog` => View the catalog for the database
+`/table/{CATALOG}/{SCHEMA}/{TABLE}` => Fetch records from the provided table.
+
+
 
 
 #### Internal Optional Features (Workspace Features)

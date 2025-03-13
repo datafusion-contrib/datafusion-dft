@@ -25,7 +25,7 @@ use lazy_static::lazy_static;
 use log::{debug, error};
 use serde::Deserialize;
 
-#[cfg(feature = "flightsql")]
+#[cfg(any(feature = "flightsql", feature = "http"))]
 use datafusion_app::config::AuthConfig;
 
 lazy_static! {
@@ -124,6 +124,37 @@ impl Default for FlightSQLClientConfig {
     }
 }
 
+#[cfg(feature = "http")]
+#[derive(Clone, Debug, Deserialize)]
+pub struct HttpServerConfig {
+    #[serde(default = "default_execution_config")]
+    pub execution: ExecutionConfig,
+    #[serde(default = "default_connection_url")]
+    pub connection_url: String,
+    #[serde(default = "default_server_metrics_port")]
+    pub server_metrics_port: String,
+    #[serde(default = "default_auth_config")]
+    pub auth: AuthConfig,
+    #[serde(default = "default_timeout_seconds")]
+    pub timeout_seconds: u64,
+    #[serde(default = "default_result_limit")]
+    pub result_limit: usize,
+}
+
+#[cfg(feature = "http")]
+impl Default for HttpServerConfig {
+    fn default() -> Self {
+        Self {
+            execution: default_execution_config(),
+            connection_url: default_connection_url(),
+            server_metrics_port: default_server_metrics_port(),
+            auth: default_auth_config(),
+            timeout_seconds: default_timeout_seconds(),
+            result_limit: default_result_limit(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct AppConfig {
     #[serde(default)]
@@ -138,6 +169,9 @@ pub struct AppConfig {
     #[cfg(feature = "flightsql")]
     #[serde(default)]
     pub flightsql_server: FlightSQLServerConfig,
+    #[cfg(feature = "http")]
+    #[serde(default)]
+    pub http_server: HttpServerConfig,
 }
 
 fn default_execution_config() -> ExecutionConfig {
@@ -189,12 +223,12 @@ fn default_paste() -> bool {
     false
 }
 
-#[cfg(feature = "flightsql")]
+#[cfg(any(feature = "flightsql", feature = "http"))]
 pub fn default_connection_url() -> String {
     "http://localhost:50051".to_string()
 }
 
-#[cfg(feature = "flightsql")]
+#[cfg(any(feature = "flightsql", feature = "http"))]
 fn default_server_metrics_port() -> String {
     "0.0.0.0:9000".to_string()
 }
@@ -208,9 +242,19 @@ fn default_editor_config() -> EditorConfig {
     EditorConfig::default()
 }
 
-#[cfg(feature = "flightsql")]
+#[cfg(any(feature = "flightsql", feature = "http"))]
 fn default_auth_config() -> AuthConfig {
     AuthConfig::default()
+}
+
+#[cfg(feature = "http")]
+fn default_timeout_seconds() -> u64 {
+    10
+}
+
+#[cfg(feature = "http")]
+fn default_result_limit() -> usize {
+    1000
 }
 
 pub fn create_config(config_path: PathBuf) -> AppConfig {

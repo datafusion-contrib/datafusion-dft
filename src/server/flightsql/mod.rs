@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-pub mod services;
+pub mod service;
 
 use crate::args::DftArgs;
 use crate::config::AppConfig;
@@ -25,9 +25,7 @@ use datafusion_app::config::merge_configs;
 use datafusion_app::extensions::DftSessionStateBuilder;
 use datafusion_app::local::ExecutionContext;
 use log::info;
-use metrics::{describe_counter, describe_histogram};
-use metrics_exporter_prometheus::{Matcher, PrometheusBuilder};
-use services::flightsql::FlightSqlServiceImpl;
+use service::FlightSqlServiceImpl;
 use std::net::SocketAddr;
 use std::time::Duration;
 use tokio::net::TcpListener;
@@ -37,25 +35,12 @@ use tonic::transport::Server;
 #[cfg(feature = "flightsql")]
 use tower_http::validate_request::ValidateRequestHeaderLayer;
 
+use super::try_start_metrics_server;
+
 const DEFAULT_TIMEOUT_SECONDS: u64 = 60;
+const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1:50051";
 
-fn initialize_metrics() {
-    describe_counter!("requests", "Incoming requests by FlightSQL endpoint");
-
-    describe_histogram!(
-        "get_flight_info_latency_ms",
-        metrics::Unit::Milliseconds,
-        "Get flight info latency ms"
-    );
-
-    describe_histogram!(
-        "do_get_fallback_latency_ms",
-        metrics::Unit::Milliseconds,
-        "Do get fallback latency ms"
-    )
-}
-
-fn create_server_handle(
+pub fn create_server_handle(
     config: &AppConfig,
     flightsql: FlightSqlServiceImpl,
     listener: TcpListener,
@@ -139,37 +124,20 @@ impl FlightSqlApp {
         addr: &str,
         metrics_addr: &str,
     ) -> Result<Self> {
-        let flightsql = services::flightsql::FlightSqlServiceImpl::new(app_execution);
-        // let OS choose a free port
+        info!("Listening to FlightSQL on {addr}");
+        let flightsql = service::FlightSqlServiceImpl::new(app_execution);
         let listener = TcpListener::bind(addr).await.unwrap();
-        let addr = listener.local_addr().unwrap();
 
         // prepare the shutdown channel
         let (tx, rx) = tokio::sync::oneshot::channel();
         let handle = create_server_handle(config, flightsql, listener, rx)?;
 
-        {
-            let builder = PrometheusBuilder::new();
-            let addr: SocketAddr = metrics_addr.parse()?;
-            info!("Listening to metrics on {addr}");
-            builder
-                .with_http_listener(addr)
-                .set_buckets_for_metric(
-                    Matcher::Suffix("latency_ms".to_string()),
-                    &[
-                        1.0, 3.0, 5.0, 10.0, 25.0, 50.0, 75.0, 100.0, 250.0, 500.0, 1000.0, 2500.0,
-                        5000.0, 10000.0, 20000.0,
-                    ],
-                )?
-                .install()
-                .expect("failed to install metrics recorder/exporter");
-
-            initialize_metrics();
-        }
+        let metrics_addr: SocketAddr = metrics_addr.parse()?;
+        try_start_metrics_server(metrics_addr)?;
 
         let app = Self {
             shutdown: Some(tx),
-            addr,
+            addr: metrics_addr,
             handle: Some(handle),
         };
         Ok(app)
@@ -188,7 +156,7 @@ impl FlightSqlApp {
         }
     }
 
-    pub async fn run_app(self) {
+    pub async fn run(self) {
         if let Some(handle) = self.handle {
             handle
                 .await
@@ -208,10 +176,8 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
     let session_state_builder = DftSessionStateBuilder::try_new(Some(merged_exec_config.clone()))?
         .with_extensions()
         .await?;
-    // FlightSQL Server mode: start a FlightSQL server
-    const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1:50051";
-    info!("Starting FlightSQL server on {}", DEFAULT_SERVER_ADDRESS);
     let session_state = session_state_builder.build()?;
+    // FlightSQL Server mode: start a FlightSQL server
     let execution_ctx = ExecutionContext::try_new(&merged_exec_config, session_state)?;
     if cli.run_ddl {
         execution_ctx.execute_ddl().await;
@@ -220,11 +186,10 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
     let app = FlightSqlApp::try_new(
         app_execution,
         &config,
-        &cli.flightsql_host
-            .unwrap_or(DEFAULT_SERVER_ADDRESS.to_string()),
+        &cli.host.unwrap_or(DEFAULT_SERVER_ADDRESS.to_string()),
         &config.flightsql_server.server_metrics_port,
     )
     .await?;
-    app.run_app().await;
+    app.run().await;
     Ok(())
 }

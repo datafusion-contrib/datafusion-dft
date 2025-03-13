@@ -22,12 +22,6 @@ use datafusion::prelude::*;
 use datafusion_app::flightsql::{FlightSQLClient, FlightSQLContext};
 use datafusion_app::local::ExecutionContext;
 
-pub enum AppType {
-    Cli,
-    Tui,
-    FlightSQLServer,
-}
-
 /// Provides all core execution functionality for execution queries from either a local
 /// `SessionContext` or a remote `FlightSQL` service
 pub struct AppExecution {
