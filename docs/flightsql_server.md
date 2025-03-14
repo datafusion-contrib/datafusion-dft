@@ -1,4 +1,4 @@
-# dft FlightSQL Server
+# FlightSQL Server Guide
 
 `dft` includes an **experimental FlightSQL server** that you can run to provide programmatic SQL access to DataFusion.
 

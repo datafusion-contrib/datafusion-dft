@@ -1,4 +1,4 @@
-# dft CLI
+# CLI Guide
 
 `dft` also provides a scriptable Command Line Interface (CLI) for executing queries directly from files or the command line. It can connect to the same DataFusion engine behind the TUI, or optionally run your queries against a FlightSQL server.
 

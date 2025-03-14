@@ -1,4 +1,4 @@
-# dft TUI
+# TUI Guide
 
 The `dft` TUI (Text User Interface) is an IDE-like experience that allows you to query DataFusion in a local “database-like” environment. It includes built-in utilities for analyzing queries, exploring catalogs, benchmarking, and more.
 
