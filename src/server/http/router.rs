@@ -54,6 +54,10 @@ pub fn create_router(execution: ExecutionContext, config: HttpServerConfig) -> R
             "/",
             get(|State(_): State<ExecutionState>| async { "Hello, from DFT!" }),
         )
+        .route(
+            "/health-check",
+            get(|State(_): State<ExecutionState>| async { "Healthy" }),
+        )
         .route("/sql", post(post_sql_handler))
         .route("/catalog", get(get_catalog_handler))
         .route("/table/:catalog/:schema/:table", get(get_table_handler))
