@@ -1,4 +1,4 @@
-# dft HTTP Server
+# HTTP Server Guide
 
 `dft` also provides an HTTP server that exposes a simple REST interface to DataFusion.
 
