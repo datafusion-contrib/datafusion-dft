@@ -1,6 +1,9 @@
- # 🚧 DOCS UNDER CONSTRUCTION
+# dft - Batteries included DataFusion
 
-# dft
+## 🚧 DOCS UNDER CONSTRUCTION
+Documentation is undergoing a significant revamp - the new documentation will be finalized as part of the v0.3 release in the late Spring or early Summer of 2025.
+
+## Overview
 
 `dft` is a batteries included suite of a [DataFusion](https://github.com/apache/arrow-datafusion) applications. The batteries being several common features to modern query execution engines such as:
 
