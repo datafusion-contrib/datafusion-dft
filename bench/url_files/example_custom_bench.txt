@@ -1,0 +1,4 @@
+http://localhost:8080/catalog
+http://localhost:8080/table/datafusion/information_schema/tables
+http://localhost:8080/table/datafusion/information_schema/views
+http://localhost:8080/table/datafusion/information_schema/columns
