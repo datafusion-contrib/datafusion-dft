@@ -15,10 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use std::sync::Arc;
+
 use arrow_flight::sql::client::FlightSqlServiceClient;
 #[cfg(feature = "flightsql")]
 use base64::engine::{general_purpose::STANDARD, Engine as _};
-use datafusion::sql::parser::DFParser;
+use datafusion::{
+    error::{DataFusionError, Result as DFResult},
+    execution::SendableRecordBatchStream,
+    physical_plan::stream::RecordBatchStreamAdapter,
+    sql::parser::DFParser,
+};
 use log::{error, info, warn};
 
 use color_eyre::eyre::{self, Result};
@@ -26,15 +33,16 @@ use tokio::sync::Mutex;
 use tokio_stream::StreamExt;
 use tonic::{transport::Channel, IntoRequest};
 
-// use crate::config::AppConfig;
 #[cfg(feature = "flightsql")]
 use crate::config::BasicAuth;
 
-use crate::{config::FlightSQLConfig, flightsql_benchmarks::FlightSQLBenchmarkStats};
+use crate::{
+    config::FlightSQLConfig, flightsql_benchmarks::FlightSQLBenchmarkStats, ExecOptions, ExecResult,
+};
 
-pub type FlightSQLClient = Mutex<Option<FlightSqlServiceClient<Channel>>>;
+pub type FlightSQLClient = Arc<Mutex<Option<FlightSqlServiceClient<Channel>>>>;
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct FlightSQLContext {
     config: FlightSQLConfig,
     flightsql_client: FlightSQLClient,
@@ -44,7 +52,7 @@ impl FlightSQLContext {
     pub fn new(config: FlightSQLConfig) -> Self {
         Self {
             config,
-            flightsql_client: Mutex::new(None),
+            flightsql_client: Arc::new(Mutex::new(None)),
         }
     }
 
@@ -155,6 +163,44 @@ impl FlightSQLContext {
             ))
         } else {
             Err(eyre::eyre!("Only a single statement can be benchmarked"))
+        }
+    }
+
+    pub async fn execute_sql_with_opts(
+        &self,
+        sql: &str,
+        _opts: ExecOptions,
+    ) -> DFResult<ExecResult> {
+        if let Some(ref mut client) = *self.flightsql_client.lock().await {
+            let flight_info = client.execute(sql.to_string(), None).await?;
+            if flight_info.endpoint.len() != 1 {
+                return Err(DataFusionError::External("More than one endpoint".into()));
+            }
+            let endpoint = &flight_info.endpoint[0];
+            if let Some(ticket) = &endpoint.ticket {
+                client
+                    .do_get(ticket.clone().into_request())
+                    .await
+                    .map(|stream| {
+                        if let Some(schema) = stream.schema().cloned() {
+                            let mapped_stream = stream
+                                .map(|res| res.map_err(|e| DataFusionError::External(e.into())));
+                            let batch_stream =
+                                Box::pin(RecordBatchStreamAdapter::new(schema, mapped_stream))
+                                    as SendableRecordBatchStream;
+                            Ok(ExecResult::RecordBatchStream(batch_stream))
+                        } else {
+                            Err(DataFusionError::External(
+                                "Missing schema from stream".into(),
+                            ))
+                        }
+                    })
+                    .map_err(|e| DataFusionError::ArrowError(e, None))?
+            } else {
+                return Err(DataFusionError::External("Missing ticket".into()));
+            }
+        } else {
+            return Err(DataFusionError::External("Missing client".into()));
         }
     }
 }

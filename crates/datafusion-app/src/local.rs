@@ -27,6 +27,7 @@ use futures::TryFutureExt;
 use log::{debug, error, info};
 
 use crate::config::ExecutionConfig;
+use crate::{ExecOptions, ExecResult};
 use color_eyre::eyre::{self, Result};
 use datafusion::common::Result as DFResult;
 use datafusion::execution::{SendableRecordBatchStream, SessionState};
@@ -405,30 +406,14 @@ impl ExecutionContext {
     pub async fn execute_sql_with_opts(
         &self,
         sql: &str,
-        opts: ExecutionOptions,
-    ) -> DFResult<ExecutionResult> {
+        opts: ExecOptions,
+    ) -> DFResult<ExecResult> {
         let df = self.session_ctx.sql(sql).await?;
         let df = if let Some(limit) = opts.limit {
             df.limit(0, Some(limit))?
         } else {
             df
         };
-        Ok(ExecutionResult::RecordBatchStream(
-            df.execute_stream().await,
-        ))
+        Ok(ExecResult::RecordBatchStream(df.execute_stream().await?))
     }
-}
-
-pub struct ExecutionOptions {
-    limit: Option<usize>,
-}
-
-impl ExecutionOptions {
-    pub fn new(limit: Option<usize>) -> Self {
-        Self { limit }
-    }
-}
-
-pub enum ExecutionResult {
-    RecordBatchStream(DFResult<SendableRecordBatchStream>),
 }

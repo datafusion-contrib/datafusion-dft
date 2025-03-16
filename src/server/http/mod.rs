@@ -77,8 +77,7 @@ impl HttpApp {
     ) -> Result<Self> {
         info!("Listening to HTTP on {addr}");
         let listener = TcpListener::bind(addr).await.unwrap();
-        let state = execution.execution_ctx().clone();
-        let router = create_router(state, config.http_server);
+        let router = create_router(execution, config.http_server);
 
         let metrics_addr: SocketAddr = metrics_addr.parse()?;
         try_start_metrics_server(metrics_addr)?;

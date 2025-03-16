@@ -19,13 +19,13 @@ use std::{io::Cursor, time::Duration};
 
 use axum::{
     body::Body,
-    extract::{Path, State},
+    extract::{Json, Path, State},
     response::{IntoResponse, Response},
     routing::{get, post},
     Router,
 };
 use datafusion::{arrow::json::ArrayWriter, execution::SendableRecordBatchStream};
-use datafusion_app::local::{ExecutionContext, ExecutionOptions, ExecutionResult};
+use datafusion_app::{ExecOptions, ExecResult};
 use http::{HeaderValue, StatusCode};
 use log::error;
 use serde::Deserialize;
@@ -33,21 +33,21 @@ use tokio_stream::StreamExt;
 use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
 use tracing::info;
 
-use crate::config::HttpServerConfig;
+use crate::{config::HttpServerConfig, execution::AppExecution};
 
 #[derive(Clone)]
 struct ExecutionState {
-    execution: ExecutionContext,
+    execution: AppExecution,
     config: HttpServerConfig,
 }
 
 impl ExecutionState {
-    pub fn new(execution: ExecutionContext, config: HttpServerConfig) -> Self {
+    pub fn new(execution: AppExecution, config: HttpServerConfig) -> Self {
         Self { execution, config }
     }
 }
 
-pub fn create_router(execution: ExecutionContext, config: HttpServerConfig) -> Router {
+pub fn create_router(execution: AppExecution, config: HttpServerConfig) -> Router {
     let state = ExecutionState::new(execution, config);
     Router::new()
         .route(
@@ -70,14 +70,22 @@ pub fn create_router(execution: ExecutionContext, config: HttpServerConfig) -> R
         .with_state(state)
 }
 
-async fn post_sql_handler(state: State<ExecutionState>, query: String) -> Response {
-    let opts = ExecutionOptions::new(Some(state.config.result_limit));
-    execute_sql_with_opts(state, query, opts).await
+#[derive(Deserialize)]
+struct PostSqlBody {
+    query: String,
+    #[serde(default)]
+    flightsql: bool,
+}
+
+async fn post_sql_handler(state: State<ExecutionState>, Json(body): Json<PostSqlBody>) -> Response {
+    let opts = ExecOptions::new(Some(state.config.result_limit), body.flightsql);
+    execute_sql_with_opts(state, body.query, opts).await
 }
 
 async fn get_catalog_handler(state: State<ExecutionState>) -> Response {
-    let opts = ExecutionOptions::new(None);
-    execute_sql_with_opts(state, "SHOW TABLES".to_string(), opts).await
+    let opts = ExecOptions::new(None, false);
+    let sql = "SHOW TABLES".to_string();
+    execute_sql_with_opts(state, sql, opts).await
 }
 
 #[derive(Deserialize)]
@@ -97,29 +105,26 @@ async fn get_table_handler(
         table,
     } = params;
     let sql = format!("SELECT * FROM \"{catalog}\".\"{schema}\".\"{table}\"");
-    let opts = ExecutionOptions::new(Some(state.config.result_limit));
+    let opts = ExecOptions::new(Some(state.config.result_limit), false);
     execute_sql_with_opts(state, sql, opts).await
 }
 
+// TODO: Maybe rename to something like `response_for_sql`
 async fn execute_sql_with_opts(
     State(state): State<ExecutionState>,
     sql: String,
-    opts: ExecutionOptions,
+    opts: ExecOptions,
 ) -> Response {
     info!("Executing sql: {sql}");
-    let results = state.execution.execute_sql_with_opts(&sql, opts).await;
-    match results {
-        Ok(ExecutionResult::RecordBatchStream(Ok(batch_stream))) => {
-            batch_stream_to_response(batch_stream).await
-        }
-        Err(e) | Ok(ExecutionResult::RecordBatchStream(Err(e))) => {
-            error!("Error executing SQL: {}", e);
-            (
-                StatusCode::BAD_REQUEST,
-                format!("SQL execution failed: {}", e),
-            )
-                .into_response()
-        }
+    match state.execution.execute_sql_with_opts(&sql, opts).await {
+        Ok(ExecResult::RecordBatchStream(stream)) => batch_stream_to_response(stream).await,
+        Ok(_) => (
+            StatusCode::BAD_REQUEST,
+            "Execution failed: unknown result type".to_string(),
+        )
+            .into_response(),
+
+        Err(e) => (StatusCode::BAD_REQUEST, format!("Execution failed: {}", e)).into_response(),
     }
 }
 
