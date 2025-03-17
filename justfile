@@ -8,7 +8,7 @@ install-tools:
 
 # Starts a debug HTTP server
 serve-http:
-    RUST_LOG=info cargo r --features=http -- serve-http   
+    RUST_LOG=info cargo r --features=http,flightsql -- serve-http   
 
 # Starts a debug FlightSQL server
 serve-flight-sql:

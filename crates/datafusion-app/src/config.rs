@@ -239,7 +239,7 @@ pub struct WasmUdfConfig {
 }
 
 #[cfg(feature = "flightsql")]
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct FlightSQLConfig {
     pub connection_url: String,
     pub benchmark_iterations: usize,

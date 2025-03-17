@@ -42,24 +42,25 @@ use crate::{
 
 pub type FlightSQLClient = Arc<Mutex<Option<FlightSqlServiceClient<Channel>>>>;
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct FlightSQLContext {
     config: FlightSQLConfig,
-    flightsql_client: FlightSQLClient,
+    client: FlightSQLClient,
 }
 
 impl FlightSQLContext {
     pub fn new(config: FlightSQLConfig) -> Self {
         Self {
             config,
-            flightsql_client: Arc::new(Mutex::new(None)),
+            client: Arc::new(Mutex::new(None)),
         }
     }
 
     pub fn client(&self) -> &FlightSQLClient {
-        &self.flightsql_client
+        &self.client
     }
 
+    // TODO - Make this part of `new` method
     /// Create FlightSQL client from users FlightSQL config
     pub async fn create_client(&self, cli_host: Option<String>) -> Result<()> {
         let final_url = cli_host.unwrap_or(self.config.connection_url.clone());
@@ -74,6 +75,7 @@ impl FlightSQLContext {
                 //
                 // Although that is for HTTP/1.1 and GRPC uses HTTP/2 - so maybe it has changed.
                 // To be tested later with the Tower auth layers to see what they support.
+                // TODO - Do we need this feature block?
                 #[cfg(feature = "flightsql")]
                 {
                     if let Some(token) = &self.config.auth.bearer_token {
@@ -85,7 +87,7 @@ impl FlightSQLContext {
                         client.set_header("Authorization", format!("Basic {encoded_basic}"))
                     }
                 }
-                let mut guard = self.flightsql_client.lock().await;
+                let mut guard = self.client.lock().await;
                 *guard = Some(client);
                 Ok(())
             }
@@ -111,7 +113,7 @@ impl FlightSQLContext {
         let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
         let statements = DFParser::parse_sql_with_dialect(query, &dialect)?;
         if statements.len() == 1 {
-            if let Some(ref mut client) = *self.flightsql_client.lock().await {
+            if let Some(ref mut client) = *self.client.lock().await {
                 for _ in 0..iterations {
                     let mut rows = 0;
                     let start = std::time::Instant::now();
@@ -171,7 +173,7 @@ impl FlightSQLContext {
         sql: &str,
         _opts: ExecOptions,
     ) -> DFResult<ExecResult> {
-        if let Some(ref mut client) = *self.flightsql_client.lock().await {
+        if let Some(ref mut client) = *self.client.lock().await {
             let flight_info = client.execute(sql.to_string(), None).await?;
             if flight_info.endpoint.len() != 1 {
                 return Err(DataFusionError::External("More than one endpoint".into()));

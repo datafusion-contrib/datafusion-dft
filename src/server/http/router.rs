@@ -78,6 +78,13 @@ struct PostSqlBody {
 }
 
 async fn post_sql_handler(state: State<ExecutionState>, Json(body): Json<PostSqlBody>) -> Response {
+    if body.flightsql && !cfg!(feature = "flightsql") {
+        return (
+            StatusCode::BAD_REQUEST,
+            "FlightSQL is not enabled on this server",
+        )
+            .into_response();
+    }
     let opts = ExecOptions::new(Some(state.config.result_limit), body.flightsql);
     execute_sql_with_opts(state, body.query, opts).await
 }

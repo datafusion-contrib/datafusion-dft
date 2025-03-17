@@ -25,7 +25,7 @@ use datafusion_app::{local::ExecutionContext, ExecOptions, ExecResult};
 
 /// Provides all core execution functionality for execution queries from either a local
 /// `SessionContext` or a remote `FlightSQL` service
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AppExecution {
     local: ExecutionContext,
     #[cfg(feature = "flightsql")]
@@ -65,16 +65,19 @@ impl AppExecution {
     }
 
     pub async fn execute_sql_with_opts(&self, sql: &str, opts: ExecOptions) -> Result<ExecResult> {
-        if cfg!(feature = "flightsql") & opts.flightsql {
-            self.flightsql
+        #[cfg(feature = "flightsql")]
+        if opts.flightsql {
+            return self
+                .flightsql
                 .execute_sql_with_opts(sql, opts)
                 .await
-                .map_err(|e| e.into())
-        } else {
-            self.local
-                .execute_sql_with_opts(sql, opts)
-                .await
-                .map_err(|e| e.into())
+                .map_err(|e| e.into());
         }
+
+        // If flightsql is not enabled or `opts.flightsql` is false, fall back to local:
+        self.local
+            .execute_sql_with_opts(sql, opts)
+            .await
+            .map_err(|e| e.into())
     }
 }
