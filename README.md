@@ -19,9 +19,9 @@ It provides two client interfaces to the query execution engine:
 And two server implementation, FlightSQL & HTTP, leveraging the same execution engine behind the TUI and CLI.  This allows users to iterate and quickly develop a database then seamlessly deploy applications built on it.
 
 `dft` is inspired by  [`datafusion-cli`], but has some differences:
-1. `dft` TUI focuses on more complete and interactive experience for users.
-2. `dft` contains many built in integrations such as Delta Lake and Iceberg that are not available in `datafusion-cli`.
-3. `dft` provides server implementations to make it easy to deploy DataFusion based applications / backends.
+1. The TUI focuses on more complete and interactive experience for users.
+2. It contains many built in integrations such as Delta Lake and Iceberg that are not available in `datafusion-cli`.
+3. It provides FlightSQL and HTTP server implementations to make it easy to deploy DataFusion based applications / backends.
 
 [`datafusion-cli`]: https://datafusion.apache.org/user-guide/cli/overview.html
 
