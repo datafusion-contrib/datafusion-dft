@@ -19,7 +19,7 @@ use std::{io::Cursor, time::Duration};
 
 use axum::{
     body::Body,
-    extract::{Json, Path, State},
+    extract::{Json, Path, Query, State},
     response::{IntoResponse, Response},
     routing::{get, post},
     Router,
@@ -72,7 +72,7 @@ pub fn create_router(execution: AppExecution, config: HttpServerConfig) -> Route
 
 #[derive(Deserialize)]
 struct PostSqlBody {
-    query: String,
+    sql: String,
     #[serde(default)]
     flightsql: bool,
 }
@@ -86,33 +86,49 @@ async fn post_sql_handler(state: State<ExecutionState>, Json(body): Json<PostSql
             .into_response();
     }
     let opts = ExecOptions::new(Some(state.config.result_limit), body.flightsql);
-    execute_sql_with_opts(state, body.query, opts).await
+    execute_sql_with_opts(state, body.sql, opts).await
 }
 
-async fn get_catalog_handler(state: State<ExecutionState>) -> Response {
-    let opts = ExecOptions::new(None, false);
+#[derive(Deserialize)]
+struct GetCatalogQueryParams {
+    #[serde(default)]
+    flightsql: bool,
+}
+
+async fn get_catalog_handler(
+    state: State<ExecutionState>,
+    Query(query): Query<GetCatalogQueryParams>,
+) -> Response {
+    let opts = ExecOptions::new(None, query.flightsql);
     let sql = "SHOW TABLES".to_string();
     execute_sql_with_opts(state, sql, opts).await
 }
 
 #[derive(Deserialize)]
-struct GetTableParams {
+struct GetTablePathParams {
     catalog: String,
     schema: String,
     table: String,
 }
 
+#[derive(Deserialize)]
+struct GetTableQueryParams {
+    #[serde(default)]
+    flightsql: bool,
+}
+
 async fn get_table_handler(
     state: State<ExecutionState>,
-    Path(params): Path<GetTableParams>,
+    Path(params): Path<GetTablePathParams>,
+    Query(query): Query<GetTableQueryParams>,
 ) -> Response {
-    let GetTableParams {
+    let GetTablePathParams {
         catalog,
         schema,
         table,
     } = params;
     let sql = format!("SELECT * FROM \"{catalog}\".\"{schema}\".\"{table}\"");
-    let opts = ExecOptions::new(Some(state.config.result_limit), false);
+    let opts = ExecOptions::new(Some(state.config.result_limit), query.flightsql);
     execute_sql_with_opts(state, sql, opts).await
 }
 

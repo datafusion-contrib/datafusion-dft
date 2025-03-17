@@ -14,9 +14,9 @@ dft serve-http
 
 The current endpoints provided are:
 
-`/sql` => Make POST requests with a SQL in the body
-`/catalog` => View the catalog for the database
-`/table/{CATALOG}/{SCHEMA}/{TABLE}` => Fetch records from the provided table.
+`/sql` => Make POST requests with body `{ sql: string, flightsql?: bool }`
+`/catalog` => View the catalog for the database, optionally accepts a `flightsql` query param
+`/table/{CATALOG}/{SCHEMA}/{TABLE}` => Fetch records from the provided table, Optionally accepts a `flightsql` query param
 
 ## Auth
 

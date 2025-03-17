@@ -22,11 +22,13 @@ use std::net::SocketAddr;
 use crate::{args::DftArgs, config::AppConfig, execution::AppExecution};
 use axum::Router;
 use color_eyre::Result;
-#[cfg(feature = "flightsql")]
-use datafusion_app::config::{AuthConfig, FlightSQLConfig};
 use datafusion_app::{
-    config::merge_configs, extensions::DftSessionStateBuilder, flightsql::FlightSQLContext,
-    local::ExecutionContext,
+    config::merge_configs, extensions::DftSessionStateBuilder, local::ExecutionContext,
+};
+#[cfg(feature = "flightsql")]
+use datafusion_app::{
+    config::{AuthConfig, FlightSQLConfig},
+    flightsql::FlightSQLContext,
 };
 use router::create_router;
 use tokio::{net::TcpListener, signal};
@@ -71,7 +73,7 @@ pub struct HttpApp {
 }
 
 impl HttpApp {
-    /// create a new app for the flightsql server
+    /// Create a new HTTP server app
     pub async fn try_new(
         execution: AppExecution,
         config: AppConfig,
