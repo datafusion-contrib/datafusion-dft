@@ -22,7 +22,6 @@ use arrow_flight::sql::client::FlightSqlServiceClient;
 use base64::engine::{general_purpose::STANDARD, Engine as _};
 use datafusion::{
     error::{DataFusionError, Result as DFResult},
-    execution::SendableRecordBatchStream,
     physical_plan::stream::RecordBatchStreamAdapter,
     sql::parser::DFParser,
 };
@@ -180,24 +179,23 @@ impl FlightSQLContext {
             }
             let endpoint = &flight_info.endpoint[0];
             if let Some(ticket) = &endpoint.ticket {
-                client
-                    .do_get(ticket.clone().into_request())
-                    .await
-                    .map(|stream| {
-                        if let Some(schema) = stream.schema().cloned() {
-                            let mapped_stream = stream
-                                .map(|res| res.map_err(|e| DataFusionError::External(e.into())));
-                            let batch_stream =
-                                Box::pin(RecordBatchStreamAdapter::new(schema, mapped_stream))
-                                    as SendableRecordBatchStream;
-                            Ok(ExecResult::RecordBatchStream(batch_stream))
+                match client.do_get(ticket.clone().into_request()).await {
+                    Ok(stream) => {
+                        let mut peekable = stream.peekable();
+                        if let Some(Ok(first)) = peekable.peek().await {
+                            let schema = first.schema();
+                            let mapped = peekable
+                                .map(|r| r.map_err(|e| DataFusionError::External(e.into())));
+                            let adapter = RecordBatchStreamAdapter::new(schema, mapped);
+                            Ok(ExecResult::RecordBatchStream(Box::pin(adapter)))
                         } else {
-                            Err(DataFusionError::External(
-                                "Missing schema from stream".into(),
-                            ))
+                            Err(DataFusionError::External("No first result".into()))
                         }
-                    })
-                    .map_err(|e| DataFusionError::ArrowError(e, None))?
+                    }
+                    Err(e) => Err(DataFusionError::External(
+                        format!("Call to do_get failed: {}", e.to_string()).into(),
+                    )),
+                }
             } else {
                 return Err(DataFusionError::External("Missing ticket".into()));
             }

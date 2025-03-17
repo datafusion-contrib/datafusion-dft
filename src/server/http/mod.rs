@@ -22,10 +22,10 @@ use std::net::SocketAddr;
 use crate::{args::DftArgs, config::AppConfig, execution::AppExecution};
 use axum::Router;
 use color_eyre::Result;
+#[cfg(feature = "flightsql")]
+use datafusion_app::config::{AuthConfig, FlightSQLConfig};
 use datafusion_app::{
-    config::{merge_configs, AuthConfig, FlightSQLConfig},
-    extensions::DftSessionStateBuilder,
-    flightsql::FlightSQLContext,
+    config::merge_configs, extensions::DftSessionStateBuilder, flightsql::FlightSQLContext,
     local::ExecutionContext,
 };
 use router::create_router;
@@ -115,6 +115,10 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
     if cli.run_ddl {
         execution_ctx.execute_ddl().await;
     }
+
+    #[cfg(not(feature = "flightsql"))]
+    let app_execution = AppExecution::new(execution_ctx);
+    #[cfg(feature = "flightsql")]
     let mut app_execution = AppExecution::new(execution_ctx);
     #[cfg(feature = "flightsql")]
     {
