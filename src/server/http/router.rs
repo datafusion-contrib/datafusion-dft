@@ -127,7 +127,10 @@ async fn get_table_handler(
         schema,
         table,
     } = params;
-    let sql = format!("SELECT * FROM \"{catalog}\".\"{schema}\".\"{table}\"");
+    let sql = format!(
+        "SELECT * FROM \"{catalog}\".\"{schema}\".\"{table}\" LIMIT {}",
+        state.config.result_limit
+    );
     let opts = ExecOptions::new(Some(state.config.result_limit), query.flightsql);
     execute_sql_with_opts(state, sql, opts).await
 }
