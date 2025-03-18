@@ -25,6 +25,11 @@ use color_eyre::Result;
 use datafusion_app::{
     config::merge_configs, extensions::DftSessionStateBuilder, local::ExecutionContext,
 };
+#[cfg(feature = "flightsql")]
+use datafusion_app::{
+    config::{AuthConfig, FlightSQLConfig},
+    flightsql::FlightSQLContext,
+};
 use router::create_router;
 use tokio::{net::TcpListener, signal};
 use tracing::info;
@@ -68,7 +73,7 @@ pub struct HttpApp {
 }
 
 impl HttpApp {
-    /// create a new app for the flightsql server
+    /// Create a new HTTP server app
     pub async fn try_new(
         execution: AppExecution,
         config: AppConfig,
@@ -77,8 +82,7 @@ impl HttpApp {
     ) -> Result<Self> {
         info!("Listening to HTTP on {addr}");
         let listener = TcpListener::bind(addr).await.unwrap();
-        let state = execution.execution_ctx().clone();
-        let router = create_router(state, config.http_server);
+        let router = create_router(execution, config.http_server);
 
         let metrics_addr: SocketAddr = metrics_addr.parse()?;
         try_start_metrics_server(metrics_addr)?;
@@ -113,7 +117,32 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
     if cli.run_ddl {
         execution_ctx.execute_ddl().await;
     }
+
+    #[cfg(not(feature = "flightsql"))]
     let app_execution = AppExecution::new(execution_ctx);
+    #[cfg(feature = "flightsql")]
+    let mut app_execution = AppExecution::new(execution_ctx);
+    #[cfg(feature = "flightsql")]
+    {
+        info!("Setting up FlightSQLContext");
+        let auth = AuthConfig {
+            basic_auth: config.flightsql_client.auth.basic_auth.clone(),
+            bearer_token: config.flightsql_client.auth.bearer_token.clone(),
+        };
+        let flightsql_cfg = FlightSQLConfig::new(
+            config.flightsql_client.connection_url.clone(),
+            config.flightsql_client.benchmark_iterations,
+            auth,
+        );
+
+        let flightsql_context = FlightSQLContext::new(flightsql_cfg.clone());
+        // TODO - Consider adding flag to allow startup even if FlightSQL initiation fails
+        flightsql_context
+            .create_client(Some(flightsql_cfg.connection_url))
+            .await?;
+        app_execution.with_flightsql_ctx(flightsql_context);
+    }
+    info!("Created AppExecution: {app_execution:?}");
     let app = HttpApp::try_new(
         app_execution,
         config.clone(),

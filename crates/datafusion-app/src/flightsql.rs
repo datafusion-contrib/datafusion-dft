@@ -15,10 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use std::sync::Arc;
+
 use arrow_flight::sql::client::FlightSqlServiceClient;
 #[cfg(feature = "flightsql")]
 use base64::engine::{general_purpose::STANDARD, Engine as _};
-use datafusion::sql::parser::DFParser;
+use datafusion::{
+    error::{DataFusionError, Result as DFResult},
+    physical_plan::stream::RecordBatchStreamAdapter,
+    sql::parser::DFParser,
+};
 use log::{error, info, warn};
 
 use color_eyre::eyre::{self, Result};
@@ -26,32 +32,34 @@ use tokio::sync::Mutex;
 use tokio_stream::StreamExt;
 use tonic::{transport::Channel, IntoRequest};
 
-// use crate::config::AppConfig;
 #[cfg(feature = "flightsql")]
 use crate::config::BasicAuth;
 
-use crate::{config::FlightSQLConfig, flightsql_benchmarks::FlightSQLBenchmarkStats};
+use crate::{
+    config::FlightSQLConfig, flightsql_benchmarks::FlightSQLBenchmarkStats, ExecOptions, ExecResult,
+};
 
-pub type FlightSQLClient = Mutex<Option<FlightSqlServiceClient<Channel>>>;
+pub type FlightSQLClient = Arc<Mutex<Option<FlightSqlServiceClient<Channel>>>>;
 
-#[derive(Default)]
+#[derive(Clone, Debug, Default)]
 pub struct FlightSQLContext {
     config: FlightSQLConfig,
-    flightsql_client: FlightSQLClient,
+    client: FlightSQLClient,
 }
 
 impl FlightSQLContext {
     pub fn new(config: FlightSQLConfig) -> Self {
         Self {
             config,
-            flightsql_client: Mutex::new(None),
+            client: Arc::new(Mutex::new(None)),
         }
     }
 
     pub fn client(&self) -> &FlightSQLClient {
-        &self.flightsql_client
+        &self.client
     }
 
+    // TODO - Make this part of `new` method
     /// Create FlightSQL client from users FlightSQL config
     pub async fn create_client(&self, cli_host: Option<String>) -> Result<()> {
         let final_url = cli_host.unwrap_or(self.config.connection_url.clone());
@@ -66,6 +74,7 @@ impl FlightSQLContext {
                 //
                 // Although that is for HTTP/1.1 and GRPC uses HTTP/2 - so maybe it has changed.
                 // To be tested later with the Tower auth layers to see what they support.
+                // TODO - Do we need this feature block?
                 #[cfg(feature = "flightsql")]
                 {
                     if let Some(token) = &self.config.auth.bearer_token {
@@ -77,7 +86,7 @@ impl FlightSQLContext {
                         client.set_header("Authorization", format!("Basic {encoded_basic}"))
                     }
                 }
-                let mut guard = self.flightsql_client.lock().await;
+                let mut guard = self.client.lock().await;
                 *guard = Some(client);
                 Ok(())
             }
@@ -103,7 +112,7 @@ impl FlightSQLContext {
         let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
         let statements = DFParser::parse_sql_with_dialect(query, &dialect)?;
         if statements.len() == 1 {
-            if let Some(ref mut client) = *self.flightsql_client.lock().await {
+            if let Some(ref mut client) = *self.client.lock().await {
                 for _ in 0..iterations {
                     let mut rows = 0;
                     let start = std::time::Instant::now();
@@ -155,6 +164,43 @@ impl FlightSQLContext {
             ))
         } else {
             Err(eyre::eyre!("Only a single statement can be benchmarked"))
+        }
+    }
+
+    pub async fn execute_sql_with_opts(
+        &self,
+        sql: &str,
+        _opts: ExecOptions,
+    ) -> DFResult<ExecResult> {
+        if let Some(ref mut client) = *self.client.lock().await {
+            let flight_info = client.execute(sql.to_string(), None).await?;
+            if flight_info.endpoint.len() != 1 {
+                return Err(DataFusionError::External("More than one endpoint".into()));
+            }
+            let endpoint = &flight_info.endpoint[0];
+            if let Some(ticket) = &endpoint.ticket {
+                match client.do_get(ticket.clone().into_request()).await {
+                    Ok(stream) => {
+                        let mut peekable = stream.peekable();
+                        if let Some(Ok(first)) = peekable.peek().await {
+                            let schema = first.schema();
+                            let mapped = peekable
+                                .map(|r| r.map_err(|e| DataFusionError::External(e.into())));
+                            let adapter = RecordBatchStreamAdapter::new(schema, mapped);
+                            Ok(ExecResult::RecordBatchStream(Box::pin(adapter)))
+                        } else {
+                            Err(DataFusionError::External("No first result".into()))
+                        }
+                    }
+                    Err(e) => Err(DataFusionError::External(
+                        format!("Call to do_get failed: {}", e.to_string()).into(),
+                    )),
+                }
+            } else {
+                return Err(DataFusionError::External("Missing ticket".into()));
+            }
+        } else {
+            return Err(DataFusionError::External("Missing client".into()));
         }
     }
 }

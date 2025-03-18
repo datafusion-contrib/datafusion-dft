@@ -17,48 +17,67 @@
 
 pub use datafusion_app::{collect_plan_io_stats, ExecutionStats};
 
+use color_eyre::Result;
 use datafusion::prelude::*;
 #[cfg(feature = "flightsql")]
 use datafusion_app::flightsql::{FlightSQLClient, FlightSQLContext};
-use datafusion_app::local::ExecutionContext;
+use datafusion_app::{local::ExecutionContext, ExecOptions, ExecResult};
 
 /// Provides all core execution functionality for execution queries from either a local
 /// `SessionContext` or a remote `FlightSQL` service
+#[derive(Clone, Debug)]
 pub struct AppExecution {
-    context: ExecutionContext,
+    local: ExecutionContext,
     #[cfg(feature = "flightsql")]
-    flightsql_context: FlightSQLContext,
+    flightsql: FlightSQLContext,
 }
 
 impl AppExecution {
-    pub fn new(context: ExecutionContext) -> Self {
+    pub fn new(local: ExecutionContext) -> Self {
         Self {
-            context,
+            local,
             #[cfg(feature = "flightsql")]
-            flightsql_context: FlightSQLContext::default(),
+            flightsql: FlightSQLContext::default(),
         }
     }
 
     pub fn execution_ctx(&self) -> &ExecutionContext {
-        &self.context
+        &self.local
     }
 
     pub fn session_ctx(&self) -> &SessionContext {
-        self.context.session_ctx()
+        self.local.session_ctx()
     }
 
     #[cfg(feature = "flightsql")]
     pub fn flightsql_client(&self) -> &FlightSQLClient {
-        self.flightsql_context.client()
+        self.flightsql.client()
     }
 
     #[cfg(feature = "flightsql")]
     pub fn flightsql_ctx(&self) -> &FlightSQLContext {
-        &self.flightsql_context
+        &self.flightsql
     }
 
     #[cfg(feature = "flightsql")]
     pub fn with_flightsql_ctx(&mut self, flightsql_ctx: FlightSQLContext) {
-        self.flightsql_context = flightsql_ctx;
+        self.flightsql = flightsql_ctx;
+    }
+
+    pub async fn execute_sql_with_opts(&self, sql: &str, opts: ExecOptions) -> Result<ExecResult> {
+        #[cfg(feature = "flightsql")]
+        if opts.flightsql {
+            return self
+                .flightsql
+                .execute_sql_with_opts(sql, opts)
+                .await
+                .map_err(|e| e.into());
+        }
+
+        // If flightsql is not enabled or `opts.flightsql` is false, fall back to local:
+        self.local
+            .execute_sql_with_opts(sql, opts)
+            .await
+            .map_err(|e| e.into())
     }
 }

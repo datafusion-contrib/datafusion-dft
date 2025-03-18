@@ -30,3 +30,21 @@ pub mod stats;
 pub mod wasm;
 
 pub use stats::{collect_plan_io_stats, ExecutionStats};
+
+use datafusion::execution::SendableRecordBatchStream;
+
+pub struct ExecOptions {
+    pub limit: Option<usize>,
+    pub flightsql: bool,
+}
+
+impl ExecOptions {
+    pub fn new(limit: Option<usize>, flightsql: bool) -> Self {
+        Self { limit, flightsql }
+    }
+}
+
+pub enum ExecResult {
+    RecordBatchStream(SendableRecordBatchStream),
+    RecordBatchStreamWithMetrics(()),
+}
