@@ -37,8 +37,8 @@ jobs:
       - name: Cache Rust dependencies
         uses: actions/cache@v4
         with:
-          path: /home/runner/target
-          key: target-dft-cache-
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.lock') }}
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
       - name: Run tests (ex-FlightSQL)
@@ -62,8 +62,8 @@ jobs:
       - name: Cache Rust dependencies
         uses: actions/cache@v4
         with:
-          path: /home/runner/target
-          key: target-dft-cache-
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.lock') }}
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
       - name: Run FlightSQL tests
@@ -114,8 +114,8 @@ jobs:
       - name: Cache Rust dependencies
         uses: actions/cache@v4
         with:
-          path: /home/runner/target
-          key: target-dft-cache-
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.lock') }}
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
       - name: Run Functions-JSON tests
@@ -139,8 +139,8 @@ jobs:
       - name: Cache Rust dependencies
         uses: actions/cache@v4
         with:
-          path: /home/runner/target
-          key: target-dft-cache-
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.lock') }}
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
       - name: Run Deltalake tests
@@ -164,8 +164,8 @@ jobs:
       - name: Cache Rust dependencies
         uses: actions/cache@v4
         with:
-          path: /home/runner/target
-          key: target-dft-cache-
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.lock') }}
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
       - name: Run Hudi tests
@@ -189,8 +189,8 @@ jobs:
       - name: Cache Rust dependencies
         uses: actions/cache@v4
         with:
-          path: /home/runner/target
-          key: target-dft-cache-
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.lock') }}
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
       - name: Run UDFs WASM tests
@@ -214,8 +214,8 @@ jobs:
       - name: Cache Rust dependencies
         uses: actions/cache@v4
         with:
-          path: /home/runner/target
-          key: target-dft-cache-
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.lock') }}
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
       - name: Run UDFs WASM tests
@@ -239,8 +239,8 @@ jobs:
       - name: Cache Rust dependencies
         uses: actions/cache@v4
         with:
-          path: /home/runner/target
-          key: target-dft-cache-
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.lock') }}
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
       - name: Run UDFs WASM tests
@@ -264,8 +264,8 @@ jobs:
       - name: Cache Rust dependencies
         uses: actions/cache@v4
         with:
-          path: /home/runner/target
-          key: target-dft-cache-
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.lock') }}
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
       - name: Start FlightSQL Server
@@ -292,8 +292,8 @@ jobs:
       - name: Cache Rust dependencies
         uses: actions/cache@v4
         with:
-          path: /home/runner/target
-          key: target-dft-cache-
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.lock') }}
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
       - name: Start FlightSQL Server
@@ -320,8 +320,8 @@ jobs:
       - name: Cache Rust dependencies
         uses: actions/cache@v4
         with:
-          path: /home/runner/target
-          key: target-dft-cache-
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.lock') }}
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
       - name: Run auth tests
