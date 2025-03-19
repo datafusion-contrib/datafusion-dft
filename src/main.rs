@@ -20,6 +20,7 @@ use color_eyre::Result;
 #[cfg(any(feature = "flightsql", feature = "http"))]
 use datafusion_dft::{args::Command, server};
 use datafusion_dft::{args::DftArgs, cli, config::create_config, tui};
+#[cfg(feature = "http")]
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 fn main() -> Result<()> {
