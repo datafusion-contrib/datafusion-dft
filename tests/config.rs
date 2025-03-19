@@ -198,6 +198,8 @@ impl TestConfigBuilder {
         self
     }
 
+    // TODO: Update this to work with HTTP server
+    #[allow(dead_code)]
     #[cfg(feature = "flightsql")]
     pub fn with_server_auth(
         &mut self,
