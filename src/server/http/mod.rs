@@ -32,11 +32,11 @@ use datafusion_app::{
 };
 use router::create_router;
 use tokio::{net::TcpListener, signal};
-use tracing::info;
+use tracing::{debug, info};
 
 use super::try_start_metrics_server;
 
-const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1:8080";
+const DEFAULT_SERVER_ADDRESS: &str = "localhost:8080";
 
 /// From https://github.com/tokio-rs/axum/blob/main/examples/graceful-shutdown/src/main.rs
 async fn shutdown_signal() {
@@ -142,7 +142,7 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
             .await?;
         app_execution.with_flightsql_ctx(flightsql_context);
     }
-    info!("Created AppExecution: {app_execution:?}");
+    debug!("Created AppExecution: {app_execution:?}");
     let app = HttpApp::try_new(
         app_execution,
         config.clone(),

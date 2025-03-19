@@ -18,6 +18,4 @@
 mod cli_cases;
 mod config;
 mod extension_cases;
-#[cfg(feature = "http")]
-mod server;
 mod tui_cases;
