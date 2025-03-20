@@ -15,38 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-pub mod catalog;
-pub mod config;
-pub mod executor;
-pub mod extensions;
-#[cfg(feature = "flightsql")]
-pub mod flightsql;
-#[cfg(feature = "flightsql")]
-pub mod flightsql_benchmarks;
-pub mod local;
-pub mod local_benchmarks;
-pub mod observability;
-pub mod sql_utils;
-pub mod stats;
-#[cfg(feature = "udfs-wasm")]
-pub mod wasm;
+use std::sync::Arc;
 
-pub use stats::{collect_plan_io_stats, ExecutionStats};
+use datafusion::catalog::CatalogProvider;
 
-use datafusion::execution::SendableRecordBatchStream;
+use crate::config::ExecutionConfig;
 
-pub struct ExecOptions {
-    pub limit: Option<usize>,
-    pub flightsql: bool,
-}
-
-impl ExecOptions {
-    pub fn new(limit: Option<usize>, flightsql: bool) -> Self {
-        Self { limit, flightsql }
-    }
-}
-
-pub enum ExecResult {
-    RecordBatchStream(SendableRecordBatchStream),
-    RecordBatchStreamWithMetrics(()),
-}
+pub fn create_app_catalog(config: &ExecutionConfig) -> Arc<dyn CatalogProvider> {}

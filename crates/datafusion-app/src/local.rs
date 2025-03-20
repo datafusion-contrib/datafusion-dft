@@ -22,10 +22,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use color_eyre::eyre::eyre;
+use datafusion::catalog::MemoryCatalogProvider;
 use datafusion::logical_expr::LogicalPlan;
 use futures::TryFutureExt;
 use log::{debug, error, info};
 
+use crate::catalog::create_catalog;
 use crate::config::ExecutionConfig;
 use crate::{ExecOptions, ExecResult};
 use color_eyre::eyre::{self, Result};
@@ -41,6 +43,8 @@ use super::local_benchmarks::LocalBenchmarkStats;
 use super::stats::{ExecutionDurationStats, ExecutionStats};
 #[cfg(feature = "udfs-wasm")]
 use super::wasm::create_wasm_udfs;
+#[cfg(feature = "observability")]
+use crate::observability::ObservabilityContext;
 
 /// Structure for executing queries locally
 ///
@@ -64,6 +68,9 @@ pub struct ExecutionContext {
     ddl_path: Option<PathBuf>,
     /// Dedicated executor for running CPU intensive work
     executor: Option<DedicatedExecutor>,
+    /// Observability handlers
+    #[cfg(feature = "observability")]
+    observability: ObservabilityContext,
 }
 
 impl std::fmt::Debug for ExecutionContext {
@@ -87,8 +94,10 @@ impl ExecutionContext {
             executor = Some(dedicated_executor)
         }
 
-        #[allow(unused_mut)]
+        #[cfg(any(feature = "udfs-wasm", feature = "observability"))]
         let mut session_ctx = SessionContext::new_with_state(session_state);
+        #[cfg(not(feature = "udfs-wasm"))]
+        let session_ctx = SessionContext::new_with_state(session_state);
 
         #[cfg(feature = "functions-json")]
         datafusion_functions_json::register_all(&mut session_ctx)?;
@@ -109,12 +118,34 @@ impl ExecutionContext {
             Arc::new(datafusion_functions_parquet::ParquetMetadataFunc {}),
         );
 
-        Ok(Self {
+        let catalog = create_app_catalog(config);
+        session_ctx.register_catalog(&config.catalog.name, catalog);
+
+        // #[cfg(feature = "observability")]
+        // {
+        //     let obs = ObservabilityContext::new(config.observability.clone());
+        // }
+
+        session_ctx.register_catalog("dft", catalog);
+
+        #[cfg(feature = "observability")]
+        let ctx = Self {
             config: config.clone(),
             session_ctx,
             ddl_path: config.ddl_path.as_ref().map(PathBuf::from),
             executor,
-        })
+            observability: ObservabilityContext::default(),
+        };
+
+        #[cfg(not(feature = "observability"))]
+        let ctx = Self {
+            config: config.clone(),
+            session_ctx,
+            ddl_path: config.ddl_path.as_ref().map(PathBuf::from),
+            executor,
+        };
+
+        Ok(ctx)
     }
 
     pub fn config(&self) -> &ExecutionConfig {
@@ -133,6 +164,12 @@ impl ExecutionContext {
     /// Return the inner [`DedicatedExecutor`]
     pub fn executor(&self) -> &Option<DedicatedExecutor> {
         &self.executor
+    }
+
+    /// Return the `ObservabilityCtx`
+    #[cfg(feature = "observability")]
+    pub fn observability(&self) -> &ObservabilityContext {
+        &self.observability
     }
 
     /// Convert the statement to a `LogicalPlan`.  Uses the [`DedicatedExecutor`] if it is available.
