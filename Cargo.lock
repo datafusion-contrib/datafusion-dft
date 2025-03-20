@@ -1478,11 +1478,12 @@ dependencies = [
 
 [[package]]
 name = "datafusion-dft"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "arrow-flight",
  "assert_cmd",
  "async-trait",
+ "chrono",
  "clap",
  "color-eyre",
  "crossterm",

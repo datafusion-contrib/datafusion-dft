@@ -7,7 +7,7 @@ readme = "README.md"
 authors = ["Matthew Turner <matthew.m.turner@outlook.com>"]
 license = "Apache-2.0"
 keywords = ["arrow", "query", "sql", "datafusion"]
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 default-run = "dft"
 
@@ -17,6 +17,7 @@ default-run = "dft"
 arrow-flight = { version = "53.0.0", features = ["flight-sql-experimental"] , optional = true }
 async-trait = "0.1.80"
 clap = { version = "4.5.1", features = ["derive"] }
+chrono = "= 0.4.39"
 color-eyre = "0.6.3"
 crossterm = { version = "0.28.1", features = ["event-stream"] }
 datafusion = "43.0.0"
