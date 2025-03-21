@@ -62,7 +62,13 @@ impl TestExecution {
             .unwrap()
             .build()
             .unwrap();
-        let execution = ExecutionContext::try_new(&config.cli.execution, session_state).unwrap();
+        let execution = ExecutionContext::try_new(
+            &config.cli.execution,
+            session_state,
+            env!("CARGO_PKG_NAME"),
+            env!("CARGO_PKG_VERSION"),
+        )
+        .unwrap();
         Self { execution }
     }
 

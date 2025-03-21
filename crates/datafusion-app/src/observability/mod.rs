@@ -17,14 +17,14 @@
 
 use std::{sync::Arc, time::Duration};
 
-use datafusion::catalog::{CatalogProvider, MemorySchemaProvider, SchemaProvider};
+use datafusion::catalog::{MemorySchemaProvider, SchemaProvider};
 
 use crate::config::ObservabilityConfig;
 
 #[derive(Clone, Debug)]
 pub struct ObservabilityContext {
     schema: Arc<dyn SchemaProvider>,
-    config: ObservabilityConfig,
+    _config: ObservabilityConfig,
 }
 
 impl ObservabilityContext {
@@ -32,7 +32,7 @@ impl ObservabilityContext {
         let schema = MemorySchemaProvider::new();
         Self {
             schema: Arc::new(schema),
-            config,
+            _config: config,
         }
     }
 
@@ -40,14 +40,14 @@ impl ObservabilityContext {
         self.schema.clone()
     }
 
-    pub fn record_request(&self, sql: &str, duration: Duration) {}
+    pub fn record_request(&self, _sql: &str, _duration: Duration) {}
 }
 
 impl Default for ObservabilityContext {
     fn default() -> Self {
         Self {
             schema: Arc::new(MemorySchemaProvider::new()),
-            config: ObservabilityConfig::default(),
+            _config: ObservabilityConfig::default(),
         }
     }
 }

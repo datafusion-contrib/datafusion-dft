@@ -228,7 +228,13 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
-        let local = ExecutionContext::try_new(&config, state).unwrap();
+        let local = ExecutionContext::try_new(
+            &config,
+            state,
+            env!("CARGO_PKG_NAME"),
+            env!("CARGO_PKG_VERSION"),
+        )
+        .unwrap();
         let execution = AppExecution::new(local);
 
         let http_config = HttpServerConfig::default();
@@ -312,7 +318,13 @@ mod flightsql_test {
             .unwrap()
             .build()
             .unwrap();
-        let local = ExecutionContext::try_new(&config, state).unwrap();
+        let local = ExecutionContext::try_new(
+            &config,
+            state,
+            env!("CARGO_PKG_NAME"),
+            env!("CARGO_PKG_VERSION"),
+        )
+        .unwrap();
         let mut execution = AppExecution::new(local);
         let flightsql_cfg = FlightSQLConfig {
             connection_url: "localhost:50051".to_string(),

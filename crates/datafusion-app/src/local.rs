@@ -22,12 +22,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use color_eyre::eyre::eyre;
-use datafusion::catalog::MemoryCatalogProvider;
 use datafusion::logical_expr::LogicalPlan;
 use futures::TryFutureExt;
 use log::{debug, error, info};
 
-use crate::catalog::create_catalog;
+use crate::catalog::create_app_catalog;
 use crate::config::ExecutionConfig;
 use crate::{ExecOptions, ExecResult};
 use color_eyre::eyre::{self, Result};
@@ -81,7 +80,12 @@ impl std::fmt::Debug for ExecutionContext {
 
 impl ExecutionContext {
     /// Construct a new `ExecutionContext` with the specified configuration
-    pub fn try_new(config: &ExecutionConfig, session_state: SessionState) -> Result<Self> {
+    pub fn try_new(
+        config: &ExecutionConfig,
+        session_state: SessionState,
+        app_name: &str,
+        app_version: &str,
+    ) -> Result<Self> {
         let mut executor = None;
         if config.dedicated_executor_enabled {
             // Ideally we would only use `enable_time` but we are still doing
@@ -118,15 +122,13 @@ impl ExecutionContext {
             Arc::new(datafusion_functions_parquet::ParquetMetadataFunc {}),
         );
 
-        let catalog = create_app_catalog(config);
+        let catalog = create_app_catalog(config, app_name, app_version)?;
         session_ctx.register_catalog(&config.catalog.name, catalog);
 
         // #[cfg(feature = "observability")]
         // {
         //     let obs = ObservabilityContext::new(config.observability.clone());
         // }
-
-        session_ctx.register_catalog("dft", catalog);
 
         #[cfg(feature = "observability")]
         let ctx = Self {

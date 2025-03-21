@@ -17,8 +17,52 @@
 
 use std::sync::Arc;
 
-use datafusion::catalog::CatalogProvider;
+use datafusion::{
+    arrow::{
+        array::StringArray,
+        datatypes::{DataType, Field, Schema},
+        record_batch::RecordBatch,
+    },
+    catalog::{CatalogProvider, MemoryCatalogProvider, MemorySchemaProvider, SchemaProvider},
+    common::Result,
+    datasource::MemTable,
+    DATAFUSION_VERSION,
+};
 
 use crate::config::ExecutionConfig;
 
-pub fn create_app_catalog(config: &ExecutionConfig) -> Arc<dyn CatalogProvider> {}
+pub fn create_app_catalog(
+    _config: &ExecutionConfig,
+    app_name: &str,
+    app_version: &str,
+) -> Result<Arc<dyn CatalogProvider>> {
+    let catalog = MemoryCatalogProvider::new();
+    let meta_schema = Arc::new(MemorySchemaProvider::new());
+    catalog.register_schema("meta", meta_schema.clone())?;
+    let versions_table = try_create_meta_versions_table(app_name, app_version)?;
+    meta_schema.register_table("versions".to_string(), versions_table)?;
+    Ok(Arc::new(catalog))
+}
+
+fn try_create_meta_versions_table(app_name: &str, app_version: &str) -> Result<Arc<MemTable>> {
+    let fields = vec![
+        Field::new(app_name, DataType::Utf8, false),
+        Field::new("datafusion", DataType::Utf8, false),
+        Field::new("datafusion-app", DataType::Utf8, false),
+    ];
+    let schema = Arc::new(Schema::new(fields));
+
+    let app_version_arr = StringArray::from(vec![app_version]);
+    let datafusion_version_arr = StringArray::from(vec![DATAFUSION_VERSION]);
+    let datafusion_app_version_arr = StringArray::from(vec![env!("CARGO_PKG_VERSION")]);
+    let batches = RecordBatch::try_new(
+        schema.clone(),
+        vec![
+            Arc::new(app_version_arr),
+            Arc::new(datafusion_version_arr),
+            Arc::new(datafusion_app_version_arr),
+        ],
+    )?;
+
+    Ok(Arc::new(MemTable::try_new(schema, vec![vec![batches]])?))
+}

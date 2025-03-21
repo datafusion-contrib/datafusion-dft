@@ -25,6 +25,7 @@ pub mod flightsql;
 pub mod flightsql_benchmarks;
 pub mod local;
 pub mod local_benchmarks;
+#[cfg(feature = "observability")]
 pub mod observability;
 pub mod sql_utils;
 pub mod stats;

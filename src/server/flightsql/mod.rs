@@ -178,7 +178,12 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
         .await?;
     let session_state = session_state_builder.build()?;
     // FlightSQL Server mode: start a FlightSQL server
-    let execution_ctx = ExecutionContext::try_new(&merged_exec_config, session_state)?;
+    let execution_ctx = ExecutionContext::try_new(
+        &merged_exec_config,
+        session_state,
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION"),
+    )?;
     if cli.run_ddl {
         execution_ctx.execute_ddl().await;
     }

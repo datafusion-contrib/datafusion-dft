@@ -374,7 +374,12 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
     // TUI mode: running the TUI
     telemetry::initialize_logs()?; // use alternate logging for TUI
     let state = AppState::new(config);
-    let execution_ctx = ExecutionContext::try_new(&merged_exec_config, session_state)?;
+    let execution_ctx = ExecutionContext::try_new(
+        &merged_exec_config,
+        session_state,
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION"),
+    )?;
     let app_execution = AppExecution::new(execution_ctx);
     let app = App::new(state, cli, app_execution);
     app.run_app().await?;

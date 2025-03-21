@@ -89,7 +89,7 @@ pub struct ExecutionConfig {
     #[cfg(feature = "udfs-wasm")]
     #[serde(default = "default_wasm_udf")]
     pub wasm_udf: WasmUdfConfig,
-    #[serde(default = "default_catalog_name")]
+    #[serde(default = "default_catalog")]
     pub catalog: CatalogConfig,
     // #[cfg(feature = "observability")]
     // #[serde(default)]
