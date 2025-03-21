@@ -91,16 +91,23 @@ impl ExecutionContext {
             // Ideally we would only use `enable_time` but we are still doing
             // some network requests as part of planning / execution which require network
             // functionality.
-
             let runtime_builder = tokio::runtime::Builder::new_multi_thread();
             let dedicated_executor =
                 DedicatedExecutor::new("cpu_runtime", config.clone(), runtime_builder);
             executor = Some(dedicated_executor)
         }
 
-        #[cfg(any(feature = "udfs-wasm", feature = "observability"))]
+        #[cfg(any(
+            feature = "udfs-wasm",
+            feature = "observability",
+            feature = "functions-json"
+        ))]
         let mut session_ctx = SessionContext::new_with_state(session_state);
-        #[cfg(not(feature = "udfs-wasm"))]
+        #[cfg(all(
+            not(feature = "udfs-wasm"),
+            not(feature = "observability"),
+            not(feature = "functions-json")
+        ))]
         let session_ctx = SessionContext::new_with_state(session_state);
 
         #[cfg(feature = "functions-json")]
