@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+pub mod catalog;
 pub mod config;
 pub mod executor;
 pub mod extensions;
@@ -24,6 +25,8 @@ pub mod flightsql;
 pub mod flightsql_benchmarks;
 pub mod local;
 pub mod local_benchmarks;
+#[cfg(feature = "observability")]
+pub mod observability;
 pub mod sql_utils;
 pub mod stats;
 #[cfg(feature = "udfs-wasm")]

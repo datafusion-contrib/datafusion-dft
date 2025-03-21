@@ -26,6 +26,7 @@ use datafusion::logical_expr::LogicalPlan;
 use futures::TryFutureExt;
 use log::{debug, error, info};
 
+use crate::catalog::create_app_catalog;
 use crate::config::ExecutionConfig;
 use crate::{ExecOptions, ExecResult};
 use color_eyre::eyre::{self, Result};
@@ -41,6 +42,8 @@ use super::local_benchmarks::LocalBenchmarkStats;
 use super::stats::{ExecutionDurationStats, ExecutionStats};
 #[cfg(feature = "udfs-wasm")]
 use super::wasm::create_wasm_udfs;
+#[cfg(feature = "observability")]
+use crate::observability::ObservabilityContext;
 
 /// Structure for executing queries locally
 ///
@@ -64,6 +67,9 @@ pub struct ExecutionContext {
     ddl_path: Option<PathBuf>,
     /// Dedicated executor for running CPU intensive work
     executor: Option<DedicatedExecutor>,
+    /// Observability handlers
+    #[cfg(feature = "observability")]
+    observability: ObservabilityContext,
 }
 
 impl std::fmt::Debug for ExecutionContext {
@@ -74,21 +80,35 @@ impl std::fmt::Debug for ExecutionContext {
 
 impl ExecutionContext {
     /// Construct a new `ExecutionContext` with the specified configuration
-    pub fn try_new(config: &ExecutionConfig, session_state: SessionState) -> Result<Self> {
+    pub fn try_new(
+        config: &ExecutionConfig,
+        session_state: SessionState,
+        app_name: &str,
+        app_version: &str,
+    ) -> Result<Self> {
         let mut executor = None;
         if config.dedicated_executor_enabled {
             // Ideally we would only use `enable_time` but we are still doing
             // some network requests as part of planning / execution which require network
             // functionality.
-
             let runtime_builder = tokio::runtime::Builder::new_multi_thread();
             let dedicated_executor =
                 DedicatedExecutor::new("cpu_runtime", config.clone(), runtime_builder);
             executor = Some(dedicated_executor)
         }
 
-        #[allow(unused_mut)]
+        #[cfg(any(
+            feature = "udfs-wasm",
+            feature = "observability",
+            feature = "functions-json"
+        ))]
         let mut session_ctx = SessionContext::new_with_state(session_state);
+        #[cfg(all(
+            not(feature = "udfs-wasm"),
+            not(feature = "observability"),
+            not(feature = "functions-json")
+        ))]
+        let session_ctx = SessionContext::new_with_state(session_state);
 
         #[cfg(feature = "functions-json")]
         datafusion_functions_json::register_all(&mut session_ctx)?;
@@ -109,12 +129,32 @@ impl ExecutionContext {
             Arc::new(datafusion_functions_parquet::ParquetMetadataFunc {}),
         );
 
-        Ok(Self {
+        let catalog = create_app_catalog(config, app_name, app_version)?;
+        session_ctx.register_catalog(&config.catalog.name, catalog);
+
+        // #[cfg(feature = "observability")]
+        // {
+        //     let obs = ObservabilityContext::new(config.observability.clone());
+        // }
+
+        #[cfg(feature = "observability")]
+        let ctx = Self {
             config: config.clone(),
             session_ctx,
             ddl_path: config.ddl_path.as_ref().map(PathBuf::from),
             executor,
-        })
+            observability: ObservabilityContext::default(),
+        };
+
+        #[cfg(not(feature = "observability"))]
+        let ctx = Self {
+            config: config.clone(),
+            session_ctx,
+            ddl_path: config.ddl_path.as_ref().map(PathBuf::from),
+            executor,
+        };
+
+        Ok(ctx)
     }
 
     pub fn config(&self) -> &ExecutionConfig {
@@ -133,6 +173,12 @@ impl ExecutionContext {
     /// Return the inner [`DedicatedExecutor`]
     pub fn executor(&self) -> &Option<DedicatedExecutor> {
         &self.executor
+    }
+
+    /// Return the `ObservabilityCtx`
+    #[cfg(feature = "observability")]
+    pub fn observability(&self) -> &ObservabilityContext {
+        &self.observability
     }
 
     /// Convert the statement to a `LogicalPlan`.  Uses the [`DedicatedExecutor`] if it is available.

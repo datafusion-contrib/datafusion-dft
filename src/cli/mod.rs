@@ -585,7 +585,12 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
 
     // CLI mode: executing commands from files or CLI arguments
     let session_state = session_state_builder.build()?;
-    let execution_ctx = ExecutionContext::try_new(&merged_exec_config, session_state)?;
+    let execution_ctx = ExecutionContext::try_new(
+        &merged_exec_config,
+        session_state,
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION"),
+    )?;
     #[allow(unused_mut)]
     let mut app_execution = AppExecution::new(execution_ctx);
     #[cfg(feature = "flightsql")]

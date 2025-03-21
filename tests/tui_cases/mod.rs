@@ -60,8 +60,13 @@ impl TestApp<'_> {
                 .unwrap()
                 .build()
                 .unwrap();
-        let execution_ctx =
-            ExecutionContext::try_new(&state.config.tui.execution, session_state).unwrap();
+        let execution_ctx = ExecutionContext::try_new(
+            &state.config.tui.execution,
+            session_state,
+            env!("CARGO_PKG_NAME"),
+            env!("CARGO_PKG_VERSION"),
+        )
+        .unwrap();
         let app_execution = AppExecution::new(execution_ctx);
         let args = DftArgs::default();
         let mut app = App::new(state, args, app_execution);

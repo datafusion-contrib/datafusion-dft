@@ -15,7 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::{io::Cursor, time::Duration};
+use std::{
+    io::Cursor,
+    time::{Duration, Instant},
+};
 
 use axum::{
     body::Body,
@@ -86,7 +89,13 @@ async fn post_sql_handler(state: State<ExecutionState>, Json(body): Json<PostSql
             .into_response();
     }
     let opts = ExecOptions::new(Some(state.config.result_limit), body.flightsql);
-    execute_sql_with_opts(state, body.sql, opts).await
+
+    let start = Instant::now();
+    let res = execute_sql_with_opts(&state, body.sql.clone(), opts).await;
+    let elapsed = start.elapsed();
+    let obs = state.execution.execution_ctx().observability();
+    obs.record_request(&body.sql, elapsed);
+    res
 }
 
 #[derive(Deserialize)]
@@ -108,7 +117,7 @@ async fn get_catalog_handler(
             .into_response();
     }
     let sql = "SHOW TABLES".to_string();
-    execute_sql_with_opts(state, sql, opts).await
+    execute_sql_with_opts(&state, sql, opts).await
 }
 
 #[derive(Deserialize)]
@@ -139,12 +148,12 @@ async fn get_table_handler(
         state.config.result_limit
     );
     let opts = ExecOptions::new(Some(state.config.result_limit), query.flightsql);
-    execute_sql_with_opts(state, sql, opts).await
+    execute_sql_with_opts(&state, sql, opts).await
 }
 
 // TODO: Maybe rename to something like `response_for_sql`
 async fn execute_sql_with_opts(
-    State(state): State<ExecutionState>,
+    State(state): &State<ExecutionState>,
     sql: String,
     opts: ExecOptions,
 ) -> Response {
@@ -219,7 +228,13 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
-        let local = ExecutionContext::try_new(&config, state).unwrap();
+        let local = ExecutionContext::try_new(
+            &config,
+            state,
+            env!("CARGO_PKG_NAME"),
+            env!("CARGO_PKG_VERSION"),
+        )
+        .unwrap();
         let execution = AppExecution::new(local);
 
         let http_config = HttpServerConfig::default();
@@ -303,7 +318,13 @@ mod flightsql_test {
             .unwrap()
             .build()
             .unwrap();
-        let local = ExecutionContext::try_new(&config, state).unwrap();
+        let local = ExecutionContext::try_new(
+            &config,
+            state,
+            env!("CARGO_PKG_NAME"),
+            env!("CARGO_PKG_VERSION"),
+        )
+        .unwrap();
         let mut execution = AppExecution::new(local);
         let flightsql_cfg = FlightSQLConfig {
             connection_url: "localhost:50051".to_string(),

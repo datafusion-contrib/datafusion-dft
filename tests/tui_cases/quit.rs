@@ -118,8 +118,13 @@ impl TestApp<'_> {
                 .unwrap()
                 .build()
                 .unwrap();
-        let execution =
-            ExecutionContext::try_new(&state.config.tui.execution, session_state).unwrap();
+        let execution = ExecutionContext::try_new(
+            &state.config.tui.execution,
+            session_state,
+            env!("CARGO_PKG_NAME"),
+            env!("CARGO_PKG_VERSION"),
+        )
+        .unwrap();
         let args = DftArgs::default();
         let app_execution = AppExecution::new(execution);
         let app = App::new(state, args, app_execution);

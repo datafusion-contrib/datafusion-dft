@@ -89,6 +89,11 @@ pub struct ExecutionConfig {
     #[cfg(feature = "udfs-wasm")]
     #[serde(default = "default_wasm_udf")]
     pub wasm_udf: WasmUdfConfig,
+    #[serde(default = "default_catalog")]
+    pub catalog: CatalogConfig,
+    // #[cfg(feature = "observability")]
+    // #[serde(default)]
+    // pub observability: ObservabilityConfig,
 }
 
 impl Default for ExecutionConfig {
@@ -103,6 +108,9 @@ impl Default for ExecutionConfig {
             iceberg: default_iceberg_config(),
             #[cfg(feature = "udfs-wasm")]
             wasm_udf: default_wasm_udf(),
+            catalog: default_catalog(),
+            // #[cfg(feature = "observability")]
+            // observability: default_observability(),
         }
     }
 }
@@ -267,4 +275,47 @@ pub struct AuthConfig {
 pub struct BasicAuth {
     pub username: String,
     pub password: String,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+pub struct CatalogConfig {
+    #[serde(default = "default_catalog_name")]
+    pub name: String,
+}
+
+impl Default for CatalogConfig {
+    fn default() -> Self {
+        Self {
+            name: default_catalog_name(),
+        }
+    }
+}
+
+fn default_catalog() -> CatalogConfig {
+    CatalogConfig::default()
+}
+
+fn default_catalog_name() -> String {
+    "dft".to_string()
+}
+
+#[cfg(feature = "observability")]
+#[derive(Clone, Debug, Deserialize)]
+pub struct ObservabilityConfig {
+    #[serde(default = "default_observability_catalog_name")]
+    pub catalog_name: String,
+}
+
+#[cfg(feature = "observability")]
+impl Default for ObservabilityConfig {
+    fn default() -> Self {
+        Self {
+            catalog_name: default_observability_catalog_name(),
+        }
+    }
+}
+
+#[cfg(feature = "observability")]
+fn default_observability_catalog_name() -> String {
+    "observability".to_string()
 }
