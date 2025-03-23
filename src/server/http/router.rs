@@ -15,10 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::{
-    io::Cursor,
-    time::{Duration, Instant},
-};
+use std::{io::Cursor, time::Duration};
 
 use axum::{
     body::Body,
@@ -30,6 +27,7 @@ use axum::{
 use datafusion::{arrow::json::ArrayWriter, execution::SendableRecordBatchStream};
 use datafusion_app::{ExecOptions, ExecResult};
 use http::{HeaderValue, StatusCode};
+use jiff::Timestamp;
 use log::error;
 use serde::Deserialize;
 use tokio_stream::StreamExt;
@@ -90,11 +88,21 @@ async fn post_sql_handler(state: State<ExecutionState>, Json(body): Json<PostSql
     }
     let opts = ExecOptions::new(Some(state.config.result_limit), body.flightsql);
 
-    let start = Instant::now();
+    let start = Timestamp::now();
     let res = execute_sql_with_opts(&state, body.sql.clone(), opts).await;
-    let elapsed = start.elapsed();
+    let elapsed = Timestamp::now() - start;
     let obs = state.execution.execution_ctx().observability();
-    obs.record_request(&body.sql, elapsed);
+    if let Err(e) = obs
+        .try_record_request(
+            state.execution.session_ctx(),
+            &body.sql,
+            start.as_millisecond(),
+            elapsed.get_milliseconds(),
+        )
+        .await
+    {
+        error!("Error recording request: {}", e.to_string())
+    }
     res
 }
 
@@ -228,13 +236,9 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
-        let local = ExecutionContext::try_new(
-            &config,
-            state,
-            env!("CARGO_PKG_NAME"),
-            env!("CARGO_PKG_VERSION"),
-        )
-        .unwrap();
+        let local =
+            ExecutionContext::try_new(&config, state, crate::APP_NAME, env!("CARGO_PKG_VERSION"))
+                .unwrap();
         let execution = AppExecution::new(local);
 
         let http_config = HttpServerConfig::default();
@@ -318,13 +322,9 @@ mod flightsql_test {
             .unwrap()
             .build()
             .unwrap();
-        let local = ExecutionContext::try_new(
-            &config,
-            state,
-            env!("CARGO_PKG_NAME"),
-            env!("CARGO_PKG_VERSION"),
-        )
-        .unwrap();
+        let local =
+            ExecutionContext::try_new(&config, state, crate::APP_NAME, env!("CARGO_PKG_VERSION"))
+                .unwrap();
         let mut execution = AppExecution::new(local);
         let flightsql_cfg = FlightSQLConfig {
             connection_url: "localhost:50051".to_string(),

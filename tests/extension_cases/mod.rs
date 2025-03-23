@@ -65,7 +65,7 @@ impl TestExecution {
         let execution = ExecutionContext::try_new(
             &config.cli.execution,
             session_state,
-            env!("CARGO_PKG_NAME"),
+            "dft",
             env!("CARGO_PKG_VERSION"),
         )
         .unwrap();

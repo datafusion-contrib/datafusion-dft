@@ -29,6 +29,7 @@ futures = "0.3.30"
 http = "1"
 http-body = "1"
 itertools = "0.13.0"
+jiff = { version = "0.2.5", optional = true }
 lazy_static = "1.4.0"
 log = "0.4.22"
 metrics = { version = "0.24.0", optional = true }
@@ -94,6 +95,7 @@ http = [
   "dep:metrics",
   "dep:metrics-exporter-prometheus",
   "dep:tower-http",
+  "jiff",
 ]
 hudi = ["datafusion-app/hudi"]
 huggingface = ["datafusion-app/huggingface"]

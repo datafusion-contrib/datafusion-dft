@@ -121,7 +121,7 @@ impl TestApp<'_> {
         let execution = ExecutionContext::try_new(
             &state.config.tui.execution,
             session_state,
-            env!("CARGO_PKG_NAME"),
+            "dft",
             env!("CARGO_PKG_VERSION"),
         )
         .unwrap();
