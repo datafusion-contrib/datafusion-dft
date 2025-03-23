@@ -66,9 +66,7 @@ impl ObservabilityContext {
     pub async fn try_record_request(
         &self,
         ctx: &SessionContext,
-        sql: &str,
-        start_ms: i64,
-        duration_ms: i64,
+        req: ObservabilityRequestDetails,
     ) -> Result<()> {
         let table_ref = TableReference::full(
             self.catalog.clone(),
@@ -87,12 +85,14 @@ impl ObservabilityContext {
             let values = Values {
                 schema,
                 values: vec![vec![
-                    lit(sql),
+                    lit(req.sql),
                     cast(
-                        lit(start_ms),
+                        lit(req.start_ms),
                         DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into())),
                     ),
-                    lit(duration_ms),
+                    lit(req.duration_ms),
+                    lit(req.rows),
+                    lit(req.status),
                 ]],
             };
             let logical_plan = LogicalPlan::Values(values);
@@ -118,6 +118,14 @@ impl ObservabilityContext {
     }
 }
 
+pub struct ObservabilityRequestDetails {
+    pub sql: String,
+    pub start_ms: i64,
+    pub duration_ms: i64,
+    pub rows: u64,
+    pub status: u16,
+}
+
 fn req_fields() -> Vec<Field> {
     vec![
         Field::new("sql", DataType::Utf8, false),
@@ -127,6 +135,8 @@ fn req_fields() -> Vec<Field> {
             false,
         ),
         Field::new("duration_ms", DataType::Int64, false),
+        Field::new("rows", DataType::UInt64, false),
+        Field::new("status", DataType::UInt16, false),
     ]
 }
 
