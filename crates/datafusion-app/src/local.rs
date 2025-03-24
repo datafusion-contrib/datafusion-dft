@@ -97,18 +97,8 @@ impl ExecutionContext {
             executor = Some(dedicated_executor)
         }
 
-        #[cfg(any(
-            feature = "udfs-wasm",
-            feature = "observability",
-            feature = "functions-json"
-        ))]
+        #[allow(unused_mut)]
         let mut session_ctx = SessionContext::new_with_state(session_state);
-        #[cfg(all(
-            not(feature = "udfs-wasm"),
-            not(feature = "observability"),
-            not(feature = "functions-json")
-        ))]
-        let session_ctx = SessionContext::new_with_state(session_state);
 
         #[cfg(feature = "functions-json")]
         datafusion_functions_json::register_all(&mut session_ctx)?;
@@ -132,26 +122,42 @@ impl ExecutionContext {
         let catalog = create_app_catalog(config, app_name, app_version)?;
         session_ctx.register_catalog(&config.catalog.name, catalog);
 
-        // #[cfg(feature = "observability")]
-        // {
-        //     let obs = ObservabilityContext::new(config.observability.clone());
-        // }
-
-        #[cfg(feature = "observability")]
-        let ctx = Self {
-            config: config.clone(),
-            session_ctx,
-            ddl_path: config.ddl_path.as_ref().map(PathBuf::from),
-            executor,
-            observability: ObservabilityContext::default(),
-        };
-
-        #[cfg(not(feature = "observability"))]
-        let ctx = Self {
-            config: config.clone(),
-            session_ctx,
-            ddl_path: config.ddl_path.as_ref().map(PathBuf::from),
-            executor,
+        let ctx = {
+            #[cfg(feature = "observability")]
+            {
+                let observability =
+                    ObservabilityContext::try_new(config.observability.clone(), app_name)?;
+                if let Some(cat) = session_ctx.catalog(&config.catalog.name) {
+                    match cat
+                        .register_schema(&config.observability.schema_name, observability.schema())
+                    {
+                        Ok(_) => {
+                            info!("Registered observability schema")
+                        }
+                        Err(e) => {
+                            error!("Error registering observability schema: {}", e.to_string())
+                        }
+                    }
+                } else {
+                    error!("Missing catalog to register observability schema")
+                }
+                Self {
+                    config: config.clone(),
+                    session_ctx,
+                    ddl_path: config.ddl_path.as_ref().map(PathBuf::from),
+                    executor,
+                    observability,
+                }
+            }
+            #[cfg(not(feature = "observability"))]
+            {
+                Self {
+                    config: config.clone(),
+                    session_ctx,
+                    ddl_path: config.ddl_path.as_ref().map(PathBuf::from),
+                    executor,
+                }
+            }
         };
 
         Ok(ctx)

@@ -221,6 +221,31 @@ jobs:
       - name: Run UDFs WASM tests
         run: |
           cargo test --manifest-path crates/datafusion-functions-parquet/Cargo.toml
+  test-crate-datafusion-app:
+    name: Crate / DataFusion-App
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cargo
+          key: cargo-dft-cache-
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.lock') }}
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
+      - name: Run UDFs WASM tests
+        run: |
+          cargo test --all-features --manifest-path crates/datafusion-app/Cargo.toml
   test-crate-udfs-wasm:
     name: Crate / UDFs-WASM
     runs-on: ubuntu-latest

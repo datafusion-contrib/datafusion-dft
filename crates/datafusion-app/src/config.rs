@@ -91,9 +91,9 @@ pub struct ExecutionConfig {
     pub wasm_udf: WasmUdfConfig,
     #[serde(default = "default_catalog")]
     pub catalog: CatalogConfig,
-    // #[cfg(feature = "observability")]
-    // #[serde(default)]
-    // pub observability: ObservabilityConfig,
+    #[cfg(feature = "observability")]
+    #[serde(default)]
+    pub observability: ObservabilityConfig,
 }
 
 impl Default for ExecutionConfig {
@@ -109,8 +109,8 @@ impl Default for ExecutionConfig {
             #[cfg(feature = "udfs-wasm")]
             wasm_udf: default_wasm_udf(),
             catalog: default_catalog(),
-            // #[cfg(feature = "observability")]
-            // observability: default_observability(),
+            #[cfg(feature = "observability")]
+            observability: default_observability(),
         }
     }
 }
@@ -302,20 +302,25 @@ fn default_catalog_name() -> String {
 #[cfg(feature = "observability")]
 #[derive(Clone, Debug, Deserialize)]
 pub struct ObservabilityConfig {
-    #[serde(default = "default_observability_catalog_name")]
-    pub catalog_name: String,
+    #[serde(default = "default_observability_schema_name")]
+    pub schema_name: String,
 }
 
 #[cfg(feature = "observability")]
 impl Default for ObservabilityConfig {
     fn default() -> Self {
         Self {
-            catalog_name: default_observability_catalog_name(),
+            schema_name: default_observability_schema_name(),
         }
     }
 }
 
 #[cfg(feature = "observability")]
-fn default_observability_catalog_name() -> String {
+fn default_observability() -> ObservabilityConfig {
+    ObservabilityConfig::default()
+}
+
+#[cfg(feature = "observability")]
+fn default_observability_schema_name() -> String {
     "observability".to_string()
 }

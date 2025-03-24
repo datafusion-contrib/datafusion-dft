@@ -15,10 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::{
-    io::Cursor,
-    time::{Duration, Instant},
-};
+use std::{io::Cursor, time::Duration};
 
 use axum::{
     body::Body,
@@ -28,8 +25,9 @@ use axum::{
     Router,
 };
 use datafusion::{arrow::json::ArrayWriter, execution::SendableRecordBatchStream};
-use datafusion_app::{ExecOptions, ExecResult};
+use datafusion_app::{observability::ObservabilityRequestDetails, ExecOptions, ExecResult};
 use http::{HeaderValue, StatusCode};
+use jiff::Timestamp;
 use log::error;
 use serde::Deserialize;
 use tokio_stream::StreamExt;
@@ -37,6 +35,11 @@ use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
 use tracing::info;
 
 use crate::{config::HttpServerConfig, execution::AppExecution};
+
+#[derive(Debug)]
+struct ExecRequest {
+    sql: String,
+}
 
 #[derive(Clone)]
 struct ExecutionState {
@@ -88,14 +91,9 @@ async fn post_sql_handler(state: State<ExecutionState>, Json(body): Json<PostSql
         )
             .into_response();
     }
+    let req = ExecRequest { sql: body.sql };
     let opts = ExecOptions::new(Some(state.config.result_limit), body.flightsql);
-
-    let start = Instant::now();
-    let res = execute_sql_with_opts(&state, body.sql.clone(), opts).await;
-    let elapsed = start.elapsed();
-    let obs = state.execution.execution_ctx().observability();
-    obs.record_request(&body.sql, elapsed);
-    res
+    create_response(&state, req, opts).await
 }
 
 #[derive(Deserialize)]
@@ -117,7 +115,8 @@ async fn get_catalog_handler(
             .into_response();
     }
     let sql = "SHOW TABLES".to_string();
-    execute_sql_with_opts(&state, sql, opts).await
+    let req = ExecRequest { sql };
+    create_response(&state, req, opts).await
 }
 
 #[derive(Deserialize)]
@@ -147,54 +146,79 @@ async fn get_table_handler(
         "SELECT * FROM \"{catalog}\".\"{schema}\".\"{table}\" LIMIT {}",
         state.config.result_limit
     );
+    let req = ExecRequest { sql };
     let opts = ExecOptions::new(Some(state.config.result_limit), query.flightsql);
-    execute_sql_with_opts(&state, sql, opts).await
+    create_response(&state, req, opts).await
 }
 
-// TODO: Maybe rename to something like `response_for_sql`
-async fn execute_sql_with_opts(
+async fn response_for_sql(
     State(state): &State<ExecutionState>,
     sql: String,
     opts: ExecOptions,
-) -> Response {
+) -> (Response, ResponseDetails) {
     info!("Executing sql: {sql}");
     match state.execution.execute_sql_with_opts(&sql, opts).await {
         Ok(ExecResult::RecordBatchStream(stream)) => batch_stream_to_response(stream).await,
-        Ok(_) => (
-            StatusCode::BAD_REQUEST,
-            "Execution failed: unknown result type".to_string(),
-        )
-            .into_response(),
+        Ok(_) => {
+            let res = (
+                StatusCode::BAD_REQUEST,
+                "Execution failed: unknown result type".to_string(),
+            )
+                .into_response();
+            (res, error_response_details())
+        }
 
-        Err(e) => (StatusCode::BAD_REQUEST, format!("{}", e)).into_response(),
+        Err(e) => {
+            let res = (StatusCode::BAD_REQUEST, format!("{}", e)).into_response();
+            (res, error_response_details())
+        }
     }
 }
 
-async fn batch_stream_to_response(batch_stream: SendableRecordBatchStream) -> Response {
+struct ResponseDetails {
+    rows: u64,
+}
+
+fn error_response_details() -> ResponseDetails {
+    ResponseDetails { rows: 0 }
+}
+
+async fn batch_stream_to_response(
+    batch_stream: SendableRecordBatchStream,
+) -> (Response, ResponseDetails) {
     let mut buf: Cursor<Vec<u8>> = Cursor::new(Vec::new());
     let mut writer = ArrayWriter::new(&mut buf);
     let mut batch_stream = batch_stream;
+    let mut rows: usize = 0;
     while let Some(maybe_batch) = batch_stream.next().await {
         match maybe_batch {
             Ok(batch) => {
                 if let Err(e) = writer.write(&batch) {
                     error!("Error serializing result batches: {}", e);
-                    return (StatusCode::INTERNAL_SERVER_ERROR, "Serialization error")
-                        .into_response();
+                    return (
+                        (StatusCode::INTERNAL_SERVER_ERROR, "Serialization error").into_response(),
+                        error_response_details(),
+                    );
                 }
+                rows += batch.num_rows()
             }
             Err(e) => {
                 error!("Error executing query: {}", e);
                 // TODO: Use more appropriate errors, like 404 for table that doesnt exist
-                return (StatusCode::INTERNAL_SERVER_ERROR, "Query execution error")
-                    .into_response();
+                return (
+                    (StatusCode::INTERNAL_SERVER_ERROR, "Query execution error").into_response(),
+                    error_response_details(),
+                );
             }
         }
     }
 
     if let Err(e) = writer.finish() {
         error!("Error finalizing JSON writer: {}", e);
-        return (StatusCode::INTERNAL_SERVER_ERROR, "Finalization error").into_response();
+        return (
+            (StatusCode::INTERNAL_SERVER_ERROR, "Finalization error").into_response(),
+            error_response_details(),
+        );
     }
 
     match String::from_utf8(buf.into_inner()) {
@@ -202,10 +226,39 @@ async fn batch_stream_to_response(batch_stream: SendableRecordBatchStream) -> Re
             let mut res = Response::new(Body::new(json));
             res.headers_mut()
                 .insert("content-type", HeaderValue::from_static("application/json"));
-            res
+            let details = ResponseDetails { rows: rows as u64 };
+            (res, details)
         }
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "UTF-8 conversion error").into_response(),
+        Err(_) => (
+            (StatusCode::INTERNAL_SERVER_ERROR, "UTF-8 conversion error").into_response(),
+            error_response_details(),
+        ),
     }
+}
+
+async fn create_response(
+    state: &State<ExecutionState>,
+    req: ExecRequest,
+    opts: ExecOptions,
+) -> Response {
+    let start = Timestamp::now();
+    let (res, details) = response_for_sql(state, req.sql.clone(), opts).await;
+    let elapsed = Timestamp::now() - start;
+    let req = ObservabilityRequestDetails {
+        sql: req.sql,
+        start_ms: start.as_millisecond(),
+        duration_ms: elapsed.get_milliseconds(),
+        rows: details.rows,
+        status: res.status().as_u16(),
+    };
+    let obs = state.execution.execution_ctx().observability();
+    if let Err(e) = obs
+        .try_record_request(state.execution.session_ctx(), req)
+        .await
+    {
+        error!("Error recording request: {}", e.to_string())
+    }
+    res
 }
 
 #[cfg(test)]
@@ -228,13 +281,9 @@ mod test {
             .unwrap()
             .build()
             .unwrap();
-        let local = ExecutionContext::try_new(
-            &config,
-            state,
-            env!("CARGO_PKG_NAME"),
-            env!("CARGO_PKG_VERSION"),
-        )
-        .unwrap();
+        let local =
+            ExecutionContext::try_new(&config, state, crate::APP_NAME, env!("CARGO_PKG_VERSION"))
+                .unwrap();
         let execution = AppExecution::new(local);
 
         let http_config = HttpServerConfig::default();
@@ -294,6 +343,49 @@ mod test {
         let body = res.into_body().collect().await.unwrap().to_bytes();
         assert_eq!(body, "FlightSQL is not enabled on this server".as_bytes())
     }
+
+    #[tokio::test]
+    async fn test_post_sql() {
+        let (execution, http_config) = setup();
+        let router = create_router(execution, http_config);
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/sql")
+            .header("Content-Type", "application/json")
+            .body(Body::from("{\"sql\": \"SELECT 1\"}"))
+            .unwrap();
+        let res = router.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_observability_request_logged() {
+        let (execution, http_config) = setup();
+        let router = create_router(execution.clone(), http_config);
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/sql")
+            .header("Content-Type", "application/json")
+            .body(Body::from("{\"sql\": \"SELECT 1\"}"))
+            .unwrap();
+        let res = router.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let batches = execution
+            .execution_ctx()
+            .session_ctx()
+            .sql("SELECT * FROM dft.observability.requests")
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        let count = batches.iter().fold(0, |acc, b| acc + b.num_rows());
+        assert_eq!(count, 1);
+    }
 }
 
 #[cfg(all(test, feature = "flightsql"))]
@@ -318,13 +410,9 @@ mod flightsql_test {
             .unwrap()
             .build()
             .unwrap();
-        let local = ExecutionContext::try_new(
-            &config,
-            state,
-            env!("CARGO_PKG_NAME"),
-            env!("CARGO_PKG_VERSION"),
-        )
-        .unwrap();
+        let local =
+            ExecutionContext::try_new(&config, state, crate::APP_NAME, env!("CARGO_PKG_VERSION"))
+                .unwrap();
         let mut execution = AppExecution::new(local);
         let flightsql_cfg = FlightSQLConfig {
             connection_url: "localhost:50051".to_string(),

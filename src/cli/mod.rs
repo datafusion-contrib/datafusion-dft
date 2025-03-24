@@ -588,7 +588,7 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
     let execution_ctx = ExecutionContext::try_new(
         &merged_exec_config,
         session_state,
-        env!("CARGO_PKG_NAME"),
+        crate::APP_NAME,
         env!("CARGO_PKG_VERSION"),
     )?;
     #[allow(unused_mut)]
