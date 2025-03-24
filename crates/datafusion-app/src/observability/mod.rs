@@ -25,6 +25,7 @@ use datafusion::{
     logical_expr::{logical_plan::dml::InsertOp, LogicalPlan, Values},
     physical_plan::execute_stream,
     prelude::{cast, lit, SessionContext},
+    scalar::ScalarValue,
     sql::TableReference,
 };
 use log::error;
@@ -94,7 +95,7 @@ impl ObservabilityContext {
                         DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into())),
                     ),
                     lit(req.duration_ms),
-                    lit(req.rows),
+                    lit(ScalarValue::UInt64(req.rows)),
                     lit(req.status),
                 ]],
             };
@@ -128,7 +129,7 @@ pub struct ObservabilityRequestDetails {
     pub sql: String,
     pub start_ms: i64,
     pub duration_ms: i64,
-    pub rows: u64,
+    pub rows: Option<u64>,
     pub status: u16,
 }
 
@@ -142,7 +143,7 @@ fn req_fields() -> Vec<Field> {
             false,
         ),
         Field::new("duration_ms", DataType::Int64, false),
-        Field::new("rows", DataType::UInt64, false),
+        Field::new("rows", DataType::UInt64, true),
         Field::new("status", DataType::UInt16, false),
     ]
 }

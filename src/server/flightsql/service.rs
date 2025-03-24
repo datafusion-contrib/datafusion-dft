@@ -25,7 +25,9 @@ use arrow_flight::{FlightDescriptor, FlightEndpoint, FlightInfo, Ticket};
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::sql::parser::DFParser;
 use datafusion_app::local::ExecutionContext;
+use datafusion_app::observability::ObservabilityRequestDetails;
 use futures::{StreamExt, TryStreamExt};
+use jiff::Timestamp;
 use log::{debug, error, info};
 use metrics::{counter, histogram};
 use prost::Message;
@@ -60,12 +62,11 @@ impl FlightSqlServiceImpl {
 
     async fn get_flight_info_statement_handler(
         &self,
-        query: CommandStatementQuery,
+        query: String,
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         info!("get_flight_info_statement query: {:?}", query);
         debug!("get_flight_info_statement request: {:?}", request);
-        let CommandStatementQuery { query, .. } = query;
         let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
         match DFParser::parse_sql_with_dialect(&query, &dialect) {
             Ok(statements) => {
@@ -192,11 +193,26 @@ impl FlightSqlService for FlightSqlServiceImpl {
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         counter!("requests", "endpoint" => "get_flight_info").increment(1);
-        let start = Instant::now();
-        let res = self.get_flight_info_statement_handler(query, request).await;
-        let duration = start.elapsed();
-        histogram!("get_flight_info_latency_ms").record(duration.as_millis() as f64);
-        res
+        let start = Timestamp::now();
+        let CommandStatementQuery { query, .. } = query;
+        let res = self
+            .get_flight_info_statement_handler(query.clone(), request)
+            .await?;
+        let duration = Timestamp::now() - start;
+        let headers = res.metadata();
+        println!("HEADAERS: {headers:?}");
+
+        let ctx = self.execution.session_ctx();
+        // let req = ObservabilityRequestDetails {
+        //     path: "GetFlightInfo".to_string(),
+        //     sql: query,
+        //     rows: None,
+        //     start_ms: start.as_millisecond(),
+        //     duration_ms: duration.get_milliseconds(),
+        // };
+        // self.execution.observability().try_record_request(ctx, req);
+        histogram!("get_flight_info_latency_ms").record(duration.get_milliseconds() as f64);
+        Ok(res)
     }
 
     async fn do_get_statement(

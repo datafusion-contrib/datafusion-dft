@@ -83,6 +83,7 @@ flightsql = [
   "datafusion-app/flightsql",
   "datafusion-app/observability",
   "dep:arrow-flight",
+  "dep:jiff",
   "dep:metrics",
   "dep:metrics-exporter-prometheus",
   "dep:tonic",

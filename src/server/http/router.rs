@@ -265,7 +265,7 @@ async fn create_response(
         sql: req.sql,
         start_ms: start.as_millisecond(),
         duration_ms: elapsed.get_milliseconds(),
-        rows: details.rows,
+        rows: Some(details.rows),
         status: res.status().as_u16(),
     };
     let obs = state.execution.execution_ctx().observability();
