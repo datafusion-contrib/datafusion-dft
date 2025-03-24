@@ -86,7 +86,7 @@ flightsql = [
   "dep:metrics-exporter-prometheus",
   "dep:tonic",
   "dep:tower-http",
-  "dep:uuid"
+  "dep:uuid",
 ]
 functions-json = ["datafusion-app/functions-json"]
 functions-parquet = ["datafusion-app/functions-parquet"]
@@ -97,7 +97,7 @@ http = [
   "dep:metrics",
   "dep:metrics-exporter-prometheus",
   "dep:tower-http",
-  "dep:uuid"
+  "dep:uuid",
 ]
 hudi = ["datafusion-app/hudi"]
 huggingface = ["datafusion-app/huggingface"]

@@ -343,6 +343,49 @@ mod test {
         let body = res.into_body().collect().await.unwrap().to_bytes();
         assert_eq!(body, "FlightSQL is not enabled on this server".as_bytes())
     }
+
+    #[tokio::test]
+    async fn test_post_sql() {
+        let (execution, http_config) = setup();
+        let router = create_router(execution, http_config);
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/sql")
+            .header("Content-Type", "application/json")
+            .body(Body::from("{\"sql\": \"SELECT 1\"}"))
+            .unwrap();
+        let res = router.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn test_observability_request_logged() {
+        let (execution, http_config) = setup();
+        let router = create_router(execution.clone(), http_config);
+
+        let req = Request::builder()
+            .method("POST")
+            .uri("/sql")
+            .header("Content-Type", "application/json")
+            .body(Body::from("{\"sql\": \"SELECT 1\"}"))
+            .unwrap();
+        let res = router.oneshot(req).await.unwrap();
+        assert_eq!(res.status(), StatusCode::OK);
+
+        let batches = execution
+            .execution_ctx()
+            .session_ctx()
+            .sql("SELECT * FROM dft.observability.requests")
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        let count = batches.iter().fold(0, |acc, b| acc + b.num_rows());
+        assert_eq!(count, 1);
+    }
 }
 
 #[cfg(all(test, feature = "flightsql"))]

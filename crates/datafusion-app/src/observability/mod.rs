@@ -63,6 +63,8 @@ impl ObservabilityContext {
         self.schema.clone()
     }
 
+    /// Attempts to insert request details in `requests` table.  No verification is performed on
+    /// the data - it is inserted exactly as is.
     pub async fn try_record_request(
         &self,
         ctx: &SessionContext,
@@ -103,7 +105,8 @@ impl ObservabilityContext {
                 .await
             {
                 Ok(res) => {
-                    // Requires executing this stream to actually insert the request
+                    // Requires executing this stream to actually insert the request. The plan
+                    // returns the count of records inserted
                     let mut stream = execute_stream(res, ctx.task_ctx())?;
                     while let Some(_) = stream.next().await {}
                 }
@@ -118,6 +121,7 @@ impl ObservabilityContext {
     }
 }
 
+/// Details that will be recorded in the configured observability request table
 pub struct ObservabilityRequestDetails {
     pub sql: String,
     pub start_ms: i64,
@@ -144,4 +148,71 @@ fn create_req_schema() -> Schema {
     let fields = req_fields();
     let schema = Schema::new(fields);
     schema
+}
+
+#[cfg(test)]
+mod test {
+    use datafusion::{assert_batches_eq, execution::SessionStateBuilder};
+
+    use crate::{
+        config::ExecutionConfig, local::ExecutionContext,
+        observability::ObservabilityRequestDetails,
+    };
+
+    #[tokio::test]
+    async fn test_observability_schema_exists() {
+        let config = ExecutionConfig::default();
+        let state = SessionStateBuilder::new().build();
+        let execution =
+            ExecutionContext::try_new(&config, state, "dft", env!("CARGO_PKG_VERSION")).unwrap();
+
+        execution
+            .session_ctx()
+            .catalog("dft")
+            .unwrap()
+            .schema("observability")
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_observability_record_request() {
+        let config = ExecutionConfig::default();
+        let state = SessionStateBuilder::new().build();
+        let execution =
+            ExecutionContext::try_new(&config, state, "dft", env!("CARGO_PKG_VERSION")).unwrap();
+
+        let ctx = execution.session_ctx();
+        let req = ObservabilityRequestDetails {
+            sql: "SELECT 1".to_string(),
+            start_ms: 100,
+            duration_ms: 200,
+            rows: 1,
+            status: 200,
+        };
+
+        execution
+            .observability()
+            .try_record_request(ctx, req)
+            .await
+            .unwrap();
+
+        let batches = execution
+            .session_ctx()
+            .sql("SELECT * FROM dft.observability.requests")
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        let expected = [
+            "+----------+--------------------------+-------------+------+--------+",
+            "| sql      | timestamp                | duration_ms | rows | status |",
+            "+----------+--------------------------+-------------+------+--------+",
+            "| SELECT 1 | 1970-01-01T00:00:00.100Z | 200         | 1    | 200    |",
+            "+----------+--------------------------+-------------+------+--------+",
+        ];
+
+        assert_batches_eq!(expected, &batches);
+    }
 }
