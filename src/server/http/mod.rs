@@ -123,9 +123,7 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
         execution_ctx.execute_ddl().await;
     }
 
-    #[cfg(not(feature = "flightsql"))]
-    let app_execution = AppExecution::new(execution_ctx);
-    #[cfg(feature = "flightsql")]
+    #[allow(unused_mut)]
     let mut app_execution = AppExecution::new(execution_ctx);
     #[cfg(feature = "flightsql")]
     {

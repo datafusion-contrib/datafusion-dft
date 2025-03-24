@@ -19,7 +19,7 @@ use std::{io::Cursor, time::Duration};
 
 use axum::{
     body::Body,
-    extract::{Json, Path, Query, State},
+    extract::{Json, OriginalUri, Path, Query, State},
     response::{IntoResponse, Response},
     routing::{get, post},
     Router,
@@ -29,7 +29,7 @@ use datafusion_app::{observability::ObservabilityRequestDetails, ExecOptions, Ex
 use http::{HeaderValue, StatusCode};
 use jiff::Timestamp;
 use log::error;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio_stream::StreamExt;
 use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
 use tracing::info;
@@ -38,6 +38,7 @@ use crate::{config::HttpServerConfig, execution::AppExecution};
 
 #[derive(Debug)]
 struct ExecRequest {
+    path: String,
     sql: String,
 }
 
@@ -83,7 +84,11 @@ struct PostSqlBody {
     flightsql: bool,
 }
 
-async fn post_sql_handler(state: State<ExecutionState>, Json(body): Json<PostSqlBody>) -> Response {
+async fn post_sql_handler(
+    state: State<ExecutionState>,
+    OriginalUri(uri): OriginalUri,
+    Json(body): Json<PostSqlBody>,
+) -> Response {
     if body.flightsql && !cfg!(feature = "flightsql") {
         return (
             StatusCode::BAD_REQUEST,
@@ -91,9 +96,10 @@ async fn post_sql_handler(state: State<ExecutionState>, Json(body): Json<PostSql
         )
             .into_response();
     }
-    let rt = state.execution.session_ctx().runtime_env();
-    println!("Runtime {rt:?}");
-    let req = ExecRequest { sql: body.sql };
+    let req = ExecRequest {
+        path: uri.path().to_string(),
+        sql: body.sql.to_string(),
+    };
     let opts = ExecOptions::new(Some(state.config.result_limit), body.flightsql);
     create_response(&state, req, opts).await
 }
@@ -106,6 +112,7 @@ struct GetCatalogQueryParams {
 
 async fn get_catalog_handler(
     state: State<ExecutionState>,
+    OriginalUri(uri): OriginalUri,
     Query(query): Query<GetCatalogQueryParams>,
 ) -> Response {
     let opts = ExecOptions::new(None, query.flightsql);
@@ -117,11 +124,14 @@ async fn get_catalog_handler(
             .into_response();
     }
     let sql = "SHOW TABLES".to_string();
-    let req = ExecRequest { sql };
+    let req = ExecRequest {
+        path: uri.path().to_string(),
+        sql,
+    };
     create_response(&state, req, opts).await
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 struct GetTablePathParams {
     catalog: String,
     schema: String,
@@ -136,19 +146,23 @@ struct GetTableQueryParams {
 
 async fn get_table_handler(
     state: State<ExecutionState>,
-    Path(params): Path<GetTablePathParams>,
+    Path(path): Path<GetTablePathParams>,
     Query(query): Query<GetTableQueryParams>,
+    OriginalUri(uri): OriginalUri,
 ) -> Response {
     let GetTablePathParams {
         catalog,
         schema,
         table,
-    } = params;
+    } = path;
     let sql = format!(
         "SELECT * FROM \"{catalog}\".\"{schema}\".\"{table}\" LIMIT {}",
         state.config.result_limit
     );
-    let req = ExecRequest { sql };
+    let req = ExecRequest {
+        path: uri.path().to_string(),
+        sql,
+    };
     let opts = ExecOptions::new(Some(state.config.result_limit), query.flightsql);
     create_response(&state, req, opts).await
 }
@@ -247,6 +261,7 @@ async fn create_response(
     let (res, details) = response_for_sql(state, req.sql.clone(), opts).await;
     let elapsed = Timestamp::now() - start;
     let req = ObservabilityRequestDetails {
+        path: req.path,
         sql: req.sql,
         start_ms: start.as_millisecond(),
         duration_ms: elapsed.get_milliseconds(),

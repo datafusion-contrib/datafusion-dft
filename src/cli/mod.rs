@@ -30,7 +30,7 @@ use datafusion_app::extensions::DftSessionStateBuilder;
 use datafusion_app::local::ExecutionContext;
 use datafusion_app::local_benchmarks::LocalBenchmarkStats;
 use futures::{Stream, StreamExt};
-use log::{error, info};
+use log::info;
 use parquet::{arrow::ArrowWriter, file::properties::WriterProperties};
 use std::error::Error;
 use std::fs::File;
@@ -43,6 +43,7 @@ use {
         flightsql::FlightSQLContext,
         flightsql_benchmarks::FlightSQLBenchmarkStats,
     },
+    log::error,
     tonic::IntoRequest,
 };
 
@@ -606,11 +607,8 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
                 auth,
             );
             let flightsql_ctx = FlightSQLContext::new(flightsql_cfg);
-            if let Err(e) = flightsql_ctx.create_client(cli.host.clone()).await {
-                error!("{}", e.to_string())
-            } else {
-                app_execution.with_flightsql_ctx(flightsql_ctx);
-            }
+            flightsql_ctx.create_client(cli.host.clone()).await?;
+            app_execution.with_flightsql_ctx(flightsql_ctx);
         }
     }
     let app = CliApp::new(app_execution, cli.clone());

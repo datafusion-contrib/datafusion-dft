@@ -87,6 +87,7 @@ impl ObservabilityContext {
             let values = Values {
                 schema,
                 values: vec![vec![
+                    lit(req.path),
                     lit(req.sql),
                     cast(
                         lit(req.start_ms),
@@ -123,6 +124,7 @@ impl ObservabilityContext {
 
 /// Details that will be recorded in the configured observability request table
 pub struct ObservabilityRequestDetails {
+    pub path: String,
     pub sql: String,
     pub start_ms: i64,
     pub duration_ms: i64,
@@ -132,6 +134,7 @@ pub struct ObservabilityRequestDetails {
 
 fn req_fields() -> Vec<Field> {
     vec![
+        Field::new("path", DataType::Utf8, false),
         Field::new("sql", DataType::Utf8, false),
         Field::new(
             "timestamp",
@@ -183,6 +186,7 @@ mod test {
 
         let ctx = execution.session_ctx();
         let req = ObservabilityRequestDetails {
+            path: "/sql".to_string(),
             sql: "SELECT 1".to_string(),
             start_ms: 100,
             duration_ms: 200,
