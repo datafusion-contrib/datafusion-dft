@@ -43,7 +43,6 @@ use {
         flightsql::FlightSQLContext,
         flightsql_benchmarks::FlightSQLBenchmarkStats,
     },
-    log::error,
     tonic::IntoRequest,
 };
 
