@@ -46,7 +46,7 @@ dft -c "SELECT 1"
 dft -f query.sql
 
 # Start FlightSQL Server (requires `flightsql` feature)
-dft serve-flight-sql
+dft serve-flightsql
 
 # Start HTTP Server (requires `http` feature)
 dft serve-http

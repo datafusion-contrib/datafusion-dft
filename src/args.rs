@@ -126,6 +126,7 @@ pub enum Command {
         config: Option<String>,
     },
     /// Start a FlightSQL server
+    #[command(name = "serve-flightsql")]
     ServeFlightSql {
         #[clap(short, long)]
         config: Option<String>,

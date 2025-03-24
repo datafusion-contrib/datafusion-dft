@@ -91,6 +91,8 @@ async fn post_sql_handler(state: State<ExecutionState>, Json(body): Json<PostSql
         )
             .into_response();
     }
+    let rt = state.execution.session_ctx().runtime_env();
+    println!("Runtime {rt:?}");
     let req = ExecRequest { sql: body.sql };
     let opts = ExecOptions::new(Some(state.config.result_limit), body.flightsql);
     create_response(&state, req, opts).await

@@ -11,8 +11,8 @@ serve-http:
     RUST_LOG=info cargo r --features=http,flightsql -- serve-http   
 
 # Starts a debug FlightSQL server
-serve-flight-sql:
-    RUST_LOG=info cargo r --features=flightsql -- serve-flight-sql
+serve-flightsql:
+    RUST_LOG=info cargo r --features=flightsql -- serve-flightsql
 
 # You should already have run `cargo r --features=http -- serve-http` in another shell
 bench-http-basic:

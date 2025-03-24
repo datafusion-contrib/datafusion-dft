@@ -32,7 +32,7 @@ use datafusion_app::{
 };
 use router::create_router;
 use tokio::{net::TcpListener, signal};
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 
 use super::try_start_metrics_server;
 
@@ -142,10 +142,14 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
 
         let flightsql_context = FlightSQLContext::new(flightsql_cfg.clone());
         // TODO - Consider adding flag to allow startup even if FlightSQL initiation fails
-        flightsql_context
+        if let Err(e) = flightsql_context
             .create_client(Some(flightsql_cfg.connection_url))
-            .await?;
-        app_execution.with_flightsql_ctx(flightsql_context);
+            .await
+        {
+            error!("{}", e.to_string())
+        } else {
+            app_execution.with_flightsql_ctx(flightsql_context);
+        }
     }
     debug!("Created AppExecution: {app_execution:?}");
     let app = HttpApp::try_new(
