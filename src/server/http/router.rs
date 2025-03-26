@@ -261,8 +261,9 @@ async fn create_response(
     let (res, details) = response_for_sql(state, req.sql.clone(), opts).await;
     let elapsed = Timestamp::now() - start;
     let req = ObservabilityRequestDetails {
+        request_id: None,
         path: req.path,
-        sql: req.sql,
+        sql: Some(req.sql),
         start_ms: start.as_millisecond(),
         duration_ms: elapsed.get_milliseconds(),
         rows: Some(details.rows),

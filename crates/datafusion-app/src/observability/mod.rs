@@ -88,8 +88,9 @@ impl ObservabilityContext {
             let values = Values {
                 schema,
                 values: vec![vec![
+                    lit(ScalarValue::Utf8(req.request_id)),
                     lit(req.path),
-                    lit(req.sql),
+                    lit(ScalarValue::Utf8(req.sql)),
                     cast(
                         lit(req.start_ms),
                         DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into())),
@@ -125,8 +126,9 @@ impl ObservabilityContext {
 
 /// Details that will be recorded in the configured observability request table
 pub struct ObservabilityRequestDetails {
+    pub request_id: Option<String>,
     pub path: String,
-    pub sql: String,
+    pub sql: Option<String>,
     pub start_ms: i64,
     pub duration_ms: i64,
     pub rows: Option<u64>,
@@ -135,8 +137,9 @@ pub struct ObservabilityRequestDetails {
 
 fn req_fields() -> Vec<Field> {
     vec![
+        Field::new("request_id", DataType::Utf8, true),
         Field::new("path", DataType::Utf8, false),
-        Field::new("sql", DataType::Utf8, false),
+        Field::new("sql", DataType::Utf8, true),
         Field::new(
             "timestamp",
             DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into())),
@@ -187,8 +190,9 @@ mod test {
 
         let ctx = execution.session_ctx();
         let req = ObservabilityRequestDetails {
+            request_id: None,
             path: "/sql".to_string(),
-            sql: "SELECT 1".to_string(),
+            sql: Some("SELECT 1".to_string()),
             start_ms: 100,
             duration_ms: 200,
             rows: 1,
