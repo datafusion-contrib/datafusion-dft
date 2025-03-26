@@ -195,7 +195,7 @@ mod test {
             sql: Some("SELECT 1".to_string()),
             start_ms: 100,
             duration_ms: 200,
-            rows: 1,
+            rows: Some(1),
             status: 200,
         };
 
