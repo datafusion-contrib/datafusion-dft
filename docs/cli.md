@@ -14,7 +14,7 @@ dft -c "SELECT 1+2"
 
 ## FlightSQL Mode
 
-Use --flightsql to run against a FlightSQL server (instead of the default local SessionContext). You can override the default host for that single command with --host
+Use `--flightsql` or `-q` to run against a FlightSQL server (instead of the default local SessionContext). You can override the default host for that single command with --host
 
 ```sh
 dft -f query.sql --flightsql --host "http://127.0.0.1:50052"
