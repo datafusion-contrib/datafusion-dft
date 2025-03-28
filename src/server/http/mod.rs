@@ -25,14 +25,17 @@ use color_eyre::Result;
 use datafusion_app::{
     config::merge_configs, extensions::DftSessionStateBuilder, local::ExecutionContext,
 };
-#[cfg(feature = "flightsql")]
-use datafusion_app::{
-    config::{AuthConfig, FlightSQLConfig},
-    flightsql::FlightSQLContext,
-};
 use router::create_router;
 use tokio::{net::TcpListener, signal};
-use tracing::{debug, error, info};
+use tracing::{debug, info};
+#[cfg(feature = "flightsql")]
+use {
+    datafusion_app::{
+        config::{AuthConfig, FlightSQLConfig},
+        flightsql::FlightSQLContext,
+    },
+    tracing::error,
+};
 
 use super::try_start_metrics_server;
 

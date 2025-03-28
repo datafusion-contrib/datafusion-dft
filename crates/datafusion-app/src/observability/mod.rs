@@ -33,7 +33,7 @@ use tokio_stream::StreamExt;
 
 use crate::config::ObservabilityConfig;
 
-const REQUESTS_TABLE_NAME: &'static str = "requests";
+const REQUESTS_TABLE_NAME: &str = "requests";
 
 #[derive(Clone, Debug)]
 pub struct ObservabilityContext {
@@ -111,7 +111,7 @@ impl ObservabilityContext {
                     // Requires executing this stream to actually insert the request. The plan
                     // returns the count of records inserted
                     let mut stream = execute_stream(res, ctx.task_ctx())?;
-                    while let Some(_) = stream.next().await {}
+                    while (stream.next().await).is_some() {}
                 }
                 Err(e) => {
                     error!("Error recording request: {}", e.to_string())
@@ -153,8 +153,7 @@ fn req_fields() -> Vec<Field> {
 
 fn create_req_schema() -> Schema {
     let fields = req_fields();
-    let schema = Schema::new(fields);
-    schema
+    Schema::new(fields)
 }
 
 #[cfg(test)]
@@ -215,11 +214,11 @@ mod test {
             .unwrap();
 
         let expected = [
-            "+------+----------+--------------------------+-------------+------+--------+",
-            "| path | sql      | timestamp                | duration_ms | rows | status |",
-            "+------+----------+--------------------------+-------------+------+--------+",
-            "| /sql | SELECT 1 | 1970-01-01T00:00:00.100Z | 200         | 1    | 200    |",
-            "+------+----------+--------------------------+-------------+------+--------+",
+            "+------------+------+----------+--------------------------+-------------+------+--------+",
+            "| request_id | path | sql      | timestamp                | duration_ms | rows | status |",
+            "+------------+------+----------+--------------------------+-------------+------+--------+",
+            "|            | /sql | SELECT 1 | 1970-01-01T00:00:00.100Z | 200         | 1    | 200    |",
+            "+------------+------+----------+--------------------------+-------------+------+--------+",
         ];
 
         assert_batches_eq!(expected, &batches);
