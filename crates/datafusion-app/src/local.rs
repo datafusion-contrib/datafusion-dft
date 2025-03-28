@@ -200,7 +200,7 @@ impl ExecutionContext {
         }
     }
 
-    /// Executes the provided `LogicalPlan` returning a `SendableRecordBatchStream`.  Uses the [`DedicatedExecutor`] if it is available.  Useful on server implementations when planning and execution are done in separate steps and you may be storing the logical with something like a request_id.
+    /// Executes the provided `LogicalPlan` returning a `SendableRecordBatchStream`.  Uses the [`DedicatedExecutor`] if it is available.  Useful on server implementations when planning and execution are done in separate steps and you may be storing the logical plan with something like a request_id.
     pub async fn execute_logical_plan(
         &self,
         logical_plan: LogicalPlan,

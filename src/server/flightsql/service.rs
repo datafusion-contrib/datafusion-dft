@@ -155,8 +155,10 @@ impl FlightSqlServiceImpl {
                 }
             }
             Err(e) => {
-                error!("error decoding handle to uuid: {:?}", e);
-                Err(Status::internal("Error decoding handle to uuid"))
+                error!("error decoding handle to uuid for {request_id}: {:?}", e);
+                Err(Status::internal(
+                    "Error decoding handle to uuid for {request_id}",
+                ))
             }
         }
     }
