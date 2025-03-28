@@ -25,14 +25,17 @@ use color_eyre::Result;
 use datafusion_app::{
     config::merge_configs, extensions::DftSessionStateBuilder, local::ExecutionContext,
 };
-#[cfg(feature = "flightsql")]
-use datafusion_app::{
-    config::{AuthConfig, FlightSQLConfig},
-    flightsql::FlightSQLContext,
-};
 use router::create_router;
 use tokio::{net::TcpListener, signal};
 use tracing::{debug, info};
+#[cfg(feature = "flightsql")]
+use {
+    datafusion_app::{
+        config::{AuthConfig, FlightSQLConfig},
+        flightsql::FlightSQLContext,
+    },
+    tracing::error,
+};
 
 use super::try_start_metrics_server;
 
@@ -123,9 +126,7 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
         execution_ctx.execute_ddl().await;
     }
 
-    #[cfg(not(feature = "flightsql"))]
-    let app_execution = AppExecution::new(execution_ctx);
-    #[cfg(feature = "flightsql")]
+    #[allow(unused_mut)]
     let mut app_execution = AppExecution::new(execution_ctx);
     #[cfg(feature = "flightsql")]
     {
@@ -142,10 +143,14 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
 
         let flightsql_context = FlightSQLContext::new(flightsql_cfg.clone());
         // TODO - Consider adding flag to allow startup even if FlightSQL initiation fails
-        flightsql_context
+        if let Err(e) = flightsql_context
             .create_client(Some(flightsql_cfg.connection_url))
-            .await?;
-        app_execution.with_flightsql_ctx(flightsql_context);
+            .await
+        {
+            error!("{}", e.to_string())
+        } else {
+            app_execution.with_flightsql_ctx(flightsql_context);
+        }
     }
     debug!("Created AppExecution: {app_execution:?}");
     let app = HttpApp::try_new(

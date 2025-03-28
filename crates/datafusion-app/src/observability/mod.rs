@@ -25,6 +25,7 @@ use datafusion::{
     logical_expr::{logical_plan::dml::InsertOp, LogicalPlan, Values},
     physical_plan::execute_stream,
     prelude::{cast, lit, SessionContext},
+    scalar::ScalarValue,
     sql::TableReference,
 };
 use log::error;
@@ -32,7 +33,7 @@ use tokio_stream::StreamExt;
 
 use crate::config::ObservabilityConfig;
 
-const REQUESTS_TABLE_NAME: &'static str = "requests";
+const REQUESTS_TABLE_NAME: &str = "requests";
 
 #[derive(Clone, Debug)]
 pub struct ObservabilityContext {
@@ -87,13 +88,15 @@ impl ObservabilityContext {
             let values = Values {
                 schema,
                 values: vec![vec![
-                    lit(req.sql),
+                    lit(ScalarValue::Utf8(req.request_id)),
+                    lit(req.path),
+                    lit(ScalarValue::Utf8(req.sql)),
                     cast(
                         lit(req.start_ms),
                         DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into())),
                     ),
                     lit(req.duration_ms),
-                    lit(req.rows),
+                    lit(ScalarValue::UInt64(req.rows)),
                     lit(req.status),
                 ]],
             };
@@ -108,7 +111,7 @@ impl ObservabilityContext {
                     // Requires executing this stream to actually insert the request. The plan
                     // returns the count of records inserted
                     let mut stream = execute_stream(res, ctx.task_ctx())?;
-                    while let Some(_) = stream.next().await {}
+                    while (stream.next().await).is_some() {}
                 }
                 Err(e) => {
                     error!("Error recording request: {}", e.to_string())
@@ -123,31 +126,34 @@ impl ObservabilityContext {
 
 /// Details that will be recorded in the configured observability request table
 pub struct ObservabilityRequestDetails {
-    pub sql: String,
+    pub request_id: Option<String>,
+    pub path: String,
+    pub sql: Option<String>,
     pub start_ms: i64,
     pub duration_ms: i64,
-    pub rows: u64,
+    pub rows: Option<u64>,
     pub status: u16,
 }
 
 fn req_fields() -> Vec<Field> {
     vec![
-        Field::new("sql", DataType::Utf8, false),
+        Field::new("request_id", DataType::Utf8, true),
+        Field::new("path", DataType::Utf8, false),
+        Field::new("sql", DataType::Utf8, true),
         Field::new(
             "timestamp",
             DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into())),
             false,
         ),
         Field::new("duration_ms", DataType::Int64, false),
-        Field::new("rows", DataType::UInt64, false),
+        Field::new("rows", DataType::UInt64, true),
         Field::new("status", DataType::UInt16, false),
     ]
 }
 
 fn create_req_schema() -> Schema {
     let fields = req_fields();
-    let schema = Schema::new(fields);
-    schema
+    Schema::new(fields)
 }
 
 #[cfg(test)]
@@ -183,10 +189,12 @@ mod test {
 
         let ctx = execution.session_ctx();
         let req = ObservabilityRequestDetails {
-            sql: "SELECT 1".to_string(),
+            request_id: None,
+            path: "/sql".to_string(),
+            sql: Some("SELECT 1".to_string()),
             start_ms: 100,
             duration_ms: 200,
-            rows: 1,
+            rows: Some(1),
             status: 200,
         };
 
@@ -206,11 +214,11 @@ mod test {
             .unwrap();
 
         let expected = [
-            "+----------+--------------------------+-------------+------+--------+",
-            "| sql      | timestamp                | duration_ms | rows | status |",
-            "+----------+--------------------------+-------------+------+--------+",
-            "| SELECT 1 | 1970-01-01T00:00:00.100Z | 200         | 1    | 200    |",
-            "+----------+--------------------------+-------------+------+--------+",
+            "+------------+------+----------+--------------------------+-------------+------+--------+",
+            "| request_id | path | sql      | timestamp                | duration_ms | rows | status |",
+            "+------------+------+----------+--------------------------+-------------+------+--------+",
+            "|            | /sql | SELECT 1 | 1970-01-01T00:00:00.100Z | 200         | 1    | 200    |",
+            "+------------+------+----------+--------------------------+-------------+------+--------+",
         ];
 
         assert_batches_eq!(expected, &batches);

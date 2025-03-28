@@ -295,7 +295,7 @@ jobs:
         uses: ./.github/actions/setup-rust
       - name: Start FlightSQL Server
         run: |
-          cargo r --features=flightsql -- serve-flight-sql --config data/configs/flightsql_basic.toml &
+          cargo r --features=flightsql -- serve-flightsql --config data/configs/flightsql_basic.toml &
       - name: Run auth tests
         run: |
           cargo t --features=flightsql extension_cases::auth_basic
@@ -323,7 +323,7 @@ jobs:
         uses: ./.github/actions/setup-rust
       - name: Start FlightSQL Server
         run: |
-          cargo r --features=flightsql -- serve-flight-sql --config data/configs/flightsql_bearer.toml &
+          cargo r --features=flightsql -- serve-flightsql --config data/configs/flightsql_bearer.toml &
       - name: Run auth tests
         run: |
           cargo t --features=flightsql extension_cases::auth_bearer

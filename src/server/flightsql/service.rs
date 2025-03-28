@@ -22,18 +22,20 @@ use arrow_flight::flight_service_server::{FlightService, FlightServiceServer};
 use arrow_flight::sql::server::FlightSqlService;
 use arrow_flight::sql::{Any, CommandStatementQuery, SqlInfo, TicketStatementQuery};
 use arrow_flight::{FlightDescriptor, FlightEndpoint, FlightInfo, Ticket};
+use color_eyre::Result;
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::sql::parser::DFParser;
 use datafusion_app::local::ExecutionContext;
+use datafusion_app::observability::ObservabilityRequestDetails;
 use futures::{StreamExt, TryStreamExt};
+use jiff::Timestamp;
 use log::{debug, error, info};
 use metrics::{counter, histogram};
 use prost::Message;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
-use tonic::{Request, Response, Status};
+use tonic::{Code, Request, Response, Status};
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -60,12 +62,12 @@ impl FlightSqlServiceImpl {
 
     async fn get_flight_info_statement_handler(
         &self,
-        query: CommandStatementQuery,
+        query: String,
+        request_id: Uuid,
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         info!("get_flight_info_statement query: {:?}", query);
         debug!("get_flight_info_statement request: {:?}", request);
-        let CommandStatementQuery { query, .. } = query;
         let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
         match DFParser::parse_sql_with_dialect(&query, &dialect) {
             Ok(statements) => {
@@ -79,9 +81,8 @@ impl FlightSqlServiceImpl {
                         debug!("logical planning took: {:?}", start.elapsed());
                         let schema = logical_plan.schema();
 
-                        let uuid = uuid::Uuid::new_v4();
                         let ticket = TicketStatementQuery {
-                            statement_handle: uuid.to_string().into(),
+                            statement_handle: request_id.to_string().into(),
                         };
                         debug!("created ticket handle: {:?}", ticket.statement_handle);
                         let mut bytes: Vec<u8> = Vec::new();
@@ -98,7 +99,7 @@ impl FlightSqlServiceImpl {
                             let mut guard = self.requests.lock().map_err(|_| {
                                 Status::internal("Failed to acquire lock on requests")
                             })?;
-                            guard.insert(uuid, logical_plan);
+                            guard.insert(request_id, logical_plan);
 
                             Ok(Response::new(info))
                         } else {
@@ -121,62 +122,43 @@ impl FlightSqlServiceImpl {
 
     async fn do_get_fallback_handler(
         &self,
-        request: Request<Ticket>,
+        request_id: String,
         message: Any,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
-        info!("do_get_fallback request: {:?}", request);
         debug!("do_get_fallback message: {:?}", message);
-        let ticket = request.into_inner();
-        let bytes = ticket.ticket.to_vec();
-        match TicketStatementQuery::decode(bytes.as_slice()) {
-            Ok(query) => {
-                let handle = query.statement_handle.clone();
-                match String::from_utf8(handle.to_vec()) {
-                    Ok(s) => {
-                        match Uuid::from_str(&s) {
-                            Ok(id) => {
-                                info!("getting plan for id: {:?}", id);
-                                // Limit the scope of the lock
-                                let maybe_plan = {
-                                    let guard = self.requests.lock().map_err(|_| {
-                                        Status::internal("Failed to acquire lock on requests")
-                                    })?;
-                                    guard.get(&id).cloned()
-                                };
-                                if let Some(plan) = maybe_plan {
-                                    let stream = self
-                                        .execution
-                                        .execute_logical_plan(plan)
-                                        .await
-                                        .map_err(|e| Status::internal(e.to_string()))?;
-                                    let builder = FlightDataEncoderBuilder::new();
-                                    let flight_data_stream =
-                                        builder
-                                            .build(stream.map_err(|e| {
-                                                FlightError::ExternalError(Box::new(e))
-                                            }))
-                                            .map_err(|e| Status::internal(e.to_string()))
-                                            .boxed();
-                                    Ok(Response::new(flight_data_stream))
-                                } else {
-                                    Err(Status::internal("Plan not found for id"))
-                                }
-                            }
-                            Err(e) => {
-                                error!("error decoding handle to uuid: {:?}", e);
-                                Err(Status::internal("Error decoding handle to uuid"))
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        error!("error decoding handle to utf8: {:?}", e);
-                        Err(Status::internal("Error decoding handle to utf8"))
-                    }
+
+        match Uuid::from_str(&request_id) {
+            Ok(id) => {
+                info!("getting plan for id: {:?}", id);
+                // Limit the scope of the lock
+                let maybe_plan = {
+                    let guard = self
+                        .requests
+                        .lock()
+                        .map_err(|_| Status::internal("Failed to acquire lock on requests"))?;
+                    guard.get(&id).cloned()
+                };
+                if let Some(plan) = maybe_plan {
+                    let stream = self
+                        .execution
+                        .execute_logical_plan(plan)
+                        .await
+                        .map_err(|e| Status::internal(e.to_string()))?;
+                    let builder = FlightDataEncoderBuilder::new();
+                    let flight_data_stream = builder
+                        .build(stream.map_err(|e| FlightError::ExternalError(Box::new(e))))
+                        .map_err(|e| Status::internal(e.to_string()))
+                        .boxed();
+                    Ok(Response::new(flight_data_stream))
+                } else {
+                    Err(Status::internal("Plan not found for id"))
                 }
             }
             Err(e) => {
-                error!("error decoding ticket: {:?}", e);
-                Err(Status::internal("Error decoding ticket"))
+                error!("error decoding handle to uuid for {request_id}: {:?}", e);
+                Err(Status::internal(
+                    "Error decoding handle to uuid for {request_id}",
+                ))
             }
         }
     }
@@ -192,10 +174,38 @@ impl FlightSqlService for FlightSqlServiceImpl {
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         counter!("requests", "endpoint" => "get_flight_info").increment(1);
-        let start = Instant::now();
-        let res = self.get_flight_info_statement_handler(query, request).await;
-        let duration = start.elapsed();
-        histogram!("get_flight_info_latency_ms").record(duration.as_millis() as f64);
+        let start = Timestamp::now();
+        let CommandStatementQuery { query, .. } = query;
+        let request_id = uuid::Uuid::new_v4();
+        let res = self
+            .get_flight_info_statement_handler(query.clone(), request_id, request)
+            .await;
+        let duration = Timestamp::now() - start;
+
+        let grpc_code = match &res {
+            Ok(_) => Code::Ok,
+            Err(status) => status.code(),
+        };
+
+        let ctx = self.execution.session_ctx();
+        let req = ObservabilityRequestDetails {
+            request_id: Some(request_id.to_string()),
+            path: "GetFlightInfo".to_string(),
+            sql: Some(query),
+            rows: None,
+            start_ms: start.as_millisecond(),
+            duration_ms: duration.get_milliseconds(),
+            status: grpc_code as u16,
+        };
+        if let Err(e) = self
+            .execution
+            .observability()
+            .try_record_request(ctx, req)
+            .await
+        {
+            error!("Error recording request: {}", e.to_string())
+        }
+        histogram!("get_flight_info_latency_ms").record(duration.get_milliseconds() as f64);
         res
     }
 
@@ -213,12 +223,53 @@ impl FlightSqlService for FlightSqlServiceImpl {
         message: Any,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         counter!("requests", "endpoint" => "do_get_fallback").increment(1);
-        let start = Instant::now();
-        let res = self.do_get_fallback_handler(request, message).await;
-        let duration = start.elapsed();
-        histogram!("do_get_fallback_latency_ms").record(duration.as_millis() as f64);
+        let start = Timestamp::now();
+        let request_id =
+            try_request_id_from_request(request).map_err(|e| Status::internal(e.to_string()))?;
+        debug!("do_get_fallback for request_id: {}", &request_id);
+        let res = self
+            .do_get_fallback_handler(request_id.clone(), message)
+            .await;
+
+        let duration = Timestamp::now() - start;
+        let grpc_code = match &res {
+            Ok(_) => Code::Ok,
+            Err(status) => status.code(),
+        };
+        let ctx = self.execution.session_ctx();
+        let req = ObservabilityRequestDetails {
+            request_id: Some(request_id),
+            path: "DoGetFallback".to_string(),
+            sql: None,
+            rows: None,
+            start_ms: start.as_millisecond(),
+            duration_ms: duration.get_milliseconds(),
+            status: grpc_code as u16,
+        };
+        if let Err(e) = self
+            .execution
+            .observability()
+            .try_record_request(ctx, req)
+            .await
+        {
+            error!("Error recording request: {}", e.to_string())
+        }
+
+        histogram!("do_get_fallback_latency_ms").record(duration.get_milliseconds() as f64);
         res
     }
 
     async fn register_sql_info(&self, _id: i32, _result: &SqlInfo) {}
+}
+
+fn try_request_id_from_request(request: Request<Ticket>) -> Result<String> {
+    let ticket = request.into_inner();
+    let bytes = ticket.ticket.to_vec();
+
+    let request_id = String::from_utf8(
+        TicketStatementQuery::decode(bytes.as_slice())?
+            .statement_handle
+            .to_vec(),
+    )?;
+    Ok(request_id)
 }

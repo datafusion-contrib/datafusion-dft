@@ -81,7 +81,9 @@ default = ["functions-parquet"]
 deltalake = ["datafusion-app/deltalake"]
 flightsql = [
   "datafusion-app/flightsql",
+  "datafusion-app/observability",
   "dep:arrow-flight",
+  "dep:jiff",
   "dep:metrics",
   "dep:metrics-exporter-prometheus",
   "dep:tonic",

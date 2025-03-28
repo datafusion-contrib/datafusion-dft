@@ -7,7 +7,7 @@
 ## Starting the Server
 
 ```sh
-dft serve-flight-sql
+dft serve-flightsql
 ```
 
 ## Endpoints
