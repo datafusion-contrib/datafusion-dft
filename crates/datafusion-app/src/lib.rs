@@ -30,6 +30,7 @@ pub mod observability;
 pub mod sql_utils;
 pub mod stats;
 #[cfg(feature = "udfs-wasm")]
+pub mod tables;
 pub mod wasm;
 
 pub use stats::{collect_plan_io_stats, ExecutionStats};
