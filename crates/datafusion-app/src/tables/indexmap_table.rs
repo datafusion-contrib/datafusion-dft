@@ -49,6 +49,9 @@ pub struct IndexMapTableConfig {
 
 /// Table for tracking observability information. Data is held in a IndexMap, which maintains
 /// insertion order, while the app is running and is serialized on app shutdown.
+///
+/// TODO: Add filter pushdown on the primary key and use `get` on that for O(1)
+/// TODO: Add filter pushdown on non primary key and use `binary_search_by` to search values
 #[derive(Debug)]
 pub struct IndexMapTable {
     schema: Arc<Schema>,
@@ -72,7 +75,9 @@ impl IndexMapTable {
         })
     }
 
-    fn hashmap_to_row(&self, values: &HashMap<String, ScalarValue>) {}
+    fn hashmap_to_row(&self, values: &HashMap<String, ScalarValue>) -> Result<()> {
+        Ok(())
+    }
 
     fn partitions(&self) -> Vec<Vec<RecordBatch>> {
         let guard = self.inner.read();
