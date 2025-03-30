@@ -40,7 +40,7 @@ use datafusion::{
 use indexmap::IndexMap;
 use parking_lot::RwLock;
 
-type ObservabilityData = Arc<RwLock<IndexMap<String, HashMap<String, ScalarValue>>>>;
+type IndexMapData = Arc<RwLock<IndexMap<String, HashMap<String, ScalarValue>>>>;
 
 #[derive(Debug)]
 pub struct IndexMapTableConfig {
@@ -54,7 +54,7 @@ pub struct IndexMapTable {
     schema: Arc<Schema>,
     constraints: Option<Constraints>,
     config: IndexMapTableConfig,
-    inner: ObservabilityData,
+    inner: IndexMapData,
 }
 
 impl IndexMapTable {
@@ -72,7 +72,17 @@ impl IndexMapTable {
         })
     }
 
-    fn partitions(&self) -> &[Vec<RecordBatch>] {}
+    fn hashmap_to_row(&self, values: &HashMap<String, ScalarValue>) {}
+
+    fn partitions(&self) -> Vec<Vec<RecordBatch>> {
+        let guard = self.inner.read();
+        let values = guard.values();
+        let mut batches = Vec::new();
+        for value in values {
+            let row = self.hashmap_to_row(value)?;
+        }
+        batches
+    }
 }
 
 #[async_trait]
@@ -97,8 +107,8 @@ impl TableProvider for IndexMapTable {
         &self,
         state: &dyn Session,
         projection: Option<&Vec<usize>>,
-        filters: &[Expr],
-        limit: Option<usize>,
+        _filters: &[Expr],
+        _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let partitions = self.partitions();
         let exec =
