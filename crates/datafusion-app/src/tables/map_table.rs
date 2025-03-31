@@ -43,7 +43,7 @@ use parking_lot::RwLock;
 // The first String key is meant to hold primary key and provide O(1) lookup.  The inner HashMap is
 // for holding arbitrary column and value pairs - the key is the column name and we use DataFusions
 // scalar value to provide dynamic typing for the column values.
-type IndexMapData = Arc<RwLock<IndexMap<String, HashMap<String, ScalarValue>>>>;
+type MapData = Arc<RwLock<IndexMap<String, HashMap<String, ScalarValue>>>>;
 
 #[derive(Debug)]
 pub struct MapTableConfig {
@@ -63,7 +63,7 @@ pub struct MapTable {
     constraints: Option<Constraints>,
     config: MapTableConfig,
     // TODO: This will be based on a Trait so you can use IndexMap, DashMap, BTreeMap, etc...
-    inner: IndexMapData,
+    inner: MapData,
 }
 
 impl MapTable {
@@ -81,7 +81,7 @@ impl MapTable {
         })
     }
 
-    fn hashmap_to_row(&self, values: &HashMap<String, ScalarValue>) -> Result<()> {
+    fn try_hashmap_to_row(&self, values: &HashMap<String, ScalarValue>) -> Result<()> {
         for (col, val) in values {
             // Check that the column is in the tables schema
             if let Some(_) = self.schema.fields.find(col) {
@@ -98,14 +98,18 @@ impl MapTable {
         Ok(())
     }
 
-    fn partitions(&self) -> Vec<Vec<RecordBatch>> {
+    fn partitions(&self) -> Result<Vec<Vec<RecordBatch>>> {
         let guard = self.inner.read();
         let values = guard.values();
+        // For now we just create a single partition
         let mut batches = Vec::new();
+
         for value in values {
-            let row = self.hashmap_to_row(value)?;
+            let row = self.try_hashmap_to_row(value)?;
         }
-        batches
+
+        let batch = RecordBatch::try_new(self.schema, _);
+        Ok(batches)
     }
 }
 
