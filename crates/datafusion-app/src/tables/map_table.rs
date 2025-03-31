@@ -135,8 +135,7 @@ impl TableProvider for MapTable {
         _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let partitions = self.partitions();
-        let exec =
-            IndexMapExec::try_new(&partitions, Arc::clone(&self.schema), projection.cloned())?;
+        let exec = MapExec::try_new(&partitions, Arc::clone(&self.schema), projection.cloned())?;
         Ok(Arc::new(exec))
     }
 
@@ -149,10 +148,10 @@ impl TableProvider for MapTable {
     // }
 }
 
-/// Execution plan for converting IndexMap data into in-memory record batches and then reading from
+/// Execution plan for converting Map data into in-memory record batches and then reading from
 /// them
 #[derive(Debug)]
-struct IndexMapExec {
+struct MapExec {
     /// The partitions to query
     partitions: Vec<Vec<RecordBatch>>,
     /// Optional projection
@@ -166,7 +165,7 @@ struct IndexMapExec {
     cache: PlanProperties,
 }
 
-impl IndexMapExec {
+impl MapExec {
     fn try_new(
         partitions: &[Vec<RecordBatch>],
         schema: SchemaRef,
@@ -204,19 +203,19 @@ impl IndexMapExec {
     }
 }
 
-impl DisplayAs for IndexMapExec {
+impl DisplayAs for MapExec {
     fn fmt_as(&self, t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match t {
             DisplayFormatType::Default | DisplayFormatType::Verbose => {
-                write!(f, "IndexMapExec")
+                write!(f, "MapExec")
             }
         }
     }
 }
 
-impl ExecutionPlan for IndexMapExec {
+impl ExecutionPlan for MapExec {
     fn name(&self) -> &str {
-        "IndexMapExec"
+        "MapExec"
     }
 
     fn as_any(&self) -> &dyn Any {
@@ -236,7 +235,7 @@ impl ExecutionPlan for IndexMapExec {
         self: Arc<Self>,
         children: Vec<Arc<dyn ExecutionPlan>>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        // IndexMapExec has no children
+        // MapExec has no children
         if children.is_empty() {
             Ok(self)
         } else {

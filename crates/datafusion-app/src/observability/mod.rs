@@ -15,8 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-pub mod table;
-
 use std::{collections::HashMap, sync::Arc};
 
 use datafusion::{
