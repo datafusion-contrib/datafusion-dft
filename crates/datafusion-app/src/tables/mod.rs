@@ -15,4 +15,4 @@
 // specific language governing permissions and limitations
 // under the License.
 
-pub mod indexmap_table;
+pub mod map_table;

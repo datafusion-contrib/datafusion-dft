@@ -40,10 +40,14 @@ use datafusion::{
 use indexmap::IndexMap;
 use parking_lot::RwLock;
 
+// The first String key is meant to hold primary key and provide O(1) lookup.  The inner HashMap is
+// for holding arbitrary column and value pairs - the key is the column name and we use DataFusions
+// scalar value to provide dynamic typing for the column values.
 type IndexMapData = Arc<RwLock<IndexMap<String, HashMap<String, ScalarValue>>>>;
 
 #[derive(Debug)]
-pub struct IndexMapTableConfig {
+pub struct MapTableConfig {
+    table_name: String,
     primary_key: String,
 }
 
@@ -51,20 +55,22 @@ pub struct IndexMapTableConfig {
 /// insertion order, while the app is running and is serialized on app shutdown.
 ///
 /// TODO: Add filter pushdown on the primary key and use `get` on that for O(1)
-/// TODO: Add filter pushdown on non primary key and use `binary_search_by` to search values
+/// TODO: Add filter pushdown on non primary key and use `binary_search_by` / `range` (whatever
+/// method the underlying map provides) to search values
 #[derive(Debug)]
-pub struct IndexMapTable {
+pub struct MapTable {
     schema: Arc<Schema>,
     constraints: Option<Constraints>,
-    config: IndexMapTableConfig,
+    config: MapTableConfig,
+    // TODO: This will be based on a Trait so you can use IndexMap, DashMap, BTreeMap, etc...
     inner: IndexMapData,
 }
 
-impl IndexMapTable {
+impl MapTable {
     pub fn try_new(
         schema: Arc<Schema>,
         constraints: Option<Constraints>,
-        config: IndexMapTableConfig,
+        config: MapTableConfig,
     ) -> Result<Self> {
         let inner = Arc::new(RwLock::new(IndexMap::new()));
         Ok(Self {
@@ -76,6 +82,19 @@ impl IndexMapTable {
     }
 
     fn hashmap_to_row(&self, values: &HashMap<String, ScalarValue>) -> Result<()> {
+        for (col, val) in values {
+            // Check that the column is in the tables schema
+            if let Some(_) = self.schema.fields.find(col) {
+            } else {
+                return Err(datafusion::error::DataFusionError::External(
+                    format!(
+                        "Column {} for table {} is not in the provided schema",
+                        col, self.config.table_name
+                    )
+                    .into(),
+                ));
+            }
+        }
         Ok(())
     }
 
@@ -91,7 +110,7 @@ impl IndexMapTable {
 }
 
 #[async_trait]
-impl TableProvider for IndexMapTable {
+impl TableProvider for MapTable {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -117,7 +136,7 @@ impl TableProvider for IndexMapTable {
     ) -> Result<Arc<dyn ExecutionPlan>> {
         let partitions = self.partitions();
         let exec =
-            IndexMapExec::try_new(partitions, Arc::clone(&self.schema), projection.cloned())?;
+            IndexMapExec::try_new(&partitions, Arc::clone(&self.schema), projection.cloned())?;
         Ok(Arc::new(exec))
     }
 
