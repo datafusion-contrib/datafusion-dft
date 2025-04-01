@@ -107,7 +107,8 @@ impl MapTable {
     fn partitions(&self) -> Result<Vec<Vec<RecordBatch>>> {
         let guard = self.inner.read();
         let values = guard.values();
-        // For now we just create a single partition
+        // We use IndexMap, which has order defined on insertion order to have our builders align
+        // with the order of the fields in the Schema.
         let mut builders: IndexMap<String, (ArrayBuilderRef, DataType)> = IndexMap::new();
         for f in &self.schema.fields {
             let builder = datatype_to_array_builder(f.data_type())?;
@@ -119,7 +120,7 @@ impl MapTable {
                 // Check that the column is in the tables schema
                 if let Some(_) = &self.schema.fields.find(col) {
                     if let Some((builder, builder_datatype)) = builders.get_mut(col) {
-                        append_scalar_to_builder(builder, builder_datatype, val)
+                        try_append_scalar_to_builder(builder, builder_datatype, val)?;
                     }
                 } else {
                     return Err(datafusion::error::DataFusionError::External(
@@ -308,6 +309,28 @@ fn datatype_to_array_builder(datatype: &DataType) -> Result<Box<dyn ArrayBuilder
     }
 }
 
+macro_rules! append_primitive_scalar {
+    ($scalar:expr, $builder:expr, $variant:ident, $builder_type:ty) => {{
+        if let ScalarValue::$variant(val) = $scalar {
+            if let Some(b) = $builder.as_any_mut().downcast_mut::<$builder_type>() {
+                if let Some(x) = val {
+                    b.append_value(*x);
+                } else {
+                    b.append_null();
+                }
+                Ok(())
+            } else {
+                Err(DataFusionError::External(
+                    format!("Failed to downcast builder for {}", stringify!($variant)).into(),
+                ))
+            }
+        } else {
+            // If the scalar is not of the expected variant, do nothing.
+            Ok(())
+        }
+    }};
+}
+
 fn try_append_scalar_to_builder(
     builder: &mut Box<dyn ArrayBuilder>,
     builder_datatype: &DataType,
@@ -315,7 +338,52 @@ fn try_append_scalar_to_builder(
 ) -> Result<()> {
     if builder_datatype == &scalar.data_type() {
         match scalar {
-            ScalarValue::Int8(i) => builder,
+            ScalarValue::Int8(_) => append_primitive_scalar!(scalar, builder, Int8, Int8Builder)?,
+            ScalarValue::Int16(_) => {
+                append_primitive_scalar!(scalar, builder, Int16, Int16Builder)?
+            }
+            ScalarValue::Int32(_) => {
+                append_primitive_scalar!(scalar, builder, Int32, Int32Builder)?
+            }
+            ScalarValue::Int64(_) => {
+                append_primitive_scalar!(scalar, builder, Int64, Int64Builder)?
+            }
+            ScalarValue::UInt8(_) => {
+                append_primitive_scalar!(scalar, builder, UInt8, UInt8Builder)?
+            }
+            ScalarValue::UInt16(_) => {
+                append_primitive_scalar!(scalar, builder, UInt16, UInt16Builder)?
+            }
+            ScalarValue::UInt32(_) => {
+                append_primitive_scalar!(scalar, builder, UInt32, UInt32Builder)?
+            }
+            ScalarValue::UInt64(_) => {
+                append_primitive_scalar!(scalar, builder, UInt64, UInt64Builder)?
+            }
+            ScalarValue::Utf8(s) => {
+                if let Some(builder) = builder.as_any_mut().downcast_mut::<StringBuilder>() {
+                    if let Some(s) = s {
+                        builder.append_value(s.clone())
+                    } else {
+                        builder.append_null()
+                    }
+                }
+            }
+            ScalarValue::LargeUtf8(s) => {
+                if let Some(builder) = builder.as_any_mut().downcast_mut::<LargeStringBuilder>() {
+                    if let Some(s) = s {
+                        builder.append_value(s.clone())
+                    } else {
+                        builder.append_null()
+                    }
+                }
+            }
+
+            _ => {
+                return Err(DataFusionError::External(
+                    format!("Unsupported DataType ({}) for conversion", builder_datatype).into(),
+                ))
+            }
         };
     } else {
         return Err(DataFusionError::External(
