@@ -20,11 +20,15 @@ use std::{any::Any, collections::HashMap, sync::Arc};
 use async_trait::async_trait;
 use datafusion::{
     arrow::{
-        array::RecordBatch,
-        datatypes::{Schema, SchemaRef},
+        array::{
+            ArrayBuilder, ArrayRef, Int16Builder, Int32Builder, Int64Builder, Int8Builder,
+            LargeStringBuilder, RecordBatch, StringBuilder, UInt16Builder, UInt32Builder,
+            UInt64Builder, UInt8Builder,
+        },
+        datatypes::{DataType, Schema, SchemaRef},
     },
     catalog::{Session, TableProvider},
-    common::{internal_err, project_schema, Constraints, Result},
+    common::{internal_err, project_schema, Constraints, DataFusionError, Result},
     datasource::TableType,
     execution::SendableRecordBatchStream,
     logical_expr::dml::InsertOp,
@@ -39,6 +43,8 @@ use datafusion::{
 };
 use indexmap::IndexMap;
 use parking_lot::RwLock;
+
+type ArrayBuilderRef = Box<dyn ArrayBuilder>;
 
 // The first String key is meant to hold primary key and provide O(1) lookup.  The inner HashMap is
 // for holding arbitrary column and value pairs - the key is the column name and we use DataFusions
@@ -102,14 +108,35 @@ impl MapTable {
         let guard = self.inner.read();
         let values = guard.values();
         // For now we just create a single partition
-        let mut batches = Vec::new();
-
-        for value in values {
-            let row = self.try_hashmap_to_row(value)?;
+        let mut builders: IndexMap<String, (ArrayBuilderRef, DataType)> = IndexMap::new();
+        for f in &self.schema.fields {
+            let builder = datatype_to_array_builder(f.data_type())?;
+            builders.insert(f.name().clone(), (builder, f.data_type().clone()));
         }
 
-        let batch = RecordBatch::try_new(self.schema, _);
-        Ok(batches)
+        for value in values {
+            for (col, val) in value {
+                // Check that the column is in the tables schema
+                if let Some(_) = &self.schema.fields.find(col) {
+                    if let Some((builder, builder_datatype)) = builders.get_mut(col) {
+                        append_scalar_to_builder(builder, builder_datatype, val)
+                    }
+                } else {
+                    return Err(datafusion::error::DataFusionError::External(
+                        format!(
+                            "Column {} for table {} is not in the provided schema",
+                            col, self.config.table_name
+                        )
+                        .into(),
+                    ));
+                }
+            }
+        }
+
+        let arrays: Vec<ArrayRef> = builders.values_mut().map(|(b, _)| b.finish()).collect();
+
+        let batch = RecordBatch::try_new(self.schema.clone(), arrays)?;
+        Ok(vec![vec![batch]])
     }
 }
 
@@ -258,6 +285,44 @@ impl ExecutionPlan for MapExec {
             self.projection(),
         )?))
     }
+}
+
+fn datatype_to_array_builder(datatype: &DataType) -> Result<Box<dyn ArrayBuilder>> {
+    match datatype {
+        DataType::Int8 => Ok(Box::new(Int8Builder::new())),
+        DataType::Int16 => Ok(Box::new(Int16Builder::new())),
+        DataType::Int32 => Ok(Box::new(Int32Builder::new())),
+        DataType::Int64 => Ok(Box::new(Int64Builder::new())),
+        DataType::UInt8 => Ok(Box::new(UInt8Builder::new())),
+        DataType::UInt16 => Ok(Box::new(UInt16Builder::new())),
+        DataType::UInt32 => Ok(Box::new(UInt32Builder::new())),
+        DataType::UInt64 => Ok(Box::new(UInt64Builder::new())),
+        DataType::Utf8 => Ok(Box::new(StringBuilder::new())),
+        DataType::LargeUtf8 => Ok(Box::new(LargeStringBuilder::new())),
+
+        _ => {
+            return Err(DataFusionError::External(
+                "Unsupported column type when constructing batch from Map".into(),
+            ))
+        }
+    }
+}
+
+fn try_append_scalar_to_builder(
+    builder: &mut Box<dyn ArrayBuilder>,
+    builder_datatype: &DataType,
+    scalar: &ScalarValue,
+) -> Result<()> {
+    if builder_datatype == &scalar.data_type() {
+        match scalar {
+            ScalarValue::Int8(i) => builder,
+        };
+    } else {
+        return Err(DataFusionError::External(
+            "Array builder and ScalarValue data types dont match".into(),
+        ));
+    };
+    Ok(())
 }
 
 #[cfg(test)]
