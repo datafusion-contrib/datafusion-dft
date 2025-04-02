@@ -49,12 +49,21 @@ type ArrayBuilderRef = Box<dyn ArrayBuilder>;
 // The first String key is meant to hold primary key and provide O(1) lookup.  The inner HashMap is
 // for holding arbitrary column and value pairs - the key is the column name and we use DataFusions
 // scalar value to provide dynamic typing for the column values.
-type MapData = Arc<RwLock<IndexMap<String, HashMap<String, ScalarValue>>>>;
+type MapData = Arc<RwLock<IndexMap<ScalarValue, HashMap<String, ScalarValue>>>>;
 
 #[derive(Debug)]
 pub struct MapTableConfig {
     table_name: String,
     primary_key: String,
+}
+
+impl MapTableConfig {
+    fn new(table_name: String, primary_key: String) -> Self {
+        Self {
+            table_name,
+            primary_key,
+        }
+    }
 }
 
 /// Table for tracking observability information. Data is held in a IndexMap, which maintains
@@ -77,8 +86,9 @@ impl MapTable {
         schema: Arc<Schema>,
         constraints: Option<Constraints>,
         config: MapTableConfig,
+        data: Option<MapData>,
     ) -> Result<Self> {
-        let inner = Arc::new(RwLock::new(IndexMap::new()));
+        let inner = data.unwrap_or(Arc::new(RwLock::new(IndexMap::new())));
         Ok(Self {
             schema,
             constraints,
@@ -87,10 +97,12 @@ impl MapTable {
         })
     }
 
+    /// Row values are stored in a HashMap where keys are column names and values are ScalarValue
+    /// to allow for holding different types
     fn try_hashmap_to_row(&self, values: &HashMap<String, ScalarValue>) -> Result<()> {
-        for (col, val) in values {
+        for col in values.keys() {
             // Check that the column is in the tables schema
-            if let Some(_) = self.schema.fields.find(col) {
+            if self.schema.fields.find(col).is_some() {
             } else {
                 return Err(datafusion::error::DataFusionError::External(
                     format!(
@@ -104,7 +116,7 @@ impl MapTable {
         Ok(())
     }
 
-    fn partitions(&self) -> Result<Vec<Vec<RecordBatch>>> {
+    fn try_create_partitions(&self) -> Result<Vec<Vec<RecordBatch>>> {
         let guard = self.inner.read();
         let values = guard.values();
         // We use IndexMap, which has order defined on insertion order to have our builders align
@@ -118,7 +130,7 @@ impl MapTable {
         for value in values {
             for (col, val) in value {
                 // Check that the column is in the tables schema
-                if let Some(_) = &self.schema.fields.find(col) {
+                if self.schema.fields.find(col).is_some() {
                     if let Some((builder, builder_datatype)) = builders.get_mut(col) {
                         try_append_scalar_to_builder(builder, builder_datatype, val)?;
                     }
@@ -161,12 +173,12 @@ impl TableProvider for MapTable {
 
     async fn scan(
         &self,
-        state: &dyn Session,
+        _state: &dyn Session,
         projection: Option<&Vec<usize>>,
         _filters: &[Expr],
         _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        let partitions = self.partitions();
+        let partitions = self.try_create_partitions()?;
         let exec = MapExec::try_new(&partitions, Arc::clone(&self.schema), projection.cloned())?;
         Ok(Arc::new(exec))
     }
@@ -278,12 +290,12 @@ impl ExecutionPlan for MapExec {
     fn execute(
         &self,
         partition: usize,
-        context: Arc<datafusion::execution::TaskContext>,
+        _context: Arc<datafusion::execution::TaskContext>,
     ) -> Result<SendableRecordBatchStream> {
         Ok(Box::pin(MemoryStream::try_new(
-            self.partitions[partition],
+            self.partitions[partition].clone(),
             Arc::clone(&self.projected_schema),
-            self.projection(),
+            self.projection.clone(),
         )?))
     }
 }
@@ -301,11 +313,9 @@ fn datatype_to_array_builder(datatype: &DataType) -> Result<Box<dyn ArrayBuilder
         DataType::Utf8 => Ok(Box::new(StringBuilder::new())),
         DataType::LargeUtf8 => Ok(Box::new(LargeStringBuilder::new())),
 
-        _ => {
-            return Err(DataFusionError::External(
-                "Unsupported column type when constructing batch from Map".into(),
-            ))
-        }
+        _ => Err(DataFusionError::External(
+            "Unsupported column type when constructing batch from Map".into(),
+        )),
     }
 }
 
@@ -394,4 +404,164 @@ fn try_append_scalar_to_builder(
 }
 
 #[cfg(test)]
-mod test {}
+mod test {
+    use std::{collections::HashMap, sync::Arc};
+
+    use datafusion::{
+        arrow::datatypes::{DataType, Field, Schema},
+        assert_batches_eq,
+        prelude::SessionContext,
+        scalar::ScalarValue,
+    };
+    use indexmap::IndexMap;
+    use parking_lot::RwLock;
+
+    use crate::tables::map_table::{MapTable, MapTableConfig};
+
+    fn setup() -> SessionContext {
+        let mut data: IndexMap<ScalarValue, HashMap<String, ScalarValue>> = IndexMap::new();
+        let mut row: HashMap<String, ScalarValue> = HashMap::new();
+        row.insert("id".to_string(), ScalarValue::Int32(Some(1)));
+        row.insert(
+            "val".to_string(),
+            ScalarValue::Utf8(Some("my_val".to_string())),
+        );
+        data.insert(ScalarValue::Int32(Some(1)), row);
+
+        let fields = vec![
+            Field::new("id", DataType::Int32, false),
+            Field::new("val", DataType::Utf8, false),
+        ];
+        let schema = Schema::new(fields);
+        let config = MapTableConfig::new("test".to_string(), "id".to_string());
+        let table = MapTable::try_new(
+            Arc::new(schema),
+            None,
+            config,
+            Some(Arc::new(RwLock::new(data))),
+        )
+        .unwrap();
+        let ctx = SessionContext::new();
+        ctx.register_table("test", Arc::new(table)).unwrap();
+        ctx
+    }
+
+    #[tokio::test]
+    async fn test_map_table_plans_correctly() {
+        // TODO UPDATE ROOT KEY, WHICH IS THE PRIMARY KEY, TO BE OF TYPE SCALARVALUE
+        let ctx = setup();
+        let batches = ctx
+            .sql("EXPLAIN SELECT * FROM test")
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        let expected = [
+            "+---------------+--------------------------------------+",
+            "| plan_type     | plan                                 |",
+            "+---------------+--------------------------------------+",
+            "| logical_plan  | TableScan: test projection=[id, val] |",
+            "| physical_plan | MapExec                              |",
+            "|               |                                      |",
+            "+---------------+--------------------------------------+",
+        ];
+
+        assert_batches_eq!(expected, &batches);
+    }
+
+    #[tokio::test]
+    async fn test_select_star_from_map_table() {
+        let ctx = setup();
+        let batches = ctx
+            .sql("SELECT * FROM test")
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        let expected = [
+            "+----+--------+",
+            "| id | val    |",
+            "+----+--------+",
+            "| 1  | my_val |",
+            "+----+--------+",
+        ];
+
+        assert_batches_eq!(expected, &batches);
+    }
+
+    #[tokio::test]
+    async fn test_select_star_with_filter_from_map_table() {
+        let ctx = setup();
+        // Check it includes the expected result
+        let batches = ctx
+            .sql("SELECT * FROM test WHERE id = 1")
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        let expected = [
+            "+----+--------+",
+            "| id | val    |",
+            "+----+--------+",
+            "| 1  | my_val |",
+            "+----+--------+",
+        ];
+
+        assert_batches_eq!(expected, &batches);
+
+        // Check it excludes the expected result
+        let batches = ctx
+            .sql("SELECT * FROM test WHERE id = 2")
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        let expected = ["++", "++"];
+
+        assert_batches_eq!(expected, &batches);
+    }
+
+    #[tokio::test]
+    async fn test_select_star_with_projection_from_map_table() {
+        let ctx = setup();
+        // Check it includes the expected result
+        let batches = ctx
+            .sql("SELECT val FROM test WHERE id = 1")
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        let expected = [
+            "+--------+",
+            "| val    |",
+            "+--------+",
+            "| my_val |",
+            "+--------+",
+        ];
+
+        assert_batches_eq!(expected, &batches);
+
+        // Check it excludes the expected result
+        let batches = ctx
+            .sql("SELECT * FROM test WHERE id = 2")
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        let expected = ["++", "++"];
+
+        assert_batches_eq!(expected, &batches);
+    }
+}

@@ -29,8 +29,8 @@ pub mod local_benchmarks;
 pub mod observability;
 pub mod sql_utils;
 pub mod stats;
-#[cfg(feature = "udfs-wasm")]
 pub mod tables;
+#[cfg(feature = "udfs-wasm")]
 pub mod wasm;
 
 pub use stats::{collect_plan_io_stats, ExecutionStats};
