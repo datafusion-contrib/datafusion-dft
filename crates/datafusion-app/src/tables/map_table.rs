@@ -54,14 +54,15 @@ type MapData = Arc<RwLock<IndexMap<ScalarValue, HashMap<String, ScalarValue>>>>;
 #[derive(Debug)]
 pub struct MapTableConfig {
     table_name: String,
-    primary_key: String,
+    /// Column name of the primary key
+    _primary_key: String,
 }
 
 impl MapTableConfig {
-    fn new(table_name: String, primary_key: String) -> Self {
+    pub fn new(table_name: String, primary_key: String) -> Self {
         Self {
             table_name,
-            primary_key,
+            _primary_key: primary_key,
         }
     }
 }
@@ -148,7 +149,7 @@ impl MapTable {
 
         let arrays: Vec<ArrayRef> = builders.values_mut().map(|(b, _)| b.finish()).collect();
 
-        let batch = RecordBatch::try_new(self.schema.clone(), arrays)?;
+        let batch = RecordBatch::try_new(Arc::clone(&self.schema), arrays)?;
         Ok(vec![vec![batch]])
     }
 }
@@ -251,7 +252,7 @@ impl DisplayAs for MapExec {
     fn fmt_as(&self, t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match t {
             DisplayFormatType::Default | DisplayFormatType::Verbose => {
-                write!(f, "MapExec")
+                write!(f, "MapExec: projection={:?}", self.projection)
             }
         }
     }
