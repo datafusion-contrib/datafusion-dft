@@ -26,6 +26,7 @@ hudi = { git = "https://github.com/apache/hudi-rs", rev = "eab36e2d3ea39372c52d2
 ], optional = true }
 iceberg-catalog-rest = { git = "https://github.com/apache/iceberg-rust", rev = "210134573569be0b6e49464aca076cb122e33e24", optional = true }
 iceberg-datafusion = { git = "https://github.com/apache/iceberg-rust", rev = "210134573569be0b6e49464aca076cb122e33e24", optional = true }
+indexmap = { version = "2.8.0", features = ["serde"] }
 itertools = "0.13.0"
 log = "0.4.22"
 num_cpus = "1.16.0"
@@ -53,3 +54,6 @@ iceberg = ["dep:iceberg-catalog-rest", "dep:iceberg-datafusion"]
 observability = []
 s3 = ["object_store/aws", "url"]
 udfs-wasm = ["dep:datafusion-udfs-wasm"]
+
+[lints.clippy]
+clone_on_ref_ptr = "deny"

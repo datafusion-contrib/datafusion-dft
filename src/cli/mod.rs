@@ -292,6 +292,13 @@ impl CliApp {
 
     async fn execute_commands(&self, commands: &[String]) -> color_eyre::Result<()> {
         info!("Executing commands: {:?}", commands);
+        if let Some(run_before_query) = &self.args.run_before {
+            self.app_execution
+                .execution_ctx()
+                .execute_sql_and_discard_results(run_before_query)
+                .await?;
+        }
+
         for command in commands {
             self.exec_from_string(command).await?
         }

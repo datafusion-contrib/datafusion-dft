@@ -29,6 +29,7 @@ pub mod local_benchmarks;
 pub mod observability;
 pub mod sql_utils;
 pub mod stats;
+pub mod tables;
 #[cfg(feature = "udfs-wasm")]
 pub mod wasm;
 
