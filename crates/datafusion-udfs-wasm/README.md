@@ -17,4 +17,16 @@ Simply specify the signature in `WasmUdfDetails` and it will be automatically ch
 
 The exported WASM function that operates on Arrow IPC data must take two `i32` as input - the first being an offset into memory and the second the number of bytes for the Arrow IPC data.  The function must return an `i64` which is packed with the result offset as the last 32 bits and number of bytes of the result as the first 32 bits.  We do this because at the time of writing I was not able to get WASM to export functions that return more than one value. As I learn more about WASM this signature may change.
 
+## Benchmarks
+
+The crate includes Criterion benchmarks for measuring the startup time of various wasmtime components. These can help identify potential performance bottlenecks in the WASM UDF initialization process.
+
+To run the benchmarks:
+
+```bash
+cargo bench --bench wasm_startup
+```
+
+For more details, see the [benchmarks README](benches/README.md).
+
 
