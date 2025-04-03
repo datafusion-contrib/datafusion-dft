@@ -389,7 +389,7 @@ mod test {
     use datafusion::{
         arrow::datatypes::{DataType, Field, Schema},
         assert_batches_eq,
-        prelude::SessionContext,
+        prelude::{SessionConfig, SessionContext},
         scalar::ScalarValue,
     };
     use indexmap::IndexMap;
@@ -421,7 +421,8 @@ mod test {
             Some(Arc::new(RwLock::new(data))),
         )
         .unwrap();
-        let ctx = SessionContext::new();
+        let config = SessionConfig::new().with_target_partitions(4);
+        let ctx = SessionContext::new_with_config(config);
         ctx.register_table("test", Arc::new(table)).unwrap();
         ctx
     }
@@ -521,17 +522,17 @@ mod test {
             .unwrap();
 
         let expected = [
-            "+---------------+---------------------------------------------------------------------------+",
-            "| plan_type     | plan                                                                      |",
-            "+---------------+---------------------------------------------------------------------------+",
-            "| logical_plan  | Filter: test.id = Int32(2)                                                |",
-            "|               |   TableScan: test projection=[id, val]                                    |",
-            "| physical_plan | CoalesceBatchesExec: target_batch_size=8192                               |",
-            "|               |   FilterExec: id@0 = 2                                                    |",
-            "|               |     RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1 |",
-            "|               |       MapExec: partitions=1, projection=Some([0, 1])                      |",
-            "|               |                                                                           |",
-            "+---------------+---------------------------------------------------------------------------+",
+            "+---------------+--------------------------------------------------------------------------+",
+            "| plan_type     | plan                                                                     |",
+            "+---------------+--------------------------------------------------------------------------+",
+            "| logical_plan  | Filter: test.id = Int32(2)                                               |",
+            "|               |   TableScan: test projection=[id, val]                                   |",
+            "| physical_plan | CoalesceBatchesExec: target_batch_size=8192                              |",
+            "|               |   FilterExec: id@0 = 2                                                   |",
+            "|               |     RepartitionExec: partitioning=RoundRobinBatch(4), input_partitions=1 |",
+            "|               |       MapExec: partitions=1, projection=Some([0, 1])                     |",
+            "|               |                                                                          |",
+            "+---------------+--------------------------------------------------------------------------+",
         ];
 
         assert_batches_eq!(expected, &batches);
