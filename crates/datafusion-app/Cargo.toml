@@ -62,5 +62,5 @@ udfs-wasm = ["dep:datafusion-udfs-wasm"]
 clone_on_ref_ptr = "deny"
 
 [[bench]]
-name = "map_table_benchmark"
 harness = false
+name = "map_table_benchmark"

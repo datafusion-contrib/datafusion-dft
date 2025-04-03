@@ -34,15 +34,15 @@ use datafusion_app::tables::map_table::{MapTable, MapTableConfig};
 /// Set up a MapTable for benchmarking with specified number of rows
 fn setup_map_table(num_rows: usize) -> SessionContext {
     let mut data: IndexMap<ScalarValue, HashMap<String, ScalarValue>> = IndexMap::new();
-    
+
     // Create rows with sequential IDs and values
     for id in 1..=num_rows {
         let mut row: HashMap<String, ScalarValue> = HashMap::new();
         let val = format!("val{}", id);
-        
+
         row.insert("id".to_string(), ScalarValue::Int32(Some(id as i32)));
         row.insert("val".to_string(), ScalarValue::Utf8(Some(val)));
-        
+
         data.insert(ScalarValue::Int32(Some(id as i32)), row);
     }
 
@@ -50,7 +50,7 @@ fn setup_map_table(num_rows: usize) -> SessionContext {
         Field::new("id", DataType::Int32, false),
         Field::new("val", DataType::Utf8, false),
     ];
-    
+
     let schema = Schema::new(fields);
     let config = MapTableConfig::new("test".to_string(), "id".to_string());
     let table = MapTable::try_new(
@@ -60,7 +60,7 @@ fn setup_map_table(num_rows: usize) -> SessionContext {
         Some(Arc::new(RwLock::new(data))),
     )
     .unwrap();
-    
+
     let config = SessionConfig::new().with_target_partitions(4);
     let ctx = SessionContext::new_with_config(config);
     ctx.register_table("test", Arc::new(table)).unwrap();
@@ -70,9 +70,9 @@ fn setup_map_table(num_rows: usize) -> SessionContext {
 /// Benchmark MapTable with different row counts
 pub fn map_table_benchmark(c: &mut Criterion) {
     let runtime = Runtime::new().unwrap();
-    
+
     let mut group = c.benchmark_group("MapTable");
-    
+
     for size in [1000, 10000, 100000] {
         group.bench_function(format!("select_all_{}", size), |b| {
             b.iter(|| {
@@ -83,7 +83,7 @@ pub fn map_table_benchmark(c: &mut Criterion) {
                 });
             });
         });
-        
+
         group.bench_function(format!("select_filtered_{}", size), |b| {
             b.iter(|| {
                 let ctx = setup_map_table(size);
@@ -96,7 +96,7 @@ pub fn map_table_benchmark(c: &mut Criterion) {
             });
         });
     }
-    
+
     group.finish();
 }
 
