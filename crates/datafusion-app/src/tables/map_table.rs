@@ -31,7 +31,6 @@ use datafusion::{
     common::{internal_err, project_schema, Constraints, DataFusionError, Result},
     datasource::TableType,
     execution::SendableRecordBatchStream,
-    logical_expr::dml::InsertOp,
     physical_expr::{EquivalenceProperties, LexOrdering},
     physical_plan::{
         execution_plan::{Boundedness, EmissionType},
@@ -72,6 +71,7 @@ impl MapTableConfig {
 ///
 /// TODO: Add filter pushdown on the primary key and use `get` on that for O(1)
 /// TODO: Add filter pushdown on non primary key and use `binary_search_by` / `range` (whatever
+/// TODO: Add projection pushdown to only read keys from HashMap that are projected
 /// method the underlying map provides) to search values
 #[derive(Debug)]
 pub struct MapTable {
@@ -96,25 +96,6 @@ impl MapTable {
             config,
             inner,
         })
-    }
-
-    /// Row values are stored in a HashMap where keys are column names and values are ScalarValue
-    /// to allow for holding different types
-    fn try_hashmap_to_row(&self, values: &HashMap<String, ScalarValue>) -> Result<()> {
-        for col in values.keys() {
-            // Check that the column is in the tables schema
-            if self.schema.fields.find(col).is_some() {
-            } else {
-                return Err(datafusion::error::DataFusionError::External(
-                    format!(
-                        "Column {} for table {} is not in the provided schema",
-                        col, self.config.table_name
-                    )
-                    .into(),
-                ));
-            }
-        }
-        Ok(())
     }
 
     fn try_create_partitions(&self) -> Result<Vec<Vec<RecordBatch>>> {
@@ -183,14 +164,6 @@ impl TableProvider for MapTable {
         let exec = MapExec::try_new(&partitions, Arc::clone(&self.schema), projection.cloned())?;
         Ok(Arc::new(exec))
     }
-
-    // async fn insert_into(
-    //     &self,
-    //     _state: &dyn Session,
-    //     input: Arc<dyn ExecutionPlan>,
-    //     insert_op: InsertOp,
-    // ) -> Result<Arc<dyn ExecutionPlan>> {
-    // }
 }
 
 /// Execution plan for converting Map data into in-memory record batches and then reading from
@@ -202,11 +175,11 @@ struct MapExec {
     /// Optional projection
     projection: Option<Vec<usize>>,
     /// Schema representing the data before projection
-    schema: SchemaRef,
+    _schema: SchemaRef,
     /// Schema representing the data after the optional projection is applied
     projected_schema: SchemaRef,
     // Sort information: one or more equivalent orderings
-    sort_information: Vec<LexOrdering>,
+    _sort_information: Vec<LexOrdering>,
     cache: PlanProperties,
 }
 
@@ -223,10 +196,10 @@ impl MapExec {
 
         Ok(Self {
             partitions: partitions.to_vec(),
-            schema,
+            _schema: schema,
             projected_schema,
             projection,
-            sort_information: vec![],
+            _sort_information: vec![],
             cache,
         })
     }
@@ -252,7 +225,12 @@ impl DisplayAs for MapExec {
     fn fmt_as(&self, t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match t {
             DisplayFormatType::Default | DisplayFormatType::Verbose => {
-                write!(f, "MapExec: projection={:?}", self.projection)
+                write!(
+                    f,
+                    "MapExec: partitions={}, projection={:?}",
+                    self.partitions.len(),
+                    self.projection
+                )
             }
         }
     }
@@ -421,13 +399,14 @@ mod test {
 
     fn setup() -> SessionContext {
         let mut data: IndexMap<ScalarValue, HashMap<String, ScalarValue>> = IndexMap::new();
-        let mut row: HashMap<String, ScalarValue> = HashMap::new();
-        row.insert("id".to_string(), ScalarValue::Int32(Some(1)));
-        row.insert(
-            "val".to_string(),
-            ScalarValue::Utf8(Some("my_val".to_string())),
-        );
-        data.insert(ScalarValue::Int32(Some(1)), row);
+        let ids = vec![1, 2, 3, 4, 5];
+        let vals = vec!["val1", "val2", "val3", "val4", "val5"];
+        for (id, val) in ids.into_iter().zip(vals) {
+            let mut row: HashMap<String, ScalarValue> = HashMap::new();
+            row.insert("id".to_string(), ScalarValue::Int32(Some(id)));
+            row.insert("val".to_string(), ScalarValue::Utf8(Some(val.to_string())));
+            data.insert(ScalarValue::Int32(Some(id)), row);
+        }
 
         let fields = vec![
             Field::new("id", DataType::Int32, false),
@@ -460,13 +439,13 @@ mod test {
             .unwrap();
 
         let expected = [
-            "+---------------+--------------------------------------+",
-            "| plan_type     | plan                                 |",
-            "+---------------+--------------------------------------+",
-            "| logical_plan  | TableScan: test projection=[id, val] |",
-            "| physical_plan | MapExec                              |",
-            "|               |                                      |",
-            "+---------------+--------------------------------------+",
+            "+---------------+------------------------------------------------+",
+            "| plan_type     | plan                                           |",
+            "+---------------+------------------------------------------------+",
+            "| logical_plan  | TableScan: test projection=[id, val]           |",
+            "| physical_plan | MapExec: partitions=1, projection=Some([0, 1]) |",
+            "|               |                                                |",
+            "+---------------+------------------------------------------------+",
         ];
 
         assert_batches_eq!(expected, &batches);
@@ -484,11 +463,15 @@ mod test {
             .unwrap();
 
         let expected = [
-            "+----+--------+",
-            "| id | val    |",
-            "+----+--------+",
-            "| 1  | my_val |",
-            "+----+--------+",
+            "+----+------+",
+            "| id | val  |",
+            "+----+------+",
+            "| 1  | val1 |",
+            "| 2  | val2 |",
+            "| 3  | val3 |",
+            "| 4  | val4 |",
+            "| 5  | val5 |",
+            "+----+------+",
         ];
 
         assert_batches_eq!(expected, &batches);
@@ -507,18 +490,18 @@ mod test {
             .unwrap();
 
         let expected = [
-            "+----+--------+",
-            "| id | val    |",
-            "+----+--------+",
-            "| 1  | my_val |",
-            "+----+--------+",
+            "+----+------+",
+            "| id | val  |",
+            "+----+------+",
+            "| 1  | val1 |",
+            "+----+------+",
         ];
 
         assert_batches_eq!(expected, &batches);
 
         // Check it excludes the expected result
         let batches = ctx
-            .sql("SELECT * FROM test WHERE id = 2")
+            .sql("SELECT * FROM test WHERE id = 6")
             .await
             .unwrap()
             .collect()
@@ -526,6 +509,30 @@ mod test {
             .unwrap();
 
         let expected = ["++", "++"];
+
+        assert_batches_eq!(expected, &batches);
+
+        let batches = ctx
+            .sql("EXPLAIN SELECT * FROM test WHERE id = 2")
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        let expected = [
+            "+---------------+---------------------------------------------------------------------------+",
+            "| plan_type     | plan                                                                      |",
+            "+---------------+---------------------------------------------------------------------------+",
+            "| logical_plan  | Filter: test.id = Int32(2)                                                |",
+            "|               |   TableScan: test projection=[id, val]                                    |",
+            "| physical_plan | CoalesceBatchesExec: target_batch_size=8192                               |",
+            "|               |   FilterExec: id@0 = 2                                                    |",
+            "|               |     RepartitionExec: partitioning=RoundRobinBatch(12), input_partitions=1 |",
+            "|               |       MapExec: partitions=1, projection=Some([0, 1])                      |",
+            "|               |                                                                           |",
+            "+---------------+---------------------------------------------------------------------------+",
+        ];
 
         assert_batches_eq!(expected, &batches);
     }
@@ -542,26 +549,124 @@ mod test {
             .await
             .unwrap();
 
-        let expected = [
-            "+--------+",
-            "| val    |",
-            "+--------+",
-            "| my_val |",
-            "+--------+",
-        ];
+        let expected = ["+------+", "| val  |", "+------+", "| val1 |", "+------+"];
 
         assert_batches_eq!(expected, &batches);
 
-        // Check it excludes the expected result
         let batches = ctx
-            .sql("SELECT * FROM test WHERE id = 2")
+            .sql("SELECT id * 2 FROM test")
             .await
             .unwrap()
             .collect()
             .await
             .unwrap();
 
-        let expected = ["++", "++"];
+        let expected = [
+            "+--------------------+",
+            "| test.id * Int64(2) |",
+            "+--------------------+",
+            "| 2                  |",
+            "| 4                  |",
+            "| 6                  |",
+            "| 8                  |",
+            "| 10                 |",
+            "+--------------------+",
+        ];
+
+        assert_batches_eq!(expected, &batches);
+    }
+
+    #[tokio::test]
+    async fn test_select_star_with_sort_from_map_table() {
+        let ctx = setup();
+        // Check it includes the expected result
+        let batches = ctx
+            .sql("SELECT * FROM test ORDER BY id DESC")
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        let expected = [
+            "+----+------+",
+            "| id | val  |",
+            "+----+------+",
+            "| 5  | val5 |",
+            "| 4  | val4 |",
+            "| 3  | val3 |",
+            "| 2  | val2 |",
+            "| 1  | val1 |",
+            "+----+------+",
+        ];
+
+        assert_batches_eq!(expected, &batches);
+
+        let batches = ctx
+            .sql("EXPLAIN SELECT * FROM test ORDER BY id DESC")
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        let expected = [
+            "+---------------+-----------------------------------------------------------+",
+            "| plan_type     | plan                                                      |",
+            "+---------------+-----------------------------------------------------------+",
+            "| logical_plan  | Sort: test.id DESC NULLS FIRST                            |",
+            "|               |   TableScan: test projection=[id, val]                    |",
+            "| physical_plan | SortExec: expr=[id@0 DESC], preserve_partitioning=[false] |",
+            "|               |   MapExec: partitions=1, projection=Some([0, 1])          |",
+            "|               |                                                           |",
+            "+---------------+-----------------------------------------------------------+",
+        ];
+
+        assert_batches_eq!(expected, &batches);
+    }
+
+    #[tokio::test]
+    async fn test_select_star_with_limit_from_map_table() {
+        let ctx = setup();
+        // Check it includes the expected result
+        let batches = ctx
+            .sql("SELECT * FROM test LIMIT 2")
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        let expected = [
+            "+----+------+",
+            "| id | val  |",
+            "+----+------+",
+            "| 1  | val1 |",
+            "| 2  | val2 |",
+            "+----+------+",
+        ];
+
+        assert_batches_eq!(expected, &batches);
+
+        let batches = ctx
+            .sql("EXPLAIN SELECT * FROM test LIMIT 2")
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        let expected = [
+            "+---------------+--------------------------------------------------+",
+            "| plan_type     | plan                                             |",
+            "+---------------+--------------------------------------------------+",
+            "| logical_plan  | Limit: skip=0, fetch=2                           |",
+            "|               |   TableScan: test projection=[id, val], fetch=2  |",
+            "| physical_plan | GlobalLimitExec: skip=0, fetch=2                 |",
+            "|               |   MapExec: partitions=1, projection=Some([0, 1]) |",
+            "|               |                                                  |",
+            "+---------------+--------------------------------------------------+",
+        ];
 
         assert_batches_eq!(expected, &batches);
     }
