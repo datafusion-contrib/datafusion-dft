@@ -193,4 +193,3 @@ criterion_group!(
     bench_function_extraction
 );
 criterion_main!(benches);
-
