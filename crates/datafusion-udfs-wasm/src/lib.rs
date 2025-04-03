@@ -43,10 +43,10 @@ pub enum WasmInputDataType {
 
 /// Details necessary to create a DataFusion `ScalarUDF`
 pub struct WasmUdfDetails {
-    name: String,
-    input_data_type: WasmInputDataType,
-    input_types: Vec<DataType>,
-    return_type: DataType,
+    pub name: String,
+    pub input_data_type: WasmInputDataType,
+    pub input_types: Vec<DataType>,
+    pub return_type: DataType,
 }
 
 impl WasmUdfDetails {
