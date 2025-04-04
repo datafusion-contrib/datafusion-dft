@@ -1,19 +1,45 @@
-# Config Reference
+# Configuration Reference
 
-`dft` is configuration through a TOML file with default location of `~/.config/dft/config.toml`.  Within the config there is a shared configuration that can be used across all apps and app specific configuration.  The shared and app specific configs are merged to come up with a final configuration that is used.  DataFusion's execution configuration can be fully customized as part of this.
+`dft` is configured through a TOML file located at `~/.config/dft/config.toml` by default. The configuration system uses a hierarchical approach:
 
-The sections for configuring each app are shown below.
+1. **Default values** built into the application
+2. **Shared configuration** applied to all interfaces
+3. **App-specific configuration** for each interface (TUI, CLI, etc.)
+
+The final configuration for each interface is a merge of these three layers, with app-specific settings taking precedence over shared settings.
+
+## Configuration Structure
+
 ```toml
+# Settings applied to all interfaces
 [shared]
+# ...shared settings...
 
+# CLI-specific settings
 [cli]
+# ...CLI settings...
 
+# TUI-specific settings
 [tui]
+# ...TUI settings...
 
+# FlightSQL client settings
 [flightsql_client]
+# ...FlightSQL client settings...
 
+# FlightSQL server settings
 [flightsql_server]
+# ...FlightSQL server settings...
 
+# HTTP server settings
+[http_server]
+# ...HTTP server settings...
+```
+
+You can specify a different config file with the `--config` parameter:
+
+```bash
+dft --config /path/to/custom/config.toml
 ```
 
 ## Execution Config

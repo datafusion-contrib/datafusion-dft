@@ -5,45 +5,68 @@ Documentation is undergoing a significant revamp - the new documentation will be
 
 ## Overview
 
-`dft` is a batteries included suite of a [DataFusion](https://github.com/apache/arrow-datafusion) applications. The batteries being several common features to modern query execution engines such as:
+`dft` is a batteries-included suite of [DataFusion](https://github.com/apache/arrow-datafusion) applications that provides:
 
-- Query files from S3 or HuggingFace datasets
-- Support for common table formats (Deltalake, Iceberg, Hudi)
-- UDFs defined in multiple languages (WASM and soon Python)
-- Popular helper functions (for example for working with JSON and Parquet data)
+- **Data Source Integration**: Query files from S3, local filesystems, or HuggingFace datasets
+- **Table Format Support**: Native support for Delta Lake, Iceberg, and Hudi
+- **Extensibility**: UDFs defined in WASM (and soon Python)
+- **Helper Functions**: Built-in functions for JSON and Parquet data processing
 
-It provides two client interfaces to the query execution engine:
-1. Text User Interface (TUI): An IDE for DataFusion developers and users that provides a local database experience with utilities to analyze / benchmark queries.
-2. Command Line Interface (CLI): Scriptable engine for executing queries from files.
+The project offers four complementary interfaces:
 
-And two server implementation, FlightSQL & HTTP, leveraging the same execution engine behind the TUI and CLI.  This allows users to iterate and quickly develop a database then seamlessly deploy applications built on it.
+1. **Text User Interface (TUI)**: An interactive SQL IDE with real-time query analysis, benchmarking, and catalog exploration
+2. **Command Line Interface (CLI)**: A scriptable engine for executing queries from files or command line
+3. **FlightSQL Server**: A standards-compliant SQL interface for programmatic access
+4. **HTTP Server**: A REST API for SQL queries and catalog exploration
 
-`dft` is inspired by  [`datafusion-cli`], but has some differences:
-1. The TUI focuses on more complete and interactive experience for users.
-2. It contains many built in integrations such as Delta Lake and Iceberg that are not available in `datafusion-cli`.
-3. It provides FlightSQL and HTTP server implementations to make it easy to deploy DataFusion based applications / backends.
+All interfaces share the same execution engine, allowing you to develop locally with the TUI and then seamlessly deploy with the server implementations.
 
-[`datafusion-cli`]: https://datafusion.apache.org/user-guide/cli/overview.html
+`dft` builds upon [`datafusion-cli`](https://datafusion.apache.org/user-guide/cli/overview.html) with enhanced interactivity, additional integrations, and ready-to-use server implementations.
 
 ## User Guide
 
 ### Installation
 
-Currently, the only supported packaging is on [crates.io](https://crates.io/search?q=datafusion-dft).  If you already have Rust installed it can be installed by running `cargo install datafusion-dft`.  If rust is not installed you can download following the directions [here](https://www.rust-lang.org/tools/install).
+#### From crates.io (Recommended)
+```sh
+# If you have Rust installed
+cargo install datafusion-dft
+
+# For full functionality with all features
+cargo install datafusion-dft --all-features
+```
+
+If you don't have Rust installed, follow the [installation instructions](https://www.rust-lang.org/tools/install).
+
+#### Feature Flags
+Common feature combinations:
+```sh
+# Core with S3 support
+cargo install datafusion-dft --features=s3
+
+# Data lake formats
+cargo install datafusion-dft --features=deltalake,iceberg,hudi
+
+# With JSON and Parquet functions
+cargo install datafusion-dft --features=function-json,functions-parquet
+```
+
+See the [Features documentation](docs/features.md) for all available features.
 
 ### Running the apps
 
-The command for each of the apps are:
-
 ```sh
-# TUI (enabled by default)
+# Interactive TUI (default)
 dft
 
-# Execute command with CLI (enabled by default)
-dft -c "SELECT 1"
+# CLI with direct query execution
+dft -c "SELECT 1 + 2"
 
-# Execute SQL from file (enabled by default)
+# CLI with file-based query
 dft -f query.sql
+
+# Benchmark a query (with stats)
+dft -c "SELECT * FROM my_table" --bench
 
 # Start FlightSQL Server (requires `flightsql` feature)
 dft serve-flightsql
@@ -52,33 +75,59 @@ dft serve-flightsql
 dft serve-http
 ```
 
-### DDL
+### Setting Up Tables with DDL
 
-The CLI can also run your configured DDL prior to executing the query by adding the `--run-ddl` parameter.
+`dft` can automatically load table definitions at startup, giving you a persistent "database-like" experience.
 
-To have the best experience with `dft` it is highly recommended to define all of your DDL in `~/.config/ddl.sql` so that any tables you wish to query are available at startup.  Additionally, now that DataFusion supports `CREATE VIEW` via sql you can also make a `VIEW` based on these tables.
+#### Using DDL Files
 
-For example, your DDL file could look like the following:
+1. Create a DDL file (default: `~/.config/dft/ddl.sql`)
+2. Add your table and view definitions:
 
+```sql
+-- S3 data source (requires s3 feature)
+CREATE EXTERNAL TABLE users 
+STORED AS NDJSON 
+LOCATION 's3://bucket/users';
+
+-- Parquet files
+CREATE EXTERNAL TABLE transactions 
+STORED AS PARQUET 
+LOCATION 's3://bucket/transactions';
+
+-- Local files
+CREATE EXTERNAL TABLE listings 
+STORED AS PARQUET 
+LOCATION 'file://folder/listings';
+
+-- Create views from tables
+CREATE VIEW users_listings AS 
+SELECT * FROM users 
+LEFT JOIN listings USING (user_id);
+
+-- Delta Lake table (requires deltalake feature)
+CREATE EXTERNAL TABLE delta_table 
+STORED AS DELTATABLE 
+LOCATION 's3://bucket/delta_table';
 ```
-CREATE EXTERNAL TABLE users STORED AS NDJSON LOCATION 's3://bucket/users';
 
-CREATE EXTERNAL TABLE transactions STORED AS PARQUET LOCATION 's3://bucket/transactions';
+#### Loading DDL
 
-CREATE EXTERNAL TABLE listings STORED AS PARQUET LOCATION 'file://folder/listings';
+- **TUI**: DDL is automatically loaded at startup
+- **CLI**: Add `--run-ddl` flag to execute DDL before your query
+- **Custom Path**: Configure a custom DDL path in your config file
+  ```toml
+  [execution]
+  ddl_path = "/path/to/my/ddl.sql"
+  ```
 
-CREATE VIEW OR REPLACE users_listings AS SELECT * FROM users LEFT JOIN listings USING (user_id);
-```
+## Quick Reference
 
-This would make the tables `users`, `transactions`, `listings`, and the view  `users_listings` available at startup.  Any of these DDL statements could also be run interactively from the SQL editor as well to create the tables.
-
-# Additional Documentation
-
-Links to more detailed documentation for each of the apps and all of the features can be found below.
-
-- [Features](docs/features.md)
-- [CLI Docs](docs/cli.md)
-- [TUI Docs](docs/tui.md)
-- [FlightSQL Server Docs](docs/flightsql_server.md)
-- [HTTP Server Docs](docs/http_server.md)
-- [Config Reference](docs/config.md)
+| Feature | Documentation |
+|---------|---------------|
+| **Core Features** | [Features Guide](docs/features.md) |
+| **TUI Interface** | [TUI Guide](docs/tui.md) |
+| **CLI Usage** | [CLI Guide](docs/cli.md) |
+| **FlightSQL Server** | [FlightSQL Guide](docs/flightsql_server.md) |
+| **HTTP Server** | [HTTP Guide](docs/http_server.md) |
+| **Configuration Options** | [Config Reference](docs/config.md) |
