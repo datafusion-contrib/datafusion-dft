@@ -88,7 +88,7 @@ The TUI is organized into several tabs that you can navigate between:
 ### Performance Analysis
 - **Query Benchmarking**: Measure execution times across multiple runs
 - **Execution Statistics**: See detailed breakdowns of query component performance
-- **Resource Utilization**: Monitor memory usage during query execution
+- **Resource Utilization**: Monitor memory usage during query execution (TODO)
 
 ### Integration Support
 - **Object Store Support**: Query S3, local files, and more
@@ -198,6 +198,6 @@ frame_rate = 60  # Default is 60
 Adjust batch size for result pagination:
 
 ```toml
-[execution]
-tui_batch_size = 100  # Default; smaller values may improve performance
+[tui.execution.datafusion]
+execution.batch_size = 100  # Default; smaller values may improve performance
 ```
