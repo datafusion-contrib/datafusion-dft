@@ -8,9 +8,6 @@
 # Start with default settings
 dft serve-flightsql
 
-# Start with custom port
-dft serve-flightsql --port 8080
-
 # Start with your custom DDL loaded
 dft serve-flightsql --run-ddl
 ```
@@ -20,33 +17,16 @@ dft serve-flightsql --run-ddl
 The server implements the FlightSQL protocol, providing:
 
 - SQL query execution
-- Schema fetching
-- Prepared statements
-- Catalog browsing
-- Metadata retrieval
+- Schema fetching (TODO)
+- Prepared statements (TODO)
+- Catalog browsing (TODO)
 
-## Client Connections
+## Client Connections (TODO - Test this)
 
 You can connect to the server using any FlightSQL-compatible client:
 
 ```python
-# Python example using pyarrow
-import pyarrow.flight
-from pyarrow.flight import FlightClient
-import pyarrow.flight.sql as flight_sql
-
-# Connect to the server
-client = flight_sql.FlightSQLClient(
-    FlightClient("grpc://localhost:50051")
-)
-
-# Execute a query
-info = client.execute("SELECT * FROM my_table")
-reader = client.do_get(info.endpoints[0].ticket)
-
-# Read the results
-for batch in reader:
-    print(batch.to_pandas())
+TODO with https://docs.influxdata.com/influxdb3/clustered/reference/client-libraries/flight/python-flightsql-dbapi/
 ```
 
 ## Authentication
@@ -88,11 +68,8 @@ Set connection and execution parameters in your config file:
 # Server address
 connection_url = "http://localhost:50051"
 
-# Batch size for result streaming
-flightsql_server_batch_size = 8092
-
 # Configure execution parameters
-[flightsql_server.execution]
+[flightsql_server.execution.datafusion]
 target_partitions = 8
 ```
 
