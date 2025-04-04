@@ -20,3 +20,7 @@ serde = ["dep:serde"]
 [[bench]]
 harness = false
 name = "wasm_startup"
+
+[[bench]]
+harness = false
+name = "query_performance"
