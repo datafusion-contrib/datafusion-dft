@@ -17,10 +17,17 @@ tokio = { version = "1.36.0", features = ["macros", "rt-multi-thread"] }
 [features]
 serde = ["dep:serde"]
 
+[profile.bench]
+debug = true
+
 [[bench]]
 harness = false
 name = "wasm_startup"
 
 [[bench]]
 harness = false
-name = "query_performance"
+name = "row_query_performance"
+
+[[bench]]
+harness = false
+name = "arrow_ipc_query_performance"
