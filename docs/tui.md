@@ -1,6 +1,6 @@
 # TUI Guide
 
-The `dft` TUI (Text User Interface) is an IDE-like experience that allows you to query DataFusion in a local “database-like” environment. It includes built-in utilities for analyzing queries, exploring catalogs, benchmarking, and more.
+The `dft` TUI (Text User Interface) provides an IDE-like experience for querying DataFusion in a local "database-like" environment. It integrates query execution, analysis, result browsing, and benchmarking in a single terminal interface.
 
 <table width="100%">
     <tr>
@@ -29,35 +29,75 @@ The `dft` TUI (Text User Interface) is an IDE-like experience that allows you to
     </tr>
 </table>
 
-## Key Features of the TUI
+## Getting Started
 
-- **Multiple Tabs** for organizing queries and results:
-  - **SQL Editor** – execute queries locally or (optionally) against FlightSQL.
-  - **Query History** – quickly review previously run queries.
-  - **Execution Context** – inspect DataFusion session details.
-  - **Logs** – filter logs from `dft` or DataFusion in real time.
-- **Custom ObjectStore Support** – easily query data from AWS S3, Azure (TODO), GCP (TODO), or local file systems.
-- **TableProviderFactory Integrations** – Delta Lake, Iceberg, Hudi, etc.
-- **Preloading DDL** – automatically run your configured DDL on startup, giving a “local DB” feel.
-- **Benchmark & Analyze** – quickly measure and analyze query performance.
+Start the TUI with a simple command:
 
----
+```bash
+# Basic launch
+dft
+
+# With specific configuration file
+dft --config path/to/config.toml
+
+# Load tables and views from DDL file
+dft --run-ddl
+```
+
+## Interface Overview
+
+The TUI is organized into several tabs that you can navigate between:
+
+### 1. SQL Editor Tab (Default)
+- Write and execute SQL directly against a local DataFusion context
+- View query results with automatic pagination
+- Optimize queries with real-time execution statistics
+
+### 2. FlightSQL Tab
+- Connect to and query remote FlightSQL servers 
+- Same interface as the SQL editor but sends queries to a FlightSQL server
+- Configure connection details in your config file
+
+### 3. Query History Tab
+- Review previously executed queries
+- See execution statistics and performance metrics
+- Re-run previous queries with a single keystroke
+
+### 4. Context Tab
+- Explore available tables, views and columns
+- View registered functions and their signatures
+- Examine catalog, schema, and table metadata
+
+### 5. Logs Tab
+- Filter logs by source and level
+- Search log messages for specific text
+- Monitor DataFusion's internal operations in real-time
+
+## Key Features
+
+### Data Exploration
+- **Automatic DDL Loading**: Tables defined in your DDL file are available immediately
+- **Rich Metadata**: Explore table schemas, column types, and statistics
+- **Result Pagination**: Browse through large result sets efficiently
+
+### Query Development
+- **Syntax Highlighting**: Color-coded SQL for better readability
+- **Editor History**: Navigate through your command history
+- **Multiple Query Editor Modes**: SQL and Flight SQL in the same interface
+
+### Performance Analysis
+- **Query Benchmarking**: Measure execution times across multiple runs
+- **Execution Statistics**: See detailed breakdowns of query component performance
+- **Resource Utilization**: Monitor memory usage during query execution (TODO)
+
+### Integration Support
+- **Object Store Support**: Query S3, local files, and more
+- **Table Formats**: Connect to Delta Lake, Iceberg, and Hudi tables
+- **Extension System**: Load custom UDFs and table providers
 
 ## Limitations
 
 - **Horizontal Scrolling**: The underlying terminal widget does not support horizontal scrolling well. For wide data sets, consider selecting only the columns you need until improved scrolling support arrives.
-
----
-
-## Starting the TUI
-
-Once you have installed `dft`, simply run:
-
-```bash
-dft
-```
-
-This will launch the TUI in your terminal.
 
 ## Key Mappings
 
@@ -113,7 +153,9 @@ Same interface as SQL tab but sends SQL queries to FlightSQL server.
 
 #### History Tab
 
-TODO
+- Review previously executed queries with their execution times
+- Re-run queries by selecting them and pressing Enter
+- Filter and search through query history
 
 #### Logs Tab
 
@@ -131,9 +173,31 @@ TODO
     - `ESCAPE` => Exit page mode and go back to scrolling mode
     - `SPACE` => Toggles hiding of targets, which have logfilter set to off
 
-## Editor Settings
+## Configuration
+
+### Editor Settings
+
+Enable syntax highlighting for SQL in your config file:
 
 ```toml
 [tui.editor]
 experimental_syntax_highlighting = true
+```
+
+### Display Settings
+
+Configure the TUI's frame rate:
+
+```toml
+[tui.display]
+frame_rate = 60  # Default is 60
+```
+
+### Performance Settings
+
+Adjust batch size for result pagination:
+
+```toml
+[tui.execution.datafusion]
+execution.batch_size = 100  # Default; smaller values may improve performance
 ```
