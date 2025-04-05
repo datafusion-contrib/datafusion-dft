@@ -55,7 +55,7 @@ pub struct DftArgs {
     )]
     pub commands: Vec<String>,
 
-    #[clap(long, help = "Path to the configuration file")]
+    #[clap(long, global = true, help = "Path to the configuration file")]
     pub config: Option<String>,
 
     #[clap(
@@ -109,9 +109,6 @@ pub struct DftArgs {
 
 impl DftArgs {
     pub fn config_path(&self) -> PathBuf {
-        if let Some(Command::ServeFlightSql { config: Some(cfg) }) = &self.command {
-            return Path::new(cfg).to_path_buf();
-        }
         if let Some(config) = self.config.as_ref() {
             Path::new(config).to_path_buf()
         } else {
@@ -125,16 +122,12 @@ impl DftArgs {
 #[derive(Clone, Debug, Subcommand)]
 pub enum Command {
     /// Start a HTTP server
-    ServeHttp {
-        #[clap(short, long)]
-        config: Option<String>,
-    },
+    ServeHttp,
     /// Start a FlightSQL server
     #[command(name = "serve-flightsql")]
-    ServeFlightSql {
-        #[clap(short, long)]
-        config: Option<String>,
-    },
+    ServeFlightSql,
+    /// Generate TPC-H data
+    GenerateTpch,
 }
 
 fn parse_valid_file(file: &str) -> std::result::Result<PathBuf, String> {

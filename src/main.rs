@@ -19,7 +19,7 @@ use clap::Parser;
 use color_eyre::Result;
 #[cfg(any(feature = "flightsql", feature = "http"))]
 use datafusion_dft::{args::Command, server};
-use datafusion_dft::{args::DftArgs, cli, config::create_config, tui};
+use datafusion_dft::{args::DftArgs, cli, config::create_config, tpch, tui};
 #[cfg(feature = "http")]
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -56,6 +56,9 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
         env_logger::init();
     }
     let cfg = create_config(cli.config_path());
+    if let Some(Command::GenerateTpch) = cli.command {
+        tpch::generate(cfg.clone())?
+    }
 
     #[cfg(feature = "flightsql")]
     if let Some(Command::ServeFlightSql { .. }) = cli.command {
