@@ -57,6 +57,7 @@ iceberg = ["dep:iceberg-catalog-rest", "dep:iceberg-datafusion"]
 observability = []
 s3 = ["object_store/aws", "url"]
 udfs-wasm = ["dep:datafusion-udfs-wasm"]
+object_store = ["dep:object_store"]
 
 [lints.clippy]
 clone_on_ref_ptr = "deny"
