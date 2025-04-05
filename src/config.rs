@@ -172,6 +172,8 @@ pub struct AppConfig {
     #[cfg(feature = "http")]
     #[serde(default)]
     pub http_server: HttpServerConfig,
+    /// Local directory or s3 path
+    pub db_path: String,
 }
 
 fn default_execution_config() -> ExecutionConfig {
