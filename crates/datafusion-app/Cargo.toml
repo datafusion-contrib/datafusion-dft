@@ -21,9 +21,9 @@ deltalake = { git = "https://github.com/delta-io/delta-rs", rev = "d8995e64c305d
 ], optional = true }
 directories = "5.0.1"
 futures = "0.3.30"
-hudi = { git = "https://github.com/apache/hudi-rs", rev = "eab36e2d3ea39372c52d2bf6fe41c9aa406c0bea", features = [
-  "datafusion",
-], optional = true }
+# hudi = { git = "https://github.com/apache/hudi-rs", rev = "eab36e2d3ea39372c52d2bf6fe41c9aa406c0bea", features = [
+#   "datafusion",
+# ], optional = true }
 iceberg-catalog-rest = { git = "https://github.com/apache/iceberg-rust", rev = "210134573569be0b6e49464aca076cb122e33e24", optional = true }
 iceberg-datafusion = { git = "https://github.com/apache/iceberg-rust", rev = "210134573569be0b6e49464aca076cb122e33e24", optional = true }
 indexmap = { version = "2.8.0", features = ["serde"] }

@@ -101,7 +101,7 @@ http = [
   "dep:tower-http",
   "dep:uuid",
 ]
-hudi = ["datafusion-app/hudi"]
+# hudi = ["datafusion-app/hudi"]
 huggingface = ["datafusion-app/huggingface"]
 iceberg = ["datafusion-app/iceberg"]
 s3 = ["datafusion-app/s3", "url"]
