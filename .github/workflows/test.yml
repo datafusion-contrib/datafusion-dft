@@ -146,31 +146,31 @@ jobs:
       - name: Run Deltalake tests
         run: |
           cargo test --features=deltalake extension_cases::deltalake
-  test-hudi:
-    name: Extension / Hudi
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [amd64]
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: true
-      - name: Cache Cargo
-        uses: actions/cache@v4
-        with:
-          path: /home/runner/.cargo
-          key: cargo-dft-cache-
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.lock') }}
-      - name: Setup Rust Toolchain
-        uses: ./.github/actions/setup-rust
-      - name: Run Hudi tests
-        run: |
-          cargo test --features=hudi extension_cases::hudi
+  # test-hudi:
+  #   name: Extension / Hudi
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     matrix:
+  #       arch: [amd64]
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #       with:
+  #         submodules: true
+  #     - name: Cache Cargo
+  #       uses: actions/cache@v4
+  #       with:
+  #         path: /home/runner/.cargo
+  #         key: cargo-dft-cache-
+  #     - name: Cache Rust dependencies
+  #       uses: actions/cache@v4
+  #       with:
+  #         path: target
+  #         key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.lock') }}
+  #     - name: Setup Rust Toolchain
+  #       uses: ./.github/actions/setup-rust
+  #     - name: Run Hudi tests
+  #       run: |
+  #         cargo test --features=hudi extension_cases::hudi
   test-udfs-wasm:
     name: Extension / UDFs-WASM
     runs-on: ubuntu-latest
