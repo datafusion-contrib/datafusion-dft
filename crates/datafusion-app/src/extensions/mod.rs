@@ -29,8 +29,8 @@ mod deltalake;
 // mod hudi;
 #[cfg(feature = "huggingface")]
 mod huggingface;
-#[cfg(feature = "iceberg")]
-mod iceberg;
+// #[cfg(feature = "iceberg")]
+// mod iceberg;
 #[cfg(feature = "s3")]
 mod s3;
 

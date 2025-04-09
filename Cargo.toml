@@ -103,7 +103,7 @@ http = [
 ]
 # hudi = ["datafusion-app/hudi"]
 huggingface = ["datafusion-app/huggingface"]
-iceberg = ["datafusion-app/iceberg"]
+# iceberg = ["datafusion-app/iceberg"]
 s3 = ["datafusion-app/s3", "url"]
 udfs-wasm = ["datafusion-app/udfs-wasm"]
 
