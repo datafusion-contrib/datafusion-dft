@@ -334,7 +334,7 @@ jobs:
         uses: ./.github/actions/setup-rust
       - name: Start FlightSQL Server
         run: |
-          cargo r --features=flightsql -- serve-flight-sql &
+          cargo r --features=flightsql -- serve-flightsql &
       - name: Run tests
         run: |
-          cargo t --features=http server::http::router
+          cargo t --features=http,flightsql server::http::router

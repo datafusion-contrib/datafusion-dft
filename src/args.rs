@@ -93,7 +93,11 @@ pub struct DftArgs {
     pub benchmark_iterations: Option<usize>,
 
     #[cfg(any(feature = "flightsql", feature = "http"))]
-    #[clap(long, help = "Set the host and port to be used for server")]
+    #[clap(
+        long,
+        global = true,
+        help = "Set the host and port to be used for server"
+    )]
     pub host: Option<String>,
 
     #[clap(
