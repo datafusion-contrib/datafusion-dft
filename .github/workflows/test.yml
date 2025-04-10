@@ -271,8 +271,8 @@ jobs:
       - name: Run UDFs WASM tests
         run: |
           cargo test --manifest-path crates/datafusion-udfs-wasm/Cargo.toml
-  test-auth-basic:
-    name: Extension / Auth-Basic
+  test-auth:
+    name: Extension / Auth
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -293,38 +293,21 @@ jobs:
           key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.lock') }}
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
-      - name: Start FlightSQL Server
+      # Right now basic and bearer auth can not be used at the same time.  So we serve an instance with one, then kill it, then serve an instance with another.  An alternative, perhaps simpler option, would be configuring the ports used - but this would come at the cost of a more annoying local dev experience as you have to remember to keep updating the ports.
+      - name: Start FlightSQL Server with Basic Auth
         run: |
-          cargo r --features=flightsql -- serve-flightsql --config data/configs/flightsql_basic.toml &
-      - name: Run auth tests
+          cargo r --features=flightsql -- serve-flightsql --config data/configs/flightsql_basic.toml & echo $! > server.pid
+      - name: Run Basic Auth tests
         run: |
           cargo t --features=flightsql extension_cases::auth_basic
-  test-auth-bearer:
-    name: Extension / Auth-Bearer
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [amd64]
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: true
-      - name: Cache Cargo
-        uses: actions/cache@v4
-        with:
-          path: /home/runner/.cargo
-          key: cargo-dft-cache-
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.lock') }}
-      - name: Setup Rust Toolchain
-        uses: ./.github/actions/setup-rust
-      - name: Start FlightSQL Server
+      - name: Kill FlightSQL Server
+        run: |
+          kill $(cat server.pid)
+          rm server.pid
+      - name: Start FlightSQL Server with Bearer Auth
         run: |
           cargo r --features=flightsql -- serve-flightsql --config data/configs/flightsql_bearer.toml &
-      - name: Run auth tests
+      - name: Run Bearer Auth tests
         run: |
           cargo t --features=flightsql extension_cases::auth_bearer
   test-http-server:

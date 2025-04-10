@@ -3,6 +3,8 @@ edition = "2021"
 name = "datafusion-app"
 version = "0.1.0"
 
+# Leaving Hudi and Iceberg around in case traction on those picks up.  It would be better if I just remove them from main and create PRs with the diff - maybe ill get around to that.
+
 [dependencies]
 arrow-flight = { version = "54.1.0", features = [
   "flight-sql-experimental",
