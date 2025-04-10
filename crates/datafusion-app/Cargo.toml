@@ -23,11 +23,6 @@ deltalake = { git = "https://github.com/delta-io/delta-rs", rev = "d8995e64c305d
 ], optional = true }
 directories = "5.0.1"
 futures = "0.3.30"
-# hudi = { git = "https://github.com/apache/hudi-rs", rev = "eab36e2d3ea39372c52d2bf6fe41c9aa406c0bea", features = [
-#   "datafusion",
-# ], optional = true }
-# iceberg-catalog-rest = { git = "https://github.com/apache/iceberg-rust", rev = "210134573569be0b6e49464aca076cb122e33e24", optional = true }
-# iceberg-datafusion = { git = "https://github.com/apache/iceberg-rust", rev = "210134573569be0b6e49464aca076cb122e33e24", optional = true }
 indexmap = { version = "2.8.0", features = ["serde"] }
 itertools = "0.13.0"
 log = "0.4.22"
@@ -53,9 +48,7 @@ deltalake = ["dep:deltalake"]
 flightsql = ["dep:arrow-flight", "dep:base64", "dep:tonic"]
 functions-json = ["dep:datafusion-functions-json"]
 functions-parquet = ["dep:datafusion-functions-parquet"]
-# hudi = ["dep:hudi"]
 huggingface = ["object_store_opendal", "opendal", "url"]
-# iceberg = ["dep:iceberg-catalog-rest", "dep:iceberg-datafusion"]
 observability = []
 s3 = ["object_store/aws", "url"]
 udfs-wasm = ["dep:datafusion-udfs-wasm"]

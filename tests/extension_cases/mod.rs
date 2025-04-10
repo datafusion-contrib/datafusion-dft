@@ -17,18 +17,16 @@
 
 //! Tests for extensions (stored in the `extension_cases` directory)
 
+#[cfg(feature = "flightsql")]
+mod auth_basic;
+#[cfg(feature = "flightsql")]
+mod auth_bearer;
 #[cfg(feature = "deltalake")]
 mod deltalake;
 #[cfg(feature = "flightsql")]
 mod flightsql;
 #[cfg(feature = "functions-json")]
 mod functions_json;
-// #[cfg(feature = "hudi")]
-// mod hudi;
-#[cfg(feature = "flightsql")]
-mod auth_basic;
-#[cfg(feature = "flightsql")]
-mod auth_bearer;
 #[cfg(feature = "huggingface")]
 mod huggingface;
 #[cfg(feature = "s3")]
