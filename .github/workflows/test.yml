@@ -332,34 +332,9 @@ jobs:
           key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.lock') }}
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
-      - name: Run auth tests
-        run: |
-          cargo t --features=http server::http::router::test
-  test-http-server-flightsql:
-    name: Extension / HTTP Server (FlightSQL)
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [amd64]
-    steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: true
-      - name: Cache Cargo
-        uses: actions/cache@v4
-        with:
-          path: /home/runner/.cargo
-          key: cargo-dft-cache-
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: /home/runner/target
-          key: target-dft-cache-
-      - name: Setup Rust Toolchain
-        uses: ./.github/actions/setup-rust
       - name: Start FlightSQL Server
         run: |
           cargo r --features=flightsql -- serve-flight-sql &
-      - name: Run auth tests
+      - name: Run tests
         run: |
-          cargo t --features=http server::http::router::flightsql_test
+          cargo t --features=http server::http::router
