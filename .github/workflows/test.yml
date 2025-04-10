@@ -272,7 +272,7 @@ jobs:
         run: |
           cargo test --manifest-path crates/datafusion-udfs-wasm/Cargo.toml
   test-auth:
-    name: Extension / Auth-Basic-Bearer
+    name: Extension / Auth
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -293,6 +293,7 @@ jobs:
           key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.lock') }}
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
+      # Right now basic and bearer auth can not be used at the same time.  So we serve an instance with one, then kill it, then serve an instance with another.  An alternative, perhaps simpler option, would be configuring the ports used - but this would come at the cost of a more annoying local dev experience as you have to remember to keep updating the ports.
       - name: Start FlightSQL Server with Basic Auth
         run: |
           cargo r --features=flightsql -- serve-flightsql --config data/configs/flightsql_basic.toml & echo $! > server.pid
