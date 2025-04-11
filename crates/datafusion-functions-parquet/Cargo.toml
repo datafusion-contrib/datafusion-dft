@@ -11,7 +11,7 @@ repository = "https://github.com/datafusion-contrib/datafusion-dft/tree/main/cra
 version = "0.1.0"
 
 [dependencies]
-arrow = { version = "54.1.0" }
+arrow = { version = "54" }
 async-trait = "0.1.41"
-datafusion = { version = "45.0.0" }
-parquet = { version = "54.1.0", default-features = false }
+datafusion = { version = "46" }
+parquet = { version = "54", default-features = false }
