@@ -41,7 +41,7 @@ jobs:
           key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.lock') }}
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
-      - name: Run tests (ex-FlightSQL)
+      - name: Run core tests
         run: |
           cargo test
   test-flightsql:

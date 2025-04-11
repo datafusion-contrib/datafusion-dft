@@ -176,7 +176,7 @@ fn test_sql_err_in_file() {
         .failure();
 
     let expected_err =
-        "Expected: [NOT] NULL or TRUE|FALSE or [NOT] DISTINCT FROM after IS, found: not";
+        "Expected: [NOT] NULL | TRUE | FALSE | DISTINCT | [form] NORMALIZED FROM after IS, found: valid at Line: 1, Column: 20";
     assert.code(1).stderr(contains_str(expected_err));
 }
 
@@ -199,7 +199,7 @@ SELECT this is not valid SQL
         .failure();
 
     let expected_err =
-        "Expected: [NOT] NULL or TRUE|FALSE or [NOT] DISTINCT FROM after IS, found: not";
+        "Expected: [NOT] NULL | TRUE | FALSE | DISTINCT | [form] NORMALIZED FROM after IS, found: valid at Line: 5, Column: 20";
     assert.code(1).stderr(contains_str(expected_err));
 }
 
