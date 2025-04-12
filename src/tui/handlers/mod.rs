@@ -24,6 +24,7 @@ use log::{error, info, trace};
 use ratatui::crossterm::event::{self, KeyCode, KeyEvent};
 use tui_logger::TuiWidgetEvent;
 
+use crate::args::Command;
 #[cfg(feature = "flightsql")]
 use crate::tui::state::tabs::flightsql::FlightSQLConnectionStatus;
 use crate::tui::state::tabs::history::Context;
@@ -245,7 +246,14 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
         AppEvent::FlightSQLEstablishConnection => {
             let execution = Arc::clone(&app.execution);
             let _event_tx = app.event_tx.clone();
-            let cli_url = app.args.host.clone();
+            let cli_url = if let Some(cmd) = app.args.command.clone() {
+                match cmd {
+                    Command::ServeFlightSql { host, .. } => host,
+                    Command::ServeHttp { host, .. } => host,
+                }
+            } else {
+                None
+            };
             tokio::spawn(async move {
                 if let Err(e) = execution.create_flightsql_client(cli_url).await {
                     error!("Error creating FlightSQL client: {:?}", e);

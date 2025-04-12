@@ -153,10 +153,18 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
         }
     }
     debug!("Created AppExecution: {app_execution:?}");
+    let url = if let Some(cmd) = cli.command.clone() {
+        match cmd {
+            crate::args::Command::ServeFlightSql { host, .. } => host,
+            crate::args::Command::ServeHttp { host, .. } => host,
+        }
+    } else {
+        None
+    };
     let app = HttpApp::try_new(
         app_execution,
         config.clone(),
-        &cli.host.unwrap_or(DEFAULT_SERVER_ADDRESS.to_string()),
+        &url.unwrap_or(DEFAULT_SERVER_ADDRESS.to_string()),
         &config.http_server.server_metrics_port,
     )
     .await?;

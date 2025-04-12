@@ -16,6 +16,7 @@
 // under the License.
 //! [`CliApp`]: Command Line User Interface
 
+use crate::args::Command;
 use crate::config::AppConfig;
 use crate::{args::DftArgs, execution::AppExecution};
 use color_eyre::eyre::eyre;
@@ -613,7 +614,15 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
                 auth,
             );
             let flightsql_ctx = FlightSQLContext::new(flightsql_cfg);
-            flightsql_ctx.create_client(cli.host.clone()).await?;
+            let url = if let Some(cmd) = cli.command.clone() {
+                match cmd {
+                    Command::ServeFlightSql { host, .. } => host,
+                    Command::ServeHttp { host, .. } => host,
+                }
+            } else {
+                None
+            };
+            flightsql_ctx.create_client(url).await?;
             app_execution.with_flightsql_ctx(flightsql_ctx);
         }
     }

@@ -188,10 +188,18 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
         execution_ctx.execute_ddl().await;
     }
     let app_execution = AppExecution::new(execution_ctx);
+    let url = if let Some(cmd) = cli.command.clone() {
+        match cmd {
+            crate::args::Command::ServeFlightSql { host, .. } => host,
+            crate::args::Command::ServeHttp { host, .. } => host,
+        }
+    } else {
+        None
+    };
     let app = FlightSqlApp::try_new(
         app_execution,
         &config,
-        &cli.host.unwrap_or(DEFAULT_SERVER_ADDRESS.to_string()),
+        &url.unwrap_or(DEFAULT_SERVER_ADDRESS.to_string()),
         &config.flightsql_server.server_metrics_port,
     )
     .await?;
