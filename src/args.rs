@@ -97,6 +97,13 @@ pub struct DftArgs {
         short,
         help = "Path to save output to. Type is inferred from file suffix"
     )]
+    pub host: Option<String>,
+
+    #[clap(
+        long,
+        short,
+        help = "Path to save output to. Type is inferred from file suffix"
+    )]
     pub output: Option<PathBuf>,
 
     #[cfg(any(feature = "flightsql", feature = "http"))]

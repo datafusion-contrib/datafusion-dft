@@ -615,15 +615,7 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
                 auth,
             );
             let flightsql_ctx = FlightSQLContext::new(flightsql_cfg);
-            let url = if let Some(cmd) = cli.command.clone() {
-                match cmd {
-                    Command::ServeFlightSql { host, .. } => host,
-                    _ => None,
-                }
-            } else {
-                None
-            };
-            flightsql_ctx.create_client(url).await?;
+            flightsql_ctx.create_client(cli.host.clone()).await?;
             app_execution.with_flightsql_ctx(flightsql_ctx);
         }
     }
