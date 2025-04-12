@@ -19,7 +19,11 @@ mod router;
 
 use std::net::SocketAddr;
 
-use crate::{args::DftArgs, config::AppConfig, execution::AppExecution};
+use crate::{
+    args::{Command, DftArgs},
+    config::AppConfig,
+    execution::AppExecution,
+};
 use axum::Router;
 use color_eyre::Result;
 use datafusion_app::{
@@ -155,8 +159,8 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
     debug!("Created AppExecution: {app_execution:?}");
     let url = if let Some(cmd) = cli.command.clone() {
         match cmd {
-            crate::args::Command::ServeFlightSql { host, .. } => host,
-            crate::args::Command::ServeHttp { host, .. } => host,
+            Command::ServeHttp { host, .. } => host,
+            _ => None,
         }
     } else {
         None

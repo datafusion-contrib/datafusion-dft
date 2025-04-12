@@ -16,6 +16,7 @@
 // under the License.
 //! [`CliApp`]: Command Line User Interface
 
+#[cfg(feature = "flightsql")]
 use crate::args::Command;
 use crate::config::AppConfig;
 use crate::{args::DftArgs, execution::AppExecution};
@@ -617,7 +618,7 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
             let url = if let Some(cmd) = cli.command.clone() {
                 match cmd {
                     Command::ServeFlightSql { host, .. } => host,
-                    Command::ServeHttp { host, .. } => host,
+                    _ => None,
                 }
             } else {
                 None

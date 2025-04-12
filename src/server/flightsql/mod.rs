@@ -17,7 +17,7 @@
 
 pub mod service;
 
-use crate::args::DftArgs;
+use crate::args::{Command, DftArgs};
 use crate::config::AppConfig;
 use crate::execution::AppExecution;
 use color_eyre::{eyre::eyre, Result};
@@ -190,8 +190,8 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
     let app_execution = AppExecution::new(execution_ctx);
     let url = if let Some(cmd) = cli.command.clone() {
         match cmd {
-            crate::args::Command::ServeFlightSql { host, .. } => host,
-            crate::args::Command::ServeHttp { host, .. } => host,
+            Command::ServeFlightSql { host, .. } => host,
+            _ => None,
         }
     } else {
         None
