@@ -18,4 +18,3 @@
 pub mod flightsql;
 #[cfg(feature = "http")]
 pub mod http;
-

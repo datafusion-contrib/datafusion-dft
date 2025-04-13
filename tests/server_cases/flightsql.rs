@@ -66,4 +66,3 @@ pub async fn test_flightsql_custom_host() {
 
     assert.stdout(contains_str(expected));
 }
-
