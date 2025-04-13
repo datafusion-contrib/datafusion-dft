@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use std::net::TcpListener;
 use std::process::Command as StdCommand;
 use std::time::Duration;
 use tokio::process::Command as TokioCommand;
@@ -23,14 +24,21 @@ use tokio::process::Command as TokioCommand;
 pub async fn test_http_custom_host() {
     let bin = assert_cmd::cargo::cargo_bin("dft");
 
-    // Custom host with alternate port
-    let custom_host = "127.0.0.1:8082";
+    // Bind to port 0 to have the OS assign an available port.
+    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind to a random port");
+    let port = listener.local_addr().unwrap().port();
+    // Drop the listener so that the port becomes available for the test server.
+    drop(listener);
+
+    // Create the custom host using the chosen port.
+    let custom_host = format!("127.0.0.1:{}", port);
+
     // Seems like we need to assign variable for server not to drop and kill prematurely
     let _server = TokioCommand::new(bin)
         .env("RUST_LOG", "off")
         .arg("serve-http")
         .arg("--host")
-        .arg(custom_host)
+        .arg(&custom_host)
         .kill_on_drop(true)
         .spawn()
         .expect("Failed to spawn server");

@@ -16,7 +16,7 @@
 // under the License.
 
 use assert_cmd::Command;
-use std::time::Duration;
+use std::{net::TcpListener, time::Duration};
 
 use tokio::process::Command as TokioCommand;
 
@@ -26,8 +26,15 @@ use crate::cli_cases::contains_str;
 pub async fn test_flightsql_custom_host() {
     let bin = assert_cmd::cargo::cargo_bin("dft");
 
-    // Custom host with alternate port
-    let custom_host = "127.0.0.1:50052";
+    // Bind to port 0 to have the OS assign an available port.
+    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind to a random port");
+    let port = listener.local_addr().unwrap().port();
+    // Drop the listener so that the port becomes available for the test server.
+    drop(listener);
+
+    // Create the custom host using the chosen port.
+    let custom_host = format!("127.0.0.1:{}", port);
+
     // Seems like we need to assign variable for server not to drop and kill prematurely
     let _server = TokioCommand::new(bin)
         .arg("serve-flightsql")
@@ -46,7 +53,7 @@ pub async fn test_flightsql_custom_host() {
         .arg("SELECT 1")
         .arg("--flightsql")
         .arg("--host")
-        .arg("http://127.0.0.1:50052")
+        .arg(format!("http://127.0.0.1:{}", port))
         .assert()
         .success();
 
