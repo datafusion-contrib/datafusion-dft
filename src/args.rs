@@ -94,8 +94,7 @@ pub struct DftArgs {
 
     #[clap(
         long,
-        short,
-        help = "Path to save output to. Type is inferred from file suffix"
+        help = "Host address to connect to"
     )]
     pub host: Option<String>,
 

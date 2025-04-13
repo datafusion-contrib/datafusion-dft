@@ -16,8 +16,6 @@
 // under the License.
 //! [`CliApp`]: Command Line User Interface
 
-#[cfg(feature = "flightsql")]
-use crate::args::Command;
 use crate::config::AppConfig;
 use crate::{args::DftArgs, execution::AppExecution};
 use color_eyre::eyre::eyre;

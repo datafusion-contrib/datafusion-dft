@@ -313,3 +313,31 @@ jobs:
       - name: Run tests
         run: |
           cargo t --features=http,flightsql server::http::router
+      - name: Run CLI cases
+        run: |
+          cargo t --features=http,flightsql server_cases::http
+  test-flightsql-server:
+    name: Extension / FlightSQL Server
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cargo
+          key: cargo-dft-cache-
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.lock') }}
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
+      - name: Run CLI cases
+        run: |
+          cargo t --features=http,flightsql server_cases::http
