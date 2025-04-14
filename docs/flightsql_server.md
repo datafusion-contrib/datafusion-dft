@@ -49,8 +49,8 @@ Prometheus metrics are automatically published to help you monitor server perfor
 
 ```toml
 [flightsql_server]
-# Configure metrics port
-server_metrics_port = "0.0.0.0:9000"
+# Configure metrics addr
+server_metrics_addr = "0.0.0.0:9000"
 ```
 
 Available metrics include:

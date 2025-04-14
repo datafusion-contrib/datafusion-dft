@@ -112,7 +112,7 @@ benchmark_iterations = 10
 
 [flightsql_server]
 connection_url = "http://localhost:50051"
-server_metrics_port = "0.0.0.0:9000"
+server_metrics_addr = "0.0.0.0:9000"
 ```
 
 ## Editor Config
