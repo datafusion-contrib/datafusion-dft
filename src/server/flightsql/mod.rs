@@ -38,7 +38,6 @@ use tower_http::validate_request::ValidateRequestHeaderLayer;
 use super::try_start_metrics_server;
 
 const DEFAULT_TIMEOUT_SECONDS: u64 = 60;
-const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1:50051";
 
 pub fn create_server_handle(
     config: &AppConfig,

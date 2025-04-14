@@ -26,13 +26,12 @@ pub async fn test_http_custom_host() {
 
     // Bind to port 0 to have the OS assign an available port.
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind to a random port");
-    let port = listener.local_addr().unwrap().port();
+    let addr = listener.local_addr().unwrap();
     // Drop the listener so that the port becomes available for the test server.
     drop(listener);
-    let custom_host = format!("localhost:{port}");
 
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind to a random port");
-    let metrics_port = listener.local_addr().unwrap().port();
+    let metrics_addr = listener.local_addr().unwrap();
     // Drop the listener so that the port becomes available for the test server.
     drop(listener);
 
@@ -40,10 +39,10 @@ pub async fn test_http_custom_host() {
     let _server = TokioCommand::new(bin)
         .env("RUST_LOG", "off")
         .arg("serve-http")
-        .arg("--port")
-        .arg(format!("{port}"))
-        .arg("--metrics-port")
-        .arg(format!("{metrics_port}"))
+        .arg("--addr")
+        .arg(format!("{addr}"))
+        .arg("--metrics-addr")
+        .arg(format!("{metrics_addr}"))
         .kill_on_drop(true)
         .spawn()
         .expect("Failed to spawn server");
@@ -53,7 +52,7 @@ pub async fn test_http_custom_host() {
 
     // Test connection to the custom host
     let response = StdCommand::new("curl")
-        .arg(format!("http://{}", custom_host))
+        .arg(format!("http://{}", addr))
         .output()
         .unwrap();
 

@@ -43,8 +43,6 @@ use {
 
 use super::try_start_metrics_server;
 
-const DEFAULT_SERVER_ADDRESS: &str = "localhost:8080";
-
 /// From https://github.com/tokio-rs/axum/blob/main/examples/graceful-shutdown/src/main.rs
 async fn shutdown_signal() {
     let ctrl_c = async {
@@ -167,7 +165,7 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
                 addr: Some(addr),
                 metrics_addr: None,
                 ..
-            } => (addr, config.http_server.server_metrics_addr.clone()),
+            } => (addr, config.http_server.server_metrics_addr),
             Command::ServeHttp {
                 addr: None,
                 metrics_addr: Some(metrics_addr),
@@ -179,13 +177,13 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
 
             _ => (
                 SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
-                config.http_server.server_metrics_addr.clone(),
+                config.http_server.server_metrics_addr,
             ),
         }
     } else {
         (
             SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
-            config.http_server.server_metrics_addr.clone(),
+            config.http_server.server_metrics_addr,
         )
     };
     let app = HttpApp::try_new(app_execution, config.clone(), addr, metrics_addr).await?;
