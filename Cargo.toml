@@ -40,7 +40,12 @@ prost = "0.13.1"
 ratatui = "0.28.0"
 serde = { version = "1.0.197", features = ["derive"] }
 strum = "0.26.2"
-tokio = { version = "1.36.0", features = ["macros", "process", "rt-multi-thread", "signal"] }
+tokio = { version = "1.36.0", features = [
+  "macros",
+  "process",
+  "rt-multi-thread",
+  "signal",
+] }
 tokio-stream = { version = "0.1.15", features = ["net"] }
 tokio-util = "0.7.10"
 toml = "0.8.12"

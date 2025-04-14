@@ -17,7 +17,7 @@
 
 mod router;
 
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use crate::{
     args::{Command, DftArgs},
@@ -84,14 +84,13 @@ impl HttpApp {
     pub async fn try_new(
         execution: AppExecution,
         config: AppConfig,
-        addr: &str,
-        metrics_addr: &str,
+        addr: SocketAddr,
+        metrics_addr: SocketAddr,
     ) -> Result<Self> {
         info!("Listening to HTTP on {addr}");
         let listener = TcpListener::bind(addr).await.unwrap();
         let router = create_router(execution, config.http_server);
 
-        let metrics_addr: SocketAddr = metrics_addr.parse()?;
         try_start_metrics_server(metrics_addr)?;
 
         let app = Self { listener, router };
@@ -160,42 +159,36 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
     let (addr, metrics_addr) = if let Some(cmd) = cli.command.clone() {
         match cmd {
             Command::ServeHttp {
-                port: Some(port),
-                metrics_port: Some(metrics_port),
+                addr: Some(addr),
+                metrics_addr: Some(metrics_addr),
                 ..
-            } => (
-                format!("localhost:{port}"),
-                format!("0.0.0.0:{metrics_port}"),
-            ),
+            } => (addr, metrics_addr),
             Command::ServeHttp {
-                port: Some(port),
-                metrics_port: None,
+                addr: Some(addr),
+                metrics_addr: None,
                 ..
-            } => (
-                format!("localhost:{port}"),
-                config.http_server.server_metrics_port.clone(),
-            ),
+            } => (addr, config.http_server.server_metrics_addr.clone()),
             Command::ServeHttp {
-                port: None,
-                metrics_port: Some(metrics_port),
+                addr: None,
+                metrics_addr: Some(metrics_addr),
                 ..
             } => (
-                DEFAULT_SERVER_ADDRESS.to_string(),
-                format!("0.0.0.0:{metrics_port}"),
+                SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+                metrics_addr,
             ),
 
             _ => (
-                DEFAULT_SERVER_ADDRESS.to_string(),
-                config.http_server.server_metrics_port.clone(),
+                SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+                config.http_server.server_metrics_addr.clone(),
             ),
         }
     } else {
         (
-            DEFAULT_SERVER_ADDRESS.to_string(),
-            config.http_server.server_metrics_port.clone(),
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+            config.http_server.server_metrics_addr.clone(),
         )
     };
-    let app = HttpApp::try_new(app_execution, config.clone(), &addr, &metrics_addr).await?;
+    let app = HttpApp::try_new(app_execution, config.clone(), addr, metrics_addr).await?;
     app.run().await;
 
     Ok(())

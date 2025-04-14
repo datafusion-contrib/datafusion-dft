@@ -19,7 +19,10 @@
 
 use crate::config::get_data_dir;
 use clap::{Parser, Subcommand};
-use std::path::{Path, PathBuf};
+use std::{
+    net::SocketAddr,
+    path::{Path, PathBuf},
+};
 
 const LONG_ABOUT: &str = "
 dft - DataFusion TUI
@@ -133,9 +136,9 @@ pub enum Command {
         #[clap(short, long)]
         config: Option<String>,
         #[clap(long, help = "Set the port to be used for server")]
-        port: Option<String>,
+        addr: Option<SocketAddr>,
         #[clap(long, help = "Set the port to be used for serving metrics")]
-        metrics_port: Option<String>,
+        metrics_addr: Option<SocketAddr>,
     },
     /// Start a FlightSQL server
     #[command(name = "serve-flightsql")]
@@ -143,9 +146,9 @@ pub enum Command {
         #[clap(short, long)]
         config: Option<String>,
         #[clap(long, help = "Set the port to be used for server")]
-        port: Option<String>,
+        addr: Option<SocketAddr>,
         #[clap(long, help = "Set the port to be used for serving metrics")]
-        metrics_port: Option<String>,
+        metrics_addr: Option<SocketAddr>,
     },
 }
 
