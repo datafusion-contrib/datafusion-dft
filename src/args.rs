@@ -19,7 +19,10 @@
 
 use crate::config::get_data_dir;
 use clap::{Parser, Subcommand};
-use std::path::{Path, PathBuf};
+use std::{
+    net::SocketAddr,
+    path::{Path, PathBuf},
+};
 
 const LONG_ABOUT: &str = "
 dft - DataFusion TUI
@@ -92,8 +95,7 @@ pub struct DftArgs {
     #[clap(short = 'n', help = "Set the number of benchmark iterations to run")]
     pub benchmark_iterations: Option<usize>,
 
-    #[cfg(any(feature = "flightsql", feature = "http"))]
-    #[clap(long, help = "Set the host and port to be used for server")]
+    #[clap(long, help = "Host address to connect to")]
     pub host: Option<String>,
 
     #[clap(
@@ -109,6 +111,13 @@ pub struct DftArgs {
 
 impl DftArgs {
     pub fn config_path(&self) -> PathBuf {
+        #[cfg(any(feature = "flightsql", feature = "http"))]
+        if let Some(Command::ServeFlightSql {
+            config: Some(cfg), ..
+        }) = &self.command
+        {
+            return Path::new(cfg).to_path_buf();
+        }
         if let Some(config) = self.config.as_ref() {
             Path::new(config).to_path_buf()
         } else {
@@ -122,11 +131,26 @@ impl DftArgs {
 #[derive(Clone, Debug, Subcommand)]
 pub enum Command {
     /// Start a HTTP server
-    ServeHttp,
+    #[cfg(feature = "http")]
+    ServeHttp {
+        #[clap(short, long)]
+        config: Option<String>,
+        #[clap(long, help = "Set the port to be used for server")]
+        addr: Option<SocketAddr>,
+        #[clap(long, help = "Set the port to be used for serving metrics")]
+        metrics_addr: Option<SocketAddr>,
+    },
     /// Start a FlightSQL server
+    #[cfg(feature = "flightsql")]
     #[command(name = "serve-flightsql")]
-    ServeFlightSql,
-    /// Generate TPC-H data
+    ServeFlightSql {
+        #[clap(short, long)]
+        config: Option<String>,
+        #[clap(long, help = "Set the port to be used for server")]
+        addr: Option<SocketAddr>,
+        #[clap(long, help = "Set the port to be used for serving metrics")]
+        metrics_addr: Option<SocketAddr>,
+    },
     GenerateTpch,
 }
 

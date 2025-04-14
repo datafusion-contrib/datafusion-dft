@@ -92,7 +92,7 @@ The TUI is organized into several tabs that you can navigate between:
 
 ### Integration Support
 - **Object Store Support**: Query S3, local files, and more
-- **Table Formats**: Connect to Delta Lake, Iceberg, and Hudi tables
+- **Table Formats**: Connect to Delta Lake tables
 - **Extension System**: Load custom UDFs and table providers
 
 ## Limitations

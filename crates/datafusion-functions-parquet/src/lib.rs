@@ -23,10 +23,10 @@ use async_trait::async_trait;
 use datafusion::catalog::Session;
 use datafusion::catalog::TableFunctionImpl;
 use datafusion::common::{plan_err, Column};
+use datafusion::datasource::memory::MemorySourceConfig;
 use datafusion::datasource::TableProvider;
 use datafusion::error::Result;
 use datafusion::logical_expr::Expr;
-use datafusion::physical_plan::memory::MemoryExec;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::scalar::ScalarValue;
 use parquet::basic::ConvertedType;
@@ -51,7 +51,7 @@ impl TableProvider for ParquetMetadataTable {
         self
     }
 
-    fn schema(&self) -> datafusion::arrow::datatypes::SchemaRef {
+    fn schema(&self) -> arrow::datatypes::SchemaRef {
         self.schema.clone()
     }
 
@@ -66,11 +66,11 @@ impl TableProvider for ParquetMetadataTable {
         _filters: &[Expr],
         _limit: Option<usize>,
     ) -> Result<Arc<dyn ExecutionPlan>> {
-        Ok(Arc::new(MemoryExec::try_new(
+        Ok(MemorySourceConfig::try_new_exec(
             &[vec![self.batch.clone()]],
             TableProvider::schema(self),
             projection.cloned(),
-        )?))
+        )?)
     }
 }
 
@@ -183,7 +183,7 @@ impl TableFunctionImpl for ParquetMetadataFunc {
             Field::new("total_uncompressed_size", DataType::Int64, true),
         ]));
 
-        // construct recordbatch from metadata
+        // construct record batch from metadata
         let mut filename_arr = vec![];
         let mut row_group_id_arr = vec![];
         let mut row_group_num_rows_arr = vec![];

@@ -18,4 +18,5 @@
 mod cli_cases;
 mod config;
 mod extension_cases;
+mod server_cases;
 mod tui_cases;

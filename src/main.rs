@@ -67,19 +67,19 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
     }
     #[cfg(feature = "http")]
     {
-        tracing_subscriber::registry()
-            .with(
-                tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                    format!(
-                        "{}=debug,tower_http=debug,axum=trace",
-                        env!("CARGO_CRATE_NAME")
-                    )
-                    .into()
-                }),
-            )
-            .with(tracing_subscriber::fmt::layer().without_time())
-            .init();
         if let Some(Command::ServeHttp { .. }) = cli.command {
+            tracing_subscriber::registry()
+                .with(
+                    tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                        format!(
+                            "{}=debug,tower_http=debug,axum=trace",
+                            env!("CARGO_CRATE_NAME")
+                        )
+                        .into()
+                    }),
+                )
+                .with(tracing_subscriber::fmt::layer().without_time())
+                .init();
             server::http::try_run(cli.clone(), cfg.clone()).await?;
             return Ok(());
         }

@@ -25,12 +25,8 @@ use std::{fmt::Debug, sync::Arc};
 mod builder;
 #[cfg(feature = "deltalake")]
 mod deltalake;
-#[cfg(feature = "hudi")]
-mod hudi;
 #[cfg(feature = "huggingface")]
 mod huggingface;
-#[cfg(feature = "iceberg")]
-mod iceberg;
 #[cfg(feature = "s3")]
 mod s3;
 
@@ -60,10 +56,6 @@ pub fn enabled_extensions() -> Vec<Arc<dyn Extension>> {
         Arc::new(s3::AwsS3Extension::new()),
         #[cfg(feature = "deltalake")]
         Arc::new(deltalake::DeltaLakeExtension::new()),
-        #[cfg(feature = "hudi")]
-        Arc::new(hudi::HudiExtension::new()),
-        #[cfg(feature = "iceberg")]
-        Arc::new(iceberg::IcebergExtension::new()),
         #[cfg(feature = "huggingface")]
         Arc::new(huggingface::HuggingFaceExtension::new()),
     ]

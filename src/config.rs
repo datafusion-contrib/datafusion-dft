@@ -19,6 +19,8 @@
 
 use std::path::PathBuf;
 
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
 use datafusion_app::config::ExecutionConfig;
 use directories::{ProjectDirs, UserDirs};
 use lazy_static::lazy_static;
@@ -84,8 +86,8 @@ pub struct FlightSQLServerConfig {
     pub execution: ExecutionConfig,
     #[serde(default = "default_connection_url")]
     pub connection_url: String,
-    #[serde(default = "default_server_metrics_port")]
-    pub server_metrics_port: String,
+    #[serde(default = "default_server_metrics_addr")]
+    pub server_metrics_addr: SocketAddr,
     #[serde(default = "default_auth_config")]
     pub auth: AuthConfig,
 }
@@ -96,7 +98,7 @@ impl Default for FlightSQLServerConfig {
         Self {
             execution: default_execution_config(),
             connection_url: default_connection_url(),
-            server_metrics_port: default_server_metrics_port(),
+            server_metrics_addr: default_server_metrics_addr(),
             auth: default_auth_config(),
         }
     }
@@ -131,8 +133,8 @@ pub struct HttpServerConfig {
     pub execution: ExecutionConfig,
     #[serde(default = "default_connection_url")]
     pub connection_url: String,
-    #[serde(default = "default_server_metrics_port")]
-    pub server_metrics_port: String,
+    #[serde(default = "default_server_metrics_addr")]
+    pub server_metrics_addr: SocketAddr,
     #[serde(default = "default_auth_config")]
     pub auth: AuthConfig,
     #[serde(default = "default_timeout_seconds")]
@@ -147,7 +149,7 @@ impl Default for HttpServerConfig {
         Self {
             execution: default_execution_config(),
             connection_url: default_connection_url(),
-            server_metrics_port: default_server_metrics_port(),
+            server_metrics_addr: default_server_metrics_addr(),
             auth: default_auth_config(),
             timeout_seconds: default_timeout_seconds(),
             result_limit: default_result_limit(),
@@ -231,8 +233,8 @@ pub fn default_connection_url() -> String {
 }
 
 #[cfg(any(feature = "flightsql", feature = "http"))]
-fn default_server_metrics_port() -> String {
-    "0.0.0.0:9000".to_string()
+fn default_server_metrics_addr() -> SocketAddr {
+    SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 9000)
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]

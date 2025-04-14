@@ -16,7 +16,7 @@
 // under the License.
 
 use datafusion::{
-    datasource::physical_plan::ParquetExec,
+    datasource::{physical_plan::ParquetSource, source::DataSourceExec},
     physical_plan::{
         aggregates::AggregateExec,
         filter::FilterExec,
@@ -354,11 +354,19 @@ impl PlanIOVisitor {
             self.time_opening = metrics.sum_by_name("time_elapsed_opening");
             self.time_scanning = metrics.sum_by_name("time_elapsed_scanning_total");
 
-            if plan.as_any().downcast_ref::<ParquetExec>().is_some() {
-                self.parquet_output_rows = metrics.output_rows();
-                self.parquet_rg_pruned_stats = metrics.sum_by_name("row_groups_pruned_statistics");
-                self.parquet_rg_matched_stats =
-                    metrics.sum_by_name("row_groups_matched_statistics");
+            if let Some(data_source_exec) = plan.as_any().downcast_ref::<DataSourceExec>() {
+                if data_source_exec
+                    .data_source()
+                    .as_any()
+                    .downcast_ref::<ParquetSource>()
+                    .is_some()
+                {
+                    self.parquet_output_rows = metrics.output_rows();
+                    self.parquet_rg_pruned_stats =
+                        metrics.sum_by_name("row_groups_pruned_statistics");
+                    self.parquet_rg_matched_stats =
+                        metrics.sum_by_name("row_groups_matched_statistics");
+                }
             }
         }
     }

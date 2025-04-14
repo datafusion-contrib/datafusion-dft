@@ -17,7 +17,7 @@
 
 pub mod service;
 
-use crate::args::DftArgs;
+use crate::args::{Command, DftArgs};
 use crate::config::AppConfig;
 use crate::execution::AppExecution;
 use color_eyre::{eyre::eyre, Result};
@@ -26,7 +26,7 @@ use datafusion_app::extensions::DftSessionStateBuilder;
 use datafusion_app::local::ExecutionContext;
 use log::info;
 use service::FlightSqlServiceImpl;
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
@@ -38,7 +38,6 @@ use tower_http::validate_request::ValidateRequestHeaderLayer;
 use super::try_start_metrics_server;
 
 const DEFAULT_TIMEOUT_SECONDS: u64 = 60;
-const DEFAULT_SERVER_ADDRESS: &str = "127.0.0.1:50051";
 
 pub fn create_server_handle(
     config: &AppConfig,
@@ -121,8 +120,8 @@ impl FlightSqlApp {
     pub async fn try_new(
         app_execution: AppExecution,
         config: &AppConfig,
-        addr: &str,
-        metrics_addr: &str,
+        addr: SocketAddr,
+        metrics_addr: SocketAddr,
     ) -> Result<Self> {
         info!("Listening to FlightSQL on {addr}");
         let flightsql = service::FlightSqlServiceImpl::new(app_execution);
@@ -132,7 +131,6 @@ impl FlightSqlApp {
         let (tx, rx) = tokio::sync::oneshot::channel();
         let handle = create_server_handle(config, flightsql, listener, rx)?;
 
-        let metrics_addr: SocketAddr = metrics_addr.parse()?;
         try_start_metrics_server(metrics_addr)?;
 
         let app = Self {
@@ -188,13 +186,41 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
         execution_ctx.execute_ddl().await;
     }
     let app_execution = AppExecution::new(execution_ctx);
-    let app = FlightSqlApp::try_new(
-        app_execution,
-        &config,
-        &cli.host.unwrap_or(DEFAULT_SERVER_ADDRESS.to_string()),
-        &config.flightsql_server.server_metrics_port,
-    )
-    .await?;
+
+    let (addr, metrics_addr) = if let Some(cmd) = cli.command.clone() {
+        match cmd {
+            Command::ServeFlightSql {
+                addr: Some(addr),
+                metrics_addr: Some(metrics_addr),
+                ..
+            } => (addr, metrics_addr),
+            Command::ServeFlightSql {
+                addr: Some(addr),
+                metrics_addr: None,
+                ..
+            } => (addr, config.flightsql_server.server_metrics_addr),
+            Command::ServeFlightSql {
+                addr: None,
+                metrics_addr: Some(metrics_addr),
+                ..
+            } => (
+                SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 50051),
+                metrics_addr,
+            ),
+
+            _ => (
+                SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 50051),
+                config.flightsql_server.server_metrics_addr,
+            ),
+        }
+    } else {
+        (
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 50051),
+            config.flightsql_server.server_metrics_addr,
+        )
+    };
+
+    let app = FlightSqlApp::try_new(app_execution, &config, addr, metrics_addr).await?;
     app.run().await;
     Ok(())
 }

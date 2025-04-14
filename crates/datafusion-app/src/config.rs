@@ -58,9 +58,9 @@ pub fn merge_configs(shared: ExecutionConfig, priority: ExecutionConfig) -> Exec
     if merged.dedicated_executor_threads != priority.dedicated_executor_threads {
         merged.dedicated_executor_threads = priority.dedicated_executor_threads
     }
-    if merged.iceberg != priority.iceberg {
-        merged.iceberg = priority.iceberg
-    }
+    // if merged.iceberg != priority.iceberg {
+    //     merged.iceberg = priority.iceberg
+    // }
 
     #[cfg(feature = "udfs-wasm")]
     if merged.wasm_udf != priority.wasm_udf {
@@ -84,8 +84,8 @@ pub struct ExecutionConfig {
     pub dedicated_executor_enabled: bool,
     #[serde(default = "default_dedicated_executor_threads")]
     pub dedicated_executor_threads: usize,
-    #[serde(default = "default_iceberg_config")]
-    pub iceberg: IcebergConfig,
+    // #[serde(default = "default_iceberg_config")]
+    // pub iceberg: IcebergConfig,
     #[cfg(feature = "udfs-wasm")]
     #[serde(default = "default_wasm_udf")]
     pub wasm_udf: WasmUdfConfig,
@@ -105,7 +105,7 @@ impl Default for ExecutionConfig {
             datafusion: None,
             dedicated_executor_enabled: default_dedicated_executor_enabled(),
             dedicated_executor_threads: default_dedicated_executor_threads(),
-            iceberg: default_iceberg_config(),
+            // iceberg: default_iceberg_config(),
             #[cfg(feature = "udfs-wasm")]
             wasm_udf: default_wasm_udf(),
             catalog: default_catalog(),
@@ -144,11 +144,11 @@ fn default_dedicated_executor_threads() -> usize {
     num_cpus::get()
 }
 
-fn default_iceberg_config() -> IcebergConfig {
-    IcebergConfig {
-        rest_catalogs: Vec::new(),
-    }
-}
+// fn default_iceberg_config() -> IcebergConfig {
+//     IcebergConfig {
+//         rest_catalogs: Vec::new(),
+//     }
+// }
 
 #[cfg(feature = "udfs-wasm")]
 fn default_wasm_udf() -> WasmUdfConfig {

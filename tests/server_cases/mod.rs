@@ -14,31 +14,7 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-
-use url::Url;
-
-use crate::extension_cases::TestExecution;
-
-#[tokio::test]
-async fn test_hudi() {
-    let test_exec = TestExecution::new();
-
-    let cwd = std::env::current_dir().unwrap();
-    let path = Url::from_file_path(cwd.join("data/hudi/v6_simplekeygen_nonhivestyle")).unwrap();
-
-    let test_exec = test_exec
-        .await
-        .with_setup(&format!(
-            "CREATE EXTERNAL TABLE h STORED AS HUDI LOCATION '{}';",
-            path
-        ))
-        .await;
-
-    let output = test_exec
-        .run_and_format("SELECT id FROM h ORDER BY id")
-        .await;
-    assert_eq!(
-        output,
-        vec!["+----+", "| id |", "+----+", "| 1  |", "| 2  |", "| 3  |", "| 4  |", "+----+"]
-    );
-}
+#[cfg(feature = "flightsql")]
+pub mod flightsql;
+#[cfg(feature = "http")]
+pub mod http;

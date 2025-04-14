@@ -14,7 +14,7 @@ version = "0.2.2"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-arrow-flight = { version = "54.1.0", features = [
+arrow-flight = { version = "54", features = [
   "flight-sql-experimental",
 ], optional = true }
 axum = { version = "0.7.9", features = ["macros"], optional = true }
@@ -22,7 +22,7 @@ chrono = "=0.4.39"
 clap = { version = "4.5.27", features = ["derive"] }
 color-eyre = "0.6.3"
 crossterm = { version = "0.28.1", features = ["event-stream"] }
-datafusion = { version = "45.0.0" }
+datafusion = { version = "46" }
 datafusion-app = { version = "0.1.0", path = "crates/datafusion-app" }
 directories = "5.0.1"
 env_logger = "0.11.5"
@@ -35,7 +35,7 @@ lazy_static = "1.4.0"
 log = "0.4.22"
 metrics = { version = "0.24.0", optional = true }
 metrics-exporter-prometheus = { version = "0.16.0", optional = true }
-parquet = "54.1.0"
+parquet = "54"
 pin-project-lite = { version = "0.2.14" }
 prost = "0.13.1"
 ratatui = "0.28.0"
@@ -43,6 +43,7 @@ serde = { version = "1.0.197", features = ["derive"] }
 strum = "0.26.2"
 tokio = { version = "1.36.0", features = [
   "macros",
+  "process",
   "rt-multi-thread",
   "signal",
 ] }
@@ -104,9 +105,7 @@ http = [
   "dep:tower-http",
   "dep:uuid",
 ]
-hudi = ["datafusion-app/hudi"]
 huggingface = ["datafusion-app/huggingface"]
-iceberg = ["datafusion-app/iceberg"]
 s3 = ["datafusion-app/s3", "url"]
 udfs-wasm = ["datafusion-app/udfs-wasm"]
 

@@ -8,7 +8,7 @@ Documentation is undergoing a significant revamp - the new documentation will be
 `dft` is a batteries-included suite of [DataFusion](https://github.com/apache/arrow-datafusion) applications that provides:
 
 - **Data Source Integration**: Query files from S3, local filesystems, or HuggingFace datasets
-- **Table Format Support**: Native support for Delta Lake, Iceberg, and Hudi
+- **Table Format Support**: Native support for Delta Lake
 - **Extensibility**: UDFs defined in WASM (and soon Python)
 - **Helper Functions**: Built-in functions for JSON and Parquet data processing
 
@@ -45,7 +45,7 @@ Common feature combinations:
 cargo install datafusion-dft --features=s3
 
 # Data lake formats
-cargo install datafusion-dft --features=deltalake,iceberg,hudi
+cargo install datafusion-dft --features=deltalake
 
 # With JSON and Parquet functions
 cargo install datafusion-dft --features=function-json,functions-parquet
