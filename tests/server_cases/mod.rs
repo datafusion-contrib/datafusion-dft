@@ -14,9 +14,7 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-
-mod cli_cases;
-mod config;
-mod extension_cases;
-mod server_cases;
-mod tui_cases;
+#[cfg(feature = "flightsql")]
+pub mod flightsql;
+#[cfg(feature = "http")]
+pub mod http;

@@ -286,7 +286,6 @@ mod test {
         config::ExecutionConfig, extensions::DftSessionStateBuilder, local::ExecutionContext,
     };
     use http::{Request, StatusCode};
-    use http_body_util::BodyExt;
 
     use crate::{
         config::HttpServerConfig, execution::AppExecution, server::http::router::create_router,

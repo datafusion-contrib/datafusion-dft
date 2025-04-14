@@ -36,7 +36,7 @@ Prometheus metrics are automatically published.
 
 ```toml
 [flightsql_server]
-server_metrics_port = "0.0.0.0:9000"
+server_metrics_addr = "0.0.0.0:9000"
 ```
 
 ## Benchmarking

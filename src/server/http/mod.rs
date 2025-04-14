@@ -17,9 +17,13 @@
 
 mod router;
 
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-use crate::{args::DftArgs, config::AppConfig, execution::AppExecution};
+use crate::{
+    args::{Command, DftArgs},
+    config::AppConfig,
+    execution::AppExecution,
+};
 use axum::Router;
 use color_eyre::Result;
 use datafusion_app::{
@@ -38,8 +42,6 @@ use {
 };
 
 use super::try_start_metrics_server;
-
-const DEFAULT_SERVER_ADDRESS: &str = "localhost:8080";
 
 /// From https://github.com/tokio-rs/axum/blob/main/examples/graceful-shutdown/src/main.rs
 async fn shutdown_signal() {
@@ -80,14 +82,13 @@ impl HttpApp {
     pub async fn try_new(
         execution: AppExecution,
         config: AppConfig,
-        addr: &str,
-        metrics_addr: &str,
+        addr: SocketAddr,
+        metrics_addr: SocketAddr,
     ) -> Result<Self> {
         info!("Listening to HTTP on {addr}");
         let listener = TcpListener::bind(addr).await.unwrap();
         let router = create_router(execution, config.http_server);
 
-        let metrics_addr: SocketAddr = metrics_addr.parse()?;
         try_start_metrics_server(metrics_addr)?;
 
         let app = Self { listener, router };
@@ -153,13 +154,39 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
         }
     }
     debug!("Created AppExecution: {app_execution:?}");
-    let app = HttpApp::try_new(
-        app_execution,
-        config.clone(),
-        &cli.host.unwrap_or(DEFAULT_SERVER_ADDRESS.to_string()),
-        &config.http_server.server_metrics_port,
-    )
-    .await?;
+    let (addr, metrics_addr) = if let Some(cmd) = cli.command.clone() {
+        match cmd {
+            Command::ServeHttp {
+                addr: Some(addr),
+                metrics_addr: Some(metrics_addr),
+                ..
+            } => (addr, metrics_addr),
+            Command::ServeHttp {
+                addr: Some(addr),
+                metrics_addr: None,
+                ..
+            } => (addr, config.http_server.server_metrics_addr),
+            Command::ServeHttp {
+                addr: None,
+                metrics_addr: Some(metrics_addr),
+                ..
+            } => (
+                SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+                metrics_addr,
+            ),
+
+            _ => (
+                SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+                config.http_server.server_metrics_addr,
+            ),
+        }
+    } else {
+        (
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 8080),
+            config.http_server.server_metrics_addr,
+        )
+    };
+    let app = HttpApp::try_new(app_execution, config.clone(), addr, metrics_addr).await?;
     app.run().await;
 
     Ok(())

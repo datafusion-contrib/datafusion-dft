@@ -19,7 +19,10 @@
 
 use crate::config::get_data_dir;
 use clap::{Parser, Subcommand};
-use std::path::{Path, PathBuf};
+use std::{
+    net::SocketAddr,
+    path::{Path, PathBuf},
+};
 
 const LONG_ABOUT: &str = "
 dft - DataFusion TUI
@@ -92,12 +95,7 @@ pub struct DftArgs {
     #[clap(short = 'n', help = "Set the number of benchmark iterations to run")]
     pub benchmark_iterations: Option<usize>,
 
-    #[cfg(any(feature = "flightsql", feature = "http"))]
-    #[clap(
-        long,
-        global = true,
-        help = "Set the host and port to be used for server"
-    )]
+    #[clap(long, help = "Host address to connect to")]
     pub host: Option<String>,
 
     #[clap(
@@ -107,13 +105,18 @@ pub struct DftArgs {
     )]
     pub output: Option<PathBuf>,
 
+    #[cfg(any(feature = "flightsql", feature = "http"))]
     #[command(subcommand)]
     pub command: Option<Command>,
 }
 
 impl DftArgs {
     pub fn config_path(&self) -> PathBuf {
-        if let Some(Command::ServeFlightSql { config: Some(cfg) }) = &self.command {
+        #[cfg(any(feature = "flightsql", feature = "http"))]
+        if let Some(Command::ServeFlightSql {
+            config: Some(cfg), ..
+        }) = &self.command
+        {
             return Path::new(cfg).to_path_buf();
         }
         if let Some(config) = self.config.as_ref() {
@@ -132,12 +135,20 @@ pub enum Command {
     ServeHttp {
         #[clap(short, long)]
         config: Option<String>,
+        #[clap(long, help = "Set the port to be used for server")]
+        addr: Option<SocketAddr>,
+        #[clap(long, help = "Set the port to be used for serving metrics")]
+        metrics_addr: Option<SocketAddr>,
     },
     /// Start a FlightSQL server
     #[command(name = "serve-flightsql")]
     ServeFlightSql {
         #[clap(short, long)]
         config: Option<String>,
+        #[clap(long, help = "Set the port to be used for server")]
+        addr: Option<SocketAddr>,
+        #[clap(long, help = "Set the port to be used for serving metrics")]
+        metrics_addr: Option<SocketAddr>,
     },
 }
 
