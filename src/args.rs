@@ -132,24 +132,20 @@ pub enum Command {
     ServeHttp {
         #[clap(short, long)]
         config: Option<String>,
-        #[clap(
-            long,
-            global = true,
-            help = "Set the host and port to be used for server"
-        )]
-        host: Option<String>,
+        #[clap(long, help = "Set the port to be used for server")]
+        port: Option<String>,
+        #[clap(long, help = "Set the port to be used for serving metrics")]
+        metrics_port: Option<String>,
     },
     /// Start a FlightSQL server
     #[command(name = "serve-flightsql")]
     ServeFlightSql {
         #[clap(short, long)]
         config: Option<String>,
-        #[clap(
-            long,
-            global = true,
-            help = "Set the host and port to be used for server"
-        )]
-        host: Option<String>,
+        #[clap(long, help = "Set the port to be used for server")]
+        port: Option<String>,
+        #[clap(long, help = "Set the port to be used for serving metrics")]
+        metrics_port: Option<String>,
     },
 }
 

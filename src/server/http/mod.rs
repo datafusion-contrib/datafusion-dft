@@ -157,21 +157,45 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
         }
     }
     debug!("Created AppExecution: {app_execution:?}");
-    let url = if let Some(cmd) = cli.command.clone() {
+    let (addr, metrics_addr) = if let Some(cmd) = cli.command.clone() {
         match cmd {
-            Command::ServeHttp { host, .. } => host,
-            _ => None,
+            Command::ServeHttp {
+                port: Some(port),
+                metrics_port: Some(metrics_port),
+                ..
+            } => (
+                format!("localhost:{port}"),
+                format!("0.0.0.0:{metrics_port}"),
+            ),
+            Command::ServeHttp {
+                port: Some(port),
+                metrics_port: None,
+                ..
+            } => (
+                format!("localhost:{port}"),
+                config.http_server.server_metrics_port.clone(),
+            ),
+            Command::ServeHttp {
+                port: None,
+                metrics_port: Some(metrics_port),
+                ..
+            } => (
+                DEFAULT_SERVER_ADDRESS.to_string(),
+                format!("0.0.0.0:{metrics_port}"),
+            ),
+
+            _ => (
+                DEFAULT_SERVER_ADDRESS.to_string(),
+                config.http_server.server_metrics_port.clone(),
+            ),
         }
     } else {
-        None
+        (
+            DEFAULT_SERVER_ADDRESS.to_string(),
+            config.http_server.server_metrics_port.clone(),
+        )
     };
-    let app = HttpApp::try_new(
-        app_execution,
-        config.clone(),
-        &url.unwrap_or(DEFAULT_SERVER_ADDRESS.to_string()),
-        &config.http_server.server_metrics_port,
-    )
-    .await?;
+    let app = HttpApp::try_new(app_execution, config.clone(), &addr, &metrics_addr).await?;
     app.run().await;
 
     Ok(())

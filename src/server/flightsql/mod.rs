@@ -188,21 +188,47 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
         execution_ctx.execute_ddl().await;
     }
     let app_execution = AppExecution::new(execution_ctx);
-    let url = if let Some(cmd) = cli.command.clone() {
+
+    let (addr, metrics_addr) = if let Some(cmd) = cli.command.clone() {
         match cmd {
-            Command::ServeFlightSql { host, .. } => host,
-            _ => None,
+            Command::ServeFlightSql {
+                port: Some(port),
+                metrics_port: Some(metrics_port),
+                ..
+            } => (
+                format!("localhost:{port}"),
+                format!("0.0.0.0:{metrics_port}"),
+            ),
+            Command::ServeFlightSql {
+                port: Some(port),
+                metrics_port: None,
+                ..
+            } => (
+                format!("localhost:{port}"),
+                config.flightsql_server.server_metrics_port.clone(),
+            ),
+            Command::ServeFlightSql {
+                port: None,
+                metrics_port: Some(metrics_port),
+                ..
+            } => (
+                DEFAULT_SERVER_ADDRESS.to_string(),
+                format!("0.0.0.0:{metrics_port}"),
+            ),
+
+            _ => (
+                DEFAULT_SERVER_ADDRESS.to_string(),
+                config.flightsql_server.server_metrics_port.clone(),
+            ),
         }
     } else {
-        None
+        (
+            DEFAULT_SERVER_ADDRESS.to_string(),
+            config.flightsql_server.server_metrics_port.clone(),
+        )
     };
-    let app = FlightSqlApp::try_new(
-        app_execution,
-        &config,
-        &url.unwrap_or(DEFAULT_SERVER_ADDRESS.to_string()),
-        &config.flightsql_server.server_metrics_port,
-    )
-    .await?;
+
+    let app = FlightSqlApp::try_new(app_execution, &config, &addr, &metrics_addr).await?;
     app.run().await;
     Ok(())
 }

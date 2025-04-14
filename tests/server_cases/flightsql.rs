@@ -32,14 +32,18 @@ pub async fn test_flightsql_custom_host() {
     // Drop the listener so that the port becomes available for the test server.
     drop(listener);
 
-    // Create the custom host using the chosen port.
-    let custom_host = format!("127.0.0.1:{}", port);
+    let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind to a random port");
+    let metrics_port = listener.local_addr().unwrap().port();
+    // Drop the listener so that the port becomes available for the test server.
+    drop(listener);
 
     // Seems like we need to assign variable for server not to drop and kill prematurely
     let _server = TokioCommand::new(bin)
         .arg("serve-flightsql")
-        .arg("--host")
-        .arg(custom_host)
+        .arg("--port")
+        .arg(format!("{port}"))
+        .arg("--metrics-port")
+        .arg(format!("{metrics_port}"))
         .kill_on_drop(true)
         .spawn()
         .expect("Failed to spawn the server");
@@ -53,7 +57,7 @@ pub async fn test_flightsql_custom_host() {
         .arg("SELECT 1")
         .arg("--flightsql")
         .arg("--host")
-        .arg(format!("http://127.0.0.1:{}", port))
+        .arg(format!("http://localhost:{}", port))
         .assert()
         .success();
 
