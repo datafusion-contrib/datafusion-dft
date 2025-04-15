@@ -1601,6 +1601,7 @@ dependencies = [
  "arrow-flight",
  "assert_cmd",
  "axum",
+ "chrono",
  "clap",
  "color-eyre",
  "crossterm",
@@ -1638,6 +1639,7 @@ dependencies = [
  "tower 0.5.2",
  "tower-http",
  "tpchgen",
+ "tpchgen-arrow",
  "tracing",
  "tracing-subscriber",
  "tui-logger",
@@ -5595,9 +5597,17 @@ checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
 
 [[package]]
 name = "tpchgen"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af098d370875e6220416d8ac3d0b18b315927fb39e290cc1280418de663d09d3"
+version = "1.0.0"
+source = "git+https://github.com/clflushopt/tpchgen-rs?rev=07745d653516f232c616d795f7bc794b2fdf9bba#07745d653516f232c616d795f7bc794b2fdf9bba"
+
+[[package]]
+name = "tpchgen-arrow"
+version = "1.0.0"
+source = "git+https://github.com/clflushopt/tpchgen-rs?rev=07745d653516f232c616d795f7bc794b2fdf9bba#07745d653516f232c616d795f7bc794b2fdf9bba"
+dependencies = [
+ "arrow",
+ "tpchgen",
+]
 
 [[package]]
 name = "tracing"

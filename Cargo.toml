@@ -57,8 +57,8 @@ tower-http = { version = "0.6.2", features = [
   "timeout",
   "trace",
 ], optional = true }
-tpchgen = "0.1.0"
-tpchgen-arrow = "0.1.0"
+tpchgen = { git = "https://github.com/clflushopt/tpchgen-rs", rev = "07745d653516f232c616d795f7bc794b2fdf9bba"}
+tpchgen-arrow = {git = "https://github.com/clflushopt/tpchgen-rs", rev = "07745d653516f232c616d795f7bc794b2fdf9bba"}
 tracing = { version = "0.1.41", features = ["log"] }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 tui-logger = { version = "0.12", features = ["tracing-support"] }

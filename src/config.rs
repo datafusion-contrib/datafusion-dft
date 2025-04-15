@@ -19,6 +19,7 @@
 
 use std::path::PathBuf;
 
+#[cfg(any(feature = "http", feature = "flightsql"))]
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use datafusion_app::config::ExecutionConfig;
@@ -174,8 +175,8 @@ pub struct AppConfig {
     #[cfg(feature = "http")]
     #[serde(default)]
     pub http_server: HttpServerConfig,
-    /// Local directory or s3 path
-    pub db_path: String,
+    #[serde(default = "defaul_file_cache_dir")]
+    pub file_cache_dir: PathBuf,
 }
 
 fn default_execution_config() -> ExecutionConfig {
@@ -188,6 +189,11 @@ fn default_display_config() -> DisplayConfig {
 
 fn default_interaction_config() -> InteractionConfig {
     InteractionConfig::default()
+}
+
+fn defaul_file_cache_dir() -> PathBuf {
+    let base = directories::BaseDirs::new().expect("Base directories should be available");
+    base.data_dir().to_path_buf().join("dft")
 }
 
 #[derive(Clone, Debug, Deserialize)]

@@ -19,10 +19,9 @@
 
 use crate::config::get_data_dir;
 use clap::{Parser, Subcommand};
-use std::{
-    net::SocketAddr,
-    path::{Path, PathBuf},
-};
+#[cfg(any(feature = "http", feature = "flightsql"))]
+use std::net::SocketAddr;
+use std::path::{Path, PathBuf};
 
 const LONG_ABOUT: &str = "
 dft - DataFusion TUI
@@ -151,7 +150,10 @@ pub enum Command {
         #[clap(long, help = "Set the port to be used for serving metrics")]
         metrics_addr: Option<SocketAddr>,
     },
-    GenerateTpch,
+    GenerateTpch {
+        #[clap(long, default_value = "1.0")]
+        scale_factor: f64,
+    },
 }
 
 fn parse_valid_file(file: &str) -> std::result::Result<PathBuf, String> {
