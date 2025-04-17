@@ -15,9 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::{fs::create_dir_all, path::PathBuf, sync::Arc};
+use std::{
+    fs::create_dir_all,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use color_eyre::{eyre, Result};
+use datafusion::arrow::record_batch::RecordBatch;
 use log::info;
 use parquet::arrow::ArrowWriter;
 use tpchgen::generators::{
@@ -101,6 +106,29 @@ fn create_tpch_dirs(config: &AppConfig) -> Result<Vec<(GeneratorType, PathBuf)>>
     Ok(table_paths)
 }
 
+fn write_batches_to_parquet<I>(
+    mut batches: std::iter::Peekable<I>,
+    table_path: &Path,
+    table_type: &str,
+) -> Result<()>
+where
+    I: Iterator<Item = RecordBatch>,
+{
+    let first = batches.peek().ok_or(eyre::Error::msg(format!(
+        "unable to generate {table_type} TPC-H data"
+    )))?;
+
+    let file_path = table_path.join("data.parquet");
+    let file = std::fs::File::create(file_path)?;
+    let mut writer = ArrowWriter::try_new(file, Arc::clone(first.schema_ref()), None)?;
+    info!("...writing {table_type} batches");
+    for batch in batches {
+        writer.write(&batch)?;
+    }
+    writer.finish()?;
+    Ok(())
+}
+
 pub fn generate(config: AppConfig, scale_factor: f64) -> Result<()> {
     info!("Generating TPC-H data");
     let table_paths = create_tpch_dirs(&config)?;
@@ -111,159 +139,47 @@ pub fn generate(config: AppConfig, scale_factor: f64) -> Result<()> {
                     info!("...generating customers");
                     let arrow_generator =
                         CustomerArrow::new(CustomerGenerator::new(scale_factor, 1, 1));
-
-                    let mut peekable = arrow_generator.peekable();
-                    let first = peekable
-                        .peek()
-                        .ok_or(eyre::Error::msg("unable to generate Customer TPC-H data"))?;
-
-                    let file_path = table_path.join("data.parquet");
-                    let file = std::fs::File::create(file_path)?;
-                    let mut writer =
-                        ArrowWriter::try_new(file, Arc::clone(first.schema_ref()), None)?;
-                    info!("...writing Customer batches");
-                    for batch in peekable {
-                        writer.write(&batch)?;
-                    }
-                    writer.finish()?;
+                    write_batches_to_parquet(arrow_generator.peekable(), &table_path, "Customer")?;
                 }
                 GeneratorType::Order => {
                     info!("...generating orders");
                     let arrow_generator = OrderArrow::new(OrderGenerator::new(scale_factor, 1, 1));
-
-                    let mut peekable = arrow_generator.peekable();
-                    let first = peekable
-                        .peek()
-                        .ok_or(eyre::Error::msg("unable to generate Customer TPC-H data"))?;
-
-                    let file_path = table_path.join("data.parquet");
-                    let file = std::fs::File::create(file_path)?;
-                    let mut writer =
-                        ArrowWriter::try_new(file, Arc::clone(first.schema_ref()), None)?;
-                    info!("...writing Order batches");
-                    for batch in peekable {
-                        writer.write(&batch)?;
-                    }
-                    writer.finish()?;
+                    write_batches_to_parquet(arrow_generator.peekable(), &table_path, "Order")?;
                 }
                 GeneratorType::LineItem => {
                     info!("...generating LineItems");
                     let arrow_generator =
                         LineItemArrow::new(LineItemGenerator::new(scale_factor, 1, 1));
-
-                    let mut peekable = arrow_generator.peekable();
-                    let first = peekable
-                        .peek()
-                        .ok_or(eyre::Error::msg("unable to generate Customer TPC-H data"))?;
-
-                    let file_path = table_path.join("data.parquet");
-                    let file = std::fs::File::create(file_path)?;
-                    let mut writer =
-                        ArrowWriter::try_new(file, Arc::clone(first.schema_ref()), None)?;
-                    info!("...writing LineItem batches");
-                    for batch in peekable {
-                        writer.write(&batch)?;
-                    }
-                    writer.finish()?;
+                    write_batches_to_parquet(arrow_generator.peekable(), &table_path, "LineItem")?;
                 }
                 GeneratorType::Nation => {
                     info!("...generating Nations");
                     let arrow_generator =
                         NationArrow::new(NationGenerator::new(scale_factor, 1, 1));
-
-                    let mut peekable = arrow_generator.peekable();
-                    let first = peekable
-                        .peek()
-                        .ok_or(eyre::Error::msg("unable to generate Customer TPC-H data"))?;
-
-                    let file_path = table_path.join("data.parquet");
-                    let file = std::fs::File::create(file_path)?;
-                    let mut writer =
-                        ArrowWriter::try_new(file, Arc::clone(first.schema_ref()), None)?;
-                    info!("...writing Nation batches");
-                    for batch in peekable {
-                        writer.write(&batch)?;
-                    }
-                    writer.finish()?;
+                    write_batches_to_parquet(arrow_generator.peekable(), &table_path, "Nation")?;
                 }
                 GeneratorType::Part => {
                     info!("...generating Parts");
                     let arrow_generator = PartArrow::new(PartGenerator::new(scale_factor, 1, 1));
-
-                    let mut peekable = arrow_generator.peekable();
-                    let first = peekable
-                        .peek()
-                        .ok_or(eyre::Error::msg("Unable to generate Customer TPC-H data"))?;
-
-                    let file_path = table_path.join("data.parquet");
-                    let file = std::fs::File::create(file_path)?;
-                    let mut writer =
-                        ArrowWriter::try_new(file, Arc::clone(first.schema_ref()), None)?;
-                    info!("...writing Part batches");
-                    for batch in peekable {
-                        writer.write(&batch)?;
-                    }
-                    writer.finish()?;
+                    write_batches_to_parquet(arrow_generator.peekable(), &table_path, "Part")?;
                 }
                 GeneratorType::PartSupp => {
                     info!("...generating PartSupps");
                     let arrow_generator =
                         PartSuppArrow::new(PartSuppGenerator::new(scale_factor, 1, 1));
-
-                    let mut peekable = arrow_generator.peekable();
-                    let first = peekable
-                        .peek()
-                        .ok_or(eyre::Error::msg("unable to generate Customer TPC-H data"))?;
-
-                    let file_path = table_path.join("data.parquet");
-                    let file = std::fs::File::create(file_path)?;
-                    let mut writer =
-                        ArrowWriter::try_new(file, Arc::clone(first.schema_ref()), None)?;
-                    info!("...writing PartSupp batches");
-                    for batch in peekable {
-                        writer.write(&batch)?;
-                    }
-                    writer.finish()?;
+                    write_batches_to_parquet(arrow_generator.peekable(), &table_path, "PartSupp")?;
                 }
                 GeneratorType::Region => {
                     info!("...generating Regions");
                     let arrow_generator =
                         RegionArrow::new(RegionGenerator::new(scale_factor, 1, 1));
-
-                    let mut peekable = arrow_generator.peekable();
-                    let first = peekable
-                        .peek()
-                        .ok_or(eyre::Error::msg("unable to generate Customer TPC-H data"))?;
-
-                    let file_path = table_path.join("data.parquet");
-                    let file = std::fs::File::create(file_path)?;
-                    let mut writer =
-                        ArrowWriter::try_new(file, Arc::clone(first.schema_ref()), None)?;
-                    info!("...writing Region batches");
-                    for batch in peekable {
-                        writer.write(&batch)?;
-                    }
-                    writer.finish()?;
+                    write_batches_to_parquet(arrow_generator.peekable(), &table_path, "Region")?;
                 }
                 GeneratorType::Supplier => {
                     info!("...generating Suppliers");
                     let arrow_generator =
                         SupplierArrow::new(SupplierGenerator::new(scale_factor, 1, 1));
-
-                    let mut peekable = arrow_generator.peekable();
-                    let first = peekable
-                        .peek()
-                        .ok_or(eyre::Error::msg("unable to generate Customer TPC-H data"))?;
-
-                    let file_path = table_path.join("data.parquet");
-                    let file = std::fs::File::create(file_path)?;
-                    let mut writer =
-                        ArrowWriter::try_new(file, Arc::clone(first.schema_ref()), None)?;
-                    info!("...writing Supplier batches");
-                    for batch in peekable {
-                        writer.write(&batch)?;
-                    }
-                    writer.finish()?;
+                    write_batches_to_parquet(arrow_generator.peekable(), &table_path, "Supplier")?;
                 }
             };
         }

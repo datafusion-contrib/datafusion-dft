@@ -1601,7 +1601,6 @@ dependencies = [
  "arrow-flight",
  "assert_cmd",
  "axum",
- "chrono",
  "clap",
  "color-eyre",
  "crossterm",
