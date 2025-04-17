@@ -225,4 +225,9 @@ impl TestConfigBuilder {
 
         self
     }
+
+    pub fn with_db_path(&mut self, path: &str) -> &mut Self {
+        self.config_text.push_str(&format!("db_dir = {path}\n"));
+        self
+    }
 }
