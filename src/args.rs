@@ -94,7 +94,7 @@ pub struct DftArgs {
     #[clap(short = 'n', help = "Set the number of benchmark iterations to run")]
     pub benchmark_iterations: Option<usize>,
 
-    #[clap(long, help = "Host address to connect to")]
+    #[clap(long, help = "Host address to query. Only used for FlightSQL")]
     pub host: Option<String>,
 
     #[clap(

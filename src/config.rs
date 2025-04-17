@@ -19,7 +19,7 @@
 
 use std::path::PathBuf;
 
-#[cfg(any(feature = "http", feature = "flightsql"))]
+#[cfg(any(feature = "flightsql", feature = "http"))]
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use datafusion_app::config::ExecutionConfig;
