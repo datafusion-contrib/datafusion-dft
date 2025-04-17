@@ -176,7 +176,7 @@ pub struct AppConfig {
     #[serde(default)]
     pub http_server: HttpServerConfig,
     #[serde(default = "defaul_file_cache_dir")]
-    pub file_cache_dir: PathBuf,
+    pub db_dir: PathBuf,
 }
 
 fn default_execution_config() -> ExecutionConfig {
