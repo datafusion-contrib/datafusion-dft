@@ -66,22 +66,22 @@ impl TryFrom<&str> for GeneratorType {
 }
 
 fn create_tpch_dirs(config: &AppConfig) -> Result<Vec<(GeneratorType, PathBuf)>> {
-    info!("...configured `db_dir` is {:?}", config.db_dir);
-    if config.db_dir.is_file() {
-        eyre::bail!("config `db_path` is a file and it must be a dir")
+    info!("...configured DB directory is {:?}", config.db.path);
+    if config.db.path.is_file() {
+        eyre::bail!("config DB directory is a file and it must be a directory")
     }
 
-    if !config.db_dir.exists() {
-        info!("...`db_dir` does not exist, creating");
-        std::fs::create_dir_all(config.db_dir.clone())?;
+    if !config.db.path.exists() {
+        info!("...DB directory does not exist, creating");
+        std::fs::create_dir_all(config.db.path.clone())?;
     } else {
-        info!("...`db_dir` exists");
+        info!("...DB directory exists");
     }
-    let tpch_dir = config.db_dir.join("tables").join("tpch");
+    let tpch_dir = config.db.path.join("tables").join("tpch");
     if !tpch_dir.exists() {
         info!(
             "...TPC-H table directory ({:?}) does not exist, creating",
-            config.db_dir
+            config.db.path
         );
         create_dir_all(&tpch_dir)?;
     } else {
