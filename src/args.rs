@@ -19,10 +19,9 @@
 
 use crate::config::get_data_dir;
 use clap::{Parser, Subcommand};
-use std::{
-    net::SocketAddr,
-    path::{Path, PathBuf},
-};
+#[cfg(any(feature = "http", feature = "flightsql"))]
+use std::net::SocketAddr;
+use std::path::{Path, PathBuf};
 
 const LONG_ABOUT: &str = "
 dft - DataFusion TUI
@@ -58,7 +57,7 @@ pub struct DftArgs {
     )]
     pub commands: Vec<String>,
 
-    #[clap(long, help = "Path to the configuration file")]
+    #[clap(long, global = true, help = "Path to the configuration file")]
     pub config: Option<String>,
 
     #[clap(
@@ -105,7 +104,6 @@ pub struct DftArgs {
     )]
     pub output: Option<PathBuf>,
 
-    #[cfg(any(feature = "flightsql", feature = "http"))]
     #[command(subcommand)]
     pub command: Option<Command>,
 }
@@ -132,6 +130,7 @@ impl DftArgs {
 #[derive(Clone, Debug, Subcommand)]
 pub enum Command {
     /// Start a HTTP server
+    #[cfg(feature = "http")]
     ServeHttp {
         #[clap(short, long)]
         config: Option<String>,
@@ -141,6 +140,7 @@ pub enum Command {
         metrics_addr: Option<SocketAddr>,
     },
     /// Start a FlightSQL server
+    #[cfg(feature = "flightsql")]
     #[command(name = "serve-flightsql")]
     ServeFlightSql {
         #[clap(short, long)]
@@ -149,6 +149,10 @@ pub enum Command {
         addr: Option<SocketAddr>,
         #[clap(long, help = "Set the port to be used for serving metrics")]
         metrics_addr: Option<SocketAddr>,
+    },
+    GenerateTpch {
+        #[clap(long, default_value = "1.0")]
+        scale_factor: f64,
     },
 }
 

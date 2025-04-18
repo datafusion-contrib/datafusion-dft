@@ -1637,6 +1637,8 @@ dependencies = [
  "tonic",
  "tower 0.5.2",
  "tower-http",
+ "tpchgen",
+ "tpchgen-arrow",
  "tracing",
  "tracing-subscriber",
  "tui-logger",
@@ -5591,6 +5593,20 @@ name = "tower-service"
 version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
+
+[[package]]
+name = "tpchgen"
+version = "1.0.0"
+source = "git+https://github.com/clflushopt/tpchgen-rs?rev=07745d653516f232c616d795f7bc794b2fdf9bba#07745d653516f232c616d795f7bc794b2fdf9bba"
+
+[[package]]
+name = "tpchgen-arrow"
+version = "1.0.0"
+source = "git+https://github.com/clflushopt/tpchgen-rs?rev=07745d653516f232c616d795f7bc794b2fdf9bba#07745d653516f232c616d795f7bc794b2fdf9bba"
+dependencies = [
+ "arrow",
+ "tpchgen",
+]
 
 [[package]]
 name = "tracing"

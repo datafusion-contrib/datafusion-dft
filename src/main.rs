@@ -17,9 +17,10 @@
 
 use clap::Parser;
 use color_eyre::Result;
+use datafusion_dft::args::Command;
 #[cfg(any(feature = "flightsql", feature = "http"))]
-use datafusion_dft::{args::Command, server};
-use datafusion_dft::{args::DftArgs, cli, config::create_config, tui};
+use datafusion_dft::server;
+use datafusion_dft::{args::DftArgs, cli, config::create_config, tpch, tui};
 #[cfg(feature = "http")]
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -39,12 +40,16 @@ fn main() -> Result<()> {
     runtime.block_on(entry_point)
 }
 
+// TODO: FlightSQL should use tracing
 fn should_init_env_logger(cli: &DftArgs) -> bool {
     #[cfg(feature = "flightsql")]
     if let Some(Command::ServeFlightSql { .. }) = cli.command {
         return true;
     }
 
+    if let Some(Command::GenerateTpch { .. }) = cli.command {
+        return true;
+    }
     if !cli.files.is_empty() || !cli.commands.is_empty() {
         return true;
     }
@@ -56,6 +61,10 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
         env_logger::init();
     }
     let cfg = create_config(cli.config_path());
+    if let Some(Command::GenerateTpch { scale_factor }) = cli.command {
+        tpch::generate(cfg.clone(), scale_factor)?;
+        return Ok(());
+    }
 
     #[cfg(feature = "flightsql")]
     if let Some(Command::ServeFlightSql { .. }) = cli.command {

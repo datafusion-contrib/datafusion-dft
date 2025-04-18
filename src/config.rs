@@ -175,6 +175,8 @@ pub struct AppConfig {
     #[cfg(feature = "http")]
     #[serde(default)]
     pub http_server: HttpServerConfig,
+    #[serde(default = "default_db_config")]
+    pub db: DbConfig,
 }
 
 fn default_execution_config() -> ExecutionConfig {
@@ -187,6 +189,29 @@ fn default_display_config() -> DisplayConfig {
 
 fn default_interaction_config() -> InteractionConfig {
     InteractionConfig::default()
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct DbConfig {
+    #[serde(default = "default_db_path")]
+    pub path: PathBuf,
+}
+
+impl Default for DbConfig {
+    fn default() -> Self {
+        default_db_config()
+    }
+}
+
+fn default_db_config() -> DbConfig {
+    DbConfig {
+        path: default_db_path(),
+    }
+}
+
+fn default_db_path() -> PathBuf {
+    let base = directories::BaseDirs::new().expect("Base directories should be available");
+    base.data_dir().to_path_buf().join("dft")
 }
 
 #[derive(Clone, Debug, Deserialize)]
