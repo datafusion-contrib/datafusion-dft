@@ -15,16 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-pub mod args;
-pub mod cli;
-pub mod config;
-pub mod db;
-pub mod execution;
-#[cfg(any(feature = "flightsql", feature = "http"))]
-pub mod server;
-pub mod telemetry;
-pub mod test_utils;
-pub mod tpch;
-pub mod tui;
+use color_eyre::Result;
+use datafusion::prelude::SessionContext;
 
-pub const APP_NAME: &str = "dft";
+use crate::config::DbConfig;
+
+pub fn register_db(ctx: &SessionContext, db_config: &DbConfig) -> Result<()> {
+    let tables = std::fs::read_dir(db_config.path)?;
+}
