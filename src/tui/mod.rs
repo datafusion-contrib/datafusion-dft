@@ -45,6 +45,7 @@ use tokio_util::sync::CancellationToken;
 use self::execution::{ExecutionError, ExecutionResultsBatch, TuiExecution};
 use self::handlers::{app_event_handler, crossterm_event_handler};
 use crate::config::AppConfig;
+use crate::db::register_db;
 use crate::telemetry;
 use crate::{args::DftArgs, execution::AppExecution};
 use datafusion_app::sql_utils::clean_sql;
@@ -373,7 +374,7 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
 
     // TUI mode: running the TUI
     telemetry::initialize_logs()?; // use alternate logging for TUI
-    let state = AppState::new(config);
+    let state = AppState::new(config.clone());
     let execution_ctx = ExecutionContext::try_new(
         &merged_exec_config,
         session_state,
@@ -381,6 +382,7 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
         env!("CARGO_PKG_VERSION"),
     )?;
     let app_execution = AppExecution::new(execution_ctx);
+    register_db(app_execution.session_ctx(), &config.db).await?;
     let app = App::new(state, cli, app_execution);
     app.run_app().await?;
     Ok(())

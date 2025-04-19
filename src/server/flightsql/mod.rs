@@ -19,6 +19,7 @@ pub mod service;
 
 use crate::args::{Command, DftArgs};
 use crate::config::AppConfig;
+use crate::db::register_db;
 use crate::execution::AppExecution;
 use color_eyre::{eyre::eyre, Result};
 use datafusion_app::config::merge_configs;
@@ -219,7 +220,7 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
             config.flightsql_server.server_metrics_addr,
         )
     };
-
+    register_db(app_execution.session_ctx(), &config.db).await?;
     let app = FlightSqlApp::try_new(app_execution, &config, addr, metrics_addr).await?;
     app.run().await;
     Ok(())
