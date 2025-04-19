@@ -86,7 +86,7 @@ impl HttpApp {
         addr: SocketAddr,
         metrics_addr: SocketAddr,
     ) -> Result<Self> {
-        info!("Listening to HTTP on {addr}");
+        info!("listening to HTTP on {addr}");
         let listener = TcpListener::bind(addr).await.unwrap();
         let router = create_router(execution, config.http_server);
 

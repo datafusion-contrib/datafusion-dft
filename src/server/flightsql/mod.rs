@@ -124,7 +124,7 @@ impl FlightSqlApp {
         addr: SocketAddr,
         metrics_addr: SocketAddr,
     ) -> Result<Self> {
-        info!("Listening to FlightSQL on {addr}");
+        info!("listening to FlightSQL on {addr}");
         let flightsql = service::FlightSqlServiceImpl::new(app_execution);
         let listener = TcpListener::bind(addr).await.unwrap();
 

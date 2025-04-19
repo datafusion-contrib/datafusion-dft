@@ -110,7 +110,7 @@ pub struct DftArgs {
 
 impl DftArgs {
     pub fn config_path(&self) -> PathBuf {
-        #[cfg(any(feature = "flightsql", feature = "http"))]
+        #[cfg(feature = "flightsql")]
         if let Some(Command::ServeFlightSql {
             config: Some(cfg), ..
         }) = &self.command
