@@ -77,7 +77,8 @@ fn create_tpch_dirs(config: &AppConfig) -> Result<Vec<(GeneratorType, PathBuf)>>
     } else {
         info!("...DB directory exists");
     }
-    let tpch_dir = config.db.path.join("tables").join("tpch");
+    let catalog_dir = config.db.path.join("tables").join("dft");
+    let tpch_dir = catalog_dir.join("tpch");
     if !tpch_dir.exists() {
         info!(
             "...TPC-H table directory ({:?}) does not exist, creating",

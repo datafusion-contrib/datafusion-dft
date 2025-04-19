@@ -17,6 +17,7 @@
 //! [`CliApp`]: Command Line User Interface
 
 use crate::config::AppConfig;
+use crate::db::register_db;
 use crate::{args::DftArgs, execution::AppExecution};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
@@ -617,6 +618,7 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
             app_execution.with_flightsql_ctx(flightsql_ctx);
         }
     }
+    register_db(app_execution.session_ctx(), &config.db).await?;
     let app = CliApp::new(app_execution, cli.clone());
     app.execute_files_or_commands().await?;
     Ok(())
