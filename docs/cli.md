@@ -69,3 +69,11 @@ This feature is still in it's early stages and is expected to evolve.  Once it h
 ```sh
 dft -c "SELECT ..." --analyze
 ```
+
+## Generate TPC-H Data
+
+Generate TPC-H data into your configured DB path
+
+```sh
+dft generate-tpch
+```

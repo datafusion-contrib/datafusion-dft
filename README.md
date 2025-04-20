@@ -73,6 +73,9 @@ dft serve-flightsql
 
 # Start HTTP Server (requires `http` feature)
 dft serve-http
+
+# Generate TPC-H data in the configured DB path
+dft generate-tpch
 ```
 
 ### Setting Up Tables with DDL
@@ -126,6 +129,7 @@ LOCATION 's3://bucket/delta_table';
 | Feature | Documentation |
 |---------|---------------|
 | **Core Features** | [Features Guide](docs/features.md) |
+| **Database** | [Database Guide](docs/db.md) |
 | **TUI Interface** | [TUI Guide](docs/tui.md) |
 | **CLI Usage** | [CLI Guide](docs/cli.md) |
 | **FlightSQL Server** | [FlightSQL Guide](docs/flightsql_server.md) |

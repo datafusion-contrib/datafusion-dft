@@ -45,7 +45,7 @@ use super::wasm::create_wasm_udfs;
 #[cfg(feature = "observability")]
 use crate::observability::ObservabilityContext;
 
-/// Structure for executing queries locally
+/// Structure for executing queries
 ///
 /// This context includes both:
 ///

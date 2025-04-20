@@ -45,7 +45,7 @@ fn describe_metrics() {
 
 pub fn try_start_metrics_server(metrics_addr: SocketAddr) -> Result<()> {
     let builder = PrometheusBuilder::new();
-    info!("Listening to metrics on {metrics_addr}");
+    info!("listening to metrics on {metrics_addr}");
     builder
         .with_http_listener(metrics_addr)
         .set_buckets_for_metric(
