@@ -57,10 +57,10 @@ pub async fn register_db(ctx: &SessionContext, db_config: &DbConfig) -> Result<(
             None => {
                 info!("...catalog does not exist, createing");
                 let mem_catalog_provider = Arc::new(MemoryCatalogProvider::new());
-                ctx.register_catalog(catalog_name, mem_catalog_provider)
-                    .ok_or(Report::msg(format!(
-                        "missing catalog {catalog_name}, shouldnt be possible"
-                    )))?
+                ctx.register_catalog(catalog_name, mem_catalog_provider);
+                ctx.catalog(catalog_name).ok_or(Report::msg(format!(
+                    "missing catalog {catalog_name}, shouldnt be possible"
+                )))?
             }
             Some(catalog) => catalog,
         };
@@ -125,4 +125,296 @@ pub async fn register_db(ctx: &SessionContext, db_config: &DbConfig) -> Result<(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use datafusion::{
+        assert_batches_eq,
+        dataframe::DataFrameWriteOptions,
+        prelude::{SessionConfig, SessionContext},
+    };
+
+    use crate::{config::DbConfig, db::register_db};
+
+    fn setup() -> SessionContext {
+        let config = SessionConfig::default().with_information_schema(true);
+        SessionContext::new_with_config(config)
+    }
+
+    #[tokio::test]
+    async fn test_register_db_no_tables() {
+        let ctx = setup();
+        let config = DbConfig::default();
+
+        register_db(&ctx, &config).await.unwrap();
+
+        let batches = ctx
+            .sql("SHOW TABLES")
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        let expected = [
+            "+---------------+--------------------+-------------+------------+",
+            "| table_catalog | table_schema       | table_name  | table_type |",
+            "+---------------+--------------------+-------------+------------+",
+            "| datafusion    | information_schema | tables      | VIEW       |",
+            "| datafusion    | information_schema | views       | VIEW       |",
+            "| datafusion    | information_schema | columns     | VIEW       |",
+            "| datafusion    | information_schema | df_settings | VIEW       |",
+            "| datafusion    | information_schema | schemata    | VIEW       |",
+            "| datafusion    | information_schema | routines    | VIEW       |",
+            "| datafusion    | information_schema | parameters  | VIEW       |",
+            "+---------------+--------------------+-------------+------------+",
+        ];
+
+        assert_batches_eq!(expected, &batches);
+    }
+
+    #[tokio::test]
+    async fn test_register_db_single_table() {
+        let ctx = setup();
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("db");
+        let config = DbConfig {
+            path: db_path.clone(),
+        };
+        let data_path = db_path.join("tables").join("dft").join("stuff").join("hi");
+
+        let df = ctx.sql("SELECT 1").await.unwrap();
+        let write_opts = DataFrameWriteOptions::new();
+
+        df.write_parquet(data_path.as_path().to_str().unwrap(), write_opts, None)
+            .await
+            .unwrap();
+
+        register_db(&ctx, &config).await.unwrap();
+
+        let batches = ctx
+            .sql("SELECT * FROM information_schema.tables ORDER BY table_catalog, table_schema, table_name")
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        let expected = [
+            "+---------------+--------------------+-------------+------------+",
+            "| table_catalog | table_schema       | table_name  | table_type |",
+            "+---------------+--------------------+-------------+------------+",
+            "| datafusion    | information_schema | columns     | VIEW       |",
+            "| datafusion    | information_schema | df_settings | VIEW       |",
+            "| datafusion    | information_schema | parameters  | VIEW       |",
+            "| datafusion    | information_schema | routines    | VIEW       |",
+            "| datafusion    | information_schema | schemata    | VIEW       |",
+            "| datafusion    | information_schema | tables      | VIEW       |",
+            "| datafusion    | information_schema | views       | VIEW       |",
+            "| dft           | information_schema | columns     | VIEW       |",
+            "| dft           | information_schema | df_settings | VIEW       |",
+            "| dft           | information_schema | parameters  | VIEW       |",
+            "| dft           | information_schema | routines    | VIEW       |",
+            "| dft           | information_schema | schemata    | VIEW       |",
+            "| dft           | information_schema | tables      | VIEW       |",
+            "| dft           | information_schema | views       | VIEW       |",
+            "| dft           | stuff              | hi          | BASE TABLE |",
+            "+---------------+--------------------+-------------+------------+",
+        ];
+
+        assert_batches_eq!(expected, &batches);
+    }
+
+    #[tokio::test]
+    async fn test_register_db_multiple_tables() {
+        let ctx = setup();
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("db");
+        let config = DbConfig {
+            path: db_path.clone(),
+        };
+        let data_1_path = db_path.join("tables").join("dft").join("stuff").join("hi");
+        let data_2_path = db_path.join("tables").join("dft").join("stuff").join("bye");
+
+        let df = ctx.sql("SELECT 1").await.unwrap();
+        let write_opts = DataFrameWriteOptions::new();
+        df.clone()
+            .write_parquet(data_1_path.as_path().to_str().unwrap(), write_opts, None)
+            .await
+            .unwrap();
+
+        let write_opts = DataFrameWriteOptions::new();
+        df.write_parquet(data_2_path.as_path().to_str().unwrap(), write_opts, None)
+            .await
+            .unwrap();
+
+        register_db(&ctx, &config).await.unwrap();
+
+        let batches = ctx
+            .sql("SELECT * FROM information_schema.tables ORDER BY table_catalog, table_schema, table_name")
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        let expected = [
+            "+---------------+--------------------+-------------+------------+",
+            "| table_catalog | table_schema       | table_name  | table_type |",
+            "+---------------+--------------------+-------------+------------+",
+            "| datafusion    | information_schema | columns     | VIEW       |",
+            "| datafusion    | information_schema | df_settings | VIEW       |",
+            "| datafusion    | information_schema | parameters  | VIEW       |",
+            "| datafusion    | information_schema | routines    | VIEW       |",
+            "| datafusion    | information_schema | schemata    | VIEW       |",
+            "| datafusion    | information_schema | tables      | VIEW       |",
+            "| datafusion    | information_schema | views       | VIEW       |",
+            "| dft           | information_schema | columns     | VIEW       |",
+            "| dft           | information_schema | df_settings | VIEW       |",
+            "| dft           | information_schema | parameters  | VIEW       |",
+            "| dft           | information_schema | routines    | VIEW       |",
+            "| dft           | information_schema | schemata    | VIEW       |",
+            "| dft           | information_schema | tables      | VIEW       |",
+            "| dft           | information_schema | views       | VIEW       |",
+            "| dft           | stuff              | bye         | BASE TABLE |",
+            "| dft           | stuff              | hi          | BASE TABLE |",
+            "+---------------+--------------------+-------------+------------+",
+        ];
+
+        assert_batches_eq!(expected, &batches);
+    }
+
+    #[tokio::test]
+    async fn test_register_db_multiple_schemas() {
+        let ctx = setup();
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("db");
+        let config = DbConfig {
+            path: db_path.clone(),
+        };
+        let data_1_path = db_path.join("tables").join("dft").join("stuff").join("hi");
+        let data_2_path = db_path
+            .join("tables")
+            .join("dft")
+            .join("things")
+            .join("bye");
+
+        let df = ctx.sql("SELECT 1").await.unwrap();
+        let write_opts = DataFrameWriteOptions::new();
+        df.clone()
+            .write_parquet(data_1_path.as_path().to_str().unwrap(), write_opts, None)
+            .await
+            .unwrap();
+
+        let write_opts = DataFrameWriteOptions::new();
+        df.write_parquet(data_2_path.as_path().to_str().unwrap(), write_opts, None)
+            .await
+            .unwrap();
+
+        register_db(&ctx, &config).await.unwrap();
+
+        let batches = ctx
+            .sql("SELECT * FROM information_schema.tables ORDER BY table_catalog, table_schema, table_name")
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        let expected = [
+            "+---------------+--------------------+-------------+------------+",
+            "| table_catalog | table_schema       | table_name  | table_type |",
+            "+---------------+--------------------+-------------+------------+",
+            "| datafusion    | information_schema | columns     | VIEW       |",
+            "| datafusion    | information_schema | df_settings | VIEW       |",
+            "| datafusion    | information_schema | parameters  | VIEW       |",
+            "| datafusion    | information_schema | routines    | VIEW       |",
+            "| datafusion    | information_schema | schemata    | VIEW       |",
+            "| datafusion    | information_schema | tables      | VIEW       |",
+            "| datafusion    | information_schema | views       | VIEW       |",
+            "| dft           | information_schema | columns     | VIEW       |",
+            "| dft           | information_schema | df_settings | VIEW       |",
+            "| dft           | information_schema | parameters  | VIEW       |",
+            "| dft           | information_schema | routines    | VIEW       |",
+            "| dft           | information_schema | schemata    | VIEW       |",
+            "| dft           | information_schema | tables      | VIEW       |",
+            "| dft           | information_schema | views       | VIEW       |",
+            "| dft           | stuff              | hi          | BASE TABLE |",
+            "| dft           | things             | bye         | BASE TABLE |",
+            "+---------------+--------------------+-------------+------------+",
+        ];
+
+        assert_batches_eq!(expected, &batches);
+    }
+
+    #[tokio::test]
+    async fn test_register_db_multiple_catalogs() {
+        let ctx = setup();
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("db");
+        let config = DbConfig {
+            path: db_path.clone(),
+        };
+        let data_1_path = db_path.join("tables").join("dft2").join("stuff").join("hi");
+        let data_2_path = db_path
+            .join("tables")
+            .join("dft")
+            .join("things")
+            .join("bye");
+
+        let df = ctx.sql("SELECT 1").await.unwrap();
+        let write_opts = DataFrameWriteOptions::new();
+        df.clone()
+            .write_parquet(data_1_path.as_path().to_str().unwrap(), write_opts, None)
+            .await
+            .unwrap();
+
+        let write_opts = DataFrameWriteOptions::new();
+        df.write_parquet(data_2_path.as_path().to_str().unwrap(), write_opts, None)
+            .await
+            .unwrap();
+
+        register_db(&ctx, &config).await.unwrap();
+
+        let batches = ctx
+            .sql("SELECT * FROM information_schema.tables ORDER BY table_catalog, table_schema, table_name")
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap();
+
+        let expected = [
+            "+---------------+--------------------+-------------+------------+",
+            "| table_catalog | table_schema       | table_name  | table_type |",
+            "+---------------+--------------------+-------------+------------+",
+            "| datafusion    | information_schema | columns     | VIEW       |",
+            "| datafusion    | information_schema | df_settings | VIEW       |",
+            "| datafusion    | information_schema | parameters  | VIEW       |",
+            "| datafusion    | information_schema | routines    | VIEW       |",
+            "| datafusion    | information_schema | schemata    | VIEW       |",
+            "| datafusion    | information_schema | tables      | VIEW       |",
+            "| datafusion    | information_schema | views       | VIEW       |",
+            "| dft           | information_schema | columns     | VIEW       |",
+            "| dft           | information_schema | df_settings | VIEW       |",
+            "| dft           | information_schema | parameters  | VIEW       |",
+            "| dft           | information_schema | routines    | VIEW       |",
+            "| dft           | information_schema | schemata    | VIEW       |",
+            "| dft           | information_schema | tables      | VIEW       |",
+            "| dft           | information_schema | views       | VIEW       |",
+            "| dft           | things             | bye         | BASE TABLE |",
+            "| dft2          | information_schema | columns     | VIEW       |",
+            "| dft2          | information_schema | df_settings | VIEW       |",
+            "| dft2          | information_schema | parameters  | VIEW       |",
+            "| dft2          | information_schema | routines    | VIEW       |",
+            "| dft2          | information_schema | schemata    | VIEW       |",
+            "| dft2          | information_schema | tables      | VIEW       |",
+            "| dft2          | information_schema | views       | VIEW       |",
+            "| dft2          | stuff              | hi          | BASE TABLE |",
+            "+---------------+--------------------+-------------+------------+",
+        ];
+
+        assert_batches_eq!(expected, &batches);
+    }
 }
