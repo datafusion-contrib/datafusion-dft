@@ -47,7 +47,7 @@ fn test_custom_config() {
         "regions",
         "suppliers",
     ];
-    let tables_path = db_path.join("tables").join("tpch");
+    let tables_path = db_path.join("tables").join("dft").join("tpch");
     std::fs::read_dir(tables_path).unwrap().for_each(|e| {
         let entry = e.unwrap();
         assert!(needed_dirs.contains(&entry.file_name().to_str().unwrap()));
