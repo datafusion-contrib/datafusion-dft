@@ -17,8 +17,6 @@
 
 //! Tests for the CLI (e.g. run from files) to make sure config works as expected
 
-use std::fs::DirEntry;
-
 use crate::config::TestConfigBuilder;
 use assert_cmd::Command;
 

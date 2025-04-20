@@ -32,7 +32,12 @@ use crate::config::DbConfig;
 
 pub async fn register_db(ctx: &SessionContext, db_config: &DbConfig) -> Result<()> {
     info!("registering tables to database");
-    let catalogs = read_dir(db_config.path.join("tables"))?;
+    let tables_path = db_config.path.join("tables");
+    if !tables_path.exists() || !tables_path.is_dir() {
+        info!("no tables directory configured, skipping table registration");
+        return Ok(());
+    }
+    let catalogs = read_dir(tables_path)?;
     info!("...reading catalogs");
     for maybe_catalog in catalogs {
         let catalog = maybe_catalog?;
