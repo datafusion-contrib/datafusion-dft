@@ -38,14 +38,7 @@ fn test_custom_config() {
         .success();
 
     let needed_dirs = [
-        "customers",
-        "orders",
-        "line_items",
-        "nations",
-        "parts",
-        "part_supps",
-        "regions",
-        "suppliers",
+        "customer", "orders", "lineitem", "nation", "part", "partsupp", "region", "supplier",
     ];
     let tables_path = db_path.join("tables").join("dft").join("tpch");
     std::fs::read_dir(tables_path).unwrap().for_each(|e| {

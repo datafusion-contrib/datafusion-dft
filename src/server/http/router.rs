@@ -32,9 +32,11 @@ use log::error;
 use serde::{Deserialize, Serialize};
 use tokio_stream::StreamExt;
 use tower_http::{timeout::TimeoutLayer, trace::TraceLayer};
-use tracing::info;
+use tracing::debug;
 
 use crate::{config::HttpServerConfig, execution::AppExecution};
+
+use super::tpch;
 
 #[derive(Debug)]
 struct ExecRequest {
@@ -67,6 +69,7 @@ pub fn create_router(execution: AppExecution, config: HttpServerConfig) -> Route
         )
         .route("/sql", post(post_sql_handler))
         .route("/catalog", get(get_catalog_handler))
+        .route("/tpch/:number", get(get_tpch_query_handler))
         .route("/table/:catalog/:schema/:table", get(get_table_handler))
         .layer((
             TraceLayer::new_for_http(),
@@ -167,12 +170,34 @@ async fn get_table_handler(
     create_response(&state, req, opts).await
 }
 
+#[derive(Deserialize, Serialize)]
+struct GetTpchPathParams {
+    number: usize,
+}
+
+async fn get_tpch_query_handler(
+    state: State<ExecutionState>,
+    Path(path): Path<GetTpchPathParams>,
+    OriginalUri(uri): OriginalUri,
+) -> Response {
+    if let Some(sql) = tpch::sql_for_tpch_query(path.number) {
+        let req = ExecRequest {
+            path: uri.path().to_string(),
+            sql: sql.to_string(),
+        };
+        let opts = ExecOptions::new(None, false);
+        create_response(&state, req, opts).await
+    } else {
+        (StatusCode::BAD_REQUEST, "Unknown TPC-H query number").into_response()
+    }
+}
+
 async fn response_for_sql(
     State(state): &State<ExecutionState>,
     sql: String,
     opts: ExecOptions,
 ) -> (Response, ResponseDetails) {
-    info!("Executing sql: {sql}");
+    debug!("Executing sql: {sql}");
     match state.execution.execute_sql_with_opts(&sql, opts).await {
         Ok(ExecResult::RecordBatchStream(stream)) => batch_stream_to_response(stream).await,
         Ok(_) => {

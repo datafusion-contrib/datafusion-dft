@@ -16,6 +16,7 @@
 // under the License.
 
 mod router;
+mod tpch;
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
