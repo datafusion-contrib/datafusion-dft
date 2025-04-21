@@ -52,14 +52,14 @@ impl TryFrom<&str> for GeneratorType {
 
     fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
         match value {
-            "customers" => Ok(Self::Customer),
+            "customer" => Ok(Self::Customer),
             "orders" => Ok(Self::Order),
-            "line_items" => Ok(Self::LineItem),
-            "nations" => Ok(Self::Nation),
-            "parts" => Ok(Self::Part),
-            "part_supps" => Ok(Self::PartSupp),
-            "regions" => Ok(Self::Region),
-            "suppliers" => Ok(Self::Supplier),
+            "lineitem" => Ok(Self::LineItem),
+            "nation" => Ok(Self::Nation),
+            "part" => Ok(Self::Part),
+            "partsupp" => Ok(Self::PartSupp),
+            "region" => Ok(Self::Region),
+            "supplier" => Ok(Self::Supplier),
             _ => Err(eyre::Report::msg(format!("Unknown generator type {value}"))),
         }
     }
@@ -89,14 +89,7 @@ fn create_tpch_dirs(config: &AppConfig) -> Result<Vec<(GeneratorType, PathBuf)>>
         info!("...TPC-H table directory ({tpch_dir:?}) exists");
     };
     let needed_dirs = [
-        "customers",
-        "orders",
-        "line_items",
-        "nations",
-        "parts",
-        "part_supps",
-        "regions",
-        "suppliers",
+        "customer", "orders", "lineitem", "nation", "part", "partsupp", "region", "supplier",
     ];
     let mut table_paths = Vec::new();
     for dir in needed_dirs {
