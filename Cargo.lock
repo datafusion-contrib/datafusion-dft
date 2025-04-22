@@ -1620,6 +1620,7 @@ dependencies = [
  "log",
  "metrics",
  "metrics-exporter-prometheus",
+ "object_store",
  "parquet",
  "pin-project-lite",
  "predicates",
@@ -5803,6 +5804,7 @@ dependencies = [
  "form_urlencoded",
  "idna",
  "percent-encoding",
+ "serde",
 ]
 
 [[package]]

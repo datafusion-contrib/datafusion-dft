@@ -34,6 +34,7 @@ lazy_static = "1.4.0"
 log = "0.4.22"
 metrics = { version = "0.24.0", optional = true }
 metrics-exporter-prometheus = { version = "0.16.0", optional = true }
+object_store = "0.11.2"
 parquet = "54"
 pin-project-lite = { version = "0.2.14" }
 prost = "0.13.1"
@@ -62,7 +63,7 @@ tracing = { version = "0.1.41", features = ["log"] }
 tracing-subscriber = { version = "0.3.19", features = ["env-filter"] }
 tui-logger = { version = "0.12", features = ["tracing-support"] }
 tui-textarea = { version = "0.6.1", features = ["search"] }
-url = { version = "2.5.2", optional = true }
+url = { version = "2.5.2", features = ["serde"] }
 uuid = { version = "1.10.0", optional = true }
 
 [dev-dependencies]
@@ -105,7 +106,7 @@ http = [
   "dep:uuid",
 ]
 huggingface = ["datafusion-app/huggingface"]
-s3 = ["datafusion-app/s3", "url"]
+s3 = ["datafusion-app/s3"]
 udfs-wasm = ["datafusion-app/udfs-wasm"]
 
 [[bin]]
