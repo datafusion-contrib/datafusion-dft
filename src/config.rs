@@ -221,7 +221,7 @@ fn default_db_path() -> Url {
         .unwrap()
         .to_string();
     let with_schema = format!("file://{path}");
-    Url::parse(&path).unwrap()
+    Url::parse(&with_schema).unwrap()
 }
 
 #[derive(Clone, Debug, Deserialize)]

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::{fs::read_dir, sync::Arc};
+use std::sync::Arc;
 
 use color_eyre::{Report, Result};
 use datafusion::{
@@ -26,113 +26,85 @@ use datafusion::{
     },
     prelude::SessionContext,
 };
-use log::{error, info};
+use log::info;
 
 use crate::config::DbConfig;
 
 pub async fn register_db(ctx: &SessionContext, db_config: &DbConfig) -> Result<()> {
     info!("registering tables to database");
-    let tables_path = db_config.path.join("tables")?;
-    let tables_url = ListingTableUrl::parse(tables_path)?;
-    let store_url = tables_url.object_store();
+    let tables_url = db_config.path.join("tables")?;
+    let listing_tables_url = ListingTableUrl::parse(tables_url.clone())?;
+    let store_url = listing_tables_url.object_store();
     let store = ctx.runtime_env().object_store(store_url)?;
-    let tables_path = object_store::path::Path::from_url_path(&tables_url)?;
+    let tables_path = object_store::path::Path::from_url_path(tables_url.path())?;
     let catalogs = store.list_with_delimiter(Some(&tables_path)).await?;
     for catalog in catalogs.common_prefixes {
-        info!("...handling {:?} catalog", catalog.filename())
+        let catalog_name = catalog
+            .filename()
+            .ok_or(Report::msg("missing catalog name"))?;
+        info!("...handling {catalog_name} catalog");
+        let maybe_catalog = ctx.catalog(catalog_name);
+        let catalog_provider = match maybe_catalog {
+            Some(catalog) => catalog,
+            None => {
+                info!("...catalog does not exist, createing");
+                let mem_catalog_provider = Arc::new(MemoryCatalogProvider::new());
+                ctx.register_catalog(catalog_name, mem_catalog_provider);
+                ctx.catalog(catalog_name).ok_or(Report::msg(format!(
+                    "missing catalog {catalog_name}, shouldnt be possible"
+                )))?
+            }
+        };
+        let schemas = store.list_with_delimiter(Some(&catalog)).await?;
+        for schema in schemas.common_prefixes {
+            let schema_name = schema
+                .filename()
+                .ok_or(Report::msg("missing schema name"))?;
+            info!("...handling {schema_name} schema");
+            let maybe_schema = catalog_provider.schema(schema_name);
+            let schema_provider = match maybe_schema {
+                Some(schema) => schema,
+                None => {
+                    info!("...schema does not exist, creating");
+                    let mem_schema_provider = Arc::new(MemorySchemaProvider::new());
+                    catalog_provider.register_schema(schema_name, mem_schema_provider)?;
+                    catalog_provider
+                        .schema(schema_name)
+                        .ok_or(Report::msg(format!(
+                            "missing schema {schema_name}, shouldnt be possible"
+                        )))?
+                }
+            };
+            let tables = store.list_with_delimiter(Some(&schema)).await?;
+            for table_path in tables.common_prefixes {
+                let table_name = table_path
+                    .filename()
+                    .ok_or(Report::msg("missing table name"))?;
+                info!("...handling table \"{catalog_name}.{schema_name}.{table_name}\"");
+
+                let p = tables_url
+                    .join(&format!("{catalog_name}/"))?
+                    .join(&format!("{schema_name}/"))?
+                    .join(&format!("{table_name}/"))?;
+                let table_url = ListingTableUrl::parse(p)?;
+                let file_format = ParquetFormat::new();
+                let listing_options =
+                    ListingOptions::new(Arc::new(file_format)).with_file_extension(".parquet");
+                // Resolve the schema
+                let resolved_schema = listing_options
+                    .infer_schema(&ctx.state(), &table_url)
+                    .await?;
+                let config = ListingTableConfig::new(table_url)
+                    .with_listing_options(listing_options)
+                    .with_schema(resolved_schema);
+                // Create a new TableProvider
+                let provider = Arc::new(ListingTable::try_new(config)?);
+                info!("...table registered");
+                schema_provider.register_table(table_name.to_string(), provider)?;
+            }
+        }
     }
 
-    // if !tables_path.exists() || !tables_path.is_dir() {
-    //     info!("no tables directory configured, skipping table registration");
-    //     return Ok(());
-    // }
-    // let catalogs = read_dir(tables_path)?;
-    // info!("...reading catalogs");
-    // for maybe_catalog in catalogs {
-    //     let catalog = maybe_catalog?;
-    //     let catalog_file_name = catalog.file_name();
-    //     let catalog_name = catalog_file_name.to_str().ok_or(Report::msg(format!(
-    //         "invalid catalog path {catalog_file_name:?}"
-    //     )))?;
-    //     // Every catalog should be a directory
-    //     if !catalog.path().is_dir() {
-    //         error!("catalog {catalog_name:?} is not a directory, skipping");
-    //         continue;
-    //     }
-    //     let catalog_path = catalog.path();
-    //     info!("...handling {:?} catalog", catalog_name);
-    //     let maybe_catalog = ctx.catalog(catalog_name);
-    //     let catalog_provider = match maybe_catalog {
-    //         None => {
-    //             info!("...catalog does not exist, createing");
-    //             let mem_catalog_provider = Arc::new(MemoryCatalogProvider::new());
-    //             ctx.register_catalog(catalog_name, mem_catalog_provider);
-    //             ctx.catalog(catalog_name).ok_or(Report::msg(format!(
-    //                 "missing catalog {catalog_name}, shouldnt be possible"
-    //             )))?
-    //         }
-    //         Some(catalog) => catalog,
-    //     };
-    //     for maybe_schema in read_dir(&catalog_path)? {
-    //         let schema = maybe_schema?;
-    //         let schema_file_name = schema.file_name();
-    //         let schema_name = schema_file_name.to_str().ok_or(Report::msg(format!(
-    //             "invalid schema path {schema_file_name:?}"
-    //         )))?;
-    //         // Every schema should be a directory
-    //         if !schema.path().is_dir() {
-    //             error!("schema {schema_name:?} is not a directory, skipping",);
-    //             continue;
-    //         }
-    //         let schema_path = schema.path();
-    //         info!("...handling {:?} schema", schema_name);
-    //         let maybe_schema = catalog_provider.schema(schema_name);
-    //         let schema_provider = match maybe_schema {
-    //             None => {
-    //                 info!("...schema does not exist, creating");
-    //                 let mem_schema_provider = Arc::new(MemorySchemaProvider::new());
-    //                 catalog_provider.register_schema(schema_name, mem_schema_provider)?;
-    //                 catalog_provider
-    //                     .schema(schema_name)
-    //                     .ok_or(Report::msg(format!(
-    //                         "missing schema {schema_name}, shouldnt be possible"
-    //                     )))?
-    //             }
-    //             Some(schema) => schema,
-    //         };
-    //         for maybe_table in read_dir(schema_path)? {
-    //             let table = maybe_table?;
-    //             // Every table should be a directory even if there is a single data file
-    //             if !table.path().is_dir() {
-    //                 error!("table {:?} is not a directory, skipping", catalog.path());
-    //                 continue;
-    //             }
-    //             let table_path = table.path();
-    //             let table_file_name = table.file_name();
-    //             let table_name = table_file_name.to_str().ok_or(Report::msg(format!(
-    //                 "invalid table path {table_file_name:?}"
-    //             )))?;
-    //             info!("...handling table {table_name:?}");
-    //             let table_url = ListingTableUrl::parse(table_path.to_str().ok_or(Report::msg(
-    //                 format!("Invalid table path for {table_path:?}"),
-    //             ))?)?;
-    //             let file_format = ParquetFormat::new();
-    //             let listing_options =
-    //                 ListingOptions::new(Arc::new(file_format)).with_file_extension(".parquet");
-    //             // Resolve the schema
-    //             let resolved_schema = listing_options
-    //                 .infer_schema(&ctx.state(), &table_url)
-    //                 .await?;
-    //             let config = ListingTableConfig::new(table_url)
-    //                 .with_listing_options(listing_options)
-    //                 .with_schema(resolved_schema);
-    //             // Create a new TableProvider
-    //             let provider = Arc::new(ListingTable::try_new(config)?);
-    //             info!("...registering {table_name}");
-    //             schema_provider.register_table(table_name.to_string(), provider)?;
-    //         }
-    //     }
-    // }
     Ok(())
 }
 
@@ -188,9 +160,9 @@ mod test {
         let ctx = setup();
         let dir = tempfile::tempdir().unwrap();
         let db_path = dir.path().join("db");
-        let config = DbConfig {
-            path: db_path.clone(),
-        };
+        let path = format!("file://{}/", db_path.to_str().unwrap());
+        let db_url = url::Url::parse(&path).unwrap();
+        let config = DbConfig { path: db_url };
         let data_path = db_path.join("tables").join("dft").join("stuff").join("hi");
 
         let df = ctx.sql("SELECT 1").await.unwrap();
@@ -240,9 +212,9 @@ mod test {
         let ctx = setup();
         let dir = tempfile::tempdir().unwrap();
         let db_path = dir.path().join("db");
-        let config = DbConfig {
-            path: db_path.clone(),
-        };
+        let path = format!("file://{}/", db_path.to_str().unwrap());
+        let db_url = url::Url::parse(&path).unwrap();
+        let config = DbConfig { path: db_url };
         let data_1_path = db_path.join("tables").join("dft").join("stuff").join("hi");
         let data_2_path = db_path.join("tables").join("dft").join("stuff").join("bye");
 
@@ -299,9 +271,9 @@ mod test {
         let ctx = setup();
         let dir = tempfile::tempdir().unwrap();
         let db_path = dir.path().join("db");
-        let config = DbConfig {
-            path: db_path.clone(),
-        };
+        let path = format!("file://{}/", db_path.to_str().unwrap());
+        let db_url = url::Url::parse(&path).unwrap();
+        let config = DbConfig { path: db_url };
         let data_1_path = db_path.join("tables").join("dft").join("stuff").join("hi");
         let data_2_path = db_path
             .join("tables")
@@ -362,9 +334,9 @@ mod test {
         let ctx = setup();
         let dir = tempfile::tempdir().unwrap();
         let db_path = dir.path().join("db");
-        let config = DbConfig {
-            path: db_path.clone(),
-        };
+        let path = format!("file://{}/", db_path.to_str().unwrap());
+        let db_url = url::Url::parse(&path).unwrap();
+        let config = DbConfig { path: db_url };
         let data_1_path = db_path.join("tables").join("dft2").join("stuff").join("hi");
         let data_2_path = db_path
             .join("tables")

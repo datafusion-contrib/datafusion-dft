@@ -109,7 +109,7 @@ where
     )))?;
 
     let file_url = table_path.join("data.parquet")?;
-    info!("...file URL {file_url}");
+    info!("...file URL '{file_url}'");
     let mut buf: Vec<u8> = Vec::new();
     {
         let mut writer = ArrowWriter::try_new(&mut buf, Arc::clone(first.schema_ref()), None)?;
