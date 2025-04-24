@@ -216,7 +216,7 @@ fn default_db_path() -> Url {
     let path = base
         .data_dir()
         .to_path_buf()
-        .join("dft")
+        .join("dft/")
         .to_str()
         .unwrap()
         .to_string();

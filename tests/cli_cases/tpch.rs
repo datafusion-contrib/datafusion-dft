@@ -26,7 +26,7 @@ fn test_custom_config() {
     let db_path = tempdir.path().join("db");
     std::fs::create_dir_all(&db_path).unwrap();
     let mut config_builder = TestConfigBuilder::default();
-    config_builder.with_db_path(db_path.to_str().unwrap());
+    config_builder.with_db_path(&format!("file://{}", db_path.to_str().unwrap()));
     let config = config_builder.build("my_config.toml");
 
     Command::cargo_bin("dft")
