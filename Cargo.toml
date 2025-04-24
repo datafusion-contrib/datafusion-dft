@@ -81,7 +81,7 @@ url = "2.5.2"
 
 # When addding a new feature, also add it to the features tested list in CI (`.github/workflows/rust.yml`)
 [features]
-default = ["functions-parquet"]
+default = ["functions-parquet", "s3"]
 deltalake = ["datafusion-app/deltalake"]
 flightsql = [
   "datafusion-app/flightsql",
