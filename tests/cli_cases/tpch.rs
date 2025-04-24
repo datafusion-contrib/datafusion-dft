@@ -23,7 +23,7 @@ use assert_cmd::Command;
 #[test]
 fn test_custom_config() {
     let tempdir = tempfile::tempdir().unwrap();
-    let db_path = tempdir.path().join("db");
+    let db_path = tempdir.path().join("db/");
     std::fs::create_dir_all(&db_path).unwrap();
     let mut config_builder = TestConfigBuilder::default();
     config_builder.with_db_path(&format!("file://{}", db_path.to_str().unwrap()));
