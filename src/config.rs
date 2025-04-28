@@ -30,6 +30,7 @@ use serde::Deserialize;
 
 #[cfg(any(feature = "flightsql", feature = "http"))]
 use datafusion_app::config::AuthConfig;
+use url::Url;
 
 lazy_static! {
     pub static ref PROJECT_NAME: String = env!("CARGO_CRATE_NAME").to_uppercase().to_string();
@@ -194,7 +195,7 @@ fn default_interaction_config() -> InteractionConfig {
 #[derive(Debug, Clone, Deserialize)]
 pub struct DbConfig {
     #[serde(default = "default_db_path")]
-    pub path: PathBuf,
+    pub path: Url,
 }
 
 impl Default for DbConfig {
@@ -209,9 +210,18 @@ fn default_db_config() -> DbConfig {
     }
 }
 
-fn default_db_path() -> PathBuf {
+#[allow(unused)]
+fn default_db_path() -> Url {
     let base = directories::BaseDirs::new().expect("Base directories should be available");
-    base.data_dir().to_path_buf().join("dft")
+    let path = base
+        .data_dir()
+        .to_path_buf()
+        .join("dft/")
+        .to_str()
+        .unwrap()
+        .to_string();
+    let with_schema = format!("file://{path}");
+    Url::parse(&with_schema).unwrap()
 }
 
 #[derive(Clone, Debug, Deserialize)]

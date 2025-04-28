@@ -20,7 +20,7 @@ on: [push, pull_request]
 
 jobs:
   test:
-    name: Core
+    name: DB
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -43,7 +43,7 @@ jobs:
         uses: ./.github/actions/setup-rust
       - name: Run core tests
         run: |
-          cargo test
+          cargo test db
   test-flightsql:
     name: Extension / FlightSQL
     runs-on: ubuntu-latest
@@ -72,6 +72,57 @@ jobs:
           # test to only be run against the server spun up in that test.  With parallelism tests 
           # can connec to server in different test which breaks determinism.
           cargo test --features=flightsql extension_cases::flightsql -- --test-threads=1
+  test-cli:
+    name: App / CLI
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
+      - name: Start LocalStack
+        uses: LocalStack/setup-localstack@v0.2.3
+        with:
+          image-tag: 'latest'
+          install-awslocal: 'true'
+          configuration: DEBUG=1
+      - name: Run Tests against LocalStack
+        run: |
+          awslocal s3 mb s3://test
+          awslocal s3 mv data/aggregate_test_100.csv s3://test/
+          awslocal s3 mb s3://tpch-db
+          echo "Test Execution complete!"
+      - name: Run CLI tests
+        run: |
+          cargo test cli_cases
+  test-tui:
+    name: App / TUI
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
+      - name: Start LocalStack
+        uses: LocalStack/setup-localstack@v0.2.3
+        with:
+          image-tag: 'latest'
+          install-awslocal: 'true'
+          configuration: DEBUG=1
+      - name: Run Tests against LocalStack
+        run: |
+          awslocal s3 mb s3://test
+          awslocal s3 mv data/aggregate_test_100.csv s3://test/
+          awslocal s3 mb s3://tpch-db
+          echo "Test Execution complete!"
+      - name: Run CLI tests
+        run: |
+          cargo test tui_cases
+
   test-s3:
     name: Extension / S3
     runs-on: ubuntu-latest

@@ -36,3 +36,7 @@ bench-http-custom file:
     echo "Running bench on $custom_bench_path"
     echo ""
     oha --urls-from-file "$custom_bench_path"
+
+setup-test-env:
+    localstack start -d
+    awslocal s3api create-bucket --bucket tmp --acl public-read
