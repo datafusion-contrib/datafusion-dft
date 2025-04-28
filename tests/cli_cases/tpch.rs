@@ -81,8 +81,6 @@ async fn test_custom_config_with_s3() {
         .assert()
         .success();
 
-    println!("A: {a:?}");
-
     let s3 = AmazonS3Builder::new()
         .with_bucket_name(bucket)
         .with_endpoint(endpoint)
@@ -96,8 +94,6 @@ async fn test_custom_config_with_s3() {
         .list_with_delimiter(Some(&Path::parse("db/tables/dft/tpch/").unwrap()))
         .await
         .unwrap();
-
-    println!("r: {r:?}");
 
     let needed_dirs = [
         "customer", "orders", "lineitem", "nation", "part", "partsupp", "region", "supplier",
