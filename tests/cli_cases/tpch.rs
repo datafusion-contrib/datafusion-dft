@@ -95,11 +95,18 @@ async fn test_custom_config_with_s3() {
         .await
         .unwrap();
 
+    println!("r: {r:?}");
+
     let needed_dirs = [
         "customer", "orders", "lineitem", "nation", "part", "partsupp", "region", "supplier",
     ];
 
-    for prefix in r.common_prefixes {
-        assert!(needed_dirs.contains(&prefix.to_string().as_str()));
+    let prefixes: Vec<_> = r
+        .common_prefixes
+        .iter()
+        .map(|p| p.parts().last().unwrap().as_ref().to_string())
+        .collect();
+    for dir in needed_dirs {
+        assert!(prefixes.contains(&dir.to_string()));
     }
 }
