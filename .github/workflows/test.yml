@@ -20,7 +20,7 @@ on: [push, pull_request]
 
 jobs:
   test:
-    name: Core
+    name: DB
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -43,7 +43,7 @@ jobs:
         uses: ./.github/actions/setup-rust
       - name: Run core tests
         run: |
-          cargo test
+          cargo test db
   test-flightsql:
     name: Extension / FlightSQL
     runs-on: ubuntu-latest
