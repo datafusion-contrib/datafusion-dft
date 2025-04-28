@@ -73,13 +73,15 @@ async fn test_custom_config_with_s3() {
     );
     let config = config_builder.build("my_config.toml");
 
-    Command::cargo_bin("dft")
+    let a = Command::cargo_bin("dft")
         .unwrap()
         .arg("--config")
         .arg(config.path)
         .arg("generate-tpch")
         .assert()
         .success();
+
+    println!("A: {a:?}");
 
     let s3 = AmazonS3Builder::new()
         .with_bucket_name(bucket)
