@@ -27,7 +27,7 @@ use datafusion::logical_expr::LogicalPlan;
 use datafusion::sql::parser::DFParser;
 use datafusion_app::local::ExecutionContext;
 use datafusion_app::observability::ObservabilityRequestDetails;
-use futures::{StreamExt, TryStreamExt};
+use futures::{Stream, StreamExt, TryStreamExt};
 use jiff::Timestamp;
 use log::{debug, error, info};
 use metrics::{counter, histogram};
@@ -98,6 +98,41 @@ impl FlightSqlServiceImpl {
                 ))
             }
         }
+    }
+
+    async fn record_request(
+        &self,
+        start: Timestamp,
+        request_id: Option<String>,
+        response_err: Option<&Status>,
+        path: String,
+        latency_metric: &'static str,
+    ) {
+        let duration = Timestamp::now() - start;
+        let grpc_code = match &response_err {
+            None => Code::Ok,
+            Some(status) => status.code(),
+        };
+        let ctx = self.execution.session_ctx();
+        let req = ObservabilityRequestDetails {
+            request_id,
+            path,
+            sql: None,
+            rows: None,
+            start_ms: start.as_millisecond(),
+            duration_ms: duration.get_milliseconds(),
+            status: grpc_code as u16,
+        };
+        if let Err(e) = self
+            .execution
+            .observability()
+            .try_record_request(ctx, req)
+            .await
+        {
+            error!("Error recording request: {}", e.to_string())
+        }
+
+        histogram!(latency_metric).record(duration.get_milliseconds() as f64);
     }
 
     async fn get_flight_info_statement_handler(
@@ -195,32 +230,16 @@ impl FlightSqlService for FlightSqlServiceImpl {
         let res = self
             .get_flight_info_statement_handler(query.clone(), request_id, request)
             .await;
-        let duration = Timestamp::now() - start;
 
-        let grpc_code = match &res {
-            Ok(_) => Code::Ok,
-            Err(status) => status.code(),
-        };
-
-        let ctx = self.execution.session_ctx();
-        let req = ObservabilityRequestDetails {
-            request_id: Some(request_id.to_string()),
-            path: "GetFlightInfo".to_string(),
-            sql: Some(query),
-            rows: None,
-            start_ms: start.as_millisecond(),
-            duration_ms: duration.get_milliseconds(),
-            status: grpc_code as u16,
-        };
-        if let Err(e) = self
-            .execution
-            .observability()
-            .try_record_request(ctx, req)
-            .await
-        {
-            error!("Error recording request: {}", e.to_string())
-        }
-        histogram!("get_flight_info_latency_ms").record(duration.get_milliseconds() as f64);
+        // TODO: Move recording to after response is sent to not impact response latency
+        self.record_request(
+            start,
+            Some(request_id.to_string()),
+            res.as_ref().err(),
+            "get_flight_info_statement".to_string(),
+            "get_flight_info_statement_latency_ms",
+        )
+        .await;
         res
     }
 
@@ -238,31 +257,15 @@ impl FlightSqlService for FlightSqlServiceImpl {
             .do_get_statement_handler(request_id.clone(), ticket)
             .await;
 
-        let duration = Timestamp::now() - start;
-        let grpc_code = match &res {
-            Ok(_) => Code::Ok,
-            Err(status) => status.code(),
-        };
-        let ctx = self.execution.session_ctx();
-        let req = ObservabilityRequestDetails {
-            request_id: Some(request_id),
-            path: "DoGetStatement".to_string(),
-            sql: None,
-            rows: None,
-            start_ms: start.as_millisecond(),
-            duration_ms: duration.get_milliseconds(),
-            status: grpc_code as u16,
-        };
-        if let Err(e) = self
-            .execution
-            .observability()
-            .try_record_request(ctx, req)
-            .await
-        {
-            error!("Error recording request: {}", e.to_string())
-        }
-
-        histogram!("do_get_statement_latency_ms").record(duration.get_milliseconds() as f64);
+        // TODO: Move recording to after response is sent to not impact response latency
+        self.record_request(
+            start,
+            Some(request_id),
+            res.as_ref().err(),
+            "do_get_statement".to_string(),
+            "do_get_statement_latency_ms",
+        )
+        .await;
         res
     }
 
@@ -280,31 +283,15 @@ impl FlightSqlService for FlightSqlServiceImpl {
             .do_get_fallback_handler(request_id.clone(), message)
             .await;
 
-        let duration = Timestamp::now() - start;
-        let grpc_code = match &res {
-            Ok(_) => Code::Ok,
-            Err(status) => status.code(),
-        };
-        let ctx = self.execution.session_ctx();
-        let req = ObservabilityRequestDetails {
-            request_id: Some(request_id),
-            path: "DoGetFallback".to_string(),
-            sql: None,
-            rows: None,
-            start_ms: start.as_millisecond(),
-            duration_ms: duration.get_milliseconds(),
-            status: grpc_code as u16,
-        };
-        if let Err(e) = self
-            .execution
-            .observability()
-            .try_record_request(ctx, req)
-            .await
-        {
-            error!("Error recording request: {}", e.to_string())
-        }
-
-        histogram!("do_get_fallback_latency_ms").record(duration.get_milliseconds() as f64);
+        // TODO: Move recording to after response is sent to not impact response latency
+        self.record_request(
+            start,
+            Some(request_id),
+            res.as_ref().err(),
+            "do_get_fallback".to_string(),
+            "do_get_fallback_latency_ms",
+        )
+        .await;
         res
     }
 
