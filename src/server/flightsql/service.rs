@@ -53,11 +53,51 @@ impl FlightSqlServiceImpl {
         }
     }
 
-    /// Return an [`FlightServiceServer`] that can be used with a
+    /// Return a [`FlightServiceServer`] that can be used with a
     /// [`Server`](tonic::transport::Server)
     pub fn service(&self) -> FlightServiceServer<Self> {
         // wrap up tonic goop
         FlightServiceServer::new(self.clone())
+    }
+
+    async fn do_get_common_handler(
+        &self,
+        request_id: String,
+    ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
+        match Uuid::from_str(&request_id) {
+            Ok(id) => {
+                info!("getting plan for id: {:?}", id);
+                // Limit the scope of the lock
+                let maybe_plan = {
+                    let guard = self
+                        .requests
+                        .lock()
+                        .map_err(|_| Status::internal("Failed to acquire lock on requests"))?;
+                    guard.get(&id).cloned()
+                };
+                if let Some(plan) = maybe_plan {
+                    let stream = self
+                        .execution
+                        .execute_logical_plan(plan)
+                        .await
+                        .map_err(|e| Status::internal(e.to_string()))?;
+                    let builder = FlightDataEncoderBuilder::new();
+                    let flight_data_stream = builder
+                        .build(stream.map_err(|e| FlightError::ExternalError(Box::new(e))))
+                        .map_err(|e| Status::internal(e.to_string()))
+                        .boxed();
+                    Ok(Response::new(flight_data_stream))
+                } else {
+                    Err(Status::internal("Plan not found for id"))
+                }
+            }
+            Err(e) => {
+                error!("error decoding handle to uuid for {request_id}: {:?}", e);
+                Err(Status::internal(
+                    "Error decoding handle to uuid for {request_id}",
+                ))
+            }
+        }
     }
 
     async fn get_flight_info_statement_handler(
@@ -120,47 +160,22 @@ impl FlightSqlServiceImpl {
         }
     }
 
+    async fn do_get_statement_handler(
+        &self,
+        request_id: String,
+        ticket: TicketStatementQuery,
+    ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
+        debug!("do_get_statement ticket: {:?}", ticket);
+        self.do_get_common_handler(request_id).await
+    }
+
     async fn do_get_fallback_handler(
         &self,
         request_id: String,
         message: Any,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
         debug!("do_get_fallback message: {:?}", message);
-
-        match Uuid::from_str(&request_id) {
-            Ok(id) => {
-                info!("getting plan for id: {:?}", id);
-                // Limit the scope of the lock
-                let maybe_plan = {
-                    let guard = self
-                        .requests
-                        .lock()
-                        .map_err(|_| Status::internal("Failed to acquire lock on requests"))?;
-                    guard.get(&id).cloned()
-                };
-                if let Some(plan) = maybe_plan {
-                    let stream = self
-                        .execution
-                        .execute_logical_plan(plan)
-                        .await
-                        .map_err(|e| Status::internal(e.to_string()))?;
-                    let builder = FlightDataEncoderBuilder::new();
-                    let flight_data_stream = builder
-                        .build(stream.map_err(|e| FlightError::ExternalError(Box::new(e))))
-                        .map_err(|e| Status::internal(e.to_string()))
-                        .boxed();
-                    Ok(Response::new(flight_data_stream))
-                } else {
-                    Err(Status::internal("Plan not found for id"))
-                }
-            }
-            Err(e) => {
-                error!("error decoding handle to uuid for {request_id}: {:?}", e);
-                Err(Status::internal(
-                    "Error decoding handle to uuid for {request_id}",
-                ))
-            }
-        }
+        self.do_get_common_handler(request_id).await
     }
 }
 
@@ -211,10 +226,44 @@ impl FlightSqlService for FlightSqlServiceImpl {
 
     async fn do_get_statement(
         &self,
-        _ticket: TicketStatementQuery,
-        _request: Request<Ticket>,
+        ticket: TicketStatementQuery,
+        request: Request<Ticket>,
     ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
-        Err(Status::unimplemented("Not implemented"))
+        counter!("requests", "endpoint" => "do_get_statement").increment(1);
+        let start = Timestamp::now();
+        let request_id =
+            try_request_id_from_request(request).map_err(|e| Status::internal(e.to_string()))?;
+        debug!("do_get_statement for request_id: {}", &request_id);
+        let res = self
+            .do_get_statement_handler(request_id.clone(), ticket)
+            .await;
+
+        let duration = Timestamp::now() - start;
+        let grpc_code = match &res {
+            Ok(_) => Code::Ok,
+            Err(status) => status.code(),
+        };
+        let ctx = self.execution.session_ctx();
+        let req = ObservabilityRequestDetails {
+            request_id: Some(request_id),
+            path: "DoGetStatement".to_string(),
+            sql: None,
+            rows: None,
+            start_ms: start.as_millisecond(),
+            duration_ms: duration.get_milliseconds(),
+            status: grpc_code as u16,
+        };
+        if let Err(e) = self
+            .execution
+            .observability()
+            .try_record_request(ctx, req)
+            .await
+        {
+            error!("Error recording request: {}", e.to_string())
+        }
+
+        histogram!("do_get_statement_latency_ms").record(duration.get_milliseconds() as f64);
+        res
     }
 
     async fn do_get_fallback(
