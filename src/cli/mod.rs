@@ -16,6 +16,7 @@
 // under the License.
 //! [`CliApp`]: Command Line User Interface
 
+use crate::args::Command;
 use crate::config::AppConfig;
 use crate::db::register_db;
 use crate::{args::DftArgs, execution::AppExecution};
@@ -39,6 +40,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 #[cfg(feature = "flightsql")]
 use {
+    crate::args::FlightSqlCommand,
     datafusion_app::{
         config::{AuthConfig, FlightSQLConfig},
         flightsql::FlightSQLContext,
@@ -82,6 +84,9 @@ impl CliApp {
         Ok(())
     }
 
+    #[cfg(feature = "flightsql")]
+    fn handle_flightsql_command(&self, command: FlightSqlCommand) {}
+
     /// Execute the provided sql, which was passed as an argument from CLI.
     ///
     /// Optionally, use the FlightSQL client for execution.
@@ -91,6 +96,11 @@ impl CliApp {
         }
 
         self.validate_args()?;
+
+        #[cfg(feature = "flightsql")]
+        if let Some(Command::FlightSql { command }) = self.args.command {
+            self.handle_flightsql_command(command)
+        }
 
         #[cfg(not(feature = "flightsql"))]
         match (
