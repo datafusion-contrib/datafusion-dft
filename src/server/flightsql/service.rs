@@ -27,7 +27,7 @@ use datafusion::logical_expr::LogicalPlan;
 use datafusion::sql::parser::DFParser;
 use datafusion_app::local::ExecutionContext;
 use datafusion_app::observability::ObservabilityRequestDetails;
-use futures::{Stream, StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt};
 use jiff::Timestamp;
 use log::{debug, error, info};
 use metrics::{counter, histogram};
@@ -236,7 +236,7 @@ impl FlightSqlService for FlightSqlServiceImpl {
             start,
             Some(request_id.to_string()),
             res.as_ref().err(),
-            "get_flight_info_statement".to_string(),
+            "/get_flight_info_statement".to_string(),
             "get_flight_info_statement_latency_ms",
         )
         .await;
@@ -262,7 +262,7 @@ impl FlightSqlService for FlightSqlServiceImpl {
             start,
             Some(request_id),
             res.as_ref().err(),
-            "do_get_statement".to_string(),
+            "/do_get_statement".to_string(),
             "do_get_statement_latency_ms",
         )
         .await;
@@ -288,7 +288,7 @@ impl FlightSqlService for FlightSqlServiceImpl {
             start,
             Some(request_id),
             res.as_ref().err(),
-            "do_get_fallback".to_string(),
+            "/do_get_fallback".to_string(),
             "do_get_fallback_latency_ms",
         )
         .await;
