@@ -73,7 +73,7 @@ async fn test_custom_config_with_s3() {
     );
     let config = config_builder.build("my_config.toml");
 
-    let a = Command::cargo_bin("dft")
+    Command::cargo_bin("dft")
         .unwrap()
         .arg("--config")
         .arg(config.path)

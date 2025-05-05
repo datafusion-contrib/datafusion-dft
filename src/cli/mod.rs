@@ -85,7 +85,11 @@ impl CliApp {
     }
 
     #[cfg(feature = "flightsql")]
-    fn handle_flightsql_command(&self, command: FlightSqlCommand) {}
+    async fn handle_flightsql_command(&self, command: FlightSqlCommand) -> color_eyre::Result<()> {
+        match command {
+            FlightSqlCommand::Query { sql } => self.exec_from_flightsql(sql, 0).await,
+        }
+    }
 
     /// Execute the provided sql, which was passed as an argument from CLI.
     ///
@@ -98,9 +102,9 @@ impl CliApp {
         self.validate_args()?;
 
         #[cfg(feature = "flightsql")]
-        if let Some(Command::FlightSql { command }) = self.args.command {
-            self.handle_flightsql_command(command)
-        }
+        if let Some(Command::FlightSql { command }) = &self.args.command {
+            return self.handle_flightsql_command(command.clone()).await;
+        };
 
         #[cfg(not(feature = "flightsql"))]
         match (
@@ -613,7 +617,7 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
     let mut app_execution = AppExecution::new(execution_ctx);
     #[cfg(feature = "flightsql")]
     {
-        if cli.flightsql {
+        if cli.flightsql || matches!(cli.command, Some(Command::FlightSql { .. })) {
             let auth = AuthConfig {
                 basic_auth: config.flightsql_client.auth.basic_auth,
                 bearer_token: config.flightsql_client.auth.bearer_token,

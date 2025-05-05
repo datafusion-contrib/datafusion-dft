@@ -608,6 +608,7 @@ async fn test_output_parquet() {
         .unwrap()
         .arg("-c")
         .arg(sql.clone())
+        .arg("--flightsql")
         .arg("-o")
         .arg(cloned_path)
         .assert()
@@ -621,6 +622,37 @@ async fn test_output_parquet() {
         .arg(read_sql)
         .assert()
         .success();
+
+    let expected = r#"
++----------+
+| Int64(1) |
++----------+
+| 1        |
++----------+"#;
+
+    assert.stdout(contains_str(expected));
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_flightsql_query_command() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        let sql = "SELECT 1".to_string();
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("flightsql")
+            .arg("query")
+            .arg(sql.clone())
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
 
     let expected = r#"
 +----------+
