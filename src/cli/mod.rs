@@ -41,6 +41,7 @@ use std::path::{Path, PathBuf};
 #[cfg(feature = "flightsql")]
 use {
     crate::args::FlightSqlCommand,
+    arrow_flight::FlightInfo,
     datafusion_app::{
         config::{AuthConfig, FlightSQLConfig},
         flightsql::FlightSQLContext,
@@ -87,7 +88,15 @@ impl CliApp {
     #[cfg(feature = "flightsql")]
     async fn handle_flightsql_command(&self, command: FlightSqlCommand) -> color_eyre::Result<()> {
         match command {
-            FlightSqlCommand::Query { sql } => self.exec_from_flightsql(sql, 0).await,
+            FlightSqlCommand::Statement { sql } => self.exec_from_flightsql(sql, 0).await,
+            FlightSqlCommand::Catalogs => {
+                let flight_info = self
+                    .app_execution
+                    .flightsql_ctx()
+                    .get_catalogs_flight_info()
+                    .await?;
+                Ok(())
+            }
         }
     }
 

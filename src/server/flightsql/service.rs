@@ -20,7 +20,9 @@ use arrow_flight::encode::FlightDataEncoderBuilder;
 use arrow_flight::error::FlightError;
 use arrow_flight::flight_service_server::{FlightService, FlightServiceServer};
 use arrow_flight::sql::server::FlightSqlService;
-use arrow_flight::sql::{Any, CommandStatementQuery, SqlInfo, TicketStatementQuery};
+use arrow_flight::sql::{
+    Any, CommandGetCatalogs, CommandStatementQuery, SqlInfo, TicketStatementQuery,
+};
 use arrow_flight::{FlightDescriptor, FlightEndpoint, FlightInfo, Ticket};
 use color_eyre::Result;
 use datafusion::logical_expr::LogicalPlan;
@@ -217,6 +219,31 @@ impl FlightSqlServiceImpl {
 #[tonic::async_trait]
 impl FlightSqlService for FlightSqlServiceImpl {
     type FlightService = FlightSqlServiceImpl;
+
+    async fn get_flight_info_catalogs(
+        &self,
+        _query: CommandGetCatalogs,
+        request: Request<FlightDescriptor>,
+    ) -> Result<Response<FlightInfo>, Status> {
+        counter!("requests", "endpoint" => "get_flight_info").increment(1);
+        let start = Timestamp::now();
+        let request_id = uuid::Uuid::new_v4();
+        let query = "SELECT DISTINCT table_catalog FROM information_schema.tables".to_string();
+        let res = self
+            .get_flight_info_statement_handler(query, request_id, request)
+            .await;
+
+        // TODO: Move recording to after response is sent to not impact response latency
+        self.record_request(
+            start,
+            Some(request_id.to_string()),
+            res.as_ref().err(),
+            "/get_flight_info_catalogs".to_string(),
+            "get_flight_info_catalogs_latency_ms",
+        )
+        .await;
+        res
+    }
 
     async fn get_flight_info_statement(
         &self,

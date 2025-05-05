@@ -645,7 +645,7 @@ async fn test_flightsql_query_command() {
         Command::cargo_bin("dft")
             .unwrap()
             .arg("flightsql")
-            .arg("query")
+            .arg("statement")
             .arg(sql.clone())
             .timeout(Duration::from_secs(5))
             .assert()
