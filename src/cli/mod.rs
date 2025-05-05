@@ -88,7 +88,7 @@ impl CliApp {
     #[cfg(feature = "flightsql")]
     async fn handle_flightsql_command(&self, command: FlightSqlCommand) -> color_eyre::Result<()> {
         match command {
-            FlightSqlCommand::Statement { sql } => self.exec_from_flightsql(sql, 0).await,
+            FlightSqlCommand::StatementQuery { sql } => self.exec_from_flightsql(sql, 0).await,
             FlightSqlCommand::Catalogs => {
                 let flight_info = self
                     .app_execution

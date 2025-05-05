@@ -130,7 +130,7 @@ impl DftArgs {
 #[derive(Clone, Debug, Subcommand)]
 pub enum FlightSqlCommand {
     /// Executes `GetFlightInfo` and `DoGet` on the provided SQL query
-    Statement { sql: String },
+    StatementQuery { sql: String },
     /// Executes `GetCatalogsFlightInfo` and `DoGet`
     Catalogs,
 }
