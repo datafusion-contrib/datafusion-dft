@@ -132,7 +132,7 @@ pub enum FlightSqlCommand {
     /// Executes `GetFlightInfo` and `DoGet` on the provided SQL query
     StatementQuery { sql: String },
     /// Executes `GetCatalogsFlightInfo` and `DoGet`
-    Catalogs,
+    GetCatalogs,
 }
 
 #[derive(Clone, Debug, Subcommand)]

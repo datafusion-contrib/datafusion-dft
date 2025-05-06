@@ -67,9 +67,14 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
     }
 
     #[cfg(feature = "flightsql")]
-    if let Some(Command::ServeFlightSql { .. }) = cli.command {
-        server::flightsql::try_run(cli.clone(), cfg.clone()).await?;
-        return Ok(());
+    {
+        if matches!(cli.command, Some(Command::FlightSql { .. })) {
+            cli::try_run(cli, cfg).await?;
+            return Ok(());
+        } else if let Some(Command::ServeFlightSql { .. }) = cli.command {
+            server::flightsql::try_run(cli.clone(), cfg.clone()).await?;
+            return Ok(());
+        }
     }
     #[cfg(feature = "http")]
     {
@@ -91,10 +96,7 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
         }
     }
 
-    if !cli.files.is_empty()
-        || !cli.commands.is_empty()
-        || matches!(cli.command, Some(Command::FlightSql { .. }))
-    {
+    if !cli.files.is_empty() || !cli.commands.is_empty() {
         cli::try_run(cli, cfg).await?;
     } else {
         tui::try_run(cli, cfg).await?;

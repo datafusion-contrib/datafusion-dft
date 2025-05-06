@@ -16,7 +16,6 @@
 // under the License.
 //! [`CliApp`]: Command Line User Interface
 
-use crate::args::Command;
 use crate::config::AppConfig;
 use crate::db::register_db;
 use crate::{args::DftArgs, execution::AppExecution};
@@ -40,8 +39,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 #[cfg(feature = "flightsql")]
 use {
-    crate::args::FlightSqlCommand,
-    arrow_flight::FlightInfo,
+    crate::args::{Command, FlightSqlCommand},
     datafusion_app::{
         config::{AuthConfig, FlightSQLConfig},
         flightsql::FlightSQLContext,
@@ -87,14 +85,24 @@ impl CliApp {
 
     #[cfg(feature = "flightsql")]
     async fn handle_flightsql_command(&self, command: FlightSqlCommand) -> color_eyre::Result<()> {
+        use futures::stream;
+
         match command {
             FlightSqlCommand::StatementQuery { sql } => self.exec_from_flightsql(sql, 0).await,
-            FlightSqlCommand::Catalogs => {
+            FlightSqlCommand::GetCatalogs => {
                 let flight_info = self
                     .app_execution
                     .flightsql_ctx()
                     .get_catalogs_flight_info()
                     .await?;
+                let streams = self
+                    .app_execution
+                    .flightsql_ctx()
+                    .do_get(flight_info)
+                    .await?;
+                let flight_batch_stream = stream::select_all(streams);
+                self.print_any_stream(flight_batch_stream).await;
+
                 Ok(())
             }
         }

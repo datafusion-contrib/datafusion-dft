@@ -229,6 +229,7 @@ impl FlightSqlService for FlightSqlServiceImpl {
         let start = Timestamp::now();
         let request_id = uuid::Uuid::new_v4();
         let query = "SELECT DISTINCT table_catalog FROM information_schema.tables".to_string();
+        // let query = "SELECT DISTINCT table_catalog FROM information_schema.tables;".to_string();
         let res = self
             .get_flight_info_statement_handler(query, request_id, request)
             .await;

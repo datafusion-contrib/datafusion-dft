@@ -27,7 +27,7 @@ use futures::TryFutureExt;
 use log::{debug, error, info};
 
 use crate::catalog::create_app_catalog;
-use crate::config::ExecutionConfig;
+use crate::config::{ExecutionConfig, ObservabilityConfig};
 use crate::{ExecOptions, ExecResult};
 use color_eyre::eyre::{self, Result};
 use datafusion::common::Result as DFResult;
@@ -70,6 +70,24 @@ pub struct ExecutionContext {
     /// Observability handlers
     #[cfg(feature = "observability")]
     observability: ObservabilityContext,
+}
+
+impl Default for ExecutionContext {
+    fn default() -> Self {
+        let cfg = SessionConfig::new().with_information_schema(true);
+        let session_ctx = SessionContext::new_with_config(cfg);
+        #[cfg(feature = "observability")]
+        let observability =
+            ObservabilityContext::try_new(ObservabilityConfig::default(), "test").unwrap();
+        Self {
+            config: ExecutionConfig::default(),
+            session_ctx,
+            ddl_path: None,
+            executor: None,
+            #[cfg(feature = "observability")]
+            observability,
+        }
+    }
 }
 
 impl std::fmt::Debug for ExecutionContext {

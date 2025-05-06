@@ -18,7 +18,12 @@
 use std::{io::Read, time::Duration};
 
 use assert_cmd::Command;
-use datafusion_dft::test_utils::fixture::{TestFixture, TestFlightSqlServiceImpl};
+use datafusion_app::local::ExecutionContext;
+use datafusion_dft::{
+    execution::AppExecution,
+    server::flightsql::service::FlightSqlServiceImpl,
+    test_utils::fixture::{TestFixture, TestFlightSqlServiceImpl},
+};
 
 use crate::{
     cli_cases::{contains_str, sql_in_file},
@@ -660,6 +665,37 @@ async fn test_flightsql_query_command() {
 +----------+
 | 1        |
 +----------+"#;
+
+    assert.stdout(contains_str(expected));
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_flightsql_get_catalogs() {
+    let ctx = ExecutionContext::default();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("flightsql")
+            .arg("get-catalogs")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r#"
++---------------+
+| table_catalog |
++---------------+
+| datafusion    |
++---------------+"#;
 
     assert.stdout(contains_str(expected));
 
