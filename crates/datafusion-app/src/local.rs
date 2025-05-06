@@ -27,7 +27,7 @@ use futures::TryFutureExt;
 use log::{debug, error, info};
 
 use crate::catalog::create_app_catalog;
-use crate::config::{ExecutionConfig, ObservabilityConfig};
+use crate::config::ExecutionConfig;
 use crate::{ExecOptions, ExecResult};
 use color_eyre::eyre::{self, Result};
 use datafusion::common::Result as DFResult;
@@ -43,7 +43,7 @@ use super::stats::{ExecutionDurationStats, ExecutionStats};
 #[cfg(feature = "udfs-wasm")]
 use super::wasm::create_wasm_udfs;
 #[cfg(feature = "observability")]
-use crate::observability::ObservabilityContext;
+use {crate::config::ObservabilityConfig, crate::observability::ObservabilityContext};
 
 /// Structure for executing queries
 ///

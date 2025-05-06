@@ -76,6 +76,7 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
             return Ok(());
         }
     }
+
     #[cfg(feature = "http")]
     {
         if let Some(Command::ServeHttp { .. }) = cli.command {
