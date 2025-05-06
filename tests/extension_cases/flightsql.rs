@@ -608,25 +608,34 @@ async fn test_output_parquet() {
 
     let cloned_path = path.clone();
 
-    let sql = "SELECT 1".to_string();
-    Command::cargo_bin("dft")
-        .unwrap()
-        .arg("-c")
-        .arg(sql.clone())
-        .arg("--flightsql")
-        .arg("-o")
-        .arg(cloned_path)
-        .assert()
-        .success();
+    tokio::task::spawn_blocking(|| {
+        let sql = "SELECT 1".to_string();
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg(sql.clone())
+            .arg("--flightsql")
+            .arg("-o")
+            .arg(cloned_path)
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success();
+    })
+    .await
+    .unwrap();
 
     let read_sql = format!("SELECT * FROM '{}'", path.to_str().unwrap());
 
-    let assert = Command::cargo_bin("dft")
-        .unwrap()
-        .arg("-c")
-        .arg(read_sql)
-        .assert()
-        .success();
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg(read_sql)
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
 
     let expected = r#"
 +----------+
