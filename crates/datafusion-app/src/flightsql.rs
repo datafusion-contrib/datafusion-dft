@@ -17,7 +17,9 @@
 
 use std::sync::Arc;
 
-use arrow_flight::sql::client::FlightSqlServiceClient;
+use arrow_flight::{
+    decode::FlightRecordBatchStream, sql::client::FlightSqlServiceClient, FlightInfo,
+};
 #[cfg(feature = "flightsql")]
 use base64::engine::{general_purpose::STANDARD, Engine as _};
 use datafusion::{
@@ -25,7 +27,7 @@ use datafusion::{
     physical_plan::stream::RecordBatchStreamAdapter,
     sql::parser::DFParser,
 };
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 
 use color_eyre::eyre::{self, Result};
 use tokio::sync::Mutex;
@@ -201,6 +203,45 @@ impl FlightSQLContext {
             }
         } else {
             return Err(DataFusionError::External("Missing client".into()));
+        }
+    }
+
+    pub async fn get_catalogs_flight_info(&self) -> DFResult<FlightInfo> {
+        let client = self.client.clone();
+        let mut guard = client.lock().await;
+        if let Some(client) = guard.as_mut() {
+            client
+                .get_catalogs()
+                .await
+                .map_err(|e| DataFusionError::ArrowError(e, None))
+        } else {
+            Err(DataFusionError::External(
+                "No FlightSQL client configured.  Add one in `~/.config/dft/config.toml`".into(),
+            ))
+        }
+    }
+
+    pub async fn do_get(&self, flight_info: FlightInfo) -> DFResult<Vec<FlightRecordBatchStream>> {
+        let client = self.client.clone();
+        let mut guard = client.lock().await;
+        if let Some(client) = guard.as_mut() {
+            let mut streams = Vec::new();
+            for endpoint in flight_info.endpoint {
+                if let Some(ticket) = endpoint.ticket {
+                    let stream = client
+                        .do_get(ticket.into_request())
+                        .await
+                        .map_err(|e| DataFusionError::ArrowError(e, None))?;
+                    streams.push(stream);
+                } else {
+                    debug!("No ticket for endpoint: {endpoint}");
+                }
+            }
+            Ok(streams)
+        } else {
+            Err(DataFusionError::External(
+                "No FlightSQL client configured. Add one in `~/.config/dft/config.toml`".into(),
+            ))
         }
     }
 }

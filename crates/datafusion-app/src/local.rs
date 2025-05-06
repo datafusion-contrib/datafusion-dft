@@ -43,7 +43,7 @@ use super::stats::{ExecutionDurationStats, ExecutionStats};
 #[cfg(feature = "udfs-wasm")]
 use super::wasm::create_wasm_udfs;
 #[cfg(feature = "observability")]
-use crate::observability::ObservabilityContext;
+use {crate::config::ObservabilityConfig, crate::observability::ObservabilityContext};
 
 /// Structure for executing queries
 ///
@@ -70,6 +70,24 @@ pub struct ExecutionContext {
     /// Observability handlers
     #[cfg(feature = "observability")]
     observability: ObservabilityContext,
+}
+
+impl Default for ExecutionContext {
+    fn default() -> Self {
+        let cfg = SessionConfig::new().with_information_schema(true);
+        let session_ctx = SessionContext::new_with_config(cfg);
+        #[cfg(feature = "observability")]
+        let observability =
+            ObservabilityContext::try_new(ObservabilityConfig::default(), "test").unwrap();
+        Self {
+            config: ExecutionConfig::default(),
+            session_ctx,
+            ddl_path: None,
+            executor: None,
+            #[cfg(feature = "observability")]
+            observability,
+        }
+    }
 }
 
 impl std::fmt::Debug for ExecutionContext {

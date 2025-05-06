@@ -128,6 +128,14 @@ impl DftArgs {
 }
 
 #[derive(Clone, Debug, Subcommand)]
+pub enum FlightSqlCommand {
+    /// Executes `GetFlightInfo` and `DoGet` on the provided SQL query
+    StatementQuery { sql: String },
+    /// Executes `GetCatalogsFlightInfo` and `DoGet`
+    GetCatalogs,
+}
+
+#[derive(Clone, Debug, Subcommand)]
 pub enum Command {
     /// Start a HTTP server
     #[cfg(feature = "http")]
@@ -138,6 +146,13 @@ pub enum Command {
         addr: Option<SocketAddr>,
         #[clap(long, help = "Set the port to be used for serving metrics")]
         metrics_addr: Option<SocketAddr>,
+    },
+    /// Make a request to a FlightSQL server
+    #[cfg(feature = "flightsql")]
+    #[command(name = "flightsql")]
+    FlightSql {
+        #[clap(subcommand)]
+        command: FlightSqlCommand,
     },
     /// Start a FlightSQL server
     #[cfg(feature = "flightsql")]

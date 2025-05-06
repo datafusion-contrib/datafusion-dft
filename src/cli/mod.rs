@@ -39,6 +39,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 #[cfg(feature = "flightsql")]
 use {
+    crate::args::{Command, FlightSqlCommand},
     datafusion_app::{
         config::{AuthConfig, FlightSQLConfig},
         flightsql::FlightSQLContext,
@@ -82,6 +83,31 @@ impl CliApp {
         Ok(())
     }
 
+    #[cfg(feature = "flightsql")]
+    async fn handle_flightsql_command(&self, command: FlightSqlCommand) -> color_eyre::Result<()> {
+        use futures::stream;
+
+        match command {
+            FlightSqlCommand::StatementQuery { sql } => self.exec_from_flightsql(sql, 0).await,
+            FlightSqlCommand::GetCatalogs => {
+                let flight_info = self
+                    .app_execution
+                    .flightsql_ctx()
+                    .get_catalogs_flight_info()
+                    .await?;
+                let streams = self
+                    .app_execution
+                    .flightsql_ctx()
+                    .do_get(flight_info)
+                    .await?;
+                let flight_batch_stream = stream::select_all(streams);
+                self.print_any_stream(flight_batch_stream).await;
+
+                Ok(())
+            }
+        }
+    }
+
     /// Execute the provided sql, which was passed as an argument from CLI.
     ///
     /// Optionally, use the FlightSQL client for execution.
@@ -91,6 +117,11 @@ impl CliApp {
         }
 
         self.validate_args()?;
+
+        #[cfg(feature = "flightsql")]
+        if let Some(Command::FlightSql { command }) = &self.args.command {
+            return self.handle_flightsql_command(command.clone()).await;
+        };
 
         #[cfg(not(feature = "flightsql"))]
         match (
@@ -603,7 +634,7 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
     let mut app_execution = AppExecution::new(execution_ctx);
     #[cfg(feature = "flightsql")]
     {
-        if cli.flightsql {
+        if cli.flightsql || matches!(cli.command, Some(Command::FlightSql { .. })) {
             let auth = AuthConfig {
                 basic_auth: config.flightsql_client.auth.basic_auth,
                 bearer_token: config.flightsql_client.auth.bearer_token,

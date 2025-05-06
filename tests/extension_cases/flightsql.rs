@@ -18,7 +18,12 @@
 use std::{io::Read, time::Duration};
 
 use assert_cmd::Command;
-use datafusion_dft::test_utils::fixture::{TestFixture, TestFlightSqlServiceImpl};
+use datafusion_app::local::ExecutionContext;
+use datafusion_dft::{
+    execution::AppExecution,
+    server::flightsql::service::FlightSqlServiceImpl,
+    test_utils::fixture::{TestFixture, TestFlightSqlServiceImpl},
+};
 
 use crate::{
     cli_cases::{contains_str, sql_in_file},
@@ -603,24 +608,34 @@ async fn test_output_parquet() {
 
     let cloned_path = path.clone();
 
-    let sql = "SELECT 1".to_string();
-    Command::cargo_bin("dft")
-        .unwrap()
-        .arg("-c")
-        .arg(sql.clone())
-        .arg("-o")
-        .arg(cloned_path)
-        .assert()
-        .success();
+    tokio::task::spawn_blocking(|| {
+        let sql = "SELECT 1".to_string();
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg(sql.clone())
+            .arg("--flightsql")
+            .arg("-o")
+            .arg(cloned_path)
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success();
+    })
+    .await
+    .unwrap();
 
     let read_sql = format!("SELECT * FROM '{}'", path.to_str().unwrap());
 
-    let assert = Command::cargo_bin("dft")
-        .unwrap()
-        .arg("-c")
-        .arg(read_sql)
-        .assert()
-        .success();
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg(read_sql)
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
 
     let expected = r#"
 +----------+
@@ -628,6 +643,68 @@ async fn test_output_parquet() {
 +----------+
 | 1        |
 +----------+"#;
+
+    assert.stdout(contains_str(expected));
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_flightsql_query_command() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        let sql = "SELECT 1".to_string();
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("flightsql")
+            .arg("statement-query")
+            .arg(sql.clone())
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r#"
++----------+
+| Int64(1) |
++----------+
+| 1        |
++----------+"#;
+
+    assert.stdout(contains_str(expected));
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_flightsql_get_catalogs() {
+    let ctx = ExecutionContext::default();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("flightsql")
+            .arg("get-catalogs")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r#"
++---------------+
+| table_catalog |
++---------------+
+| datafusion    |
++---------------+"#;
 
     assert.stdout(contains_str(expected));
 
