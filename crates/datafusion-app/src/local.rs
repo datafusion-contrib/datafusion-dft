@@ -72,24 +72,6 @@ pub struct ExecutionContext {
     observability: ObservabilityContext,
 }
 
-impl Default for ExecutionContext {
-    fn default() -> Self {
-        let cfg = SessionConfig::new().with_information_schema(true);
-        let session_ctx = SessionContext::new_with_config(cfg);
-        #[cfg(feature = "observability")]
-        let observability =
-            ObservabilityContext::try_new(ObservabilityConfig::default(), "test").unwrap();
-        Self {
-            config: ExecutionConfig::default(),
-            session_ctx,
-            ddl_path: None,
-            executor: None,
-            #[cfg(feature = "observability")]
-            observability,
-        }
-    }
-}
-
 impl std::fmt::Debug for ExecutionContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ExecutionContext").finish()
@@ -179,6 +161,27 @@ impl ExecutionContext {
         };
 
         Ok(ctx)
+    }
+
+    /// Useful for testing execution functionality
+    pub fn test() -> Self {
+        let cfg = SessionConfig::new().with_information_schema(true);
+        let session_ctx = SessionContext::new_with_config(cfg);
+        let exec_cfg = ExecutionConfig::default();
+        // Okay to `unwrap` in a test
+        let app_catalog = create_app_catalog(&exec_cfg, "test", ".0.1.0").unwrap();
+        session_ctx.register_catalog("test", app_catalog);
+        #[cfg(feature = "observability")]
+        let observability =
+            ObservabilityContext::try_new(ObservabilityConfig::default(), "test").unwrap();
+        Self {
+            config: ExecutionConfig::default(),
+            session_ctx,
+            ddl_path: None,
+            executor: None,
+            #[cfg(feature = "observability")]
+            observability,
+        }
     }
 
     pub fn config(&self) -> &ExecutionConfig {

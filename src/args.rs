@@ -129,10 +129,21 @@ impl DftArgs {
 
 #[derive(Clone, Debug, Subcommand)]
 pub enum FlightSqlCommand {
-    /// Executes `GetFlightInfo` and `DoGet` on the provided SQL query
-    StatementQuery { sql: String },
-    /// Executes `GetCatalogsFlightInfo` and `DoGet`
+    /// Executes `CommandStatementQuery` and `DoGet` to return results
+    StatementQuery {
+        /// The query to execute
+        sql: String,
+    },
+    /// Executes `CommandGetCatalogs` and `DoGet` to return results
     GetCatalogs,
+    /// Executes `CommandGetDbSchemas` and `DoGet` to return results
+    GetDbSchemas {
+        /// The catalog to retrieve schemas
+        #[clap(long, short)]
+        catalog: Option<String>,
+        #[clap(long, short)]
+        schema_pattern: Option<String>,
+    },
 }
 
 #[derive(Clone, Debug, Subcommand)]
