@@ -102,7 +102,24 @@ impl CliApp {
                     .await?;
                 let flight_batch_stream = stream::select_all(streams);
                 self.print_any_stream(flight_batch_stream).await;
-
+                Ok(())
+            }
+            FlightSqlCommand::GetDbSchemas {
+                catalog,
+                schema_pattern,
+            } => {
+                let flight_info = self
+                    .app_execution
+                    .flightsql_ctx()
+                    .get_db_schemas_flight_info(catalog, schema_pattern)
+                    .await?;
+                let streams = self
+                    .app_execution
+                    .flightsql_ctx()
+                    .do_get(flight_info)
+                    .await?;
+                let flight_batch_stream = stream::select_all(streams);
+                self.print_any_stream(flight_batch_stream).await;
                 Ok(())
             }
         }

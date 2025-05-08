@@ -650,7 +650,7 @@ async fn test_output_parquet() {
 }
 
 #[tokio::test]
-async fn test_flightsql_query_command() {
+async fn test_query_command() {
     let test_server = TestFlightSqlServiceImpl::new();
     let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
 
@@ -681,8 +681,8 @@ async fn test_flightsql_query_command() {
 }
 
 #[tokio::test]
-async fn test_flightsql_get_catalogs() {
-    let ctx = ExecutionContext::default();
+async fn test_get_catalogs() {
+    let ctx = ExecutionContext::test();
     let exec = AppExecution::new(ctx);
     let test_server = FlightSqlServiceImpl::new(exec);
     let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
@@ -705,6 +705,146 @@ async fn test_flightsql_get_catalogs() {
 +---------------+
 | datafusion    |
 +---------------+"#;
+
+    assert.stdout(contains_str(expected));
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_get_schemas_no_filter() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("flightsql")
+            .arg("get-db-schemas")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r#"
++---------------+--------------------+
+| table_catalog | table_schema       |
++---------------+--------------------+
+| datafusion    | information_schema |
+| test          | information_schema |
+| test          | meta               |
++---------------+--------------------+
+"#;
+
+    assert.stdout(contains_str(expected));
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_get_schemas_filter_catalog() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("flightsql")
+            .arg("get-db-schemas")
+            .arg("-c")
+            .arg("test")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r#"
++---------------+--------------------+
+| table_catalog | table_schema       |
++---------------+--------------------+
+| test          | information_schema |
+| test          | meta               |
++---------------+--------------------+
+"#;
+
+    assert.stdout(contains_str(expected));
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_get_schemas_filter_pattern() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("flightsql")
+            .arg("get-db-schemas")
+            .arg("-s")
+            .arg("information")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r#"
++---------------+--------------------+
+| table_catalog | table_schema       |
++---------------+--------------------+
+| datafusion    | information_schema |
+| test          | information_schema |
++---------------+--------------------+
+"#;
+
+    assert.stdout(contains_str(expected));
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_get_schemas_filter_pattern_and_catalog() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("flightsql")
+            .arg("get-db-schemas")
+            .arg("-s")
+            .arg("information")
+            .arg("-c")
+            .arg("test")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r#"
++---------------+--------------------+
+| table_catalog | table_schema       |
++---------------+--------------------+
+| test          | information_schema |
++---------------+--------------------+
+"#;
 
     assert.stdout(contains_str(expected));
 

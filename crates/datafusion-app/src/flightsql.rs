@@ -18,7 +18,9 @@
 use std::sync::Arc;
 
 use arrow_flight::{
-    decode::FlightRecordBatchStream, sql::client::FlightSqlServiceClient, FlightInfo,
+    decode::FlightRecordBatchStream,
+    sql::{client::FlightSqlServiceClient, CommandGetDbSchemas},
+    FlightInfo,
 };
 #[cfg(feature = "flightsql")]
 use base64::engine::{general_purpose::STANDARD, Engine as _};
@@ -195,19 +197,19 @@ impl FlightSQLContext {
                         }
                     }
                     Err(e) => Err(DataFusionError::External(
-                        format!("Call to do_get failed: {}", e.to_string()).into(),
+                        format!("Call to do_get failed: {}", e).into(),
                     )),
                 }
             } else {
-                return Err(DataFusionError::External("Missing ticket".into()));
+                Err(DataFusionError::External("Missing ticket".into()))
             }
         } else {
-            return Err(DataFusionError::External("Missing client".into()));
+            Err(DataFusionError::External("Missing client".into()))
         }
     }
 
     pub async fn get_catalogs_flight_info(&self) -> DFResult<FlightInfo> {
-        let client = self.client.clone();
+        let client = Arc::clone(&self.client);
         let mut guard = client.lock().await;
         if let Some(client) = guard.as_mut() {
             client
@@ -221,8 +223,31 @@ impl FlightSQLContext {
         }
     }
 
+    pub async fn get_db_schemas_flight_info(
+        &self,
+        catalog: Option<String>,
+        schema_pattern: Option<String>,
+    ) -> DFResult<FlightInfo> {
+        let client = Arc::clone(&self.client);
+        let mut guard = client.lock().await;
+        if let Some(client) = guard.as_mut() {
+            let cmd = CommandGetDbSchemas {
+                catalog,
+                db_schema_filter_pattern: schema_pattern,
+            };
+            client
+                .get_db_schemas(cmd)
+                .await
+                .map_err(|e| DataFusionError::ArrowError(e, None))
+        } else {
+            Err(DataFusionError::External(
+                "No FlightSQL client configured.  Add one in `~/.config/dft/config.toml`".into(),
+            ))
+        }
+    }
+
     pub async fn do_get(&self, flight_info: FlightInfo) -> DFResult<Vec<FlightRecordBatchStream>> {
-        let client = self.client.clone();
+        let client = Arc::clone(&self.client);
         let mut guard = client.lock().await;
         if let Some(client) = guard.as_mut() {
             let mut streams = Vec::new();

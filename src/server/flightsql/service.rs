@@ -21,7 +21,8 @@ use arrow_flight::error::FlightError;
 use arrow_flight::flight_service_server::{FlightService, FlightServiceServer};
 use arrow_flight::sql::server::FlightSqlService;
 use arrow_flight::sql::{
-    Any, CommandGetCatalogs, CommandStatementQuery, SqlInfo, TicketStatementQuery,
+    Any, CommandGetCatalogs, CommandGetDbSchemas, CommandStatementQuery, SqlInfo,
+    TicketStatementQuery,
 };
 use arrow_flight::{FlightDescriptor, FlightEndpoint, FlightInfo, Ticket};
 use color_eyre::Result;
@@ -90,13 +91,13 @@ impl FlightSqlServiceImpl {
                         .boxed();
                     Ok(Response::new(flight_data_stream))
                 } else {
-                    Err(Status::internal("Plan not found for id"))
+                    Err(Status::internal("plan not found for id"))
                 }
             }
             Err(e) => {
                 error!("error decoding handle to uuid for {request_id}: {:?}", e);
                 Err(Status::internal(
-                    "Error decoding handle to uuid for {request_id}",
+                    "error decoding handle to uuid for {request_id}",
                 ))
             }
         }
@@ -131,20 +132,22 @@ impl FlightSqlServiceImpl {
             .try_record_request(ctx, req)
             .await
         {
-            error!("Error recording request: {}", e.to_string())
+            error!("error recording request: {}", e.to_string())
         }
 
         histogram!(latency_metric).record(duration.get_milliseconds() as f64);
     }
 
-    async fn get_flight_info_statement_handler(
+    async fn create_flight_info(
         &self,
         query: String,
         request_id: Uuid,
-        request: Request<FlightDescriptor>,
+        _request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
-        info!("get_flight_info_statement query: {:?}", query);
-        debug!("get_flight_info_statement request: {:?}", request);
+        debug!(
+            "creating flight info for request id {request_id} with query: {:?}",
+            query
+        );
         let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
         match DFParser::parse_sql_with_dialect(&query, &dialect) {
             Ok(statements) => {
@@ -174,25 +177,25 @@ impl FlightSqlServiceImpl {
                             debug!("flight info: {:?}", info);
 
                             let mut guard = self.requests.lock().map_err(|_| {
-                                Status::internal("Failed to acquire lock on requests")
+                                Status::internal("failed to acquire lock on requests")
                             })?;
                             guard.insert(request_id, logical_plan);
 
                             Ok(Response::new(info))
                         } else {
                             error!("error encoding ticket");
-                            Err(Status::internal("Error encoding ticket"))
+                            Err(Status::internal("error encoding ticket"))
                         }
                     }
                     Err(e) => {
                         error!("error planning SQL query: {:?}", e);
-                        Err(Status::internal("Error planning SQL query"))
+                        Err(Status::internal("error planning SQL query"))
                     }
                 }
             }
             Err(e) => {
                 error!("error parsing SQL query: {:?}", e);
-                Err(Status::internal("Error parsing SQL query"))
+                Err(Status::internal("error parsing SQL query"))
             }
         }
     }
@@ -229,9 +232,40 @@ impl FlightSqlService for FlightSqlServiceImpl {
         let start = Timestamp::now();
         let request_id = uuid::Uuid::new_v4();
         let query = "SELECT DISTINCT table_catalog FROM information_schema.tables".to_string();
-        let res = self
-            .get_flight_info_statement_handler(query, request_id, request)
-            .await;
+        let res = self.create_flight_info(query, request_id, request).await;
+
+        // TODO: Move recording to after response is sent to not impact response latency
+        self.record_request(
+            start,
+            Some(request_id.to_string()),
+            res.as_ref().err(),
+            "/get_flight_info_catalogs".to_string(),
+            "get_flight_info_catalogs_latency_ms",
+        )
+        .await;
+        res
+    }
+
+    async fn get_flight_info_schemas(
+        &self,
+        command: CommandGetDbSchemas,
+        request: Request<FlightDescriptor>,
+    ) -> Result<Response<FlightInfo>, Status> {
+        counter!("requests", "endpoint" => "get_flight_info").increment(1);
+        let start = Timestamp::now();
+        let request_id = uuid::Uuid::new_v4();
+        let CommandGetDbSchemas {
+            catalog,
+            db_schema_filter_pattern,
+        } = command;
+        let query = match (catalog, db_schema_filter_pattern) {
+            (Some(catalog), Some(filter)) => format!("SELECT DISTINCT table_catalog, table_schema FROM information_schema.tables WHERE table_catalog = '{catalog}' AND table_schema ILIKE '%{filter}%' ORDER BY table_catalog, table_schema"),
+            (None, Some(filter)) => format!("SELECT DISTINCT table_catalog, table_schema FROM information_schema.tables WHERE table_schema ILIKE '%{filter}%' ORDER BY table_catalog, table_schema"),
+            (Some(catalog), None) => format!("SELECT DISTINCT table_catalog, table_schema FROM information_schema.tables WHERE table_catalog = '{catalog}' ORDER BY table_catalog, table_schema"),
+            (None, None) => "SELECT DISTINCT table_catalog, table_schema FROM information_schema.tables ORDER BY table_catalog, table_schema".to_string()
+        };
+        println!("QUERY: {query}");
+        let res = self.create_flight_info(query, request_id, request).await;
 
         // TODO: Move recording to after response is sent to not impact response latency
         self.record_request(
@@ -255,7 +289,7 @@ impl FlightSqlService for FlightSqlServiceImpl {
         let CommandStatementQuery { query, .. } = query;
         let request_id = uuid::Uuid::new_v4();
         let res = self
-            .get_flight_info_statement_handler(query.clone(), request_id, request)
+            .create_flight_info(query.clone(), request_id, request)
             .await;
 
         // TODO: Move recording to after response is sent to not impact response latency
