@@ -288,7 +288,7 @@ impl FlightSqlService for FlightSqlServiceImpl {
         command: CommandGetTables,
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
-        counter!("requests", "endpoint" => "get_flight_info_schemas").increment(1);
+        counter!("requests", "endpoint" => "get_flight_info_tables").increment(1);
         let start = Timestamp::now();
         let CommandGetTables {
             catalog,
