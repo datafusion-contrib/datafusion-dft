@@ -106,12 +106,39 @@ impl CliApp {
             }
             FlightSqlCommand::GetDbSchemas {
                 catalog,
-                schema_pattern,
+                db_schema_filter_pattern,
             } => {
                 let flight_info = self
                     .app_execution
                     .flightsql_ctx()
-                    .get_db_schemas_flight_info(catalog, schema_pattern)
+                    .get_db_schemas_flight_info(catalog, db_schema_filter_pattern)
+                    .await?;
+                let streams = self
+                    .app_execution
+                    .flightsql_ctx()
+                    .do_get(flight_info)
+                    .await?;
+                let flight_batch_stream = stream::select_all(streams);
+                self.print_any_stream(flight_batch_stream).await;
+                Ok(())
+            }
+
+            FlightSqlCommand::GetTables {
+                catalog,
+                db_schema_filter_pattern,
+                table_name_filter_pattern,
+                table_types,
+            } => {
+                let flight_info = self
+                    .app_execution
+                    .flightsql_ctx()
+                    .get_tables_flight_info(
+                        catalog,
+                        db_schema_filter_pattern,
+                        table_name_filter_pattern,
+                        table_types.unwrap_or_default(),
+                        false,
+                    )
                     .await?;
                 let streams = self
                     .app_execution

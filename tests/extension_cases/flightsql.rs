@@ -660,6 +660,7 @@ async fn test_query_command() {
             .unwrap()
             .arg("flightsql")
             .arg("statement-query")
+            .arg("--sql")
             .arg(sql.clone())
             .timeout(Duration::from_secs(5))
             .assert()
@@ -757,7 +758,7 @@ async fn test_get_schemas_filter_catalog() {
             .unwrap()
             .arg("flightsql")
             .arg("get-db-schemas")
-            .arg("-c")
+            .arg("--catalog")
             .arg("test")
             .timeout(Duration::from_secs(5))
             .assert()
@@ -792,7 +793,7 @@ async fn test_get_schemas_filter_pattern() {
             .unwrap()
             .arg("flightsql")
             .arg("get-db-schemas")
-            .arg("-s")
+            .arg("--db-schema-filter-pattern")
             .arg("information")
             .timeout(Duration::from_secs(5))
             .assert()
@@ -827,9 +828,9 @@ async fn test_get_schemas_filter_pattern_and_catalog() {
             .unwrap()
             .arg("flightsql")
             .arg("get-db-schemas")
-            .arg("-s")
+            .arg("--db-schema-filter-pattern")
             .arg("information")
-            .arg("-c")
+            .arg("--catalog")
             .arg("test")
             .timeout(Duration::from_secs(5))
             .assert()
@@ -844,6 +845,209 @@ async fn test_get_schemas_filter_pattern_and_catalog() {
 +---------------+--------------------+
 | test          | information_schema |
 +---------------+--------------------+
+"#;
+
+    assert.stdout(contains_str(expected));
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_get_tables_no_filter() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("flightsql")
+            .arg("get-tables")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r#"
++---------------+--------------------+-------------+------------+
+| table_catalog | table_schema       | table_name  | table_type |
++---------------+--------------------+-------------+------------+
+| test          | meta               | versions    | BASE TABLE |
+| test          | information_schema | tables      | VIEW       |
+| test          | information_schema | views       | VIEW       |
+| test          | information_schema | columns     | VIEW       |
+| test          | information_schema | df_settings | VIEW       |
+| test          | information_schema | schemata    | VIEW       |
+| test          | information_schema | routines    | VIEW       |
+| test          | information_schema | parameters  | VIEW       |
+| datafusion    | information_schema | tables      | VIEW       |
+| datafusion    | information_schema | views       | VIEW       |
+| datafusion    | information_schema | columns     | VIEW       |
+| datafusion    | information_schema | df_settings | VIEW       |
+| datafusion    | information_schema | schemata    | VIEW       |
+| datafusion    | information_schema | routines    | VIEW       |
+| datafusion    | information_schema | parameters  | VIEW       |
++---------------+--------------------+-------------+------------+
+"#;
+
+    assert.stdout(contains_str(expected));
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_get_tables_catalog_filter() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("flightsql")
+            .arg("get-tables")
+            .arg("--catalog")
+            .arg("test")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r#"
++---------------+--------------------+-------------+------------+
+| table_catalog | table_schema       | table_name  | table_type |
++---------------+--------------------+-------------+------------+
+| test          | meta               | versions    | BASE TABLE |
+| test          | information_schema | tables      | VIEW       |
+| test          | information_schema | views       | VIEW       |
+| test          | information_schema | columns     | VIEW       |
+| test          | information_schema | df_settings | VIEW       |
+| test          | information_schema | schemata    | VIEW       |
+| test          | information_schema | routines    | VIEW       |
+| test          | information_schema | parameters  | VIEW       |
++---------------+--------------------+-------------+------------+
+"#;
+
+    assert.stdout(contains_str(expected));
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_get_tables_schema_filter() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("flightsql")
+            .arg("get-tables")
+            .arg("--db-schema-filter-pattern")
+            .arg("meta")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r#"
++---------------+--------------+------------+------------+
+| table_catalog | table_schema | table_name | table_type |
++---------------+--------------+------------+------------+
+| test          | meta         | versions   | BASE TABLE |
++---------------+--------------+------------+------------+
+"#;
+
+    assert.stdout(contains_str(expected));
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_get_tables_table_filter() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("flightsql")
+            .arg("get-tables")
+            .arg("--table-name-filter-pattern")
+            .arg("tables")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r#"
++---------------+--------------------+------------+------------+
+| table_catalog | table_schema       | table_name | table_type |
++---------------+--------------------+------------+------------+
+| datafusion    | information_schema | tables     | VIEW       |
+| test          | information_schema | tables     | VIEW       |
++---------------+--------------------+------------+------------+
+"#;
+
+    assert.stdout(contains_str(expected));
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_get_tables_table_type() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("flightsql")
+            .arg("get-tables")
+            .arg("--table-types")
+            .arg("VIEW")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r#"
++---------------+--------------------+-------------+------------+
+| table_catalog | table_schema       | table_name  | table_type |
++---------------+--------------------+-------------+------------+
+| datafusion    | information_schema | columns     | VIEW       |
+| datafusion    | information_schema | df_settings | VIEW       |
+| datafusion    | information_schema | parameters  | VIEW       |
+| datafusion    | information_schema | routines    | VIEW       |
+| datafusion    | information_schema | schemata    | VIEW       |
+| datafusion    | information_schema | tables      | VIEW       |
+| datafusion    | information_schema | views       | VIEW       |
+| test          | information_schema | columns     | VIEW       |
+| test          | information_schema | df_settings | VIEW       |
+| test          | information_schema | parameters  | VIEW       |
+| test          | information_schema | routines    | VIEW       |
+| test          | information_schema | schemata    | VIEW       |
+| test          | information_schema | tables      | VIEW       |
+| test          | information_schema | views       | VIEW       |
++---------------+--------------------+-------------+------------+
 "#;
 
     assert.stdout(contains_str(expected));

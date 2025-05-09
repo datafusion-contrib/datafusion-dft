@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 use arrow_flight::{
     decode::FlightRecordBatchStream,
-    sql::{client::FlightSqlServiceClient, CommandGetDbSchemas},
+    sql::{client::FlightSqlServiceClient, CommandGetDbSchemas, CommandGetTables},
     FlightInfo,
 };
 #[cfg(feature = "flightsql")]
@@ -226,17 +226,46 @@ impl FlightSQLContext {
     pub async fn get_db_schemas_flight_info(
         &self,
         catalog: Option<String>,
-        schema_pattern: Option<String>,
+        schema_filter_pattern: Option<String>,
     ) -> DFResult<FlightInfo> {
         let client = Arc::clone(&self.client);
         let mut guard = client.lock().await;
         if let Some(client) = guard.as_mut() {
             let cmd = CommandGetDbSchemas {
                 catalog,
-                db_schema_filter_pattern: schema_pattern,
+                db_schema_filter_pattern: schema_filter_pattern,
             };
             client
                 .get_db_schemas(cmd)
+                .await
+                .map_err(|e| DataFusionError::ArrowError(e, None))
+        } else {
+            Err(DataFusionError::External(
+                "No FlightSQL client configured.  Add one in `~/.config/dft/config.toml`".into(),
+            ))
+        }
+    }
+
+    pub async fn get_tables_flight_info(
+        &self,
+        catalog: Option<String>,
+        schema_filter_pattern: Option<String>,
+        table_name_filter_pattern: Option<String>,
+        table_types: Vec<String>,
+        include_schema: bool,
+    ) -> DFResult<FlightInfo> {
+        let client = Arc::clone(&self.client);
+        let mut guard = client.lock().await;
+        if let Some(client) = guard.as_mut() {
+            let cmd = CommandGetTables {
+                catalog,
+                db_schema_filter_pattern: schema_filter_pattern,
+                table_name_filter_pattern,
+                table_types,
+                include_schema,
+            };
+            client
+                .get_tables(cmd)
                 .await
                 .map_err(|e| DataFusionError::ArrowError(e, None))
         } else {

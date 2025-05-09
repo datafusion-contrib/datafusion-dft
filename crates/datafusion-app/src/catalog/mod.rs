@@ -38,7 +38,7 @@ pub fn create_app_catalog(
 ) -> Result<Arc<dyn CatalogProvider>> {
     let catalog = MemoryCatalogProvider::new();
     let meta_schema = Arc::new(MemorySchemaProvider::new());
-    catalog.register_schema("meta", meta_schema.clone())?;
+    catalog.register_schema("meta", Arc::<MemorySchemaProvider>::clone(&meta_schema))?;
     let versions_table = try_create_meta_versions_table(app_name, app_version)?;
     meta_schema.register_table("versions".to_string(), versions_table)?;
     Ok(Arc::new(catalog))
@@ -56,7 +56,7 @@ fn try_create_meta_versions_table(app_name: &str, app_version: &str) -> Result<A
     let datafusion_version_arr = StringArray::from(vec![DATAFUSION_VERSION]);
     let datafusion_app_version_arr = StringArray::from(vec![env!("CARGO_PKG_VERSION")]);
     let batches = RecordBatch::try_new(
-        schema.clone(),
+        Arc::<Schema>::clone(&schema),
         vec![
             Arc::new(app_version_arr),
             Arc::new(datafusion_version_arr),
