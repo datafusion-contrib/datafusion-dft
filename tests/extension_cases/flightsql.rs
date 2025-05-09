@@ -875,21 +875,21 @@ async fn test_get_tables_no_filter() {
 +---------------+--------------------+-------------+------------+
 | table_catalog | table_schema       | table_name  | table_type |
 +---------------+--------------------+-------------+------------+
-| test          | meta               | versions    | BASE TABLE |
-| test          | information_schema | tables      | VIEW       |
-| test          | information_schema | views       | VIEW       |
-| test          | information_schema | columns     | VIEW       |
-| test          | information_schema | df_settings | VIEW       |
-| test          | information_schema | schemata    | VIEW       |
-| test          | information_schema | routines    | VIEW       |
-| test          | information_schema | parameters  | VIEW       |
-| datafusion    | information_schema | tables      | VIEW       |
-| datafusion    | information_schema | views       | VIEW       |
 | datafusion    | information_schema | columns     | VIEW       |
 | datafusion    | information_schema | df_settings | VIEW       |
-| datafusion    | information_schema | schemata    | VIEW       |
-| datafusion    | information_schema | routines    | VIEW       |
 | datafusion    | information_schema | parameters  | VIEW       |
+| datafusion    | information_schema | routines    | VIEW       |
+| datafusion    | information_schema | schemata    | VIEW       |
+| datafusion    | information_schema | tables      | VIEW       |
+| datafusion    | information_schema | views       | VIEW       |
+| test          | information_schema | columns     | VIEW       |
+| test          | information_schema | df_settings | VIEW       |
+| test          | information_schema | parameters  | VIEW       |
+| test          | information_schema | routines    | VIEW       |
+| test          | information_schema | schemata    | VIEW       |
+| test          | information_schema | tables      | VIEW       |
+| test          | information_schema | views       | VIEW       |
+| test          | meta               | versions    | BASE TABLE |
 +---------------+--------------------+-------------+------------+
 "#;
 
@@ -923,14 +923,14 @@ async fn test_get_tables_catalog_filter() {
 +---------------+--------------------+-------------+------------+
 | table_catalog | table_schema       | table_name  | table_type |
 +---------------+--------------------+-------------+------------+
-| test          | meta               | versions    | BASE TABLE |
-| test          | information_schema | tables      | VIEW       |
-| test          | information_schema | views       | VIEW       |
 | test          | information_schema | columns     | VIEW       |
 | test          | information_schema | df_settings | VIEW       |
-| test          | information_schema | schemata    | VIEW       |
-| test          | information_schema | routines    | VIEW       |
 | test          | information_schema | parameters  | VIEW       |
+| test          | information_schema | routines    | VIEW       |
+| test          | information_schema | schemata    | VIEW       |
+| test          | information_schema | tables      | VIEW       |
+| test          | information_schema | views       | VIEW       |
+| test          | meta               | versions    | BASE TABLE |
 +---------------+--------------------+-------------+------------+
 "#;
 
