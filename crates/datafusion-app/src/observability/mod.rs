@@ -61,7 +61,7 @@ impl ObservabilityContext {
     }
 
     pub fn schema(&self) -> Arc<dyn SchemaProvider> {
-        self.schema.clone()
+        Arc::<dyn SchemaProvider>::clone(&self.schema)
     }
 
     /// Attempts to insert request details in `requests` table.  No verification is performed on

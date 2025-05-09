@@ -127,11 +127,13 @@ impl DftArgs {
     }
 }
 
+/// Parameters for each command match to exactly how they are defined in specification (https://arrow.apache.org/docs/format/FlightSql.html#protocol-buffer-definitions)
 #[derive(Clone, Debug, Subcommand)]
 pub enum FlightSqlCommand {
     /// Executes `CommandStatementQuery` and `DoGet` to return results
     StatementQuery {
         /// The query to execute
+        #[clap(long)]
         sql: String,
     },
     /// Executes `CommandGetCatalogs` and `DoGet` to return results
@@ -139,10 +141,26 @@ pub enum FlightSqlCommand {
     /// Executes `CommandGetDbSchemas` and `DoGet` to return results
     GetDbSchemas {
         /// The catalog to retrieve schemas
-        #[clap(long, short)]
+        #[clap(long)]
         catalog: Option<String>,
-        #[clap(long, short)]
-        schema_pattern: Option<String>,
+        /// Schema filter pattern to apply
+        #[clap(long)]
+        db_schema_filter_pattern: Option<String>,
+    },
+    /// Executes `CommandGetDbSchemas` and `DoGet` to return results
+    GetTables {
+        /// The catalog to retrieve schemas
+        #[clap(long)]
+        catalog: Option<String>,
+        /// Schema filter pattern to apply
+        #[clap(long)]
+        db_schema_filter_pattern: Option<String>,
+        /// Table name filter pattern to apply
+        #[clap(long)]
+        table_name_filter_pattern: Option<String>,
+        /// Specific table types to return
+        #[clap(long)]
+        table_types: Option<Vec<String>>,
     },
 }
 
