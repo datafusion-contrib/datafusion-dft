@@ -14,10 +14,30 @@ dft -c "SELECT 1+2"
 
 ## FlightSQL Mode
 
-Use `--flightsql` or `-q` to run against a FlightSQL server (instead of the default local SessionContext). You can override the default host for that single command with --host
+Use `--flightsql` or `-q` to run commands or files against a FlightSQL server (instead of the default local SessionContext). You can override the default host for that single command with --host
 
 ```sh
 dft -f query.sql --flightsql --host "http://127.0.0.1:50052"
+```
+
+### FlightSQL Commands
+
+Additioanlly, you can use the `flightsql` subcommand to interact with different methods [exposed by a FlightSQL server](https://arrow.apache.org/docs/format/FlightSql.html) directly:
+
+```sh
+# Execute a SQL query
+dft flightsql statement-query --sql "SELECT * FROM table"
+
+# List all catalogs
+dft flightsql get-catalogs
+
+# List schemas in a catalog
+dft flightsql get-db-schemas --catalog mycatalog
+dft flightsql get-db-schemas --db-schema-filter-pattern "my%"
+
+# List tables in a schema
+dft flightsql get-tables --catalog mycatalog --db-schema-filter-pattern myschema
+dft flightsql get-tables --table-name-filter-pattern "table" --table-types VIEW
 ```
 
 ## Auth
