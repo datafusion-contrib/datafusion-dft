@@ -150,7 +150,18 @@ impl CliApp {
                 Ok(())
             }
 
-            FlightSqlCommand::CreatePreparedStatement { query } => Ok(()),
+            FlightSqlCommand::CreatePreparedStatement { query } => {
+                let prepared = self
+                    .app_execution
+                    .flightsql_ctx()
+                    .create_prepared_statement(query)
+                    .await?;
+                let dataset_schema = prepared.dataset_schema()?;
+                let parameter_schema = prepared.parameter_schema()?;
+                println!("Created prepared statement with schema:\n{dataset_schema:?}");
+                println!("Parameters:\n{parameter_schema:?}");
+                Ok(())
+            }
         }
     }
 

@@ -31,7 +31,7 @@ use arrow_flight::{
 use color_eyre::Result;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::ipc::writer::IpcWriteOptions;
-use datafusion::logical_expr::{LogicalPlan, LogicalPlanBuilder, Prepare};
+use datafusion::logical_expr::{LogicalPlan, LogicalPlanBuilder};
 use datafusion::prelude::{col, lit};
 use datafusion::sql::parser::DFParser;
 use datafusion_app::local::ExecutionContext;
