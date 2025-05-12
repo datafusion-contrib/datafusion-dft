@@ -134,7 +134,7 @@ pub enum FlightSqlCommand {
     StatementQuery {
         /// The query to execute
         #[clap(long)]
-        sql: String,
+        query: String,
     },
     /// Executes `CommandGetCatalogs` and `DoGet` to return results
     GetCatalogs,
@@ -161,6 +161,11 @@ pub enum FlightSqlCommand {
         /// Specific table types to return
         #[clap(long)]
         table_types: Option<Vec<String>>,
+    },
+    CreatePreparedStatement {
+        /// The query for the prepared statement
+        #[clap(long)]
+        query: String,
     },
 }
 

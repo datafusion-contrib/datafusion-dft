@@ -21,12 +21,17 @@ use arrow_flight::error::FlightError;
 use arrow_flight::flight_service_server::{FlightService, FlightServiceServer};
 use arrow_flight::sql::server::FlightSqlService;
 use arrow_flight::sql::{
-    Any, CommandGetCatalogs, CommandGetDbSchemas, CommandGetTables, CommandStatementQuery, SqlInfo,
+    ActionCreatePreparedStatementRequest, ActionCreatePreparedStatementResult, Any,
+    CommandGetCatalogs, CommandGetDbSchemas, CommandGetTables, CommandStatementQuery, SqlInfo,
     TicketStatementQuery,
 };
-use arrow_flight::{FlightDescriptor, FlightEndpoint, FlightInfo, Ticket};
+use arrow_flight::{
+    Action, FlightDescriptor, FlightEndpoint, FlightInfo, IpcMessage, SchemaAsIpc, Ticket,
+};
 use color_eyre::Result;
-use datafusion::logical_expr::LogicalPlan;
+use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use datafusion::arrow::ipc::writer::IpcWriteOptions;
+use datafusion::logical_expr::{LogicalPlan, LogicalPlanBuilder, Prepare};
 use datafusion::prelude::{col, lit};
 use datafusion::sql::parser::DFParser;
 use datafusion_app::local::ExecutionContext;
@@ -205,6 +210,44 @@ impl FlightSqlServiceImpl {
         }
     }
 
+    async fn query_to_create_prepared_statement_action(
+        &self,
+        query: String,
+    ) -> Result<ActionCreatePreparedStatementResult> {
+        let ctx = self.execution.session_ctx();
+        let state = ctx.state();
+        let logical_plan = state.create_logical_plan(&query).await?;
+        let query_schema = logical_plan.schema().as_arrow().clone();
+        let (parameter_data_types, parameter_fields): (Vec<DataType>, Vec<Field>) = logical_plan
+            .get_parameter_types()?
+            .into_iter()
+            .filter_map(|(k, v)| v.map(|v| (v.clone(), Field::new(k, v, false))))
+            .collect();
+        let parameters_schema = Schema::new(parameter_fields);
+
+        let id = Uuid::new_v4().to_string();
+        let builder = LogicalPlanBuilder::new(logical_plan);
+        let prepared = builder
+            .prepare(id.clone(), parameter_data_types)
+            .map_err(|e| Status::internal(e.to_string()))?
+            .build()?;
+        ctx.execute_logical_plan(prepared).await?.collect().await?;
+        debug!("created prepared statement with id {id}");
+        let opts = IpcWriteOptions::default();
+        let dataset_schema_as_ipc = SchemaAsIpc::new(&query_schema, &opts);
+        let IpcMessage(dataset_bytes) = IpcMessage::try_from(dataset_schema_as_ipc)
+            .map_err(|e| Status::internal(e.to_string()))?;
+        let parameters_schema_as_ipc = SchemaAsIpc::new(&parameters_schema, &opts);
+        let IpcMessage(parameters_bytes) = IpcMessage::try_from(parameters_schema_as_ipc)?;
+        debug!("serialized prepared statement");
+        let res = ActionCreatePreparedStatementResult {
+            prepared_statement_handle: id.into_bytes().into(),
+            dataset_schema: dataset_bytes,
+            parameter_schema: parameters_bytes,
+        };
+        Ok(res)
+    }
+
     async fn do_get_statement_handler(
         &self,
         request_id: String,
@@ -376,6 +419,20 @@ impl FlightSqlService for FlightSqlServiceImpl {
         )
         .await;
         res
+    }
+
+    async fn do_action_create_prepared_statement(
+        &self,
+        query: ActionCreatePreparedStatementRequest,
+        _request: Request<Action>,
+    ) -> Result<ActionCreatePreparedStatementResult, Status> {
+        counter!("requests", "endpoint" => "do_action_create_prepared_statement").increment(1);
+        let ActionCreatePreparedStatementRequest { query, .. } = query;
+        let res = self
+            .query_to_create_prepared_statement_action(query)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
+        Ok(res)
     }
 
     async fn do_get_statement(

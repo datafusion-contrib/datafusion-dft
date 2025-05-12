@@ -88,7 +88,7 @@ impl CliApp {
         use futures::stream;
 
         match command {
-            FlightSqlCommand::StatementQuery { sql } => self.exec_from_flightsql(sql, 0).await,
+            FlightSqlCommand::StatementQuery { query } => self.exec_from_flightsql(query, 0).await,
             FlightSqlCommand::GetCatalogs => {
                 let flight_info = self
                     .app_execution
@@ -149,6 +149,8 @@ impl CliApp {
                 self.print_any_stream(flight_batch_stream).await;
                 Ok(())
             }
+
+            FlightSqlCommand::CreatePreparedStatement { query } => Ok(()),
         }
     }
 

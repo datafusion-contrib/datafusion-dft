@@ -19,7 +19,10 @@ use std::sync::Arc;
 
 use arrow_flight::{
     decode::FlightRecordBatchStream,
-    sql::{client::FlightSqlServiceClient, CommandGetDbSchemas, CommandGetTables},
+    sql::{
+        client::{FlightSqlServiceClient, PreparedStatement},
+        ActionCreatePreparedStatementRequest, CommandGetDbSchemas, CommandGetTables,
+    },
     FlightInfo,
 };
 #[cfg(feature = "flightsql")]
@@ -266,6 +269,24 @@ impl FlightSQLContext {
             };
             client
                 .get_tables(cmd)
+                .await
+                .map_err(|e| DataFusionError::ArrowError(e, None))
+        } else {
+            Err(DataFusionError::External(
+                "No FlightSQL client configured.  Add one in `~/.config/dft/config.toml`".into(),
+            ))
+        }
+    }
+
+    pub async fn create_prepared_statement(
+        &self,
+        query: String,
+    ) -> DFResult<PreparedStatement<Channel>> {
+        let client = Arc::clone(&self.client);
+        let mut guard = client.lock().await;
+        if let Some(client) = guard.as_mut() {
+            client
+                .prepare(query, None)
                 .await
                 .map_err(|e| DataFusionError::ArrowError(e, None))
         } else {
