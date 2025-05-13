@@ -85,6 +85,8 @@ impl CliApp {
 
     #[cfg(feature = "flightsql")]
     async fn handle_flightsql_command(&self, command: FlightSqlCommand) -> color_eyre::Result<()> {
+        use arrow_flight::IpcMessage;
+        use datafusion::arrow::datatypes::Schema;
         use futures::stream;
 
         match command {
@@ -151,15 +153,13 @@ impl CliApp {
             }
 
             FlightSqlCommand::CreatePreparedStatement { query } => {
-                let prepared = self
+                let prepared_result = self
                     .app_execution
                     .flightsql_ctx()
                     .create_prepared_statement(query)
                     .await?;
-                let dataset_schema = prepared.dataset_schema()?;
-                let parameter_schema = prepared.parameter_schema()?;
-                println!("Created prepared statement with schema:\n{dataset_schema:?}");
-                println!("Parameters:\n{parameter_schema:?}");
+                let handle = String::from_utf8(prepared_result.prepared_statement_handle.to_vec())?;
+                println!("Created prepared statement: {handle}");
                 Ok(())
             }
         }

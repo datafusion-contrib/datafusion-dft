@@ -70,6 +70,8 @@ pub struct ExecutionContext {
     /// Observability handlers
     #[cfg(feature = "observability")]
     observability: ObservabilityContext,
+    /// Map of prepared statements where the key is the id of the prepared statement and the value
+    /// is [`datafusion::logical_expr::Prepare`] that can be reused.
 }
 
 impl std::fmt::Debug for ExecutionContext {

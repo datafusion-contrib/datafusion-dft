@@ -162,6 +162,7 @@ pub enum FlightSqlCommand {
         #[clap(long)]
         table_types: Option<Vec<String>>,
     },
+    /// Creates a prepared statement on the server
     CreatePreparedStatement {
         /// The query for the prepared statement
         #[clap(long)]

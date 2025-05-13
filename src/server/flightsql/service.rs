@@ -19,11 +19,11 @@ use crate::execution::AppExecution;
 use arrow_flight::encode::FlightDataEncoderBuilder;
 use arrow_flight::error::FlightError;
 use arrow_flight::flight_service_server::{FlightService, FlightServiceServer};
-use arrow_flight::sql::server::FlightSqlService;
+use arrow_flight::sql::server::{FlightSqlService, PeekableFlightDataStream};
 use arrow_flight::sql::{
     ActionCreatePreparedStatementRequest, ActionCreatePreparedStatementResult, Any,
-    CommandGetCatalogs, CommandGetDbSchemas, CommandGetTables, CommandStatementQuery, SqlInfo,
-    TicketStatementQuery,
+    CommandGetCatalogs, CommandGetDbSchemas, CommandGetTables, CommandPreparedStatementQuery,
+    CommandStatementQuery, DoPutPreparedStatementResult, SqlInfo, TicketStatementQuery,
 };
 use arrow_flight::{
     Action, FlightDescriptor, FlightEndpoint, FlightInfo, IpcMessage, SchemaAsIpc, Ticket,
@@ -433,6 +433,13 @@ impl FlightSqlService for FlightSqlServiceImpl {
             .await
             .map_err(|e| Status::internal(e.to_string()))?;
         Ok(res)
+    }
+
+    async fn do_put_prepared_statement_query(
+        &self,
+        query: CommandPreparedStatementQuery,
+        _request: Request<PeekableFlightDataStream>,
+    ) -> Result<DoPutPreparedStatementResult> {
     }
 
     async fn do_get_statement(
