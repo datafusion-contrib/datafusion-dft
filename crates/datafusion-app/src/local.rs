@@ -17,12 +17,13 @@
 
 //! [`ExecutionContext`]: DataFusion based execution context for running SQL queries
 
+use std::collections::HashMap;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use color_eyre::eyre::eyre;
-use datafusion::logical_expr::LogicalPlan;
+use datafusion::logical_expr::{LogicalPlan, Prepare};
 use futures::TryFutureExt;
 use log::{debug, error, info};
 
@@ -72,6 +73,7 @@ pub struct ExecutionContext {
     observability: ObservabilityContext,
     /// Map of prepared statements where the key is the id of the prepared statement and the value
     /// is [`datafusion::logical_expr::Prepare`] that can be reused.
+    prepared_statements: HashMap<String, Prepare>,
 }
 
 impl std::fmt::Debug for ExecutionContext {
