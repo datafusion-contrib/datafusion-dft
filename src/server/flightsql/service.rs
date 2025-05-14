@@ -36,6 +36,7 @@ use datafusion::prelude::{col, lit};
 use datafusion::sql::parser::DFParser;
 use datafusion_app::local::ExecutionContext;
 use datafusion_app::observability::ObservabilityRequestDetails;
+use datafusion_app::prepared_statement::PreparedStatementHandle;
 use futures::{StreamExt, TryStreamExt};
 use jiff::Timestamp;
 use log::{debug, error, info};
@@ -239,9 +240,10 @@ impl FlightSqlServiceImpl {
             .map_err(|e| Status::internal(e.to_string()))?;
         let parameters_schema_as_ipc = SchemaAsIpc::new(&parameters_schema, &opts);
         let IpcMessage(parameters_bytes) = IpcMessage::try_from(parameters_schema_as_ipc)?;
+        let handle = PreparedStatementHandle::new(id);
         debug!("serialized prepared statement");
         let res = ActionCreatePreparedStatementResult {
-            prepared_statement_handle: id.into_bytes().into(),
+            prepared_statement_handle: handle.encode_to_vec().into(),
             dataset_schema: dataset_bytes,
             parameter_schema: parameters_bytes,
         };
@@ -442,6 +444,9 @@ impl FlightSqlService for FlightSqlServiceImpl {
     //     query: CommandPreparedStatementQuery,
     //     _request: Request<PeekableFlightDataStream>,
     // ) -> Result<DoPutPreparedStatementResult> {
+    //     let CommandPreparedStatementQuery {
+    //         prepared_statement_handle,
+    //     } = query;
     // }
 
     async fn do_get_statement(

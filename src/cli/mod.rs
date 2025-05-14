@@ -45,6 +45,7 @@ use {
         flightsql::FlightSQLContext,
         flightsql_benchmarks::FlightSQLBenchmarkStats,
     },
+    prost::Message,
     tonic::IntoRequest,
 };
 
@@ -87,6 +88,7 @@ impl CliApp {
     async fn handle_flightsql_command(&self, command: FlightSqlCommand) -> color_eyre::Result<()> {
         use arrow_flight::IpcMessage;
         use datafusion::arrow::datatypes::Schema;
+        use datafusion_app::prepared_statement::PreparedStatementHandle;
         use futures::stream;
 
         match command {
@@ -158,8 +160,9 @@ impl CliApp {
                     .flightsql_ctx()
                     .create_prepared_statement(query)
                     .await?;
-                let handle = String::from_utf8(prepared_result.prepared_statement_handle.to_vec())?;
-                println!("Created prepared statement: {handle}");
+                let handle =
+                    PreparedStatementHandle::decode(prepared_result.prepared_statement_handle)?;
+                println!("Created prepared statement: {}", handle.id);
                 Ok(())
             }
         }
