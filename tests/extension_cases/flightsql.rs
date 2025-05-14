@@ -660,7 +660,7 @@ async fn test_query_command() {
             .unwrap()
             .arg("flightsql")
             .arg("statement-query")
-            .arg("--sql")
+            .arg("--query")
             .arg(sql.clone())
             .timeout(Duration::from_secs(5))
             .assert()
@@ -1049,6 +1049,34 @@ async fn test_get_tables_table_type() {
 | test          | information_schema | views       | VIEW       |
 +---------------+--------------------+-------------+------------+
 "#;
+
+    assert.stdout(contains_str(expected));
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_create_prepared_statement() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("flightsql")
+            .arg("create-prepared-statement")
+            .arg("--query")
+            .arg("SELECT 1")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r#"Created prepared statement"#;
 
     assert.stdout(contains_str(expected));
 
