@@ -426,6 +426,8 @@ impl FlightSqlService for FlightSqlServiceImpl {
         query: ActionCreatePreparedStatementRequest,
         _request: Request<Action>,
     ) -> Result<ActionCreatePreparedStatementResult, Status> {
+        // TODO: Add metadata option to request header which allows stateless option where all
+        // information required to execute query is passed back to client
         counter!("requests", "endpoint" => "do_action_create_prepared_statement").increment(1);
         let ActionCreatePreparedStatementRequest { query, .. } = query;
         let res = self
@@ -435,12 +437,12 @@ impl FlightSqlService for FlightSqlServiceImpl {
         Ok(res)
     }
 
-    async fn do_put_prepared_statement_query(
-        &self,
-        query: CommandPreparedStatementQuery,
-        _request: Request<PeekableFlightDataStream>,
-    ) -> Result<DoPutPreparedStatementResult> {
-    }
+    // async fn do_put_prepared_statement_query(
+    //     &self,
+    //     query: CommandPreparedStatementQuery,
+    //     _request: Request<PeekableFlightDataStream>,
+    // ) -> Result<DoPutPreparedStatementResult> {
+    // }
 
     async fn do_get_statement(
         &self,

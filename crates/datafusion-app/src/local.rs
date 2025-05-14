@@ -151,6 +151,7 @@ impl ExecutionContext {
                     ddl_path: config.ddl_path.as_ref().map(PathBuf::from),
                     executor,
                     observability,
+                    prepared_statements: HashMap::new(),
                 }
             }
             #[cfg(not(feature = "observability"))]
@@ -160,6 +161,7 @@ impl ExecutionContext {
                     session_ctx,
                     ddl_path: config.ddl_path.as_ref().map(PathBuf::from),
                     executor,
+                    prepared_statements: HashMap::new(),
                 }
             }
         };
@@ -185,6 +187,7 @@ impl ExecutionContext {
             executor: None,
             #[cfg(feature = "observability")]
             observability,
+            prepared_statements: HashMap::new(),
         }
     }
 
