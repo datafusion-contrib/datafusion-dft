@@ -16,6 +16,7 @@
 // under the License.
 
 use crate::execution::AppExecution;
+use arrow_flight::decode::FlightRecordBatchStream;
 use arrow_flight::encode::FlightDataEncoderBuilder;
 use arrow_flight::error::FlightError;
 use arrow_flight::flight_service_server::{FlightService, FlightServiceServer};
@@ -29,6 +30,7 @@ use arrow_flight::{
     Action, FlightDescriptor, FlightEndpoint, FlightInfo, IpcMessage, SchemaAsIpc, Ticket,
 };
 use color_eyre::Result;
+use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::ipc::writer::IpcWriteOptions;
 use datafusion::logical_expr::{LogicalPlan, LogicalPlanBuilder};
@@ -68,6 +70,10 @@ impl FlightSqlServiceImpl {
     pub fn service(&self) -> FlightServiceServer<Self> {
         // wrap up tonic goop
         FlightServiceServer::new(self.clone())
+    }
+
+    pub fn execution_ctx(&self) -> &ExecutionContext {
+        &self.execution
     }
 
     async fn do_get_common_handler(
@@ -211,12 +217,13 @@ impl FlightSqlServiceImpl {
         }
     }
 
-    async fn query_to_create_prepared_statement_action(
+    pub(crate) async fn query_to_create_prepared_statement_action(
         &self,
         query: String,
     ) -> Result<ActionCreatePreparedStatementResult> {
         let ctx = self.execution.session_ctx();
         let state = ctx.state();
+        // Create the prepared statement plan and extract parameters
         let logical_plan = state.create_logical_plan(&query).await?;
         let query_schema = logical_plan.schema().as_arrow().clone();
         let (parameter_data_types, parameter_fields): (Vec<DataType>, Vec<Field>) = logical_plan
@@ -227,13 +234,17 @@ impl FlightSqlServiceImpl {
         let parameters_schema = Schema::new(parameter_fields);
 
         let id = Uuid::new_v4().to_string();
-        let builder = LogicalPlanBuilder::new(logical_plan);
-        let prepared = builder
-            .prepare(id.clone(), parameter_data_types)
-            .map_err(|e| Status::internal(e.to_string()))?
-            .build()?;
-        ctx.execute_logical_plan(prepared).await?.collect().await?;
+        // Make sure the prepared statement builds
+        // let builder = LogicalPlanBuilder::new(logical_plan);
+        // let prepared = builder
+        //     .prepare(id.clone(), parameter_data_types)
+        //     .map_err(|e| Status::internal(e.to_string()))?
+        //     .build()?;
+        // By default save it to `ExecutionContext` state for later use
+        self.execution
+            .insert_prepared_statement(id.clone(), logical_plan.clone());
         debug!("created prepared statement with id {id}");
+        // Serialize the prepared statement
         let opts = IpcWriteOptions::default();
         let dataset_schema_as_ipc = SchemaAsIpc::new(&query_schema, &opts);
         let IpcMessage(dataset_bytes) = IpcMessage::try_from(dataset_schema_as_ipc)
@@ -439,15 +450,34 @@ impl FlightSqlService for FlightSqlServiceImpl {
         Ok(res)
     }
 
-    // async fn do_put_prepared_statement_query(
-    //     &self,
-    //     query: CommandPreparedStatementQuery,
-    //     _request: Request<PeekableFlightDataStream>,
-    // ) -> Result<DoPutPreparedStatementResult> {
-    //     let CommandPreparedStatementQuery {
-    //         prepared_statement_handle,
-    //     } = query;
-    // }
+    async fn do_put_prepared_statement_query(
+        &self,
+        query: CommandPreparedStatementQuery,
+        request: Request<PeekableFlightDataStream>,
+    ) -> Result<DoPutPreparedStatementResult> {
+        let CommandPreparedStatementQuery {
+            prepared_statement_handle,
+        } = query;
+        let handle = PreparedStatementHandle::decode(prepared_statement_handle)
+            .map_err(|e| Status::internal(e.to_string()))?;
+        let stream = request.into_inner();
+        // The first message contains the flight descriptor and the schema.
+        // Read the flight descriptor without discarding the schema:
+        let flight_descriptor: FlightDescriptor = stream
+            .peek()
+            .await
+            .cloned()
+            .transpose()?
+            .and_then(|data| data.flight_descriptor)
+            .expect("first message should contain flight descriptor");
+
+        // Pass the stream through a decoder
+        let batches: Vec<RecordBatch> = FlightRecordBatchStream::new_from_flight_data(
+            request.into_inner().map_err(|e| e.into()),
+        )
+        .try_collect()
+        .await?;
+    }
 
     async fn do_get_statement(
         &self,
@@ -514,4 +544,47 @@ fn try_request_id_from_request(request: Request<Ticket>) -> Result<String> {
             .to_vec(),
     )?;
     Ok(request_id)
+}
+
+#[cfg(test)]
+mod tests {
+    use datafusion_app::local::ExecutionContext;
+
+    use crate::execution::AppExecution;
+
+    use super::FlightSqlServiceImpl;
+
+    fn setup() -> FlightSqlServiceImpl {
+        let execution = ExecutionContext::test();
+        let app_execution = AppExecution::new(execution);
+        FlightSqlServiceImpl::new(app_execution)
+    }
+
+    #[tokio::test]
+    async fn test_create_prepared_statement_without_params() {
+        let flight = setup();
+        let query = "SELECT NOW()".to_string();
+        let res = flight
+            .query_to_create_prepared_statement_action(query)
+            .await;
+        assert!(res.is_ok());
+        let execution = flight.execution_ctx();
+        let prepared_statements = execution.prepared_statements();
+        let prepared_statements = prepared_statements.read();
+        assert!(prepared_statements.len() == 1);
+    }
+
+    #[tokio::test]
+    async fn test_create_prepared_statement_with_param() {
+        let flight = setup();
+        let query = "SELECT * FROM information_schema.tables WHERE table_type = $1";
+        let res = flight
+            .query_to_create_prepared_statement_action(query.to_string())
+            .await;
+        assert!(res.is_ok());
+        let execution = flight.execution_ctx();
+        let prepared_statements = execution.prepared_statements();
+        let prepared_statements = prepared_statements.read();
+        assert!(prepared_statements.len() == 1);
+    }
 }
