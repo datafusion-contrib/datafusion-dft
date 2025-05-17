@@ -45,6 +45,7 @@ use {
         flightsql::FlightSQLContext,
         flightsql_benchmarks::FlightSQLBenchmarkStats,
     },
+    prost::Message,
     tonic::IntoRequest,
 };
 
@@ -85,10 +86,13 @@ impl CliApp {
 
     #[cfg(feature = "flightsql")]
     async fn handle_flightsql_command(&self, command: FlightSqlCommand) -> color_eyre::Result<()> {
+        use arrow_flight::IpcMessage;
+        use datafusion::arrow::datatypes::Schema;
+        use datafusion_app::prepared_statement::PreparedStatementHandle;
         use futures::stream;
 
         match command {
-            FlightSqlCommand::StatementQuery { sql } => self.exec_from_flightsql(sql, 0).await,
+            FlightSqlCommand::StatementQuery { query } => self.exec_from_flightsql(query, 0).await,
             FlightSqlCommand::GetCatalogs => {
                 let flight_info = self
                     .app_execution
@@ -147,6 +151,30 @@ impl CliApp {
                     .await?;
                 let flight_batch_stream = stream::select_all(streams);
                 self.print_any_stream(flight_batch_stream).await;
+                Ok(())
+            }
+
+            FlightSqlCommand::CreatePreparedStatement { query } => {
+                let prepared_result = self
+                    .app_execution
+                    .flightsql_ctx()
+                    .create_prepared_statement(query)
+                    .await?;
+                let handle =
+                    PreparedStatementHandle::decode(prepared_result.prepared_statement_handle)?;
+                println!("created prepared statement: {}", handle.prepared_id);
+                Ok(())
+            }
+
+            FlightSqlCommand::DoPutPreparedStatementQuery { query } => {
+                let prepared_result = self
+                    .app_execution
+                    .flightsql_ctx()
+                    .create_prepared_statement(query)
+                    .await?;
+                let handle =
+                    PreparedStatementHandle::decode(prepared_result.prepared_statement_handle)?;
+                println!("created prepared statement: {}", handle.prepared_id);
                 Ok(())
             }
         }

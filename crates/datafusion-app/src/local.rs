@@ -17,14 +17,16 @@
 
 //! [`ExecutionContext`]: DataFusion based execution context for running SQL queries
 
+use std::collections::HashMap;
 use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use color_eyre::eyre::eyre;
-use datafusion::logical_expr::LogicalPlan;
+use datafusion::logical_expr::{LogicalPlan, Prepare};
 use futures::TryFutureExt;
 use log::{debug, error, info};
+use parking_lot::RwLock;
 
 use crate::catalog::create_app_catalog;
 use crate::config::ExecutionConfig;
@@ -70,6 +72,9 @@ pub struct ExecutionContext {
     /// Observability handlers
     #[cfg(feature = "observability")]
     observability: ObservabilityContext,
+    /// Map of prepared statements where the key is the id of the prepared statement and the value
+    /// is [`datafusion::logical_expr::LogicalPlan`] that can be reused.
+    prepared_statements: Arc<RwLock<HashMap<String, LogicalPlan>>>,
 }
 
 impl std::fmt::Debug for ExecutionContext {
@@ -147,6 +152,7 @@ impl ExecutionContext {
                     ddl_path: config.ddl_path.as_ref().map(PathBuf::from),
                     executor,
                     observability,
+                    prepared_statements: Arc::new(RwLock::new(HashMap::new())),
                 }
             }
             #[cfg(not(feature = "observability"))]
@@ -156,6 +162,7 @@ impl ExecutionContext {
                     session_ctx,
                     ddl_path: config.ddl_path.as_ref().map(PathBuf::from),
                     executor,
+                    prepared_statements: Arc::new(RwLock::new(HashMap::new())),
                 }
             }
         };
@@ -181,6 +188,7 @@ impl ExecutionContext {
             executor: None,
             #[cfg(feature = "observability")]
             observability,
+            prepared_statements: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -200,6 +208,16 @@ impl ExecutionContext {
     /// Return the inner [`DedicatedExecutor`]
     pub fn executor(&self) -> &Option<DedicatedExecutor> {
         &self.executor
+    }
+
+    pub fn prepared_statements(&self) -> Arc<RwLock<HashMap<String, LogicalPlan>>> {
+        Arc::clone(&self.prepared_statements)
+    }
+
+    pub fn insert_prepared_statement(&self, id: String, logical_plan: LogicalPlan) {
+        let prepared_statements = Arc::clone(&self.prepared_statements);
+        let mut prepared_statements = prepared_statements.write();
+        prepared_statements.insert(id, logical_plan);
     }
 
     /// Return the `ObservabilityCtx`

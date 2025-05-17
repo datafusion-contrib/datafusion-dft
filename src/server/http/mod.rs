@@ -103,10 +103,10 @@ impl HttpApp {
             .await
         {
             Ok(_) => {
-                info!("Shutting down app")
+                info!("shutting down app")
             }
             Err(_) => {
-                panic!("Error serving HTTP app")
+                panic!("error serving HTTP app")
             }
         }
     }
@@ -133,7 +133,7 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
     let mut app_execution = AppExecution::new(execution_ctx);
     #[cfg(feature = "flightsql")]
     {
-        info!("Setting up FlightSQLContext");
+        info!("setting up FlightSQLContext");
         let auth = AuthConfig {
             basic_auth: config.flightsql_client.auth.basic_auth.clone(),
             bearer_token: config.flightsql_client.auth.bearer_token.clone(),
@@ -155,7 +155,7 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
             app_execution.with_flightsql_ctx(flightsql_context);
         }
     }
-    debug!("Created AppExecution: {app_execution:?}");
+    debug!("created AppExecution: {app_execution:?}");
     let (addr, metrics_addr) = if let Some(cmd) = cli.command.clone() {
         match cmd {
             Command::ServeHttp {

@@ -27,6 +27,7 @@ pub mod local;
 pub mod local_benchmarks;
 #[cfg(feature = "observability")]
 pub mod observability;
+pub mod prepared_statement;
 pub mod sql_utils;
 pub mod stats;
 pub mod tables;
