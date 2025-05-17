@@ -162,7 +162,19 @@ impl CliApp {
                     .await?;
                 let handle =
                     PreparedStatementHandle::decode(prepared_result.prepared_statement_handle)?;
-                println!("Created prepared statement: {}", handle.id);
+                println!("created prepared statement: {}", handle.prepared_id);
+                Ok(())
+            }
+
+            FlightSqlCommand::DoPutPreparedStatementQuery { query } => {
+                let prepared_result = self
+                    .app_execution
+                    .flightsql_ctx()
+                    .create_prepared_statement(query)
+                    .await?;
+                let handle =
+                    PreparedStatementHandle::decode(prepared_result.prepared_statement_handle)?;
+                println!("created prepared statement: {}", handle.prepared_id);
                 Ok(())
             }
         }

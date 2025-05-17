@@ -29,12 +29,16 @@ use arrow_flight::sql::{
 use arrow_flight::{
     Action, FlightDescriptor, FlightEndpoint, FlightInfo, IpcMessage, SchemaAsIpc, Ticket,
 };
+use color_eyre::eyre::ensure;
 use color_eyre::Result;
 use datafusion::arrow::array::RecordBatch;
+use datafusion::arrow::compute::concat_batches;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
 use datafusion::arrow::ipc::writer::IpcWriteOptions;
+use datafusion::common::ParamValues;
 use datafusion::logical_expr::{LogicalPlan, LogicalPlanBuilder};
 use datafusion::prelude::{col, lit};
+use datafusion::scalar::ScalarValue;
 use datafusion::sql::parser::DFParser;
 use datafusion_app::local::ExecutionContext;
 use datafusion_app::observability::ObservabilityRequestDetails;
@@ -52,7 +56,7 @@ use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct FlightSqlServiceImpl {
-    requests: Arc<Mutex<HashMap<Uuid, LogicalPlan>>>,
+    requests: Arc<Mutex<HashMap<String, LogicalPlan>>>,
     execution: ExecutionContext,
 }
 
@@ -89,7 +93,7 @@ impl FlightSqlServiceImpl {
                         .requests
                         .lock()
                         .map_err(|_| Status::internal("Failed to acquire lock on requests"))?;
-                    guard.get(&id).cloned()
+                    guard.get(&id.to_string()).cloned()
                 };
                 if let Some(plan) = maybe_plan {
                     let stream = self
@@ -175,7 +179,7 @@ impl FlightSqlServiceImpl {
                 .requests
                 .lock()
                 .map_err(|_| Status::internal("failed to acquire lock on requests"))?;
-            guard.insert(request_id, logical_plan);
+            guard.insert(request_id.to_string(), logical_plan);
 
             Ok(Response::new(info))
         } else {
@@ -233,7 +237,11 @@ impl FlightSqlServiceImpl {
             .collect();
         let parameters_schema = Schema::new(parameter_fields);
 
-        let id = Uuid::new_v4().to_string();
+        // A single prepared statement can be reused many times so it gets its own id which can be
+        // used to invoke it
+        let prepared_id = Uuid::new_v4().to_string();
+        // Id specific to the request
+        let request_id = Uuid::new_v4().to_string();
         // Make sure the prepared statement builds
         // let builder = LogicalPlanBuilder::new(logical_plan);
         // let prepared = builder
@@ -242,8 +250,8 @@ impl FlightSqlServiceImpl {
         //     .build()?;
         // By default save it to `ExecutionContext` state for later use
         self.execution
-            .insert_prepared_statement(id.clone(), logical_plan.clone());
-        debug!("created prepared statement with id {id}");
+            .insert_prepared_statement(prepared_id.clone(), logical_plan.clone());
+        debug!("created prepared statement with id {prepared_id}");
         // Serialize the prepared statement
         let opts = IpcWriteOptions::default();
         let dataset_schema_as_ipc = SchemaAsIpc::new(&query_schema, &opts);
@@ -251,7 +259,7 @@ impl FlightSqlServiceImpl {
             .map_err(|e| Status::internal(e.to_string()))?;
         let parameters_schema_as_ipc = SchemaAsIpc::new(&parameters_schema, &opts);
         let IpcMessage(parameters_bytes) = IpcMessage::try_from(parameters_schema_as_ipc)?;
-        let handle = PreparedStatementHandle::new(id);
+        let handle = PreparedStatementHandle::new(prepared_id, request_id);
         debug!("serialized prepared statement");
         let res = ActionCreatePreparedStatementResult {
             prepared_statement_handle: handle.encode_to_vec().into(),
@@ -460,10 +468,10 @@ impl FlightSqlService for FlightSqlServiceImpl {
         } = query;
         let handle = PreparedStatementHandle::decode(prepared_statement_handle)
             .map_err(|e| Status::internal(e.to_string()))?;
-        let stream = request.into_inner();
+        let mut stream = request.into_inner();
         // The first message contains the flight descriptor and the schema.
         // Read the flight descriptor without discarding the schema:
-        let flight_descriptor: FlightDescriptor = stream
+        stream
             .peek()
             .await
             .cloned()
@@ -472,11 +480,30 @@ impl FlightSqlService for FlightSqlServiceImpl {
             .expect("first message should contain flight descriptor");
 
         // Pass the stream through a decoder
-        let batches: Vec<RecordBatch> = FlightRecordBatchStream::new_from_flight_data(
-            request.into_inner().map_err(|e| e.into()),
-        )
-        .try_collect()
-        .await?;
+        let batches: Vec<RecordBatch> =
+            FlightRecordBatchStream::new_from_flight_data(stream.map_err(|e| e.into()))
+                .try_collect()
+                .await?;
+        let params = params_from_batches(batches)?;
+        let plans = &self.execution.prepared_statements();
+        let guard = plans.read();
+        if let Some(plan) = guard.get(&handle.prepared_id) {
+            // We make a copy of the prepared statement that we can use for the request
+            let plan_with_params = plan.clone().with_param_values(params)?;
+            let requests = Arc::clone(&self.requests);
+            let mut guard = requests.lock().unwrap();
+            guard.insert(handle.request_id, plan_with_params);
+            let res = DoPutPreparedStatementResult {
+                prepared_statement_handle: None,
+            };
+            Ok(res)
+        } else {
+            Err(Status::internal(format!(
+                "no prepared statement for id {}",
+                handle.prepared_id
+            ))
+            .into())
+        }
     }
 
     async fn do_get_statement(
@@ -544,6 +571,54 @@ fn try_request_id_from_request(request: Request<Ticket>) -> Result<String> {
             .to_vec(),
     )?;
     Ok(request_id)
+}
+
+fn params_from_batches(batches: Vec<RecordBatch>) -> Result<ParamValues> {
+    ensure!(
+        batches.len() >= 1,
+        "at least one record batch of params must be provided"
+    );
+    let concatted = concat_batches(&batches[0].schema(), &batches)?;
+    record_batch_to_param_values(&concatted)
+}
+
+// Copied from https://github.com/datafusion-contrib/datafusion-flight-sql-server/blob/4b6dcea299b7afe0eee3e7e46b6c83f513afb990/datafusion-flight-sql-server/src/service.rs#L1113C1-L1149C2
+// Converts a record batch with a single row into ParamValues
+fn record_batch_to_param_values(batch: &RecordBatch) -> Result<ParamValues> {
+    let mut param_values: Vec<(String, Option<usize>, ScalarValue)> = Vec::new();
+
+    let mut is_list = true;
+    for col_index in 0..batch.num_columns() {
+        let array = batch.column(col_index);
+        let scalar = ScalarValue::try_from_array(array, 0)?;
+        let name = batch
+            .schema_ref()
+            .field(col_index)
+            .name()
+            .trim_start_matches('$')
+            .to_string();
+        let index = name.parse().ok();
+        is_list &= index.is_some();
+        param_values.push((name, index, scalar));
+    }
+    if is_list {
+        let mut values: Vec<(Option<usize>, ScalarValue)> = param_values
+            .into_iter()
+            .map(|(_name, index, value)| (index, value))
+            .collect();
+        values.sort_by_key(|(index, _value)| *index);
+        Ok(values
+            .into_iter()
+            .map(|(_index, value)| value)
+            .collect::<Vec<ScalarValue>>()
+            .into())
+    } else {
+        Ok(param_values
+            .into_iter()
+            .map(|(name, _index, value)| (name, value))
+            .collect::<Vec<(String, ScalarValue)>>()
+            .into())
+    }
 }
 
 #[cfg(test)]

@@ -20,11 +20,16 @@ use prost::Message;
 #[derive(Clone, Message)]
 pub struct PreparedStatementHandle {
     #[prost(string)]
-    pub id: String,
+    pub prepared_id: String,
+    #[prost(string)]
+    pub request_id: String,
 }
 
 impl PreparedStatementHandle {
-    pub fn new(id: String) -> Self {
-        Self { id }
+    pub fn new(prepared_id: String, request_id: String) -> Self {
+        Self {
+            prepared_id,
+            request_id,
+        }
     }
 }
