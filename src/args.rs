@@ -174,6 +174,8 @@ pub enum FlightSqlCommand {
     },
     /// Bind parameters to a prepared statement
     DoPutPreparedStatementQuery {
+        /// The prepared statement id to bind parameters to
+        prepared_id: String,
         /// The parameters to be bound
         params_list: Vec<String>,
     },

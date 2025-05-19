@@ -166,15 +166,24 @@ impl CliApp {
                 Ok(())
             }
 
-            FlightSqlCommand::DoPutPreparedStatementQuery { query } => {
-                let prepared_result = self
+            FlightSqlCommand::DoPutPreparedStatementQuery {
+                prepared_id,
+                params_list,
+            } => {
+                let params_batch = params_list_to_params_batch();
+                let put_result = self
                     .app_execution
                     .flightsql_ctx()
-                    .create_prepared_statement(query)
-                    .await?;
-                let handle =
-                    PreparedStatementHandle::decode(prepared_result.prepared_statement_handle)?;
-                println!("created prepared statement: {}", handle.prepared_id);
+                    .bind_prepared_statement_params(prepared_id, params_batch)
+                    .await;
+                // let prepared_result = self
+                //     .app_execution
+                //     .flightsql_ctx()
+                //     .create_prepared_statement(query)
+                //     .await?;
+                // let handle =
+                //     PreparedStatementHandle::decode(prepared_result.prepared_statement_handle)?;
+                // println!("created prepared statement: {}", handle.prepared_id);
                 Ok(())
             }
         }
