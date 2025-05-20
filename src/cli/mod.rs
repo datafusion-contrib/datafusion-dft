@@ -84,6 +84,18 @@ impl CliApp {
         Ok(())
     }
 
+    async fn save_prepared_result(
+        &self,
+        create_prepared_result: ActionCreatePreparedStatementResult,
+    ) -> Result<()> {
+        let prepared_statements = self
+            .app_execution
+            .execution_ctx()
+            .session_ctx()
+            .table()
+            .await?;
+    }
+
     #[cfg(feature = "flightsql")]
     async fn handle_flightsql_command(&self, command: FlightSqlCommand) -> color_eyre::Result<()> {
         use arrow_flight::IpcMessage;
@@ -160,6 +172,7 @@ impl CliApp {
                     .flightsql_ctx()
                     .create_prepared_statement(query)
                     .await?;
+                self.save_prepared_result(prepared_result);
                 let handle =
                     PreparedStatementHandle::decode(prepared_result.prepared_statement_handle)?;
                 println!("created prepared statement: {}", handle.prepared_id);
@@ -170,20 +183,12 @@ impl CliApp {
                 prepared_id,
                 params_list,
             } => {
-                let params_batch = params_list_to_params_batch();
+                let params_batch = params_list_to_params_batch(params_list);
                 let put_result = self
                     .app_execution
                     .flightsql_ctx()
                     .bind_prepared_statement_params(prepared_id, params_batch)
                     .await;
-                // let prepared_result = self
-                //     .app_execution
-                //     .flightsql_ctx()
-                //     .create_prepared_statement(query)
-                //     .await?;
-                // let handle =
-                //     PreparedStatementHandle::decode(prepared_result.prepared_statement_handle)?;
-                // println!("created prepared statement: {}", handle.prepared_id);
                 Ok(())
             }
         }
@@ -734,4 +739,11 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
     let app = CliApp::new(app_execution, cli.clone());
     app.execute_files_or_commands().await?;
     Ok(())
+}
+
+fn params_list_to_params_batch(params: Vec<String>) -> RecordBatch {
+    let fields = params.iter().enumerate().map(|(i, _s)| {
+        let name = format!("${}", i + 1);
+        Field::new()
+    });
 }

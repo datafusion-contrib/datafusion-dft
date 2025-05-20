@@ -338,7 +338,7 @@ impl FlightSQLContext {
                 .with_flight_descriptor(Some(descriptor))
                 .with_schema(params.schema());
             let flight_data = flight_stream_builder
-                .build(futures::stream::iter(Ok(params)))
+                .build(futures::stream::iter([Ok(params)]))
                 .try_collect::<Vec<_>>()
                 .await
                 .map_err(|e| DataFusionError::External(e.to_string().into()))?;

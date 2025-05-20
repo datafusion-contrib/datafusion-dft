@@ -23,7 +23,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use color_eyre::eyre::eyre;
-use datafusion::logical_expr::{LogicalPlan, Prepare};
+use datafusion::logical_expr::LogicalPlan;
 use futures::TryFutureExt;
 use log::{debug, error, info};
 use parking_lot::RwLock;

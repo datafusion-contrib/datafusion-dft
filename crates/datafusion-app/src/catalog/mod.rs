@@ -41,8 +41,31 @@ pub fn create_app_catalog(
     catalog.register_schema("meta", Arc::<MemorySchemaProvider>::clone(&meta_schema))?;
     let versions_table = try_create_meta_versions_table(app_name, app_version)?;
     meta_schema.register_table("versions".to_string(), versions_table)?;
+    #[cfg(feature = "flightsql")]
+    {
+        let flightsql_schema = Arc::new(MemorySchemaProvider::new());
+    }
     Ok(Arc::new(catalog))
 }
+
+// fn create_flightsql_prepared_statements_table() -> Result<Arc<MemTable>> {
+//     let fields = vec![
+//         Field::new("datafusion", DataType::Utf8, false),
+//         Field::new("datafusion-app", DataType::Utf8, false),
+//     ];
+//     let schema = Arc::new(Schema::new(fields));
+//
+//     let batches = RecordBatch::try_new(
+//         Arc::<Schema>::clone(&schema),
+//         vec![
+//             Arc::new(app_version_arr),
+//             Arc::new(datafusion_version_arr),
+//             Arc::new(datafusion_app_version_arr),
+//         ],
+//     )?;
+//
+//     Ok(Arc::new(MemTable::try_new(schema, vec![vec![batches]])?))
+// }
 
 fn try_create_meta_versions_table(app_name: &str, app_version: &str) -> Result<Arc<MemTable>> {
     let fields = vec![
