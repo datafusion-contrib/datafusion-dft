@@ -44,6 +44,7 @@ pub fn create_app_catalog(
     #[cfg(feature = "flightsql")]
     {
         let flightsql_schema = Arc::new(MemorySchemaProvider::new());
+        catalog.register_schema("flightsql", flightsql_schema)?;
     }
     Ok(Arc::new(catalog))
 }

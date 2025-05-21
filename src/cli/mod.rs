@@ -172,6 +172,7 @@ impl CliApp {
                     .flightsql_ctx()
                     .create_prepared_statement(query)
                     .await?;
+
                 self.save_prepared_result(prepared_result);
                 let handle =
                     PreparedStatementHandle::decode(prepared_result.prepared_statement_handle)?;
