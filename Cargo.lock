@@ -1477,6 +1477,7 @@ dependencies = [
  "object_store_opendal",
  "opendal",
  "parking_lot",
+ "prost",
  "serde",
  "tokio",
  "tokio-stream",

@@ -24,6 +24,8 @@ use datafusion_udfs_wasm::WasmInputDataType;
 use serde::Deserialize;
 use std::collections::HashMap;
 
+use crate::db::{default_db_config, DbConfig};
+
 #[cfg(feature = "s3")]
 use {
     color_eyre::Result,
@@ -94,6 +96,7 @@ pub struct ExecutionConfig {
     #[cfg(feature = "observability")]
     #[serde(default)]
     pub observability: ObservabilityConfig,
+    pub db: DbConfig,
 }
 
 impl Default for ExecutionConfig {
@@ -111,6 +114,7 @@ impl Default for ExecutionConfig {
             catalog: default_catalog(),
             #[cfg(feature = "observability")]
             observability: default_observability(),
+            db: default_db_config(),
         }
     }
 }

@@ -19,9 +19,13 @@
 
 use crate::config::get_data_dir;
 use clap::{Parser, Subcommand};
+use datafusion::{arrow::datatypes::DataType, common::ParamValues, scalar::ScalarValue};
 #[cfg(any(feature = "http", feature = "flightsql"))]
 use std::net::SocketAddr;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::HashMap,
+    path::{Path, PathBuf},
+};
 
 const LONG_ABOUT: &str = "
 dft - DataFusion TUI
@@ -134,7 +138,7 @@ pub enum FlightSqlCommand {
     StatementQuery {
         /// The query to execute
         #[clap(long)]
-        sql: String,
+        query: String,
     },
     /// Executes `CommandGetCatalogs` and `DoGet` to return results
     GetCatalogs,
@@ -161,6 +165,19 @@ pub enum FlightSqlCommand {
         /// Specific table types to return
         #[clap(long)]
         table_types: Option<Vec<String>>,
+    },
+    /// Creates a prepared statement on the server
+    CreatePreparedStatement {
+        /// The query for the prepared statement
+        #[clap(long)]
+        query: String,
+    },
+    /// Bind parameters to a prepared statement
+    DoPutPreparedStatementQuery {
+        /// The prepared statement id to bind parameters to
+        prepared_id: String,
+        /// The parameters to be bound
+        params_list: Vec<String>,
     },
 }
 

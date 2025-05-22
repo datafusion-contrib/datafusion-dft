@@ -27,8 +27,39 @@ use datafusion::{
     prelude::SessionContext,
 };
 use log::info;
+use serde::Deserialize;
+use url::Url;
 
-use crate::config::DbConfig;
+#[derive(Debug, Clone, Deserialize)]
+pub struct DbConfig {
+    #[serde(default = "default_db_path")]
+    pub path: Url,
+}
+
+impl Default for DbConfig {
+    fn default() -> Self {
+        default_db_config()
+    }
+}
+
+pub fn default_db_config() -> DbConfig {
+    DbConfig {
+        path: default_db_path(),
+    }
+}
+
+fn default_db_path() -> Url {
+    let base = directories::BaseDirs::new().expect("Base directories should be available");
+    let path = base
+        .data_dir()
+        .to_path_buf()
+        .join("dft/")
+        .to_str()
+        .unwrap()
+        .to_string();
+    let with_schema = format!("file://{path}");
+    Url::parse(&with_schema).unwrap()
+}
 
 pub async fn register_db(ctx: &SessionContext, db_config: &DbConfig) -> Result<()> {
     info!("registering tables to database");

@@ -15,16 +15,21 @@
 // specific language governing permissions and limitations
 // under the License.
 
-pub mod args;
-pub mod cli;
-pub mod config;
-// pub mod db;
-pub mod execution;
-#[cfg(any(feature = "flightsql", feature = "http"))]
-pub mod server;
-pub mod telemetry;
-pub mod test_utils;
-pub mod tpch;
-pub mod tui;
+use prost::Message;
 
-pub const APP_NAME: &str = "dft";
+#[derive(Clone, Message)]
+pub struct PreparedStatementHandle {
+    #[prost(string)]
+    pub prepared_id: String,
+    #[prost(string)]
+    pub request_id: String,
+}
+
+impl PreparedStatementHandle {
+    pub fn new(prepared_id: String, request_id: String) -> Self {
+        Self {
+            prepared_id,
+            request_id,
+        }
+    }
+}

@@ -14,12 +14,10 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
-
 pub mod service;
 
 use crate::args::{Command, DftArgs};
 use crate::config::AppConfig;
-use crate::db::register_db;
 use crate::execution::AppExecution;
 use color_eyre::{eyre::eyre, Result};
 use datafusion_app::config::merge_configs;
@@ -186,6 +184,7 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
     if cli.run_ddl {
         execution_ctx.execute_ddl().await;
     }
+    execution_ctx.register_db().await?;
     let app_execution = AppExecution::new(execution_ctx);
 
     let (addr, metrics_addr) = if let Some(cmd) = cli.command.clone() {
@@ -220,7 +219,6 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
             config.flightsql_server.server_metrics_addr,
         )
     };
-    register_db(app_execution.session_ctx(), &config.db).await?;
     let app = FlightSqlApp::try_new(app_execution, &config, addr, metrics_addr).await?;
     app.run().await;
     Ok(())
