@@ -18,7 +18,7 @@
 pub mod args;
 pub mod cli;
 pub mod config;
-pub mod db;
+// pub mod db;
 pub mod execution;
 #[cfg(any(feature = "flightsql", feature = "http"))]
 pub mod server;

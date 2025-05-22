@@ -23,7 +23,6 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use crate::{
     args::{Command, DftArgs},
     config::AppConfig,
-    db::register_db,
     execution::AppExecution,
 };
 use axum::Router;
@@ -128,6 +127,7 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
     if cli.run_ddl {
         execution_ctx.execute_ddl().await;
     }
+    execution_ctx.register_db().await?;
 
     #[allow(unused_mut)]
     let mut app_execution = AppExecution::new(execution_ctx);
@@ -188,7 +188,6 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
             config.http_server.server_metrics_addr,
         )
     };
-    register_db(app_execution.session_ctx(), &config.db).await?;
     let app = HttpApp::try_new(app_execution, config.clone(), addr, metrics_addr).await?;
     app.run().await;
 

@@ -17,6 +17,7 @@
 
 pub mod catalog;
 pub mod config;
+pub mod db;
 pub mod executor;
 pub mod extensions;
 #[cfg(feature = "flightsql")]

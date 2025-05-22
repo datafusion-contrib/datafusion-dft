@@ -30,6 +30,7 @@ use parking_lot::RwLock;
 
 use crate::catalog::create_app_catalog;
 use crate::config::ExecutionConfig;
+use crate::db::register_db;
 use crate::{ExecOptions, ExecResult};
 use color_eyre::eyre::{self, Result};
 use datafusion::common::Result as DFResult;
@@ -168,6 +169,11 @@ impl ExecutionContext {
         };
 
         Ok(ctx)
+    }
+
+    pub async fn register_db(&self) -> Result<()> {
+        register_db(&self.session_ctx, &self.config.db).await;
+        Ok(())
     }
 
     /// Useful for testing execution functionality
