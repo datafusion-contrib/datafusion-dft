@@ -39,6 +39,7 @@ use std::path::{Path, PathBuf};
 #[cfg(feature = "flightsql")]
 use {
     crate::args::{Command, FlightSqlCommand},
+    arrow_flight::sql::ActionCreatePreparedStatementResult,
     datafusion_app::{
         config::{AuthConfig, FlightSQLConfig},
         flightsql::FlightSQLContext,
@@ -83,16 +84,34 @@ impl CliApp {
         Ok(())
     }
 
+    #[cfg(feature = "flightsql")]
     async fn save_prepared_result(
         &self,
         create_prepared_result: ActionCreatePreparedStatementResult,
     ) -> Result<()> {
+        use datafusion::{
+            datasource::provider_as_source,
+            logical_expr::{dml::InsertOp, LogicalPlanBuilder},
+            sql::TableReference,
+        };
+
+        let prepared_statements_table =
+            TableReference::full("dft", "flightsql", "prepared_statements");
         let prepared_statements = self
             .app_execution
             .execution_ctx()
             .session_ctx()
-            .table()
+            .table(prepared_statements_table)
             .await?;
+        let (state, logical_plan) = prepared_statements.into_parts();
+        let builder = LogicalPlanBuilder::new(logical_plan);
+        let insert_plan = LogicalPlanBuilder::insert_into(
+            input,
+            prepared_statements_table,
+            provider_as_source(prepared_statements),
+            InsertOp::Append,
+        );
+        Ok(())
     }
 
     #[cfg(feature = "flightsql")]
