@@ -33,6 +33,7 @@ runs:
         rustup install stable
         rustup default stable
         rustup component add clippy
+        rustup component add rustfmt
     - name: Install Cargo tools
       shell: bash
       run: |

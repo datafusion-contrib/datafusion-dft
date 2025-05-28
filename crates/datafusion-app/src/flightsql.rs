@@ -19,29 +19,38 @@ use std::sync::Arc;
 
 use arrow_flight::{
     decode::FlightRecordBatchStream,
-    sql::{client::FlightSqlServiceClient, CommandGetDbSchemas, CommandGetTables},
-    FlightInfo,
+    encode::FlightDataEncoderBuilder,
+    sql::{
+        client::FlightSqlServiceClient, ActionCreatePreparedStatementRequest,
+        ActionCreatePreparedStatementResult, Any, CommandGetDbSchemas, CommandGetTables,
+        CommandPreparedStatementQuery, ProstMessageExt,
+    },
+    Action, FlightDescriptor, FlightInfo, PutResult,
 };
-#[cfg(feature = "flightsql")]
 use base64::engine::{general_purpose::STANDARD, Engine as _};
+use color_eyre::eyre::{self, Result};
 use datafusion::{
+    arrow::array::RecordBatch,
+    common::ParamValues,
     error::{DataFusionError, Result as DFResult},
     physical_plan::stream::RecordBatchStreamAdapter,
     sql::parser::DFParser,
 };
+use futures::{stream, TryStreamExt};
 use log::{debug, error, info, warn};
-
-use color_eyre::eyre::{self, Result};
+use prost::Message;
 use tokio::sync::Mutex;
 use tokio_stream::StreamExt;
 use tonic::{transport::Channel, IntoRequest};
 
-#[cfg(feature = "flightsql")]
 use crate::config::BasicAuth;
 
 use crate::{
     config::FlightSQLConfig, flightsql_benchmarks::FlightSQLBenchmarkStats, ExecOptions, ExecResult,
 };
+
+pub(crate) static CREATE_PREPARED_STATEMENT: &str = "CreatePreparedStatement";
+pub(crate) static CLOSE_PREPARED_STATEMENT: &str = "ClosePreparedStatement";
 
 pub type FlightSQLClient = Arc<Mutex<Option<FlightSqlServiceClient<Channel>>>>;
 
@@ -271,6 +280,78 @@ impl FlightSQLContext {
         } else {
             Err(DataFusionError::External(
                 "No FlightSQL client configured.  Add one in `~/.config/dft/config.toml`".into(),
+            ))
+        }
+    }
+
+    pub async fn create_prepared_statement(
+        &self,
+        query: String,
+    ) -> DFResult<ActionCreatePreparedStatementResult> {
+        let client = Arc::clone(&self.client);
+        let mut guard = client.lock().await;
+        if let Some(client) = guard.as_mut() {
+            let cmd = ActionCreatePreparedStatementRequest {
+                query,
+                transaction_id: None,
+            };
+            let action = Action {
+                r#type: CREATE_PREPARED_STATEMENT.to_string(),
+                body: cmd.as_any().encode_to_vec().into(),
+            };
+            let mut result = client
+                .inner_mut()
+                .do_action(action)
+                .await
+                .map_err(|e| DataFusionError::External(e.to_string().into()))?
+                .into_inner();
+            let result = result
+                .message()
+                .await
+                .map_err(|e| DataFusionError::External(e.to_string().into()))?
+                .unwrap();
+            let any = Any::decode(&*result.body)
+                .map_err(|e| DataFusionError::External(e.to_string().into()))?;
+            let prepared_result: ActionCreatePreparedStatementResult = any.unpack()?.unwrap();
+            Ok(prepared_result)
+        } else {
+            Err(DataFusionError::External(
+                "No FlightSQL client configured.  Add one in `~/.config/dft/config.toml`".into(),
+            ))
+        }
+    }
+
+    pub async fn bind_prepared_statement_params(
+        &self,
+        prepared_id: String,
+        params: RecordBatch,
+    ) -> DFResult<Option<PutResult>> {
+        let client = Arc::clone(&self.client);
+        let mut guard = client.lock().await;
+        if let Some(client) = guard.as_mut() {
+            let cmd = CommandPreparedStatementQuery {
+                prepared_statement_handle: self.handle.clone(),
+            };
+
+            let descriptor = FlightDescriptor::new_cmd(cmd.as_any().encode_to_vec());
+            let flight_stream_builder = FlightDataEncoderBuilder::new()
+                .with_flight_descriptor(Some(descriptor))
+                .with_schema(params.schema());
+            let flight_data = flight_stream_builder
+                .build(futures::stream::iter([Ok(params)]))
+                .try_collect::<Vec<_>>()
+                .await
+                .map_err(|e| DataFusionError::External(e.to_string().into()))?;
+
+            client
+                .do_put(stream::iter(flight_data))
+                .await?
+                .message()
+                .await
+                .map_err(|e| DataFusionError::External(e.to_string().into()))
+        } else {
+            Err(DataFusionError::External(
+                "No FlightSQL client configured. Add one in `~/.config/dft/config.toml`".into(),
             ))
         }
     }

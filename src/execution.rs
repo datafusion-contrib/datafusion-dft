@@ -23,7 +23,7 @@ use datafusion::prelude::*;
 use datafusion_app::flightsql::{FlightSQLClient, FlightSQLContext};
 use datafusion_app::{local::ExecutionContext, ExecOptions, ExecResult};
 
-/// Provides all core execution functionality for execution queries from either a local
+/// Provides all core execution functionality for executing queries from either a local
 /// `SessionContext` or a remote `FlightSQL` service
 #[derive(Clone, Debug)]
 pub struct AppExecution {

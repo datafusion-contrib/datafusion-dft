@@ -16,21 +16,33 @@
 // under the License.
 
 use crate::execution::AppExecution;
+use arrow_flight::decode::FlightRecordBatchStream;
 use arrow_flight::encode::FlightDataEncoderBuilder;
 use arrow_flight::error::FlightError;
 use arrow_flight::flight_service_server::{FlightService, FlightServiceServer};
-use arrow_flight::sql::server::FlightSqlService;
+use arrow_flight::sql::server::{FlightSqlService, PeekableFlightDataStream};
 use arrow_flight::sql::{
-    Any, CommandGetCatalogs, CommandGetDbSchemas, CommandGetTables, CommandStatementQuery, SqlInfo,
-    TicketStatementQuery,
+    ActionCreatePreparedStatementRequest, ActionCreatePreparedStatementResult, Any,
+    CommandGetCatalogs, CommandGetDbSchemas, CommandGetTables, CommandPreparedStatementQuery,
+    CommandStatementQuery, DoPutPreparedStatementResult, SqlInfo, TicketStatementQuery,
 };
-use arrow_flight::{FlightDescriptor, FlightEndpoint, FlightInfo, Ticket};
+use arrow_flight::{
+    Action, FlightDescriptor, FlightEndpoint, FlightInfo, IpcMessage, SchemaAsIpc, Ticket,
+};
+use color_eyre::eyre::ensure;
 use color_eyre::Result;
-use datafusion::logical_expr::LogicalPlan;
+use datafusion::arrow::array::RecordBatch;
+use datafusion::arrow::compute::concat_batches;
+use datafusion::arrow::datatypes::{DataType, Field, Schema};
+use datafusion::arrow::ipc::writer::IpcWriteOptions;
+use datafusion::common::ParamValues;
+use datafusion::logical_expr::{LogicalPlan, LogicalPlanBuilder};
 use datafusion::prelude::{col, lit};
+use datafusion::scalar::ScalarValue;
 use datafusion::sql::parser::DFParser;
 use datafusion_app::local::ExecutionContext;
 use datafusion_app::observability::ObservabilityRequestDetails;
+use datafusion_app::prepared_statement::PreparedStatementHandle;
 use futures::{StreamExt, TryStreamExt};
 use jiff::Timestamp;
 use log::{debug, error, info};
@@ -44,7 +56,7 @@ use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct FlightSqlServiceImpl {
-    requests: Arc<Mutex<HashMap<Uuid, LogicalPlan>>>,
+    requests: Arc<Mutex<HashMap<String, LogicalPlan>>>,
     execution: ExecutionContext,
 }
 
@@ -64,6 +76,10 @@ impl FlightSqlServiceImpl {
         FlightServiceServer::new(self.clone())
     }
 
+    pub fn execution_ctx(&self) -> &ExecutionContext {
+        &self.execution
+    }
+
     async fn do_get_common_handler(
         &self,
         request_id: String,
@@ -77,7 +93,7 @@ impl FlightSqlServiceImpl {
                         .requests
                         .lock()
                         .map_err(|_| Status::internal("Failed to acquire lock on requests"))?;
-                    guard.get(&id).cloned()
+                    guard.get(&id.to_string()).cloned()
                 };
                 if let Some(plan) = maybe_plan {
                     let stream = self
@@ -163,7 +179,7 @@ impl FlightSqlServiceImpl {
                 .requests
                 .lock()
                 .map_err(|_| Status::internal("failed to acquire lock on requests"))?;
-            guard.insert(request_id, logical_plan);
+            guard.insert(request_id.to_string(), logical_plan);
 
             Ok(Response::new(info))
         } else {
@@ -203,6 +219,54 @@ impl FlightSqlServiceImpl {
                 Err(Status::internal("error parsing SQL query"))
             }
         }
+    }
+
+    pub(crate) async fn query_to_create_prepared_statement_action(
+        &self,
+        query: String,
+    ) -> Result<ActionCreatePreparedStatementResult> {
+        let ctx = self.execution.session_ctx();
+        let state = ctx.state();
+        // Create the prepared statement plan and extract parameters
+        let logical_plan = state.create_logical_plan(&query).await?;
+        let query_schema = logical_plan.schema().as_arrow().clone();
+        let (parameter_data_types, parameter_fields): (Vec<DataType>, Vec<Field>) = logical_plan
+            .get_parameter_types()?
+            .into_iter()
+            .filter_map(|(k, v)| v.map(|v| (v.clone(), Field::new(k, v, false))))
+            .collect();
+        let parameters_schema = Schema::new(parameter_fields);
+
+        // A single prepared statement can be reused many times so it gets its own id which can be
+        // used to invoke it
+        let prepared_id = Uuid::new_v4().to_string();
+        // Id specific to the request
+        let request_id = Uuid::new_v4().to_string();
+        // Make sure the prepared statement builds
+        // let builder = LogicalPlanBuilder::new(logical_plan);
+        // let prepared = builder
+        //     .prepare(id.clone(), parameter_data_types)
+        //     .map_err(|e| Status::internal(e.to_string()))?
+        //     .build()?;
+        // By default save it to `ExecutionContext` state for later use
+        self.execution
+            .insert_prepared_statement(prepared_id.clone(), logical_plan.clone());
+        debug!("created prepared statement with id {prepared_id}");
+        // Serialize the prepared statement
+        let opts = IpcWriteOptions::default();
+        let dataset_schema_as_ipc = SchemaAsIpc::new(&query_schema, &opts);
+        let IpcMessage(dataset_bytes) = IpcMessage::try_from(dataset_schema_as_ipc)
+            .map_err(|e| Status::internal(e.to_string()))?;
+        let parameters_schema_as_ipc = SchemaAsIpc::new(&parameters_schema, &opts);
+        let IpcMessage(parameters_bytes) = IpcMessage::try_from(parameters_schema_as_ipc)?;
+        let handle = PreparedStatementHandle::new(prepared_id, request_id);
+        debug!("serialized prepared statement");
+        let res = ActionCreatePreparedStatementResult {
+            prepared_statement_handle: handle.encode_to_vec().into(),
+            dataset_schema: dataset_bytes,
+            parameter_schema: parameters_bytes,
+        };
+        Ok(res)
     }
 
     async fn do_get_statement_handler(
@@ -378,6 +442,70 @@ impl FlightSqlService for FlightSqlServiceImpl {
         res
     }
 
+    async fn do_action_create_prepared_statement(
+        &self,
+        query: ActionCreatePreparedStatementRequest,
+        _request: Request<Action>,
+    ) -> Result<ActionCreatePreparedStatementResult, Status> {
+        // TODO: Add metadata option to request header which allows stateless option where all
+        // information required to execute query is passed back to client
+        counter!("requests", "endpoint" => "do_action_create_prepared_statement").increment(1);
+        let ActionCreatePreparedStatementRequest { query, .. } = query;
+        let res = self
+            .query_to_create_prepared_statement_action(query)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
+        Ok(res)
+    }
+
+    async fn do_put_prepared_statement_query(
+        &self,
+        query: CommandPreparedStatementQuery,
+        request: Request<PeekableFlightDataStream>,
+    ) -> Result<DoPutPreparedStatementResult> {
+        let CommandPreparedStatementQuery {
+            prepared_statement_handle,
+        } = query;
+        let handle = PreparedStatementHandle::decode(prepared_statement_handle)
+            .map_err(|e| Status::internal(e.to_string()))?;
+        let mut stream = request.into_inner();
+        // The first message contains the flight descriptor and the schema.
+        // Read the flight descriptor without discarding the schema:
+        stream
+            .peek()
+            .await
+            .cloned()
+            .transpose()?
+            .and_then(|data| data.flight_descriptor)
+            .expect("first message should contain flight descriptor");
+
+        // Pass the stream through a decoder
+        let batches: Vec<RecordBatch> =
+            FlightRecordBatchStream::new_from_flight_data(stream.map_err(|e| e.into()))
+                .try_collect()
+                .await?;
+        let params = params_from_batches(batches)?;
+        let plans = &self.execution.prepared_statements();
+        let guard = plans.read();
+        if let Some(plan) = guard.get(&handle.prepared_id) {
+            // We make a copy of the prepared statement that we can use for the request
+            let plan_with_params = plan.clone().with_param_values(params)?;
+            let requests = Arc::clone(&self.requests);
+            let mut guard = requests.lock().unwrap();
+            guard.insert(handle.request_id, plan_with_params);
+            let res = DoPutPreparedStatementResult {
+                prepared_statement_handle: None,
+            };
+            Ok(res)
+        } else {
+            Err(Status::internal(format!(
+                "no prepared statement for id {}",
+                handle.prepared_id
+            ))
+            .into())
+        }
+    }
+
     async fn do_get_statement(
         &self,
         ticket: TicketStatementQuery,
@@ -443,4 +571,95 @@ fn try_request_id_from_request(request: Request<Ticket>) -> Result<String> {
             .to_vec(),
     )?;
     Ok(request_id)
+}
+
+fn params_from_batches(batches: Vec<RecordBatch>) -> Result<ParamValues> {
+    ensure!(
+        batches.len() >= 1,
+        "at least one record batch of params must be provided"
+    );
+    let concatted = concat_batches(&batches[0].schema(), &batches)?;
+    record_batch_to_param_values(&concatted)
+}
+
+// Copied from https://github.com/datafusion-contrib/datafusion-flight-sql-server/blob/4b6dcea299b7afe0eee3e7e46b6c83f513afb990/datafusion-flight-sql-server/src/service.rs#L1113C1-L1149C2
+// Converts a record batch with a single row into ParamValues
+fn record_batch_to_param_values(batch: &RecordBatch) -> Result<ParamValues> {
+    let mut param_values: Vec<(String, Option<usize>, ScalarValue)> = Vec::new();
+
+    let mut is_list = true;
+    for col_index in 0..batch.num_columns() {
+        let array = batch.column(col_index);
+        let scalar = ScalarValue::try_from_array(array, 0)?;
+        let name = batch
+            .schema_ref()
+            .field(col_index)
+            .name()
+            .trim_start_matches('$')
+            .to_string();
+        let index = name.parse().ok();
+        is_list &= index.is_some();
+        param_values.push((name, index, scalar));
+    }
+    if is_list {
+        let mut values: Vec<(Option<usize>, ScalarValue)> = param_values
+            .into_iter()
+            .map(|(_name, index, value)| (index, value))
+            .collect();
+        values.sort_by_key(|(index, _value)| *index);
+        Ok(values
+            .into_iter()
+            .map(|(_index, value)| value)
+            .collect::<Vec<ScalarValue>>()
+            .into())
+    } else {
+        Ok(param_values
+            .into_iter()
+            .map(|(name, _index, value)| (name, value))
+            .collect::<Vec<(String, ScalarValue)>>()
+            .into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use datafusion_app::local::ExecutionContext;
+
+    use crate::execution::AppExecution;
+
+    use super::FlightSqlServiceImpl;
+
+    fn setup() -> FlightSqlServiceImpl {
+        let execution = ExecutionContext::test();
+        let app_execution = AppExecution::new(execution);
+        FlightSqlServiceImpl::new(app_execution)
+    }
+
+    #[tokio::test]
+    async fn test_create_prepared_statement_without_params() {
+        let flight = setup();
+        let query = "SELECT NOW()".to_string();
+        let res = flight
+            .query_to_create_prepared_statement_action(query)
+            .await;
+        assert!(res.is_ok());
+        let execution = flight.execution_ctx();
+        let prepared_statements = execution.prepared_statements();
+        let prepared_statements = prepared_statements.read();
+        assert!(prepared_statements.len() == 1);
+    }
+
+    #[tokio::test]
+    async fn test_create_prepared_statement_with_param() {
+        let flight = setup();
+        let query = "SELECT * FROM information_schema.tables WHERE table_type = $1";
+        let res = flight
+            .query_to_create_prepared_statement_action(query.to_string())
+            .await;
+        assert!(res.is_ok());
+        let execution = flight.execution_ctx();
+        let prepared_statements = execution.prepared_statements();
+        let prepared_statements = prepared_statements.read();
+        assert!(prepared_statements.len() == 1);
+    }
 }

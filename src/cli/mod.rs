@@ -17,7 +17,6 @@
 //! [`CliApp`]: Command Line User Interface
 
 use crate::config::AppConfig;
-use crate::db::register_db;
 use crate::{args::DftArgs, execution::AppExecution};
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
@@ -40,11 +39,13 @@ use std::path::{Path, PathBuf};
 #[cfg(feature = "flightsql")]
 use {
     crate::args::{Command, FlightSqlCommand},
+    arrow_flight::sql::ActionCreatePreparedStatementResult,
     datafusion_app::{
         config::{AuthConfig, FlightSQLConfig},
         flightsql::FlightSQLContext,
         flightsql_benchmarks::FlightSQLBenchmarkStats,
     },
+    prost::Message,
     tonic::IntoRequest,
 };
 
@@ -84,11 +85,44 @@ impl CliApp {
     }
 
     #[cfg(feature = "flightsql")]
+    async fn save_prepared_result(
+        &self,
+        create_prepared_result: ActionCreatePreparedStatementResult,
+    ) -> Result<()> {
+        use datafusion::{
+            datasource::provider_as_source,
+            logical_expr::{dml::InsertOp, LogicalPlanBuilder},
+            sql::TableReference,
+        };
+
+        let prepared_statements_table =
+            TableReference::full("dft", "flightsql", "prepared_statements");
+        let prepared_statements = self
+            .app_execution
+            .execution_ctx()
+            .session_ctx()
+            .table(prepared_statements_table)
+            .await?;
+        let (state, logical_plan) = prepared_statements.into_parts();
+        let builder = LogicalPlanBuilder::new(logical_plan);
+        let insert_plan = LogicalPlanBuilder::insert_into(
+            input,
+            prepared_statements_table,
+            provider_as_source(prepared_statements),
+            InsertOp::Append,
+        );
+        Ok(())
+    }
+
+    #[cfg(feature = "flightsql")]
     async fn handle_flightsql_command(&self, command: FlightSqlCommand) -> color_eyre::Result<()> {
+        use arrow_flight::IpcMessage;
+        use datafusion::arrow::datatypes::Schema;
+        use datafusion_app::prepared_statement::PreparedStatementHandle;
         use futures::stream;
 
         match command {
-            FlightSqlCommand::StatementQuery { sql } => self.exec_from_flightsql(sql, 0).await,
+            FlightSqlCommand::StatementQuery { query } => self.exec_from_flightsql(query, 0).await,
             FlightSqlCommand::GetCatalogs => {
                 let flight_info = self
                     .app_execution
@@ -147,6 +181,33 @@ impl CliApp {
                     .await?;
                 let flight_batch_stream = stream::select_all(streams);
                 self.print_any_stream(flight_batch_stream).await;
+                Ok(())
+            }
+
+            FlightSqlCommand::CreatePreparedStatement { query } => {
+                let prepared_result = self
+                    .app_execution
+                    .flightsql_ctx()
+                    .create_prepared_statement(query)
+                    .await?;
+
+                self.save_prepared_result(prepared_result);
+                let handle =
+                    PreparedStatementHandle::decode(prepared_result.prepared_statement_handle)?;
+                println!("created prepared statement: {}", handle.prepared_id);
+                Ok(())
+            }
+
+            FlightSqlCommand::DoPutPreparedStatementQuery {
+                prepared_id,
+                params_list,
+            } => {
+                let params_batch = params_list_to_params_batch(params_list);
+                let put_result = self
+                    .app_execution
+                    .flightsql_ctx()
+                    .bind_prepared_statement_params(prepared_id, params_batch)
+                    .await;
                 Ok(())
             }
         }
@@ -674,6 +735,7 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
         crate::APP_NAME,
         env!("CARGO_PKG_VERSION"),
     )?;
+    execution_ctx.register_db().await?;
     #[allow(unused_mut)]
     let mut app_execution = AppExecution::new(execution_ctx);
     #[cfg(feature = "flightsql")]
@@ -693,8 +755,14 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
             app_execution.with_flightsql_ctx(flightsql_ctx);
         }
     }
-    register_db(app_execution.session_ctx(), &config.db).await?;
     let app = CliApp::new(app_execution, cli.clone());
     app.execute_files_or_commands().await?;
     Ok(())
+}
+
+fn params_list_to_params_batch(params: Vec<String>) -> RecordBatch {
+    let fields = params.iter().enumerate().map(|(i, _s)| {
+        let name = format!("${}", i + 1);
+        Field::new()
+    });
 }
