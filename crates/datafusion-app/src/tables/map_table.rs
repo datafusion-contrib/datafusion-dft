@@ -48,6 +48,8 @@ type ArrayBuilderRef = Box<dyn ArrayBuilder>;
 // The first String key is meant to hold primary key and provide O(1) lookup.  The inner HashMap is
 // for holding arbitrary column and value pairs - the key is the column name and we use DataFusions
 // scalar value to provide dynamic typing for the column values.
+//
+// Todo: Maybe the inner HashMap should be a Vec to make projecting easier
 type MapData = Arc<RwLock<IndexMap<ScalarValue, HashMap<String, ScalarValue>>>>;
 
 #[derive(Debug)]

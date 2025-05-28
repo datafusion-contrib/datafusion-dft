@@ -33,6 +33,7 @@ opendal = { version = "0.51", features = [
 parking_lot = "0.12.3"
 prost = "0.13.5"
 serde = { version = "1.0.197", features = ["derive"] }
+serde_json = { version = "1.0.140", features = ["indexmap"] }
 tokio = { version = "1.36.0", features = ["macros", "rt-multi-thread"] }
 tokio-stream = { version = "0.1.15", features = ["net"] }
 tonic = { version = "0.12.3", optional = true }
