@@ -5597,13 +5597,15 @@ checksum = "8df9b6e13f2d32c91b9bd719c00d1958837bc7dec474d94952798cc8e69eeec3"
 
 [[package]]
 name = "tpchgen"
-version = "1.0.0"
-source = "git+https://github.com/clflushopt/tpchgen-rs?rev=07745d653516f232c616d795f7bc794b2fdf9bba#07745d653516f232c616d795f7bc794b2fdf9bba"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a4fdf684719132c392148d85c8a0766dba6a9d70a5948a6ccd7a20b227773ab6"
 
 [[package]]
 name = "tpchgen-arrow"
-version = "1.0.0"
-source = "git+https://github.com/clflushopt/tpchgen-rs?rev=07745d653516f232c616d795f7bc794b2fdf9bba#07745d653516f232c616d795f7bc794b2fdf9bba"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fc6fa34274c3331d8ab48d168c1cd2feb7c178be69f951d5161197c8bf6a925b"
 dependencies = [
  "arrow",
  "tpchgen",
