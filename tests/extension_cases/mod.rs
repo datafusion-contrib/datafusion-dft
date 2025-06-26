@@ -27,6 +27,8 @@ mod deltalake;
 mod flightsql;
 #[cfg(feature = "functions-json")]
 mod functions_json;
+#[cfg(feature = "flightsql")]
+mod headers;
 #[cfg(feature = "huggingface")]
 mod huggingface;
 #[cfg(feature = "s3")]

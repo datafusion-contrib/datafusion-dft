@@ -89,6 +89,11 @@ impl FlightSQLContext {
                         let encoded_basic = STANDARD.encode(format!("{username}:{password}"));
                         client.set_header("Authorization", format!("Basic {encoded_basic}"))
                     }
+                    let headers = &self.config.headers;
+                    for (name, value) in headers {
+                            client.set_header(name, value);
+                        }
+                    
                 }
                 let mut guard = self.client.lock().await;
                 *guard = Some(client);
