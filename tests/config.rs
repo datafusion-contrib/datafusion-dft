@@ -201,16 +201,12 @@ impl TestConfigBuilder {
     }
 
     #[cfg(feature = "flightsql")]
-    pub fn with_client_headers(
-        &mut self,
-        headers: Option<HashMap<String, String>>,
-    ) -> &mut Self {
+    pub fn with_client_headers(&mut self, headers: Option<HashMap<String, String>>) -> &mut Self {
         self.config_text.push_str("[flightsql_client.headers]\n");
 
         if let Some(headers) = &headers {
             for (name, value) in headers {
-                self.config_text
-                .push_str(&format!("{name} = {value}\n"));
+                self.config_text.push_str(&format!("{name} = {value}\n"));
             }
         }
 

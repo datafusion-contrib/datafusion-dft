@@ -91,9 +91,8 @@ impl FlightSQLContext {
                     }
                     let headers = &self.config.headers;
                     for (name, value) in headers {
-                            client.set_header(name, value);
-                        }
-                    
+                        client.set_header(name, value);
+                    }
                 }
                 let mut guard = self.client.lock().await;
                 *guard = Some(client);
