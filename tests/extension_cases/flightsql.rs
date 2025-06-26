@@ -17,6 +17,10 @@
 
 use std::{io::Read, time::Duration};
 
+use crate::{
+    cli_cases::{contains_str, sql_in_file},
+    config::TestConfigBuilder,
+};
 use assert_cmd::Command;
 use datafusion_app::local::ExecutionContext;
 use datafusion_dft::{
@@ -24,11 +28,7 @@ use datafusion_dft::{
     server::flightsql::service::FlightSqlServiceImpl,
     test_utils::fixture::{TestFixture, TestFlightSqlServiceImpl},
 };
-
-use crate::{
-    cli_cases::{contains_str, sql_in_file},
-    config::TestConfigBuilder,
-};
+use std::collections::HashMap;
 
 #[tokio::test]
 pub async fn test_execute_with_no_flightsql_server() {
@@ -1052,5 +1052,45 @@ async fn test_get_tables_table_type() {
 
     assert.stdout(contains_str(expected));
 
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_client_headers() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let mut config_builder = TestConfigBuilder::default();
+    config_builder.with_client_headers(Some(HashMap::from([(
+        "database".to_string(),
+        "some_db".to_string(),
+    )])));
+    let config = config_builder.build("my_config.toml");
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1 + 2;")
+            .arg("--flightsql")
+            .arg("--config")
+            .arg(config.path)
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r##"
++---------------------+
+| Int64(1) + Int64(2) |
++---------------------+
+| 3                   |
++---------------------+
+    "##;
+    assert.stdout(contains_str(expected));
     fixture.shutdown_and_wait().await;
 }

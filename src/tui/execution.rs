@@ -28,6 +28,8 @@ use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::execute_stream;
 use futures::StreamExt;
 use log::{error, info};
+#[cfg(feature = "flightsql")]
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::UnboundedSender;
@@ -404,8 +406,15 @@ impl TuiExecution {
     // TODO: Maybe just expose `inner` and use that rather than re-implementing the same
     // functions here.
     #[cfg(feature = "flightsql")]
-    pub async fn create_flightsql_client(&self, cli_host: Option<String>) -> Result<()> {
-        self.inner.flightsql_ctx().create_client(cli_host).await
+    pub async fn create_flightsql_client(
+        &self,
+        cli_host: Option<String>,
+        cli_headers: Option<HashMap<String, String>>,
+    ) -> Result<()> {
+        self.inner
+            .flightsql_ctx()
+            .create_client(cli_host, cli_headers)
+            .await
     }
 
     #[cfg(feature = "flightsql")]

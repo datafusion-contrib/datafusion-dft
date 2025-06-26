@@ -27,6 +27,7 @@ use directories::{ProjectDirs, UserDirs};
 use lazy_static::lazy_static;
 use log::{debug, error};
 use serde::Deserialize;
+use std::collections::HashMap;
 
 #[cfg(any(feature = "flightsql", feature = "http"))]
 use datafusion_app::config::AuthConfig;
@@ -115,6 +116,8 @@ pub struct FlightSQLClientConfig {
     pub benchmark_iterations: usize,
     #[serde(default = "default_auth_config")]
     pub auth: AuthConfig,
+    #[serde(default = "default_headers")]
+    pub headers: HashMap<String, String>,
 }
 
 #[cfg(feature = "flightsql")]
@@ -124,6 +127,7 @@ impl Default for FlightSQLClientConfig {
             connection_url: default_connection_url(),
             benchmark_iterations: default_benchmark_iterations(),
             auth: default_auth_config(),
+            headers: default_headers(),
         }
     }
 }
@@ -264,6 +268,11 @@ fn default_paste() -> bool {
 #[cfg(any(feature = "flightsql", feature = "http"))]
 pub fn default_connection_url() -> String {
     "http://localhost:50051".to_string()
+}
+
+#[cfg(feature = "flightsql")]
+pub fn default_headers() -> HashMap<String, String> {
+    HashMap::new()
 }
 
 #[cfg(any(feature = "flightsql", feature = "http"))]

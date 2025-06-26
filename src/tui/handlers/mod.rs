@@ -246,8 +246,9 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
             let execution = Arc::clone(&app.execution);
             let _event_tx = app.event_tx.clone();
             let host = app.args.host.clone();
+            let headers = app.args.header.clone().map(|vec| vec.into_iter().collect());
             tokio::spawn(async move {
-                if let Err(e) = execution.create_flightsql_client(host).await {
+                if let Err(e) = execution.create_flightsql_client(host, headers).await {
                     error!("Error creating FlightSQL client: {:?}", e);
                     if let Err(e) = _event_tx.send(AppEvent::FlightSQLFailedToConnect) {
                         error!("Error sending FlightSQLFailedToConnect message: {e}");

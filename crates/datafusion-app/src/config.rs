@@ -252,15 +252,22 @@ pub struct FlightSQLConfig {
     pub connection_url: String,
     pub benchmark_iterations: usize,
     pub auth: AuthConfig,
+    pub headers: HashMap<String, String>,
 }
 
 #[cfg(feature = "flightsql")]
 impl FlightSQLConfig {
-    pub fn new(connection_url: String, benchmark_iterations: usize, auth: AuthConfig) -> Self {
+    pub fn new(
+        connection_url: String,
+        benchmark_iterations: usize,
+        auth: AuthConfig,
+        headers: HashMap<String, String>,
+    ) -> Self {
         Self {
             connection_url,
             benchmark_iterations,
             auth,
+            headers,
         }
     }
 }

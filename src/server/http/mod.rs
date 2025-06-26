@@ -142,12 +142,16 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
             config.flightsql_client.connection_url.clone(),
             config.flightsql_client.benchmark_iterations,
             auth,
+            config.flightsql_client.headers.clone(),
         );
 
         let flightsql_context = FlightSQLContext::new(flightsql_cfg.clone());
         // TODO - Consider adding flag to allow startup even if FlightSQL initiation fails
         if let Err(e) = flightsql_context
-            .create_client(Some(flightsql_cfg.connection_url))
+            .create_client(
+                Some(flightsql_cfg.connection_url),
+                Some(flightsql_cfg.headers),
+            )
             .await
         {
             error!("{}", e.to_string())

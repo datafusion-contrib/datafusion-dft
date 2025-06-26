@@ -31,13 +31,13 @@ use datafusion::{
 };
 use log::{debug, error, info, warn};
 
+#[cfg(feature = "flightsql")]
+use crate::config::BasicAuth;
 use color_eyre::eyre::{self, Result};
+use std::collections::HashMap;
 use tokio::sync::Mutex;
 use tokio_stream::StreamExt;
 use tonic::{transport::Channel, IntoRequest};
-
-#[cfg(feature = "flightsql")]
-use crate::config::BasicAuth;
 
 use crate::{
     config::FlightSQLConfig, flightsql_benchmarks::FlightSQLBenchmarkStats, ExecOptions, ExecResult,
@@ -65,7 +65,11 @@ impl FlightSQLContext {
 
     // TODO - Make this part of `new` method
     /// Create FlightSQL client from users FlightSQL config
-    pub async fn create_client(&self, cli_host: Option<String>) -> Result<()> {
+    pub async fn create_client(
+        &self,
+        cli_host: Option<String>,
+        cli_headers: Option<HashMap<String, String>>,
+    ) -> Result<()> {
         let final_url = cli_host.unwrap_or(self.config.connection_url.clone());
         let url = Box::leak(final_url.into_boxed_str());
         info!("Connecting to FlightSQL host: {}", url);
@@ -88,6 +92,14 @@ impl FlightSQLContext {
                     {
                         let encoded_basic = STANDARD.encode(format!("{username}:{password}"));
                         client.set_header("Authorization", format!("Basic {encoded_basic}"))
+                    }
+
+                    let mut headers = self.config.headers.clone();
+                    if let Some(cli) = cli_headers {
+                        headers.extend(cli);
+                    }
+                    for (name, value) in headers {
+                        client.set_header(name, value);
                     }
                 }
                 let mut guard = self.client.lock().await;
