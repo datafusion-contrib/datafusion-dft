@@ -19,6 +19,7 @@
 
 use crate::config::get_data_dir;
 use clap::{Parser, Subcommand};
+use http::{HeaderName, HeaderValue};
 #[cfg(any(feature = "http", feature = "flightsql"))]
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -96,6 +97,14 @@ pub struct DftArgs {
 
     #[clap(long, help = "Host address to query. Only used for FlightSQL")]
     pub host: Option<String>,
+
+    #[clap(
+        long,
+        help = "Header to add to Flight SQL connection. Only used for FlightSQL",
+        value_parser(parse_header_line),
+        action = clap::ArgAction::Append
+    )]
+    pub header: Option<Vec<(String, String)>>,
 
     #[clap(
         long,
@@ -217,4 +226,17 @@ fn parse_command(command: &str) -> std::result::Result<String, String> {
     } else {
         Err("-c flag expects only non empty commands".to_string())
     }
+}
+
+fn parse_header_line(line: &str) -> Result<(String, String), String> {
+    let (name, value) = line
+        .split_once(':')
+        .ok_or_else(|| format!("Invalid header format: '{}'", line))?;
+
+    let name =
+        HeaderName::try_from(name.trim()).map_err(|e| format!("Invalid header name: {}", e))?;
+    let value =
+        HeaderValue::try_from(value.trim()).map_err(|e| format!("Invalid header value: {}", e))?;
+
+    Ok((name.to_string(), value.to_str().unwrap().to_string()))
 }
