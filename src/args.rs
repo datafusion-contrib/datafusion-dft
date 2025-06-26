@@ -238,5 +238,9 @@ fn parse_header_line(line: &str) -> Result<(String, String), String> {
     let value =
         HeaderValue::try_from(value.trim()).map_err(|e| format!("Invalid header value: {}", e))?;
 
-    Ok((name.to_string(), value.to_str().unwrap().to_string()))
+    let value_str = value
+        .to_str()
+        .map_err(|e| format!("Header value contains invalid characters: {}", e))?;
+
+    Ok((name.to_string(), value_str.to_string()))
 }
