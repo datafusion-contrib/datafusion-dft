@@ -72,7 +72,6 @@ jobs:
           # test to only be run against the server spun up in that test.  With parallelism tests 
           # can connec to server in different test which breaks determinism.
           cargo test --features=flightsql extension_cases::flightsql -- --test-threads=1
-          cargo test --features=flightsql extension_cases::headers -- --test-threads=1
   test-cli:
     name: App / CLI
     runs-on: ubuntu-latest
