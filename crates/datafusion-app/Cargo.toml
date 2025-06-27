@@ -50,6 +50,7 @@ huggingface = ["object_store_opendal", "opendal", "url"]
 observability = []
 s3 = ["object_store/aws", "url"]
 udfs-wasm = ["dep:datafusion-udfs-wasm"]
+object_store = ["dep:object_store"]
 
 [lints.clippy]
 clone_on_ref_ptr = "deny"
