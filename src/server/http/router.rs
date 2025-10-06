@@ -463,7 +463,7 @@ mod flightsql_test {
         };
         let flightsql_ctx = FlightSQLContext::new(flightsql_cfg);
         flightsql_ctx
-            .create_client(Some("http://localhost:50051".to_string()))
+            .create_client(Some("http://localhost:50051".to_string()), None)
             .await
             .unwrap();
         execution.with_flightsql_ctx(flightsql_ctx);

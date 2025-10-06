@@ -15,6 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#[cfg(feature = "flightsql")]
+use std::collections::HashMap;
 use std::{io::Write, path::PathBuf};
 
 use tempfile::{tempdir, TempDir};
@@ -193,6 +195,19 @@ impl TestConfigBuilder {
             self.config_text.push_str(&format!(
                 "client_basic_auth.password = {client_basic_password}\n"
             ));
+        }
+
+        self
+    }
+
+    #[cfg(feature = "flightsql")]
+    pub fn with_client_headers(&mut self, headers: Option<HashMap<String, String>>) -> &mut Self {
+        self.config_text.push_str("[flightsql_client.headers]\n");
+
+        if let Some(headers) = &headers {
+            for (name, value) in headers {
+                self.config_text.push_str(&format!("{name} = {value}\n"));
+            }
         }
 
         self
