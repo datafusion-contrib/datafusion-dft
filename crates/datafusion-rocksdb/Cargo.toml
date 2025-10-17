@@ -1,0 +1,14 @@
+[package]
+authors = ["Matthew Turner <matthew.m.turner@outlook.com>"]
+description = "DataFusion UDFs and extension points for RocksDB"
+edition = "2021"
+homepage = "https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-rocksdb"
+keywords = ["datafusion", "rocksdb", "query", "sql"]
+license = "Apache-2.0"
+name = "datafusion-rocksdb"
+readme = "README.md"
+repository = "https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-rocksdb"
+version = "0.1.0"
+
+[dependencies]
+datafusion = { version = "46" }
