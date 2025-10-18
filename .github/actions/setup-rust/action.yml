@@ -28,10 +28,8 @@ runs:
     - name: Setup Rust toolchain
       shell: bash
       run: |
-        rustup show
         rustup self update
-        rustup install stable
-        rustup default stable
+        rustup show
         rustup component add clippy
         rustup component add rustfmt
     - name: Install Cargo tools
