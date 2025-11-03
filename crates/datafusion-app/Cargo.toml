@@ -18,7 +18,7 @@ datafusion-functions-parquet = { optional = true, path = "../datafusion-function
 datafusion-udfs-wasm = { features = [
   "serde",
 ], optional = true, path = "../datafusion-udfs-wasm", version = "0.1.0" }
-deltalake = { features = ["datafusion"], optional = true, version = "0.26" }
+deltalake = { features = ["datafusion"], optional = true, version = "0.29" }
 directories = "5.0.1"
 futures = "0.3.30"
 indexmap = { features = ["serde"], version = "2.8.0" }
@@ -26,15 +26,15 @@ itertools = "0.13.0"
 log = "0.4.22"
 num_cpus = "1.16.0"
 object_store = { features = ["aws"], optional = true, version = "0.12" }
-object_store_opendal = { optional = true, version = "0.49" }
+object_store_opendal = { optional = true, version = "0.54" }
 opendal = { features = [
   "services-huggingface",
-], optional = true, version = "0.51" }
+], optional = true, version = "0.54.1" }
 parking_lot = "0.12.3"
 serde = { features = ["derive"], version = "1.0.197" }
 tokio = { features = ["macros", "rt-multi-thread"], version = "1.36.0" }
 tokio-stream = { features = ["net"], version = "0.1.15" }
-tonic = { optional = true, version = "0.12.3" }
+tonic = { optional = true, version = "0.13" }
 url = { optional = true, version = "2.5.2" }
 
 [dev-dependencies]
