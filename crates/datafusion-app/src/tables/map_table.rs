@@ -190,7 +190,7 @@ impl MapExec {
         projection: Option<Vec<usize>>,
     ) -> Result<Self> {
         let projected_schema = project_schema(&schema, projection.as_ref())?;
-        let constraints = Constraints::empty();
+        let constraints = Constraints::new_unverified(vec![]);
         let cache =
             Self::compute_properties(Arc::clone(&projected_schema), &[], constraints, partitions);
 
@@ -212,7 +212,7 @@ impl MapExec {
         partitions: &[Vec<RecordBatch>],
     ) -> PlanProperties {
         PlanProperties::new(
-            EquivalenceProperties::new_with_orderings(schema, orderings)
+            EquivalenceProperties::new_with_orderings(schema, orderings.iter().cloned())
                 .with_constraints(constraints),
             Partitioning::UnknownPartitioning(partitions.len()),
             EmissionType::Incremental,
@@ -225,6 +225,14 @@ impl DisplayAs for MapExec {
     fn fmt_as(&self, t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match t {
             DisplayFormatType::Default | DisplayFormatType::Verbose => {
+                write!(
+                    f,
+                    "MapExec: partitions={}, projection={:?}",
+                    self.partitions.len(),
+                    self.projection
+                )
+            }
+            DisplayFormatType::TreeRender => {
                 write!(
                     f,
                     "MapExec: partitions={}, projection={:?}",
@@ -440,13 +448,14 @@ mod test {
             .unwrap();
 
         let expected = [
-            "+---------------+------------------------------------------------+",
-            "| plan_type     | plan                                           |",
-            "+---------------+------------------------------------------------+",
-            "| logical_plan  | TableScan: test projection=[id, val]           |",
-            "| physical_plan | MapExec: partitions=1, projection=Some([0, 1]) |",
-            "|               |                                                |",
-            "+---------------+------------------------------------------------+",
+            "+---------------+--------------------------------------------------+",
+            "| plan_type     | plan                                             |",
+            "+---------------+--------------------------------------------------+",
+            "| logical_plan  | TableScan: test projection=[id, val]             |",
+            "| physical_plan | CooperativeExec                                  |",
+            "|               |   MapExec: partitions=1, projection=Some([0, 1]) |",
+            "|               |                                                  |",
+            "+---------------+--------------------------------------------------+",
         ];
 
         assert_batches_eq!(expected, &batches);
@@ -522,17 +531,18 @@ mod test {
             .unwrap();
 
         let expected = [
-            "+---------------+--------------------------------------------------------------------------+",
-            "| plan_type     | plan                                                                     |",
-            "+---------------+--------------------------------------------------------------------------+",
-            "| logical_plan  | Filter: test.id = Int32(2)                                               |",
-            "|               |   TableScan: test projection=[id, val]                                   |",
-            "| physical_plan | CoalesceBatchesExec: target_batch_size=8192                              |",
-            "|               |   FilterExec: id@0 = 2                                                   |",
-            "|               |     RepartitionExec: partitioning=RoundRobinBatch(4), input_partitions=1 |",
-            "|               |       MapExec: partitions=1, projection=Some([0, 1])                     |",
-            "|               |                                                                          |",
-            "+---------------+--------------------------------------------------------------------------+",
+             "+---------------+--------------------------------------------------------------------------+",
+    "| plan_type     | plan                                                                     |",
+    "+---------------+--------------------------------------------------------------------------+",
+    "| logical_plan  | Filter: test.id = Int32(2)                                               |",
+    "|               |   TableScan: test projection=[id, val]                                   |",
+    "| physical_plan | CoalesceBatchesExec: target_batch_size=8192                              |",
+    "|               |   FilterExec: id@0 = 2                                                   |",
+    "|               |     RepartitionExec: partitioning=RoundRobinBatch(4), input_partitions=1 |",
+    "|               |       CooperativeExec                                                    |",
+    "|               |         MapExec: partitions=1, projection=Some([0, 1])                   |",
+    "|               |                                                                          |",
+    "+---------------+--------------------------------------------------------------------------+",
         ];
 
         assert_batches_eq!(expected, &batches);
@@ -618,7 +628,8 @@ mod test {
             "| logical_plan  | Sort: test.id DESC NULLS FIRST                            |",
             "|               |   TableScan: test projection=[id, val]                    |",
             "| physical_plan | SortExec: expr=[id@0 DESC], preserve_partitioning=[false] |",
-            "|               |   MapExec: partitions=1, projection=Some([0, 1])          |",
+            "|               |   CooperativeExec                                         |",
+            "|               |     MapExec: partitions=1, projection=Some([0, 1])        |",
             "|               |                                                           |",
             "+---------------+-----------------------------------------------------------+",
         ];
@@ -658,15 +669,16 @@ mod test {
             .unwrap();
 
         let expected = [
-            "+---------------+--------------------------------------------------+",
-            "| plan_type     | plan                                             |",
-            "+---------------+--------------------------------------------------+",
-            "| logical_plan  | Limit: skip=0, fetch=2                           |",
-            "|               |   TableScan: test projection=[id, val], fetch=2  |",
-            "| physical_plan | GlobalLimitExec: skip=0, fetch=2                 |",
-            "|               |   MapExec: partitions=1, projection=Some([0, 1]) |",
-            "|               |                                                  |",
-            "+---------------+--------------------------------------------------+",
+            "+---------------+----------------------------------------------------+",
+            "| plan_type     | plan                                               |",
+            "+---------------+----------------------------------------------------+",
+            "| logical_plan  | Limit: skip=0, fetch=2                             |",
+            "|               |   TableScan: test projection=[id, val], fetch=2    |",
+            "| physical_plan | GlobalLimitExec: skip=0, fetch=2                   |",
+            "|               |   CooperativeExec                                  |",
+            "|               |     MapExec: partitions=1, projection=Some([0, 1]) |",
+            "|               |                                                    |",
+            "+---------------+----------------------------------------------------+",
         ];
 
         assert_batches_eq!(expected, &batches);

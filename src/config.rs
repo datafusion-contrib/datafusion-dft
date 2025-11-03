@@ -27,10 +27,11 @@ use directories::{ProjectDirs, UserDirs};
 use lazy_static::lazy_static;
 use log::{debug, error};
 use serde::Deserialize;
-use std::collections::HashMap;
 
 #[cfg(any(feature = "flightsql", feature = "http"))]
 use datafusion_app::config::AuthConfig;
+#[cfg(feature = "flightsql")]
+use std::collections::HashMap;
 use url::Url;
 
 lazy_static! {
