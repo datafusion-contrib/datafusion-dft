@@ -38,4 +38,5 @@ runs:
       shell: bash
       run: |
         cargo install taplo-cli --locked
-        cargo install cargo-machete just
+        cargo install just
+        cargo install --version 0.8.0 cargo-machete --locked
