@@ -190,7 +190,7 @@ impl MapExec {
         projection: Option<Vec<usize>>,
     ) -> Result<Self> {
         let projected_schema = project_schema(&schema, projection.as_ref())?;
-        let constraints = Constraints::empty();
+        let constraints = Constraints::new_unverified(vec![]);
         let cache =
             Self::compute_properties(Arc::clone(&projected_schema), &[], constraints, partitions);
 
@@ -212,7 +212,7 @@ impl MapExec {
         partitions: &[Vec<RecordBatch>],
     ) -> PlanProperties {
         PlanProperties::new(
-            EquivalenceProperties::new_with_orderings(schema, orderings)
+            EquivalenceProperties::new_with_orderings(schema, orderings.iter().cloned())
                 .with_constraints(constraints),
             Partitioning::UnknownPartitioning(partitions.len()),
             EmissionType::Incremental,
@@ -225,6 +225,14 @@ impl DisplayAs for MapExec {
     fn fmt_as(&self, t: DisplayFormatType, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match t {
             DisplayFormatType::Default | DisplayFormatType::Verbose => {
+                write!(
+                    f,
+                    "MapExec: partitions={}, projection={:?}",
+                    self.partitions.len(),
+                    self.projection
+                )
+            }
+            DisplayFormatType::TreeRender => {
                 write!(
                     f,
                     "MapExec: partitions={}, projection={:?}",

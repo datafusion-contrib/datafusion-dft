@@ -16,12 +16,12 @@ version = "0.2.2"
 [dependencies]
 arrow-flight = { features = [
   "flight-sql-experimental",
-], optional = true, version = "54" }
+], optional = true, version = "56" }
 axum = { features = ["macros"], optional = true, version = "0.7.9" }
 clap = { features = ["derive"], version = "4.5.27" }
 color-eyre = "0.6.3"
 crossterm = { features = ["event-stream"], version = "0.28.1" }
-datafusion = { version = "46" }
+datafusion = { version = "50" }
 datafusion-app = { path = "crates/datafusion-app", version = "0.1.0" }
 directories = "5.0.1"
 env_logger = "0.11.5"
@@ -34,8 +34,8 @@ lazy_static = "1.4.0"
 log = "0.4.22"
 metrics = { optional = true, version = "0.24.0" }
 metrics-exporter-prometheus = { optional = true, version = "0.16.0" }
-object_store = "0.11.2"
-parquet = "54"
+object_store = "0.12"
+parquet = "56"
 pin-project-lite = { version = "0.2.14" }
 prost = "0.13.1"
 ratatui = "0.28.0"
@@ -57,8 +57,8 @@ tower-http = { features = [
   "timeout",
   "trace",
 ], optional = true, version = "0.6.2" }
-tpchgen = "1.1"
-tpchgen-arrow = "1.1"
+tpchgen = "2.0"
+tpchgen-arrow = "2.0"
 tracing = { features = ["log"], version = "0.1.41" }
 tracing-subscriber = { features = ["env-filter"], version = "0.3.19" }
 tui-logger = { features = ["tracing-support"], version = "0.12" }
