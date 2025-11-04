@@ -101,3 +101,6 @@ queries/**
 
 bench/url_files/*
 !bench/url_files/example_custom_bench.txt
+
+# Tags
+tags
