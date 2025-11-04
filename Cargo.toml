@@ -40,6 +40,7 @@ pin-project-lite = { version = "0.2.14" }
 prost = "0.13.1"
 ratatui = "0.28.0"
 serde = { features = ["derive"], version = "1.0.197" }
+socket2 = "0.5"
 strum = "0.26.2"
 tokio = { features = [
   "macros",
