@@ -20,7 +20,10 @@
 use color_eyre::{eyre, Result};
 use datafusion::catalog::MemoryCatalogProviderList;
 use datafusion::catalog::{CatalogProvider, CatalogProviderList, TableProviderFactory};
-use datafusion::datasource::file_format::FileFormatFactory;
+use datafusion::datasource::file_format::{
+    csv::CsvFormatFactory, json::JsonFormatFactory, parquet::ParquetFormatFactory,
+    FileFormatFactory,
+};
 use datafusion::execution::context::SessionState;
 use datafusion::execution::runtime_env::RuntimeEnv;
 use datafusion::execution::session_state::SessionStateBuilder;
@@ -55,7 +58,7 @@ pub struct DftSessionStateBuilder {
     execution_config: Option<ExecutionConfig>,
     session_config: SessionConfig,
     table_factories: Option<HashMap<String, Arc<dyn TableProviderFactory>>>,
-    file_format_factories: Option<Vec<Arc<dyn FileFormatFactory>>>,
+    file_format_factories: Vec<Arc<dyn FileFormatFactory>>,
     catalog_providers: Option<HashMap<String, Arc<dyn CatalogProvider>>>,
     runtime_env: Option<Arc<RuntimeEnv>>,
 }
@@ -79,7 +82,11 @@ impl Default for DftSessionStateBuilder {
             session_config: SessionConfig::default().with_information_schema(true),
             execution_config: None,
             table_factories: None,
-            file_format_factories: None,
+            file_format_factories: vec![
+                Arc::new(ParquetFormatFactory::new()),
+                Arc::new(CsvFormatFactory::new()),
+                Arc::new(JsonFormatFactory::new()),
+            ],
             catalog_providers: None,
             runtime_env: None,
         }
@@ -99,7 +106,12 @@ impl DftSessionStateBuilder {
             session_config,
             execution_config: config,
             table_factories: None,
-            file_format_factories: None,
+            file_format_factories: vec![
+                Arc::new(ParquetFormatFactory::new()),
+                Arc::new(CsvFormatFactory::new()),
+                Arc::new(JsonFormatFactory::new()),
+            ],
+
             catalog_providers: None,
             runtime_env: None,
         };
@@ -120,10 +132,7 @@ impl DftSessionStateBuilder {
 
     /// Add a file format factory to the list of file format factories on this builder
     pub fn add_file_format_factory(&mut self, factory: Arc<dyn FileFormatFactory>) {
-        match &mut self.file_format_factories {
-            None => self.file_format_factories = Some(vec![factory]),
-            Some(factories) => factories.push(factory),
-        }
+        let _ = self.file_format_factories.push(factory);
     }
 
     /// Add a catalog provider to the list of providers on this builder
@@ -190,9 +199,7 @@ impl DftSessionStateBuilder {
         if let Some(table_factories) = table_factories {
             builder = builder.with_table_factories(table_factories);
         }
-        if let Some(file_format_factories) = file_format_factories {
-            builder = builder.with_file_formats(file_format_factories);
-        }
+        builder = builder.with_file_formats(file_format_factories);
 
         if let Some(catalog_providers) = catalog_providers {
             let catalogs_list = MemoryCatalogProviderList::new();
