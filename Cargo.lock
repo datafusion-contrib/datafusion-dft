@@ -2002,6 +2002,8 @@ dependencies = [
  "tui-textarea",
  "url",
  "uuid",
+ "vortex",
+ "vortex-file",
 ]
 
 [[package]]
