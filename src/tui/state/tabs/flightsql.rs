@@ -103,7 +103,7 @@ impl FlightSQLTabState<'_> {
         self.query_results_state = Some(RefCell::new(TableState::default()));
     }
 
-    pub fn editor(&self) -> TextArea {
+    pub fn editor(&self) -> TextArea<'_> {
         // TODO: Figure out how to do this without clone. Probably need logic in handler to make
         // updates to the Widget and then pass a ref
         self.editor.clone()

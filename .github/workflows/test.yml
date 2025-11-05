@@ -222,6 +222,31 @@ jobs:
       - name: Run UDFs WASM tests
         run: |
           cargo test --features=udfs-wasm extension_cases::udfs_WASM
+  test-vortex:
+    name: Extension / Vortex
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cargo
+          key: cargo-dft-cache-
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.lock') }}
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
+      - name: Run Vortex tests
+        run: |
+          cargo test --features=vortex extension_cases::vortex
   test-crate-functions-parquet:
     name: Crate / Functions-Parquet
     runs-on: ubuntu-latest

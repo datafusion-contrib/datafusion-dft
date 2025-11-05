@@ -36,6 +36,7 @@ tokio = { features = ["macros", "rt-multi-thread"], version = "1.36.0" }
 tokio-stream = { features = ["net"], version = "0.1.15" }
 tonic = { optional = true, version = "0.13" }
 url = { optional = true, version = "2.5.2" }
+vortex-datafusion = { optional = true, version = "0.54" }
 
 [dev-dependencies]
 criterion = { features = ["async_tokio"], version = "0.5.1" }
@@ -50,6 +51,7 @@ huggingface = ["object_store_opendal", "opendal", "url"]
 observability = []
 s3 = ["object_store/aws", "url"]
 udfs-wasm = ["dep:datafusion-udfs-wasm"]
+vortex = ["dep:vortex-datafusion"]
 
 [lints.clippy]
 clone_on_ref_ptr = "deny"

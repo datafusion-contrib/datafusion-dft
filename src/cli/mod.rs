@@ -47,6 +47,11 @@ use {
     },
     tonic::IntoRequest,
 };
+#[cfg(feature = "vortex")]
+use {
+    vortex::{arrow::FromArrowArray, stream::ArrayStreamAdapter, ArrayRef},
+    vortex_file::VortexWriteOptions,
+};
 
 const LOCAL_BENCHMARK_HEADER_ROW: &str =
     "query,runs,logical_planning_min,logical_planning_max,logical_planning_mean,logical_planning_median,logical_planning_percent_of_total,physical_planning_min,physical_planning_max,physical_planning,mean,physical_planning_median,physical_planning_percent_of_total,execution_min,execution_max,execution_execution_mean,execution_median,execution_percent_of_total,total_min,total_max,total_mean,total_median,total_percent_of_total";
@@ -597,8 +602,64 @@ impl CliApp {
                     Err(e) => return Err(eyre!("Error executing SQL: {e}")),
                 }
             }
-            writer.close()?;
+            writer.close().await?;
         }
+
+        Ok(())
+    }
+}
+
+/// Wrapper for Vortex writer to handle Arrow RecordBatch conversion
+#[cfg(feature = "vortex")]
+struct VortexFileWriter {
+    path: PathBuf,
+    batches: Vec<RecordBatch>,
+}
+
+#[cfg(feature = "vortex")]
+impl VortexFileWriter {
+    fn new(file: File, _schema: SchemaRef, path: &Path) -> Result<Self> {
+        // We need to drop the std::fs::File and use tokio::fs::File later
+        drop(file);
+        Ok(Self {
+            path: path.to_path_buf(),
+            batches: Vec::new(),
+        })
+    }
+
+    fn write(&mut self, batch: &RecordBatch) -> Result<()> {
+        // Collect batches to write them all at once when closing
+        self.batches.push(batch.clone());
+        Ok(())
+    }
+
+    async fn close(self) -> Result<()> {
+        if self.batches.is_empty() {
+            return Ok(());
+        }
+
+        // Open file using tokio::fs::File which implements VortexWrite
+        let file = tokio::fs::File::create(&self.path).await?;
+
+        // Concatenate all batches into a single batch
+        let schema = self.batches[0].schema();
+        let concatenated = datafusion::arrow::compute::concat_batches(&schema, &self.batches)?;
+
+        // Convert to Vortex array
+        let vortex_array = ArrayRef::from_arrow(concatenated, false);
+        let dtype = vortex_array.dtype().clone();
+
+        // Create a stream adapter (same as the example)
+        let stream = ArrayStreamAdapter::new(
+            dtype,
+            futures::stream::iter(std::iter::once(Ok(vortex_array))),
+        );
+
+        // Write using async API
+        VortexWriteOptions::default()
+            .write(file, stream)
+            .await
+            .map_err(|e| eyre!("Failed to write Vortex file: {}", e))?;
 
         Ok(())
     }
@@ -612,6 +673,8 @@ enum AnyWriter {
     Csv(csv::writer::Writer<File>),
     Json(json::writer::LineDelimitedWriter<File>),
     Parquet(ArrowWriter<File>),
+    #[cfg(feature = "vortex")]
+    Vortex(VortexFileWriter),
 }
 
 impl AnyWriter {
@@ -620,10 +683,12 @@ impl AnyWriter {
             AnyWriter::Csv(w) => Ok(w.write(batch)?),
             AnyWriter::Json(w) => Ok(w.write(batch)?),
             AnyWriter::Parquet(w) => Ok(w.write(batch)?),
+            #[cfg(feature = "vortex")]
+            AnyWriter::Vortex(w) => Ok(w.write(batch)?),
         }
     }
 
-    fn close(self) -> Result<()> {
+    async fn close(self) -> Result<()> {
         match self {
             AnyWriter::Csv(w) => Ok(w.close()?),
             AnyWriter::Json(w) => Ok(w.close()?),
@@ -631,6 +696,8 @@ impl AnyWriter {
                 w.close()?;
                 Ok(())
             }
+            #[cfg(feature = "vortex")]
+            AnyWriter::Vortex(w) => w.close().await,
         }
     }
 }
@@ -649,10 +716,19 @@ fn path_to_writer(path: &Path, schema: SchemaRef) -> Result<AnyWriter> {
                     let writer = ArrowWriter::try_new(file, schema, Some(props))?;
                     Ok(AnyWriter::Parquet(writer))
                 }
+                #[cfg(feature = "vortex")]
+                "vortex" => Ok(AnyWriter::Vortex(VortexFileWriter::new(
+                    file, schema, path,
+                )?)),
                 _ => {
+                    #[cfg(feature = "vortex")]
+                    return Err(eyre!(
+                        "Only 'csv', 'parquet', 'json', and 'vortex' file types can be output"
+                    ));
+                    #[cfg(not(feature = "vortex"))]
                     return Err(eyre!(
                         "Only 'csv', 'parquet', and 'json' file types can be output"
-                    ))
+                    ));
                 }
             };
         }

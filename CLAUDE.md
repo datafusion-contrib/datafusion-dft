@@ -53,6 +53,8 @@ cargo test --features=s3 extension_cases::s3
 cargo test --features=functions-json extension_cases::functions_json
 cargo test --features=deltalake extension_cases::deltalake
 cargo test --features=udfs-wasm extension_cases::udfs_wasm
+cargo test --features=vortex extension_cases::vortex
+cargo test --features=vortex cli_cases::basic::test_output_vortex
 
 # Run tests for specific crates
 cargo test --manifest-path crates/datafusion-app/Cargo.toml --all-features
@@ -148,6 +150,7 @@ The project uses extensive feature flags to keep binary size manageable:
 - `functions-parquet` - Parquet-specific functions (default)
 - `functions-json` - JSON functions
 - `deltalake` - Delta Lake table format support
+- `vortex` - Vortex file format support
 - `flightsql` - FlightSQL server and client
 - `http` - HTTP server
 - `huggingface` - HuggingFace dataset integration

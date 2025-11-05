@@ -299,7 +299,7 @@ async fn create_response(
         .try_record_request(state.execution.session_ctx(), req)
         .await
     {
-        error!("Error recording request: {}", e.to_string())
+        error!("Error recording request: {}", e)
     }
     res
 }

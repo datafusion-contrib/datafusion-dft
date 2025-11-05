@@ -33,6 +33,8 @@ mod huggingface;
 mod s3;
 #[cfg(feature = "udfs-wasm")]
 mod udfs_wasm;
+#[cfg(feature = "vortex")]
+mod vortex;
 
 use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::util::pretty::pretty_format_batches;

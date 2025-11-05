@@ -58,7 +58,7 @@ macro_rules! convert_binary_array_values_to_cells {
     };
 }
 
-pub fn record_batch_to_table_header_cells(record_batch: &RecordBatch) -> Vec<Cell> {
+pub fn record_batch_to_table_header_cells(record_batch: &RecordBatch) -> Vec<Cell<'_>> {
     let mut cells = vec![Cell::new("#").bg(tailwind::ORANGE.c300).fg(tailwind::BLACK)];
     record_batch.schema_ref().fields().iter().for_each(|f| {
         let cell = Cell::new(f.name().as_str())
@@ -69,7 +69,7 @@ pub fn record_batch_to_table_header_cells(record_batch: &RecordBatch) -> Vec<Cel
     cells
 }
 
-pub fn create_row_number_cells(record_batch: &RecordBatch) -> Vec<Cell> {
+pub fn create_row_number_cells(record_batch: &RecordBatch) -> Vec<Cell<'_>> {
     let cells: Vec<Cell> = (0..record_batch.num_rows())
         .map(|i| {
             Cell::new(i.to_string())
@@ -80,7 +80,7 @@ pub fn create_row_number_cells(record_batch: &RecordBatch) -> Vec<Cell> {
     cells
 }
 
-pub fn record_batch_to_table_row_cells(record_batch: &RecordBatch) -> Result<Vec<Vec<Cell>>> {
+pub fn record_batch_to_table_row_cells(record_batch: &RecordBatch) -> Result<Vec<Vec<Cell<'_>>>> {
     let row_count = record_batch.num_rows();
     let column_count = record_batch.num_columns();
 

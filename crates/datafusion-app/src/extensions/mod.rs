@@ -29,6 +29,8 @@ mod deltalake;
 mod huggingface;
 #[cfg(feature = "s3")]
 mod s3;
+#[cfg(feature = "vortex")]
+mod vortex;
 
 pub use builder::DftSessionStateBuilder;
 
@@ -58,5 +60,7 @@ pub fn enabled_extensions() -> Vec<Arc<dyn Extension>> {
         Arc::new(deltalake::DeltaLakeExtension::new()),
         #[cfg(feature = "huggingface")]
         Arc::new(huggingface::HuggingFaceExtension::new()),
+        #[cfg(feature = "vortex")]
+        Arc::new(vortex::VortexExtension::new()),
     ]
 }
