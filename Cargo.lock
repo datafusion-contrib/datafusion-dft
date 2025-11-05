@@ -1774,6 +1774,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "socket2 0.5.8",
  "strum 0.26.3",
  "tempfile",
  "tokio",

@@ -76,6 +76,7 @@ insta = { features = ["yaml"], version = "1.40.0" }
 predicates = "3.1.2"
 reqwest = { features = ["json"], version = "0.12.23" }
 serde_json = "1.0.140"
+socket2 = "0.5"
 tempfile = "3.2.0"
 url = "2.5.2"
 

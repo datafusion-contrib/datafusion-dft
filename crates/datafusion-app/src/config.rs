@@ -247,12 +247,24 @@ pub struct WasmUdfConfig {
 }
 
 #[cfg(feature = "flightsql")]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct FlightSQLConfig {
     pub connection_url: String,
     pub benchmark_iterations: usize,
     pub auth: AuthConfig,
     pub headers: HashMap<String, String>,
+}
+
+#[cfg(feature = "flightsql")]
+impl Default for FlightSQLConfig {
+    fn default() -> Self {
+        Self {
+            connection_url: "http://localhost:50051".to_string(),
+            benchmark_iterations: 10,
+            auth: AuthConfig::default(),
+            headers: HashMap::new(),
+        }
+    }
 }
 
 #[cfg(feature = "flightsql")]

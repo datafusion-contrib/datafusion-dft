@@ -381,7 +381,23 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
         crate::APP_NAME,
         env!("CARGO_PKG_VERSION"),
     )?;
-    let app_execution = AppExecution::new(execution_ctx);
+    #[allow(unused_mut)]
+    let mut app_execution = AppExecution::new(execution_ctx);
+
+    #[cfg(feature = "flightsql")]
+    {
+        use datafusion_app::config::FlightSQLConfig;
+        use datafusion_app::flightsql::FlightSQLContext;
+
+        let flightsql_config = FlightSQLConfig::new(
+            config.flightsql_client.connection_url.clone(),
+            config.flightsql_client.benchmark_iterations,
+            config.flightsql_client.auth.clone(),
+            config.flightsql_client.headers.clone(),
+        );
+        app_execution.with_flightsql_ctx(FlightSQLContext::new(flightsql_config));
+    }
+
     register_db(app_execution.session_ctx(), &config.db).await?;
     let app = App::new(state, cli, app_execution);
     app.run_app().await?;
