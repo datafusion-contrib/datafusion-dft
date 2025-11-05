@@ -120,7 +120,7 @@ impl SQLTabState<'_> {
         self.refresh_query_results_state();
     }
 
-    pub fn editor(&self) -> TextArea {
+    pub fn editor(&self) -> TextArea<'_> {
         // TODO: Figure out how to do this without clone. Probably need logic in handler to make
         // updates to the Widget and then pass a ref
         self.editor.clone()
@@ -134,11 +134,11 @@ impl SQLTabState<'_> {
         self.ddl_error = error;
     }
 
-    pub fn ddl_editor(&self) -> TextArea {
+    pub fn ddl_editor(&self) -> TextArea<'_> {
         self.ddl_editor.clone()
     }
 
-    pub fn active_editor_cloned(&self) -> TextArea {
+    pub fn active_editor_cloned(&self) -> TextArea<'_> {
         match self.mode {
             SQLTabMode::Normal => self.editor.clone(),
             SQLTabMode::DDL => self.ddl_editor.clone(),

@@ -80,7 +80,7 @@ impl TestApp<'_> {
     }
 
     /// Return the app state
-    pub fn state(&self) -> &datafusion_dft::tui::state::AppState {
+    pub fn state(&self) -> &datafusion_dft::tui::state::AppState<'_> {
         self.app.state()
     }
 
