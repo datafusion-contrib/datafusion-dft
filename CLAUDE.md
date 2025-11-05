@@ -54,6 +54,7 @@ cargo test --features=functions-json extension_cases::functions_json
 cargo test --features=deltalake extension_cases::deltalake
 cargo test --features=udfs-wasm extension_cases::udfs_wasm
 cargo test --features=vortex extension_cases::vortex
+cargo test --features=vortex cli_cases::basic::test_output_vortex
 
 # Run tests for specific crates
 cargo test --manifest-path crates/datafusion-app/Cargo.toml --all-features

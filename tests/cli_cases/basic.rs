@@ -491,3 +491,38 @@ fn test_output_parquet() {
 
     assert.stdout(contains_str(expected));
 }
+
+#[test]
+#[cfg(feature = "vortex")]
+fn test_output_vortex() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("test.vortex");
+
+    let sql = "SELECT 1 as num, 'hello' as text".to_string();
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(sql.clone())
+        .arg("-o")
+        .arg(path.clone())
+        .assert()
+        .success();
+
+    let read_sql = format!("SELECT * FROM '{}'", path.to_str().unwrap());
+
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(read_sql)
+        .assert()
+        .success();
+
+    let expected = r#"
++-----+-------+
+| num | text  |
++-----+-------+
+| 1   | hello |
++-----+-------+"#;
+
+    assert.stdout(contains_str(expected));
+}
