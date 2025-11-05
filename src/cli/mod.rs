@@ -717,7 +717,9 @@ fn path_to_writer(path: &Path, schema: SchemaRef) -> Result<AnyWriter> {
                     Ok(AnyWriter::Parquet(writer))
                 }
                 #[cfg(feature = "vortex")]
-                "vortex" => Ok(AnyWriter::Vortex(VortexFileWriter::new(file, schema, path)?)),
+                "vortex" => Ok(AnyWriter::Vortex(VortexFileWriter::new(
+                    file, schema, path,
+                )?)),
                 _ => {
                     #[cfg(feature = "vortex")]
                     return Err(eyre!(
