@@ -133,7 +133,7 @@ impl FlightSqlServiceImpl {
             .try_record_request(ctx, req)
             .await
         {
-            error!("error recording request: {}", e.to_string())
+            error!("error recording request: {}", e)
         }
 
         histogram!(latency_metric).record(duration.get_milliseconds() as f64);
