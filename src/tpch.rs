@@ -17,6 +17,8 @@
 
 use std::sync::Arc;
 
+use crate::args::TpchFormat;
+use crate::config::AppConfig;
 use color_eyre::{eyre, Result};
 use datafusion::{arrow::record_batch::RecordBatch, datasource::listing::ListingTableUrl};
 use datafusion_app::{
@@ -35,7 +37,12 @@ use tpchgen_arrow::{
 };
 use url::Url;
 
-use crate::config::AppConfig;
+#[cfg(feature = "vortex")]
+use {
+    datafusion::arrow::compute::concat_batches,
+    vortex::{arrow::FromArrowArray, stream::ArrayStreamAdapter, ArrayRef},
+    vortex_file::VortexWriteOptions,
+};
 
 enum GeneratorType {
     Customer,
@@ -125,7 +132,75 @@ where
     Ok(())
 }
 
-pub async fn generate(config: AppConfig, scale_factor: f64) -> Result<()> {
+#[cfg(feature = "vortex")]
+async fn write_batches_to_vortex<I>(
+    batches: std::iter::Peekable<I>,
+    table_path: &Url,
+    table_type: &str,
+    store: Arc<dyn ObjectStore>,
+) -> Result<()>
+where
+    I: Iterator<Item = RecordBatch>,
+{
+    let batches_vec: Vec<RecordBatch> = batches.collect();
+
+    if batches_vec.is_empty() {
+        return Err(eyre::Error::msg(format!(
+            "unable to generate {table_type} TPC-H data"
+        )));
+    }
+
+    let file_url = table_path.join("data.vortex")?;
+    info!("...file URL '{file_url}'");
+
+    // Concatenate all batches into a single batch
+    let schema = batches_vec[0].schema();
+    let concatenated = concat_batches(&schema, &batches_vec)?;
+
+    // Convert to Vortex array
+    let vortex_array = ArrayRef::from_arrow(concatenated, false);
+    let dtype = vortex_array.dtype().clone();
+
+    // Create a stream adapter
+    let stream = ArrayStreamAdapter::new(
+        dtype,
+        futures::stream::iter(std::iter::once(Ok(vortex_array))),
+    );
+
+    // Write to a buffer
+    let mut buf: Vec<u8> = Vec::new();
+    info!("...writing {table_type} batches to vortex format");
+    VortexWriteOptions::default()
+        .write(&mut buf, stream)
+        .await
+        .map_err(|e| eyre::Error::msg(format!("Failed to write Vortex file: {}", e)))?;
+
+    let file_path = object_store::path::Path::from_url_path(file_url.path())?;
+    info!("...putting to file path {}", file_path);
+    store.put(&file_path, buf.into()).await?;
+    Ok(())
+}
+
+async fn write_batches<I>(
+    batches: std::iter::Peekable<I>,
+    table_path: &Url,
+    table_type: &str,
+    store: Arc<dyn ObjectStore>,
+    format: &TpchFormat,
+) -> Result<()>
+where
+    I: Iterator<Item = RecordBatch>,
+{
+    match format {
+        TpchFormat::Parquet => {
+            write_batches_to_parquet(batches, table_path, table_type, store).await
+        }
+        #[cfg(feature = "vortex")]
+        TpchFormat::Vortex => write_batches_to_vortex(batches, table_path, table_type, store).await,
+    }
+}
+
+pub async fn generate(config: AppConfig, scale_factor: f64, format: TpchFormat) -> Result<()> {
     let merged_exec_config = merge_configs(config.shared.clone(), config.cli.execution.clone());
     let session_state_builder = DftSessionStateBuilder::try_new(Some(merged_exec_config.clone()))?
         .with_extensions()
@@ -155,22 +230,24 @@ pub async fn generate(config: AppConfig, scale_factor: f64) -> Result<()> {
                 info!("...generating customers");
                 let arrow_generator =
                     CustomerArrow::new(CustomerGenerator::new(scale_factor, 1, 1));
-                write_batches_to_parquet(
+                write_batches(
                     arrow_generator.peekable(),
                     &table_path,
                     "Customer",
                     Arc::clone(&store),
+                    &format,
                 )
                 .await?;
             }
             GeneratorType::Order => {
                 info!("...generating orders");
                 let arrow_generator = OrderArrow::new(OrderGenerator::new(scale_factor, 1, 1));
-                write_batches_to_parquet(
+                write_batches(
                     arrow_generator.peekable(),
                     &table_path,
                     "Order",
                     Arc::clone(&store),
+                    &format,
                 )
                 .await?;
             }
@@ -178,33 +255,36 @@ pub async fn generate(config: AppConfig, scale_factor: f64) -> Result<()> {
                 info!("...generating LineItems");
                 let arrow_generator =
                     LineItemArrow::new(LineItemGenerator::new(scale_factor, 1, 1));
-                write_batches_to_parquet(
+                write_batches(
                     arrow_generator.peekable(),
                     &table_path,
                     "LineItem",
                     Arc::clone(&store),
+                    &format,
                 )
                 .await?;
             }
             GeneratorType::Nation => {
                 info!("...generating Nations");
                 let arrow_generator = NationArrow::new(NationGenerator::new(scale_factor, 1, 1));
-                write_batches_to_parquet(
+                write_batches(
                     arrow_generator.peekable(),
                     &table_path,
                     "Nation",
                     Arc::clone(&store),
+                    &format,
                 )
                 .await?;
             }
             GeneratorType::Part => {
                 info!("...generating Parts");
                 let arrow_generator = PartArrow::new(PartGenerator::new(scale_factor, 1, 1));
-                write_batches_to_parquet(
+                write_batches(
                     arrow_generator.peekable(),
                     &table_path,
                     "Part",
                     Arc::clone(&store),
+                    &format,
                 )
                 .await?;
             }
@@ -212,22 +292,24 @@ pub async fn generate(config: AppConfig, scale_factor: f64) -> Result<()> {
                 info!("...generating PartSupps");
                 let arrow_generator =
                     PartSuppArrow::new(PartSuppGenerator::new(scale_factor, 1, 1));
-                write_batches_to_parquet(
+                write_batches(
                     arrow_generator.peekable(),
                     &table_path,
                     "PartSupp",
                     Arc::clone(&store),
+                    &format,
                 )
                 .await?;
             }
             GeneratorType::Region => {
                 info!("...generating Regions");
                 let arrow_generator = RegionArrow::new(RegionGenerator::new(scale_factor, 1, 1));
-                write_batches_to_parquet(
+                write_batches(
                     arrow_generator.peekable(),
                     &table_path,
                     "Region",
                     Arc::clone(&store),
+                    &format,
                 )
                 .await?;
             }
@@ -235,16 +317,25 @@ pub async fn generate(config: AppConfig, scale_factor: f64) -> Result<()> {
                 info!("...generating Suppliers");
                 let arrow_generator =
                     SupplierArrow::new(SupplierGenerator::new(scale_factor, 1, 1));
-                write_batches_to_parquet(
+                write_batches(
                     arrow_generator.peekable(),
                     &table_path,
                     "Supplier",
                     Arc::clone(&store),
+                    &format,
                 )
                 .await?;
             }
         }
     }
+
+    let tpch_dir = config
+        .db
+        .path
+        .join("tables/")?
+        .join("dft/")?
+        .join("tpch/")?;
+    println!("TPC-H dataset saved to: {}", tpch_dir);
 
     Ok(())
 }

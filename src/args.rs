@@ -206,7 +206,16 @@ pub enum Command {
     GenerateTpch {
         #[clap(long, default_value = "1.0")]
         scale_factor: f64,
+        #[clap(long, default_value = "parquet")]
+        format: TpchFormat,
     },
+}
+
+#[derive(Clone, Debug, clap::ValueEnum)]
+pub enum TpchFormat {
+    Parquet,
+    #[cfg(feature = "vortex")]
+    Vortex,
 }
 
 fn parse_valid_file(file: &str) -> std::result::Result<PathBuf, String> {

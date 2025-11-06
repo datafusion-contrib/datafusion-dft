@@ -61,8 +61,12 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
         env_logger::init();
     }
     let cfg = create_config(cli.config_path());
-    if let Some(Command::GenerateTpch { scale_factor }) = cli.command {
-        tpch::generate(cfg.clone(), scale_factor).await?;
+    if let Some(Command::GenerateTpch {
+        scale_factor,
+        format,
+    }) = cli.command
+    {
+        tpch::generate(cfg.clone(), scale_factor, format).await?;
         return Ok(());
     }
 
