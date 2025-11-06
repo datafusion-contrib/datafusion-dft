@@ -66,6 +66,7 @@ tui-textarea = { features = ["search"], version = "0.6.1" }
 url = { features = ["serde"], version = "2.5.2" }
 uuid = { optional = true, version = "1.10.0" }
 vortex = { optional = true, version = "0.54" }
+vortex-datafusion = { optional = true, version = "0.54" }
 vortex-file = { optional = true, version = "0.54" }
 
 [dev-dependencies]
@@ -111,7 +112,7 @@ http = [
 huggingface = ["datafusion-app/huggingface"]
 s3 = ["datafusion-app/s3"]
 udfs-wasm = ["datafusion-app/udfs-wasm"]
-vortex = ["datafusion-app/vortex", "dep:vortex", "dep:vortex-file"]
+vortex = ["datafusion-app/vortex", "dep:vortex", "dep:vortex-datafusion", "dep:vortex-file"]
 
 [[bin]]
 name = "dft"

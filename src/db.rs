@@ -21,14 +21,32 @@ use color_eyre::{Report, Result};
 use datafusion::{
     catalog::{MemoryCatalogProvider, MemorySchemaProvider},
     datasource::{
-        file_format::parquet::ParquetFormat,
+        file_format::{csv::CsvFormat, json::JsonFormat, parquet::ParquetFormat, FileFormat},
         listing::{ListingOptions, ListingTable, ListingTableConfig, ListingTableUrl},
     },
     prelude::SessionContext,
 };
 use log::info;
+use std::path::Path;
+#[cfg(feature = "vortex")]
+use vortex_datafusion::VortexFormat;
 
 use crate::config::DbConfig;
+
+/// Detects the file format based on file extension
+fn detect_format(extension: &str) -> Result<(Arc<dyn FileFormat>, &'static str)> {
+    match extension.to_lowercase().as_str() {
+        "parquet" => Ok((Arc::new(ParquetFormat::new()), ".parquet")),
+        "csv" => Ok((Arc::new(CsvFormat::default()), ".csv")),
+        "json" => Ok((Arc::new(JsonFormat::default()), ".json")),
+        #[cfg(feature = "vortex")]
+        "vortex" => Ok((Arc::new(VortexFormat::default()), ".vortex")),
+        _ => Err(Report::msg(format!(
+            "Unsupported file extension: {}",
+            extension
+        ))),
+    }
+}
 
 pub async fn register_db(ctx: &SessionContext, db_config: &DbConfig) -> Result<()> {
     info!("registering tables to database");
@@ -87,9 +105,27 @@ pub async fn register_db(ctx: &SessionContext, db_config: &DbConfig) -> Result<(
                     .join(&format!("{schema_name}/"))?
                     .join(&format!("{table_name}/"))?;
                 let table_url = ListingTableUrl::parse(p)?;
-                let file_format = ParquetFormat::new();
+
+                // List files in the table directory to detect the format
+                let files = store.list_with_delimiter(Some(&table_path)).await?;
+
+                // Find the first file with an extension to determine the format
+                let extension = files
+                    .objects
+                    .iter()
+                    .find_map(|obj| {
+                        let path = obj.location.as_ref();
+                        Path::new(path).extension().and_then(|ext| ext.to_str())
+                    })
+                    .ok_or(Report::msg(format!(
+                        "No files with extensions found in table directory: {table_name}"
+                    )))?;
+
+                info!("...detected format: {extension}");
+                let (file_format, file_extension) = detect_format(extension)?;
+
                 let listing_options =
-                    ListingOptions::new(Arc::new(file_format)).with_file_extension(".parquet");
+                    ListingOptions::new(file_format).with_file_extension(file_extension);
                 // Resolve the schema
                 let resolved_schema = listing_options
                     .infer_schema(&ctx.state(), &table_url)
@@ -126,7 +162,11 @@ mod test {
     #[tokio::test]
     async fn test_register_db_no_tables() {
         let ctx = setup();
-        let config = DbConfig::default();
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("db");
+        let path = format!("file://{}/", db_path.to_str().unwrap());
+        let db_url = url::Url::parse(&path).unwrap();
+        let config = DbConfig { path: db_url };
 
         register_db(&ctx, &config).await.unwrap();
 
