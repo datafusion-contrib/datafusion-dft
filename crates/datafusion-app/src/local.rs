@@ -97,14 +97,11 @@ impl ExecutionContext {
             executor = Some(dedicated_executor)
         }
 
-        #[allow(unused_mut)]
         let mut session_ctx = SessionContext::new_with_state(session_state);
+        session_ctx = session_ctx.enable_url_table();
 
         #[cfg(feature = "functions-json")]
         datafusion_functions_json::register_all(&mut session_ctx)?;
-
-        // Register Parquet Metadata Function
-        let session_ctx = session_ctx.enable_url_table();
 
         #[cfg(feature = "udfs-wasm")]
         {
