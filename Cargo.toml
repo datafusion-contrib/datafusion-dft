@@ -112,7 +112,12 @@ http = [
 huggingface = ["datafusion-app/huggingface"]
 s3 = ["datafusion-app/s3"]
 udfs-wasm = ["datafusion-app/udfs-wasm"]
-vortex = ["datafusion-app/vortex", "dep:vortex", "dep:vortex-datafusion", "dep:vortex-file"]
+vortex = [
+  "datafusion-app/vortex",
+  "dep:vortex",
+  "dep:vortex-datafusion",
+  "dep:vortex-file",
+]
 
 [[bin]]
 name = "dft"
