@@ -42,3 +42,60 @@ async fn test_deltalake() {
         vec!["+----+", "| id |", "+----+", "| 5  |", "| 7  |", "| 9  |", "+----+"]
     );
 }
+
+#[cfg(feature = "s3")]
+#[tokio::test(flavor = "multi_thread")]
+async fn test_deltalake_s3() {
+    use assert_cmd::Command;
+    use std::io::Write;
+
+    use crate::{cli_cases::contains_str, config::TestConfigBuilder};
+
+    let tempdir = tempfile::tempdir().unwrap();
+    let ddl_path = tempdir.path().join("my_ddl.sql");
+    let mut file = std::fs::File::create(ddl_path.clone()).unwrap();
+    let ddl = "CREATE EXTERNAL TABLE delta_tbl STORED AS DELTATABLE LOCATION 's3://test/deltalake/simple_table';";
+    file.write_all(ddl.as_bytes()).unwrap();
+    file.flush().unwrap();
+
+    // Create a temp db directory to avoid conflicts with existing db files
+    let db_dir = tempdir.path().join("db");
+    std::fs::create_dir(&db_dir).unwrap();
+
+    let mut config_builder = TestConfigBuilder::default();
+    config_builder.with_ddl_path("cli", ddl_path);
+    config_builder.with_db_path(&format!("file://{}", db_dir.display()));
+    config_builder.with_s3_object_store(
+        "cli",
+        "s3",
+        "test",
+        "s3://test",
+        "http://localhost:4566",
+        "LSIAQAAAAAAVNCBMPNSG",
+        "5555555555555555555555555555555555555555",
+        true,
+    );
+    let config = config_builder.build("my_config.toml");
+
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("--config")
+        .arg(config.path)
+        .arg("--run-ddl")
+        .arg("-c")
+        .arg("SELECT id FROM delta_tbl ORDER BY id")
+        .assert()
+        .success();
+
+    let expected = r#"
++----+
+| id |
++----+
+| 5  |
+| 7  |
+| 9  |
++----+
+"#;
+
+    assert.stdout(contains_str(expected));
+}

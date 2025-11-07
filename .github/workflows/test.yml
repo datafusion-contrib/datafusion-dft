@@ -196,7 +196,31 @@ jobs:
         uses: ./.github/actions/setup-rust
       - name: Run Deltalake tests
         run: |
-          cargo test --features=deltalake extension_cases::deltalake
+          cargo test --features=deltalake extension_cases::deltalake::test_deltalake
+  test-deltalake-s3:
+    name: Extension / Deltalake-S3
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
+      - name: Start LocalStack
+        uses: LocalStack/setup-localstack@v0.2.3
+        with:
+          image-tag: 'latest'
+          install-awslocal: 'true'
+          configuration: DEBUG=1
+      - name: Upload Delta Lake data to LocalStack
+        run: |
+          awslocal s3 mb s3://test
+          awslocal s3 sync data/deltalake/simple_table s3://test/deltalake/simple_table
+          echo "Test Execution complete!"
+      - name: Run Deltalake S3 tests
+        run: |
+          cargo test --features="deltalake s3" extension_cases::deltalake::test_deltalake_s3
   test-udfs-wasm:
     name: Extension / UDFs-WASM
     runs-on: ubuntu-latest

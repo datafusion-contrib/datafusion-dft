@@ -52,6 +52,7 @@ cargo test --features=flightsql extension_cases::flightsql -- --test-threads=1
 cargo test --features=s3 extension_cases::s3
 cargo test --features=functions-json extension_cases::functions_json
 cargo test --features=deltalake extension_cases::deltalake
+cargo test --features="deltalake s3" extension_cases::deltalake::test_deltalake_s3  # Requires LocalStack
 cargo test --features=udfs-wasm extension_cases::udfs_wasm
 cargo test --features=vortex extension_cases::vortex
 cargo test --features=vortex cli_cases::basic::test_output_vortex
@@ -189,16 +190,20 @@ The main runtime in `src/main.rs` uses a single-threaded Tokio runtime optimized
 
 ### Testing Against LocalStack
 
-Some tests (S3, TUI, CLI) require LocalStack for S3 testing. The CI workflow shows the setup:
+Some tests (S3, TUI, CLI, Delta Lake + S3) require LocalStack for S3 testing. The CI workflow shows the setup:
 
 ```bash
 # Start LocalStack
 localstack start -d
-awslocal s3api create-bucket --bucket tmp --acl public-read
-awslocal s3 mv data/aggregate_test_100.csv s3://tmp/
+awslocal s3api create-bucket --bucket test --acl public-read
+awslocal s3 mv data/aggregate_test_100.csv s3://test/
 
-# Run tests
+# Run S3 tests
 cargo test --features=s3 extension_cases::s3
+
+# For Delta Lake + S3 tests, also sync the delta lake data
+awslocal s3 sync data/deltalake/simple_table s3://test/deltalake/simple_table
+cargo test --features="deltalake s3" extension_cases::deltalake::test_deltalake_s3
 ```
 
 ### Benchmarking
