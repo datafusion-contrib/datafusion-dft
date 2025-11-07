@@ -26,7 +26,7 @@ use datafusion::{
     },
     prelude::SessionContext,
 };
-use log::info;
+use log::{debug, info};
 use std::path::Path;
 #[cfg(feature = "vortex")]
 use vortex_datafusion::VortexFormat;
@@ -50,7 +50,7 @@ fn detect_format(extension: &str) -> Result<(Arc<dyn FileFormat>, &'static str)>
 
 pub async fn register_db(ctx: &SessionContext, db_config: &DbConfig) -> Result<()> {
     info!("registering tables to database");
-    let tables_url = db_config.path.join("tables")?;
+    let tables_url = db_config.path.join("tables/")?;
     let listing_tables_url = ListingTableUrl::parse(tables_url.clone())?;
     let store_url = listing_tables_url.object_store();
     let store = ctx.runtime_env().object_store(store_url)?;
@@ -104,7 +104,9 @@ pub async fn register_db(ctx: &SessionContext, db_config: &DbConfig) -> Result<(
                     .join(&format!("{catalog_name}/"))?
                     .join(&format!("{schema_name}/"))?
                     .join(&format!("{table_name}/"))?;
+
                 let table_url = ListingTableUrl::parse(p)?;
+                debug!("...table url: {table_url:?}");
 
                 // List files in the table directory to detect the format
                 let files = store.list_with_delimiter(Some(&table_path)).await?;
