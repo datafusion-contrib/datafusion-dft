@@ -195,10 +195,7 @@ jobs:
           echo "Delta Lake data uploaded to LocalStack"
       - name: Run Deltalake tests
         run: |
-          cargo test --features=deltalake extension_cases::deltalake::test_deltalake
-      - name: Run Deltalake S3 tests
-        run: |
-          cargo test --features="deltalake s3" extension_cases::deltalake::test_deltalake_s3
+          cargo test --features="deltalake s3" extension_cases::deltalake
   test-udfs-wasm:
     name: Extension / UDFs-WASM
     runs-on: ubuntu-latest
