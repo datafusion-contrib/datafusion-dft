@@ -2003,6 +2003,7 @@ dependencies = [
  "url",
  "uuid",
  "vortex",
+ "vortex-datafusion",
  "vortex-file",
 ]
 
