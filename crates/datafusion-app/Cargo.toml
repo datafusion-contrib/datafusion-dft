@@ -18,7 +18,10 @@ datafusion-functions-parquet = { optional = true, path = "../datafusion-function
 datafusion-udfs-wasm = { features = [
   "serde",
 ], optional = true, path = "../datafusion-udfs-wasm", version = "0.1.0" }
-deltalake = { features = ["datafusion", "s3"], optional = true, version = "0.29" }
+deltalake = { features = [
+  "datafusion",
+  "s3",
+], optional = true, version = "0.29" }
 directories = "5.0.1"
 futures = "0.3.30"
 indexmap = { features = ["serde"], version = "2.8.0" }
