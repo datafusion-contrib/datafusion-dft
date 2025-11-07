@@ -38,6 +38,13 @@ impl Extension for DeltaLakeExtension {
         _config: ExecutionConfig,
         builder: &mut DftSessionStateBuilder,
     ) -> datafusion::common::Result<()> {
+        // Register S3 handlers if s3 feature is enabled
+        // This is required for Delta Lake to recognize s3:// URLs
+        #[cfg(feature = "s3")]
+        {
+            deltalake::aws::register_handlers(None);
+        }
+
         builder.add_table_factory("DELTATABLE", Arc::new(DeltaTableFactory {}));
         Ok(())
     }
