@@ -196,6 +196,12 @@ jobs:
       - name: Run Deltalake tests
         run: |
           cargo test --features="deltalake s3" extension_cases::deltalake
+        env:
+          AWS_ACCESS_KEY_ID: LSIAQAAAAAAVNCBMPNSG
+          AWS_SECRET_ACCESS_KEY: 5555555555555555555555555555555555555555
+          AWS_ENDPOINT_URL: http://localhost:4566
+          AWS_REGION: us-east-1
+          AWS_ALLOW_HTTP: true
   test-udfs-wasm:
     name: Extension / UDFs-WASM
     runs-on: ubuntu-latest
