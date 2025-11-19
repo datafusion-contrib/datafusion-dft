@@ -179,24 +179,29 @@ jobs:
       matrix:
         arch: [amd64]
     steps:
-      - uses: actions/checkout@v2
-        with:
-          submodules: true
-      - name: Cache Cargo
-        uses: actions/cache@v4
-        with:
-          path: /home/runner/.cargo
-          key: cargo-dft-cache-
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-target-${{ hashFiles('Cargo.lock') }}
+      - uses: actions/checkout@v3
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
+      - name: Start LocalStack
+        uses: LocalStack/setup-localstack@v0.2.3
+        with:
+          image-tag: 'latest'
+          install-awslocal: 'true'
+          configuration: DEBUG=1
+      - name: Upload Delta Lake data to LocalStack
+        run: |
+          awslocal s3 mb s3://test
+          awslocal s3 sync data/deltalake/simple_table s3://test/deltalake/simple_table
+          echo "Delta Lake data uploaded to LocalStack"
       - name: Run Deltalake tests
         run: |
-          cargo test --features=deltalake extension_cases::deltalake
+          cargo test --features="deltalake s3" extension_cases::deltalake
+        env:
+          AWS_ACCESS_KEY_ID: LSIAQAAAAAAVNCBMPNSG
+          AWS_SECRET_ACCESS_KEY: 5555555555555555555555555555555555555555
+          AWS_ENDPOINT_URL: http://localhost:4566
+          AWS_REGION: us-east-1
+          AWS_ALLOW_HTTP: true
   test-udfs-wasm:
     name: Extension / UDFs-WASM
     runs-on: ubuntu-latest
