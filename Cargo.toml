@@ -16,12 +16,12 @@ version = "0.2.2"
 [dependencies]
 arrow-flight = { features = [
   "flight-sql-experimental",
-], optional = true, version = "56" }
+], optional = true, version = "57" }
 axum = { features = ["macros"], optional = true, version = "0.7.9" }
 clap = { features = ["derive"], version = "4.5.27" }
 color-eyre = "0.6.3"
 crossterm = { features = ["event-stream"], version = "0.28.1" }
-datafusion = { version = "50" }
+datafusion = { version = "51" }
 datafusion-app = { path = "crates/datafusion-app", version = "0.1.0" }
 directories = "5.0.1"
 env_logger = "0.11.5"
@@ -35,9 +35,9 @@ log = "0.4.22"
 metrics = { optional = true, version = "0.24.0" }
 metrics-exporter-prometheus = { optional = true, version = "0.16.0" }
 object_store = "0.12"
-parquet = "56"
+parquet = "57"
 pin-project-lite = { version = "0.2.14" }
-prost = "0.13.1"
+prost = "0.14.1"
 ratatui = "0.28.0"
 serde = { features = ["derive"], version = "1.0.197" }
 strum = "0.26.2"
@@ -50,24 +50,24 @@ tokio = { features = [
 tokio-stream = { features = ["net"], version = "0.1.15" }
 tokio-util = "0.7.10"
 toml = "0.8.12"
-tonic = { optional = true, version = "0.13" }
+tonic = { optional = true, version = "0.14" }
 tower = { version = "0.5.0" }
 tower-http = { features = [
   "auth",
   "timeout",
   "trace",
 ], optional = true, version = "0.6.2" }
-tpchgen = "2.0"
-tpchgen-arrow = "2.0"
+tpchgen = "2.0.2"
+tpchgen-arrow = "2.0.2"
 tracing = { features = ["log"], version = "0.1.41" }
 tracing-subscriber = { features = ["env-filter"], version = "0.3.19" }
 tui-logger = { features = ["tracing-support"], version = "0.12" }
 tui-textarea = { features = ["search"], version = "0.6.1" }
 url = { features = ["serde"], version = "2.5.2" }
 uuid = { optional = true, version = "1.10.0" }
-vortex = { optional = true, version = "0.54" }
-vortex-datafusion = { optional = true, version = "0.54" }
-vortex-file = { optional = true, version = "0.54" }
+vortex = { optional = true, version = "0.58" }
+vortex-datafusion = { optional = true, version = "0.58" }
+vortex-file = { optional = true, version = "0.58" }
 
 [dev-dependencies]
 assert_cmd = "2.0.16"

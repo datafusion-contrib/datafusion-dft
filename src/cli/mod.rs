@@ -37,6 +37,8 @@ use std::error::Error;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+#[cfg(feature = "vortex")]
+use vortex::session::VortexSession;
 #[cfg(feature = "flightsql")]
 use {
     crate::args::{Command, FlightSqlCommand},
@@ -49,7 +51,8 @@ use {
 };
 #[cfg(feature = "vortex")]
 use {
-    vortex::{arrow::FromArrowArray, stream::ArrayStreamAdapter, ArrayRef},
+    vortex::array::{arrow::FromArrowArray, stream::ArrayStreamAdapter, ArrayRef},
+    vortex::VortexSessionDefault,
     vortex_file::VortexWriteOptions,
 };
 
@@ -614,16 +617,19 @@ impl CliApp {
 struct VortexFileWriter {
     path: PathBuf,
     batches: Vec<RecordBatch>,
+    session: VortexSession,
 }
 
 #[cfg(feature = "vortex")]
 impl VortexFileWriter {
     fn new(file: File, _schema: SchemaRef, path: &Path) -> Result<Self> {
         // We need to drop the std::fs::File and use tokio::fs::File later
+
         drop(file);
         Ok(Self {
             path: path.to_path_buf(),
             batches: Vec::new(),
+            session: VortexSession::default(),
         })
     }
 
@@ -656,7 +662,7 @@ impl VortexFileWriter {
         );
 
         // Write using async API
-        VortexWriteOptions::default()
+        VortexWriteOptions::new(self.session)
             .write(file, stream)
             .await
             .map_err(|e| eyre!("Failed to write Vortex file: {}", e))?;

@@ -40,7 +40,7 @@ use url::Url;
 #[cfg(feature = "vortex")]
 use {
     datafusion::arrow::compute::concat_batches,
-    vortex::{arrow::FromArrowArray, stream::ArrayStreamAdapter, ArrayRef},
+    vortex::array::{arrow::FromArrowArray, stream::ArrayStreamAdapter, ArrayRef},
     vortex_file::VortexWriteOptions,
 };
 
@@ -142,6 +142,8 @@ async fn write_batches_to_vortex<I>(
 where
     I: Iterator<Item = RecordBatch>,
 {
+    use vortex::{session::VortexSession, VortexSessionDefault};
+
     let batches_vec: Vec<RecordBatch> = batches.collect();
 
     if batches_vec.is_empty() {
@@ -170,7 +172,7 @@ where
     // Write to a buffer
     let mut buf: Vec<u8> = Vec::new();
     info!("...writing {table_type} batches to vortex format");
-    VortexWriteOptions::default()
+    VortexWriteOptions::new(VortexSession::default())
         .write(&mut buf, stream)
         .await
         .map_err(|e| eyre::Error::msg(format!("Failed to write Vortex file: {}", e)))?;
