@@ -34,6 +34,11 @@ runs:
         rustup default stable
         rustup component add clippy
         rustup component add rustfmt
+    - name: Cache Cargo tools
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/bin
+        key: cargo-tools-${{ runner.os }}-taplo-just-machete-v1
     - name: Install Cargo tools
       shell: bash
       run: |
