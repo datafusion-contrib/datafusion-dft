@@ -19,7 +19,8 @@
       "Bash(cargo run:*)",
       "Bash(RUST_LOG=debug cargo run:*)",
       "Bash(cat:*)",
-      "Bash(cargo clippy:*)"
+      "Bash(cargo clippy:*)",
+      "Bash(test:*)"
     ],
     "deny": [],
     "ask": []
