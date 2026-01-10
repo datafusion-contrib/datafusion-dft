@@ -17,7 +17,9 @@
       "Bash(cargo doc:*)",
       "Bash(RUST_BACKTRACE=1 cargo test:*)",
       "Bash(cargo run:*)",
-      "Bash(RUST_LOG=debug cargo run:*)"
+      "Bash(RUST_LOG=debug cargo run:*)",
+      "Bash(cat:*)",
+      "Bash(cargo clippy:*)"
     ],
     "deny": [],
     "ask": []

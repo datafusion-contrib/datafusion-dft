@@ -75,7 +75,10 @@ pub fn create_router(execution: AppExecution, config: HttpServerConfig) -> Route
             TraceLayer::new_for_http(),
             // Graceful shutdown will wait for outstanding requests to complete. Add a timeout so
             // requests don't hang forever.
-            TimeoutLayer::new(Duration::from_secs(state.config.timeout_seconds)),
+            TimeoutLayer::with_status_code(
+                http::StatusCode::REQUEST_TIMEOUT,
+                Duration::from_secs(state.config.timeout_seconds),
+            ),
         ))
         .with_state(state)
 }
