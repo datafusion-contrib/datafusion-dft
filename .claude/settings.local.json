@@ -19,7 +19,10 @@
       "Bash(cargo run:*)",
       "Bash(RUST_LOG=debug cargo run:*)",
       "Bash(cat:*)",
-      "Bash(cargo clippy:*)"
+      "Bash(cargo clippy:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(ls:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

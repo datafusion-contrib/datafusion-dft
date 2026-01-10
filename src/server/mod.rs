@@ -40,7 +40,73 @@ fn describe_metrics() {
         "do_get_fallback_latency_ms",
         metrics::Unit::Milliseconds,
         "Do get fallback latency ms"
-    )
+    );
+
+    // Tokio runtime metrics descriptions
+    #[cfg(any(feature = "http", feature = "flightsql"))]
+    {
+        // IO Runtime metrics
+        describe_counter!(
+            "io_runtime_workers_count",
+            "Number of worker threads in IO runtime"
+        );
+        describe_counter!(
+            "io_runtime_total_park_count",
+            "Total park count for IO runtime"
+        );
+        describe_counter!(
+            "io_runtime_total_noop_count",
+            "Total noop count for IO runtime"
+        );
+        describe_counter!(
+            "io_runtime_total_steal_count",
+            "Total steal count for IO runtime"
+        );
+        describe_counter!(
+            "io_runtime_num_remote_schedules",
+            "Number of remote schedules for IO runtime"
+        );
+        describe_histogram!(
+            "io_runtime_mean_poll_duration_us",
+            metrics::Unit::Microseconds,
+            "Mean poll duration for IO runtime"
+        );
+        describe_histogram!(
+            "io_runtime_budget_forced_yield_count",
+            "Budget forced yield count for IO runtime"
+        );
+
+        // CPU Runtime metrics
+        describe_counter!(
+            "cpu_runtime_workers_count",
+            "Number of worker threads in CPU runtime"
+        );
+        describe_counter!(
+            "cpu_runtime_total_park_count",
+            "Total park count for CPU runtime"
+        );
+        describe_counter!(
+            "cpu_runtime_total_noop_count",
+            "Total noop count for CPU runtime"
+        );
+        describe_counter!(
+            "cpu_runtime_total_steal_count",
+            "Total steal count for CPU runtime"
+        );
+        describe_counter!(
+            "cpu_runtime_num_remote_schedules",
+            "Number of remote schedules for CPU runtime"
+        );
+        describe_histogram!(
+            "cpu_runtime_mean_poll_duration_us",
+            metrics::Unit::Microseconds,
+            "Mean poll duration for CPU runtime"
+        );
+        describe_histogram!(
+            "cpu_runtime_budget_forced_yield_count",
+            "Budget forced yield count for CPU runtime"
+        );
+    }
 }
 
 pub fn try_start_metrics_server(metrics_addr: SocketAddr) -> Result<()> {

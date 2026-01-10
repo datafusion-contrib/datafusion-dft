@@ -323,6 +323,10 @@ fn default_catalog_name() -> String {
 pub struct ObservabilityConfig {
     #[serde(default = "default_observability_schema_name")]
     pub schema_name: String,
+    #[serde(default = "default_tokio_metrics_enabled")]
+    pub tokio_metrics_enabled: bool,
+    #[serde(default = "default_tokio_metrics_interval_secs")]
+    pub tokio_metrics_interval_secs: u64,
 }
 
 #[cfg(feature = "observability")]
@@ -330,6 +334,8 @@ impl Default for ObservabilityConfig {
     fn default() -> Self {
         Self {
             schema_name: default_observability_schema_name(),
+            tokio_metrics_enabled: default_tokio_metrics_enabled(),
+            tokio_metrics_interval_secs: default_tokio_metrics_interval_secs(),
         }
     }
 }
@@ -342,4 +348,14 @@ fn default_observability() -> ObservabilityConfig {
 #[cfg(feature = "observability")]
 fn default_observability_schema_name() -> String {
     "observability".to_string()
+}
+
+#[cfg(feature = "observability")]
+fn default_tokio_metrics_enabled() -> bool {
+    true
+}
+
+#[cfg(feature = "observability")]
+fn default_tokio_metrics_interval_secs() -> u64 {
+    10
 }

@@ -33,6 +33,12 @@ use tokio_stream::StreamExt;
 
 use crate::config::ObservabilityConfig;
 
+#[cfg(feature = "observability")]
+pub mod tokio_metrics;
+
+#[cfg(feature = "observability")]
+pub use tokio_metrics::TokioMetricsCollector;
+
 const REQUESTS_TABLE_NAME: &str = "requests";
 
 #[derive(Clone, Debug)]
