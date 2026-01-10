@@ -6,7 +6,20 @@
       "WebFetch(domain:docs.rs)",
       "Bash(cargo tree:*)",
       "Bash(cargo check:*)",
-      "Bash(cargo update:*)"
+      "Bash(cargo update:*)",
+      "Bash(cargo install:*)",
+      "Bash(cargo metadata:*)",
+      "Bash(cargo clean:*)",
+      "WebSearch",
+      "Bash(cargo search:*)",
+      "Bash(cargo info:*)",
+      "Bash(cargo build:*)",
+      "Bash(cargo doc:*)",
+      "Bash(RUST_BACKTRACE=1 cargo test:*)",
+      "Bash(cargo run:*)",
+      "Bash(RUST_LOG=debug cargo run:*)",
+      "Bash(cat:*)",
+      "Bash(cargo clippy:*)"
     ],
     "deny": [],
     "ask": []

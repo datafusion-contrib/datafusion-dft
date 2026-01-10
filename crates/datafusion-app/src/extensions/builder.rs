@@ -132,7 +132,7 @@ impl DftSessionStateBuilder {
 
     /// Add a file format factory to the list of file format factories on this builder
     pub fn add_file_format_factory(&mut self, factory: Arc<dyn FileFormatFactory>) {
-        let _ = self.file_format_factories.push(factory);
+        self.file_format_factories.push(factory);
     }
 
     /// Add a catalog provider to the list of providers on this builder

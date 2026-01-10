@@ -40,8 +40,9 @@ use url::Url;
 #[cfg(feature = "vortex")]
 use {
     datafusion::arrow::compute::concat_batches,
-    vortex::{arrow::FromArrowArray, stream::ArrayStreamAdapter, ArrayRef},
+    vortex::array::{arrow::FromArrowArray, ArrayRef},
     vortex_file::VortexWriteOptions,
+    vortex_session::VortexSession,
 };
 
 enum GeneratorType {
@@ -159,18 +160,15 @@ where
 
     // Convert to Vortex array
     let vortex_array = ArrayRef::from_arrow(concatenated, false);
-    let dtype = vortex_array.dtype().clone();
 
-    // Create a stream adapter
-    let stream = ArrayStreamAdapter::new(
-        dtype,
-        futures::stream::iter(std::iter::once(Ok(vortex_array))),
-    );
+    // Convert to array stream
+    let stream = vortex_array.to_array_stream();
 
     // Write to a buffer
     let mut buf: Vec<u8> = Vec::new();
     info!("...writing {table_type} batches to vortex format");
-    VortexWriteOptions::default()
+    let session = VortexSession::empty();
+    VortexWriteOptions::new(session)
         .write(&mut buf, stream)
         .await
         .map_err(|e| eyre::Error::msg(format!("Failed to write Vortex file: {}", e)))?;

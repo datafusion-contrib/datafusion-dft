@@ -63,7 +63,7 @@ pub fn merge_configs(shared: ExecutionConfig, priority: ExecutionConfig) -> Exec
     // }
 
     #[cfg(feature = "udfs-wasm")]
-    if merged.wasm_udf != priority.wasm_udf {
+    if !priority.wasm_udf.module_functions.is_empty() {
         merged.wasm_udf = priority.wasm_udf
     }
 

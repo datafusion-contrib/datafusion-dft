@@ -114,7 +114,7 @@ impl ObservabilityContext {
                     while (stream.next().await).is_some() {}
                 }
                 Err(e) => {
-                    error!("Error recording request: {}", e.to_string())
+                    error!("Error recording request: {}", e)
                 }
             }
         } else {

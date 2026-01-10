@@ -132,7 +132,7 @@ impl ExecutionContext {
                             info!("Registered observability schema")
                         }
                         Err(e) => {
-                            error!("Error registering observability schema: {}", e.to_string())
+                            error!("Error registering observability schema: {}", e)
                         }
                     }
                 } else {

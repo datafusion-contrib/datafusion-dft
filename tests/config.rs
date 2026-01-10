@@ -127,7 +127,7 @@ impl TestConfigBuilder {
         return_type: &str,
     ) -> &mut Self {
         // Begin the wasm UDF section.
-        self.config_text.push_str("[execution.wasm_udf]\n");
+        self.config_text.push_str("[shared.wasm_udf]\n");
 
         // Start the inline table for module_functions.
         self.config_text.push_str("module_functions = { ");

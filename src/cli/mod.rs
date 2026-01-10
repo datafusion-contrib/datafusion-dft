@@ -49,8 +49,9 @@ use {
 };
 #[cfg(feature = "vortex")]
 use {
-    vortex::{arrow::FromArrowArray, stream::ArrayStreamAdapter, ArrayRef},
+    vortex::array::{arrow::FromArrowArray, ArrayRef},
     vortex_file::VortexWriteOptions,
+    vortex_session::VortexSession,
 };
 
 const LOCAL_BENCHMARK_HEADER_ROW: &str =
@@ -647,16 +648,13 @@ impl VortexFileWriter {
 
         // Convert to Vortex array
         let vortex_array = ArrayRef::from_arrow(concatenated, false);
-        let dtype = vortex_array.dtype().clone();
 
-        // Create a stream adapter (same as the example)
-        let stream = ArrayStreamAdapter::new(
-            dtype,
-            futures::stream::iter(std::iter::once(Ok(vortex_array))),
-        );
+        // Convert to array stream
+        let stream = vortex_array.to_array_stream();
 
         // Write using async API
-        VortexWriteOptions::default()
+        let session = VortexSession::empty();
+        VortexWriteOptions::new(session)
             .write(file, stream)
             .await
             .map_err(|e| eyre!("Failed to write Vortex file: {}", e))?;
