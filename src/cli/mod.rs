@@ -155,6 +155,51 @@ impl CliApp {
                 self.print_any_stream(flight_batch_stream).await;
                 Ok(())
             }
+            FlightSqlCommand::GetTableTypes => {
+                let flight_info = self
+                    .app_execution
+                    .flightsql_ctx()
+                    .get_table_types_flight_info()
+                    .await?;
+                let streams = self
+                    .app_execution
+                    .flightsql_ctx()
+                    .do_get(flight_info)
+                    .await?;
+                let flight_batch_stream = stream::select_all(streams);
+                self.print_any_stream(flight_batch_stream).await;
+                Ok(())
+            }
+            FlightSqlCommand::GetSqlInfo { info } => {
+                let flight_info = self
+                    .app_execution
+                    .flightsql_ctx()
+                    .get_sql_info_flight_info(info)
+                    .await?;
+                let streams = self
+                    .app_execution
+                    .flightsql_ctx()
+                    .do_get(flight_info)
+                    .await?;
+                let flight_batch_stream = stream::select_all(streams);
+                self.print_any_stream(flight_batch_stream).await;
+                Ok(())
+            }
+            FlightSqlCommand::GetXdbcTypeInfo { data_type } => {
+                let flight_info = self
+                    .app_execution
+                    .flightsql_ctx()
+                    .get_xdbc_type_info_flight_info(data_type)
+                    .await?;
+                let streams = self
+                    .app_execution
+                    .flightsql_ctx()
+                    .do_get(flight_info)
+                    .await?;
+                let flight_batch_stream = stream::select_all(streams);
+                self.print_any_stream(flight_batch_stream).await;
+                Ok(())
+            }
         }
     }
 
