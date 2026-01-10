@@ -2144,6 +2144,7 @@ dependencies = [
  "indexmap",
  "itertools 0.13.0",
  "log",
+ "metrics",
  "num_cpus",
  "object_store",
  "object_store_opendal",
@@ -2151,6 +2152,7 @@ dependencies = [
  "parking_lot",
  "serde",
  "tokio",
+ "tokio-metrics",
  "tokio-stream",
  "tonic",
  "url",
@@ -2414,6 +2416,7 @@ dependencies = [
  "strum 0.26.3",
  "tempfile",
  "tokio",
+ "tokio-metrics",
  "tokio-stream",
  "tokio-util",
  "toml",
@@ -5514,7 +5517,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9120690fafc389a67ba3803df527d0ec9cbbc9cc45e4cc20b332996dfb672425"
 dependencies = [
  "anyhow",
- "itertools 0.12.1",
+ "itertools 0.14.0",
  "proc-macro2",
  "quote",
  "syn 2.0.114",
@@ -6922,6 +6925,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.114",
+]
+
+[[package]]
+name = "tokio-metrics"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a34e87dd30650518a4e041bca77c931f3f5a19621eecdcd794f5c1813bca9e98"
+dependencies = [
+ "futures-util",
+ "metrics",
+ "pin-project-lite",
+ "tokio",
+ "tokio-stream",
 ]
 
 [[package]]
@@ -8733,7 +8749,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

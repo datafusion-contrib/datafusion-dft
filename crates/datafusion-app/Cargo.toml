@@ -27,6 +27,7 @@ futures = "0.3.30"
 indexmap = { features = ["serde"], version = "2.8.0" }
 itertools = "0.13.0"
 log = "0.4.22"
+metrics = { optional = true, version = "0.24.0" }
 num_cpus = "1.16.0"
 object_store = { features = ["aws"], optional = true, version = "0.12" }
 object_store_opendal = { optional = true, version = "0.54" }
@@ -36,6 +37,7 @@ opendal = { features = [
 parking_lot = "0.12.3"
 serde = { features = ["derive"], version = "1.0.197" }
 tokio = { features = ["macros", "rt-multi-thread"], version = "1.36.0" }
+tokio-metrics = { features = ["metrics-rs-integration"], optional = true, version = "0.4" }
 tokio-stream = { features = ["net"], version = "0.1.15" }
 tonic = { optional = true, version = "0.14" }
 url = { optional = true, version = "2.5.2" }
@@ -51,7 +53,7 @@ flightsql = ["dep:arrow-flight", "dep:base64", "dep:tonic"]
 functions-json = ["dep:datafusion-functions-json"]
 functions-parquet = ["dep:datafusion-functions-parquet"]
 huggingface = ["object_store_opendal", "opendal", "url"]
-observability = []
+observability = ["dep:metrics", "dep:tokio-metrics"]
 s3 = ["object_store/aws", "url"]
 udfs-wasm = ["dep:datafusion-udfs-wasm"]
 vortex = ["dep:vortex-datafusion"]

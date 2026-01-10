@@ -47,6 +47,7 @@ tokio = { features = [
   "rt-multi-thread",
   "signal",
 ], version = "1.36.0" }
+tokio-metrics = { features = ["metrics-rs-integration"], optional = true, version = "0.4" }
 tokio-stream = { features = ["net"], version = "0.1.15" }
 tokio-util = "0.7.10"
 toml = "0.8.12"
@@ -95,6 +96,7 @@ flightsql = [
   "dep:jiff",
   "dep:metrics",
   "dep:metrics-exporter-prometheus",
+  "dep:tokio-metrics",
   "dep:tonic",
   "dep:tower-http",
   "dep:uuid",
@@ -107,6 +109,7 @@ http = [
   "dep:jiff",
   "dep:metrics",
   "dep:metrics-exporter-prometheus",
+  "dep:tokio-metrics",
   "dep:tower-http",
   "dep:uuid",
 ]
