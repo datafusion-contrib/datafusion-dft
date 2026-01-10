@@ -19,7 +19,9 @@
       "Bash(cargo run:*)",
       "Bash(RUST_LOG=debug cargo run:*)",
       "Bash(cat:*)",
-      "Bash(cargo clippy:*)"
+      "Bash(cargo clippy:*)",
+      "Bash(find:*)",
+      "WebFetch(domain:arrow.apache.org)"
     ],
     "deny": [],
     "ask": []

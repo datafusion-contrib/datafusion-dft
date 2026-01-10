@@ -21,11 +21,13 @@ use arrow_flight::error::FlightError;
 use arrow_flight::flight_service_server::{FlightService, FlightServiceServer};
 use arrow_flight::sql::server::FlightSqlService;
 use arrow_flight::sql::{
-    Any, CommandGetCatalogs, CommandGetDbSchemas, CommandGetTables, CommandStatementQuery, SqlInfo,
+    Any, CommandGetCatalogs, CommandGetDbSchemas, CommandGetSqlInfo, CommandGetTableTypes,
+    CommandGetTables, CommandGetXdbcTypeInfo, CommandStatementQuery, SqlInfo,
     TicketStatementQuery,
 };
 use arrow_flight::{FlightDescriptor, FlightEndpoint, FlightInfo, Ticket};
 use color_eyre::Result;
+use datafusion::arrow::datatypes::Schema;
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::prelude::{col, lit};
 use datafusion::sql::parser::DFParser;
@@ -42,18 +44,30 @@ use std::sync::{Arc, Mutex};
 use tonic::{Code, Request, Response, Status};
 use uuid::Uuid;
 
+/// Prepared statement handle containing the logical plan and metadata
+#[derive(Clone)]
+pub struct PreparedStatementHandle {
+    pub plan: LogicalPlan,
+    pub parameter_schema: Option<Arc<Schema>>,
+    pub dataset_schema: Arc<Schema>,
+    pub created_at: Timestamp,
+}
+
 #[derive(Clone)]
 pub struct FlightSqlServiceImpl {
     requests: Arc<Mutex<HashMap<Uuid, LogicalPlan>>>,
+    prepared_statements: Arc<Mutex<HashMap<Uuid, PreparedStatementHandle>>>,
     execution: ExecutionContext,
 }
 
 impl FlightSqlServiceImpl {
     pub fn new(execution: AppExecution) -> Self {
         let requests = HashMap::new();
+        let prepared_statements = HashMap::new();
         Self {
             execution: execution.execution_ctx().clone(),
             requests: Arc::new(Mutex::new(requests)),
+            prepared_statements: Arc::new(Mutex::new(prepared_statements)),
         }
     }
 
@@ -348,6 +362,117 @@ impl FlightSqlService for FlightSqlServiceImpl {
             res.as_ref().err(),
             "/get_flight_info_tables".to_string(),
             "get_flight_info_tables_latency_ms",
+        )
+        .await;
+        res
+    }
+
+    async fn get_flight_info_table_types(
+        &self,
+            _query: CommandGetTableTypes,
+        request: Request<FlightDescriptor>,
+    ) -> Result<Response<FlightInfo>, Status> {
+        counter!("requests", "endpoint" => "get_flight_info_table_types").increment(1);
+        let start = Timestamp::now();
+        let request_id = uuid::Uuid::new_v4();
+        let query =
+            "SELECT DISTINCT table_type FROM information_schema.tables ORDER BY table_type"
+                .to_string();
+        let res = self.create_flight_info(query, request_id, request).await;
+
+        // TODO: Move recording to after response is sent to not impact response latency
+        self.record_request(
+            start,
+            Some(request_id.to_string()),
+            res.as_ref().err(),
+            "/get_flight_info_table_types".to_string(),
+            "get_flight_info_table_types_latency_ms",
+        )
+        .await;
+        res
+    }
+
+    async fn get_flight_info_sql_info(
+        &self,
+        _query: CommandGetSqlInfo,
+        request: Request<FlightDescriptor>,
+    ) -> Result<Response<FlightInfo>, Status> {
+        counter!("requests", "endpoint" => "get_flight_info_sql_info").increment(1);
+        let start = Timestamp::now();
+        let request_id = uuid::Uuid::new_v4();
+
+        // For now, return basic server info via a simple SQL query
+        // TODO: Implement full SqlInfo support with DenseUnion schema
+        let query = format!(
+            "SELECT '{}' as server_name, '{}' as server_version, '57.0' as arrow_version, false as read_only",
+            "datafusion-dft",
+            env!("CARGO_PKG_VERSION")
+        );
+
+        let res = self.create_flight_info(query, request_id, request).await;
+
+        // TODO: Move recording to after response is sent to not impact response latency
+        self.record_request(
+            start,
+            Some(request_id.to_string()),
+            res.as_ref().err(),
+            "/get_flight_info_sql_info".to_string(),
+            "get_flight_info_sql_info_latency_ms",
+        )
+        .await;
+        res
+    }
+
+    async fn get_flight_info_xdbc_type_info(
+        &self,
+        query: CommandGetXdbcTypeInfo,
+        request: Request<FlightDescriptor>,
+    ) -> Result<Response<FlightInfo>, Status> {
+        counter!("requests", "endpoint" => "get_flight_info_xdbc_type_info").increment(1);
+        let start = Timestamp::now();
+        let request_id = uuid::Uuid::new_v4();
+
+        // Build query to return XDBC type info for DataFusion-supported types
+        // If data_type filter is provided, we would filter to that type
+        // For now, return all supported types
+        let type_filter = if let Some(data_type) = query.data_type {
+            format!(" WHERE type_num = {}", data_type)
+        } else {
+            String::new()
+        };
+
+        // Return basic type information for common Arrow/DataFusion types
+        // This is a simplified version - a full implementation would include all XDBC type metadata
+        let query = format!(
+            "SELECT * FROM (VALUES \
+                (-5, 'BIGINT', 19, NULL, NULL, NULL, 1, 0, 3, 0, 0, 0, 'BIGINT', -5, 0, 10, 0), \
+                (4, 'INTEGER', 10, NULL, NULL, NULL, 1, 0, 3, 0, 0, 0, 'INTEGER', 4, 0, 10, 0), \
+                (5, 'SMALLINT', 5, NULL, NULL, NULL, 1, 0, 3, 0, 0, 0, 'SMALLINT', 5, 0, 10, 0), \
+                (-6, 'TINYINT', 3, NULL, NULL, NULL, 1, 0, 3, 0, 0, 0, 'TINYINT', -6, 0, 10, 0), \
+                (8, 'DOUBLE', 15, NULL, NULL, NULL, 1, 0, 3, 0, 0, 0, 'DOUBLE PRECISION', 8, 0, 2, 0), \
+                (7, 'REAL', 7, NULL, NULL, NULL, 1, 0, 3, 0, 0, 0, 'REAL', 7, 0, 2, 0), \
+                (12, 'VARCHAR', 2147483647, '''', '''', 'length', 1, 1, 3, 0, 0, 0, 'VARCHAR', 12, 0, 0, 0), \
+                (91, 'DATE', 10, '''', '''', NULL, 1, 0, 3, 0, 0, 0, 'DATE', 91, 0, 0, 0), \
+                (93, 'TIMESTAMP', 23, '''', '''', NULL, 1, 0, 3, 0, 0, 0, 'TIMESTAMP', 93, 3, 0, 0), \
+                (-7, 'BOOLEAN', 1, NULL, NULL, NULL, 1, 0, 3, 0, 0, 0, 'BOOLEAN', -7, 0, 0, 0), \
+                (-2, 'BINARY', 2147483647, '''', '''', 'length', 1, 0, 3, 0, 0, 0, 'BINARY', -2, 0, 0, 0), \
+                (2, 'DECIMAL', 38, NULL, NULL, 'precision,scale', 1, 0, 3, 0, 0, 0, 'DECIMAL', 2, 0, 10, 0) \
+            ) AS types(\
+                type_name_num, type_name_str, column_size, literal_prefix, literal_suffix, create_params, \
+                nullable, case_sensitive, searchable, unsigned_attribute, fixed_prec_scale, auto_increment, \
+                local_type_name, data_type, minimum_scale, maximum_scale, sql_datetime_sub\
+            ){type_filter}"
+        );
+
+        let res = self.create_flight_info(query, request_id, request).await;
+
+        // TODO: Move recording to after response is sent to not impact response latency
+        self.record_request(
+            start,
+            Some(request_id.to_string()),
+            res.as_ref().err(),
+            "/get_flight_info_xdbc_type_info".to_string(),
+            "get_flight_info_xdbc_type_info_latency_ms",
         )
         .await;
         res
