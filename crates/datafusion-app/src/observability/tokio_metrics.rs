@@ -38,14 +38,20 @@ impl TokioMetricsCollector {
 
                     // Always available metrics
                     gauge!(format!("{}_workers_count", prefix)).set(metrics.workers_count as f64);
-                    counter!(format!("{}_total_park_count", prefix)).absolute(metrics.total_park_count);
+                    counter!(format!("{}_total_park_count", prefix))
+                        .absolute(metrics.total_park_count);
                     gauge!(format!("{}_max_park_count", prefix)).set(metrics.max_park_count as f64);
                     gauge!(format!("{}_min_park_count", prefix)).set(metrics.min_park_count as f64);
-                    gauge!(format!("{}_total_busy_duration_us", prefix)).set(metrics.total_busy_duration.as_micros() as f64);
-                    gauge!(format!("{}_max_busy_duration_us", prefix)).set(metrics.max_busy_duration.as_micros() as f64);
-                    gauge!(format!("{}_min_busy_duration_us", prefix)).set(metrics.min_busy_duration.as_micros() as f64);
-                    gauge!(format!("{}_global_queue_depth", prefix)).set(metrics.global_queue_depth as f64);
-                    gauge!(format!("{}_elapsed_seconds", prefix)).set(metrics.elapsed.as_secs_f64());
+                    gauge!(format!("{}_total_busy_duration_us", prefix))
+                        .set(metrics.total_busy_duration.as_micros() as f64);
+                    gauge!(format!("{}_max_busy_duration_us", prefix))
+                        .set(metrics.max_busy_duration.as_micros() as f64);
+                    gauge!(format!("{}_min_busy_duration_us", prefix))
+                        .set(metrics.min_busy_duration.as_micros() as f64);
+                    gauge!(format!("{}_global_queue_depth", prefix))
+                        .set(metrics.global_queue_depth as f64);
+                    gauge!(format!("{}_elapsed_seconds", prefix))
+                        .set(metrics.elapsed.as_secs_f64());
                 }
             }
         });

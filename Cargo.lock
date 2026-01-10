@@ -2416,7 +2416,6 @@ dependencies = [
  "strum 0.26.3",
  "tempfile",
  "tokio",
- "tokio-metrics",
  "tokio-stream",
  "tokio-util",
  "toml",
