@@ -37,7 +37,9 @@ opendal = { features = [
 parking_lot = "0.12.3"
 serde = { features = ["derive"], version = "1.0.197" }
 tokio = { features = ["macros", "rt-multi-thread"], version = "1.36.0" }
-tokio-metrics = { features = ["metrics-rs-integration"], optional = true, version = "0.4" }
+tokio-metrics = { features = [
+  "metrics-rs-integration",
+], optional = true, version = "0.4" }
 tokio-stream = { features = ["net"], version = "0.1.15" }
 tonic = { optional = true, version = "0.14" }
 url = { optional = true, version = "2.5.2" }
