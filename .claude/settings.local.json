@@ -21,6 +21,9 @@
       "Bash(cat:*)",
       "Bash(cargo clippy:*)",
       "Bash(test:*)"
+      "WebFetch(domain:github.com)",
+      "Bash(ls:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

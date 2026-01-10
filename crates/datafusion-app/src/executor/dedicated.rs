@@ -202,11 +202,26 @@ impl DedicatedExecutor {
 
         let handle = rx_handle.recv().expect("driver started");
 
+        // Start tokio metrics collection for the dedicated executor runtime
+        #[cfg(feature = "observability")]
+        let metrics_collector = {
+            use crate::observability::TokioMetricsCollector;
+            use std::time::Duration;
+
+            Some(TokioMetricsCollector::start(
+                handle.clone(),
+                "cpu_runtime".to_string(),
+                Duration::from_secs(10),
+            ))
+        };
+
         let state = State {
             handle: Some(handle),
             start_shutdown: notify_shutdown,
             completed_shutdown: rx_shutdown.map_err(Arc::new).boxed().shared(),
             thread: Some(thread),
+            #[cfg(feature = "observability")]
+            _metrics_collector: metrics_collector,
         };
 
         Self {
@@ -352,6 +367,10 @@ struct State {
 
     /// The inner thread that can be used to join during drop.
     thread: Option<std::thread::JoinHandle<()>>,
+
+    /// Tokio metrics collector for the dedicated executor runtime.
+    #[cfg(feature = "observability")]
+    _metrics_collector: Option<crate::observability::TokioMetricsCollector>,
 }
 
 // IMPORTANT: Implement `Drop` for `State`, NOT for `DedicatedExecutor`, because the executor can be cloned and clones

@@ -61,6 +61,31 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
         env_logger::init();
     }
     let cfg = create_config(cli.config_path());
+
+    // Start tokio metrics collection for IO runtime when running servers
+    #[cfg(any(feature = "flightsql", feature = "http"))]
+    let _io_metrics_collector = {
+        use datafusion_app::observability::TokioMetricsCollector;
+        use std::time::Duration;
+
+        let is_server = match &cli.command {
+            #[cfg(feature = "http")]
+            Some(Command::ServeHttp { .. }) => true,
+            #[cfg(feature = "flightsql")]
+            Some(Command::ServeFlightSql { .. }) => true,
+            _ => false,
+        };
+
+        if is_server {
+            Some(TokioMetricsCollector::start_current(
+                "io_runtime".to_string(),
+                Duration::from_secs(10),
+            ))
+        } else {
+            None
+        }
+    };
+
     if let Some(Command::GenerateTpch {
         scale_factor,
         format,
