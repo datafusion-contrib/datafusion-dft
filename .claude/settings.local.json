@@ -14,7 +14,10 @@
       "Bash(cargo search:*)",
       "Bash(cargo info:*)",
       "Bash(cargo build:*)",
-      "Bash(cargo doc:*)"
+      "Bash(cargo doc:*)",
+      "Bash(RUST_BACKTRACE=1 cargo test:*)",
+      "Bash(cargo run:*)",
+      "Bash(RUST_LOG=debug cargo run:*)"
     ],
     "deny": [],
     "ask": []
