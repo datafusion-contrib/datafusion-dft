@@ -4,7 +4,7 @@ name = "datafusion-udfs-wasm"
 version = "0.1.0"
 
 [dependencies]
-datafusion = { default-features = false, version = "50" }
+datafusion = { default-features = false, version = "51" }
 log = "0.4.25"
 serde = { optional = true, version = "1.0.217" }
 wasi-common = "29.0.1"

@@ -29,7 +29,7 @@ use datafusion::{
 use log::{debug, info};
 use std::path::Path;
 #[cfg(feature = "vortex")]
-use vortex_datafusion::VortexFormat;
+use {vortex_datafusion::VortexFormat, vortex_session::VortexSession};
 
 use crate::config::DbConfig;
 
@@ -40,7 +40,7 @@ fn detect_format(extension: &str) -> Result<(Arc<dyn FileFormat>, &'static str)>
         "csv" => Ok((Arc::new(CsvFormat::default()), ".csv")),
         "json" => Ok((Arc::new(JsonFormat::default()), ".json")),
         #[cfg(feature = "vortex")]
-        "vortex" => Ok((Arc::new(VortexFormat::default()), ".vortex")),
+        "vortex" => Ok((Arc::new(VortexFormat::new(VortexSession::empty())), ".vortex")),
         _ => Err(Report::msg(format!(
             "Unsupported file extension: {}",
             extension

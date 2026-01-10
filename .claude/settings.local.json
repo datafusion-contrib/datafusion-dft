@@ -6,7 +6,15 @@
       "WebFetch(domain:docs.rs)",
       "Bash(cargo tree:*)",
       "Bash(cargo check:*)",
-      "Bash(cargo update:*)"
+      "Bash(cargo update:*)",
+      "Bash(cargo install:*)",
+      "Bash(cargo metadata:*)",
+      "Bash(cargo clean:*)",
+      "WebSearch",
+      "Bash(cargo search:*)",
+      "Bash(cargo info:*)",
+      "Bash(cargo build:*)",
+      "Bash(cargo doc:*)"
     ],
     "deny": [],
     "ask": []
