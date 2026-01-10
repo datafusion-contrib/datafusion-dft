@@ -40,10 +40,7 @@ use url::Url;
 #[cfg(feature = "vortex")]
 use {
     datafusion::arrow::compute::concat_batches,
-    vortex::{
-        array::{arrow::FromArrowArray, stream::ArrayStream, ArrayRef},
-        error::VortexError,
-    },
+    vortex::array::{arrow::FromArrowArray, ArrayRef},
     vortex_file::VortexWriteOptions,
     vortex_session::VortexSession,
 };

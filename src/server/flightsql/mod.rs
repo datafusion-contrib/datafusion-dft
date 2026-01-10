@@ -40,6 +40,7 @@ use super::try_start_metrics_server;
 
 const DEFAULT_TIMEOUT_SECONDS: u64 = 60;
 
+#[allow(deprecated)]
 pub fn create_server_handle(
     config: &AppConfig,
     flightsql: FlightSqlServiceImpl,
