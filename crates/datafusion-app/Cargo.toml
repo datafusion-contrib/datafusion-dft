@@ -21,7 +21,7 @@ datafusion-udfs-wasm = { features = [
 deltalake = { features = [
   "datafusion",
   "s3",
-], optional = true, version = "0.29" }
+], optional = true, version = "0.30" }
 directories = "5.0.1"
 futures = "0.3.30"
 indexmap = { features = ["serde"], version = "2.8.0" }
