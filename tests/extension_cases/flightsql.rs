@@ -1056,6 +1056,130 @@ async fn test_get_tables_table_type() {
 }
 
 #[tokio::test]
+async fn test_get_table_types() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("flightsql")
+            .arg("get-table-types")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r#"
++------------+
+| table_type |
++------------+
+| BASE TABLE |
+| VIEW       |
++------------+
+"#;
+
+    assert.stdout(contains_str(expected));
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_get_sql_info() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("flightsql")
+            .arg("get-sql-info")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    // Check that we get basic server info back
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(
+        output.contains("datafusion-dft"),
+        "Should contain server name"
+    );
+    assert!(
+        output.contains("server_name"),
+        "Should contain server_name column"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_get_xdbc_type_info() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("flightsql")
+            .arg("get-xdbc-type-info")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    // Check that we get type information back
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(
+        output.contains("BIGINT") || output.contains("INTEGER"),
+        "Should contain integer types"
+    );
+    assert!(output.contains("VARCHAR"), "Should contain VARCHAR type");
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_get_xdbc_type_info_filtered() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("flightsql")
+            .arg("get-xdbc-type-info")
+            .arg("--data-type")
+            .arg("12") // VARCHAR type code
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    // Check that we get filtered results
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(output.contains("VARCHAR"), "Should contain VARCHAR type");
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
 pub async fn test_client_headers() {
     let ctx = ExecutionContext::test();
     let exec = AppExecution::new(ctx);
@@ -1092,5 +1216,143 @@ pub async fn test_client_headers() {
 +---------------------+
     "##;
     assert.stdout(contains_str(expected));
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_create_and_close_prepared_statement() {
+    use arrow_flight::sql::client::FlightSqlServiceClient;
+    use tonic::transport::Channel;
+
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    // Create FlightSQL client
+    let channel = Channel::from_static("http://127.0.0.1:50051")
+        .connect()
+        .await
+        .expect("Failed to connect to test server");
+    let mut client = FlightSqlServiceClient::new(channel);
+
+    // Create a prepared statement
+    let sql = "SELECT 1 + 2 as result";
+    let prepared_stmt = client
+        .prepare(sql.to_string(), None)
+        .await
+        .expect("Failed to create prepared statement");
+
+    // Verify we got a schema
+    let schema = prepared_stmt
+        .dataset_schema()
+        .expect("Failed to get schema");
+    assert_eq!(schema.fields().len(), 1);
+    assert_eq!(schema.field(0).name(), "result");
+
+    // Close the prepared statement
+    prepared_stmt
+        .close()
+        .await
+        .expect("Failed to close prepared statement");
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_prepared_statement_execute() {
+    use arrow_flight::sql::client::FlightSqlServiceClient;
+    use tonic::transport::Channel;
+
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    // Create FlightSQL client
+    let channel = Channel::from_static("http://127.0.0.1:50051")
+        .connect()
+        .await
+        .expect("Failed to connect to test server");
+    let mut client = FlightSqlServiceClient::new(channel);
+
+    // Create a prepared statement
+    let sql = "SELECT 42 as answer";
+    let mut prepared_stmt = client
+        .prepare(sql.to_string(), None)
+        .await
+        .expect("Failed to create prepared statement");
+
+    // Verify schema
+    let schema = prepared_stmt
+        .dataset_schema()
+        .expect("Failed to get schema");
+    assert_eq!(schema.fields().len(), 1);
+    assert_eq!(schema.field(0).name(), "answer");
+
+    // Execute the prepared statement
+    let flight_info = prepared_stmt
+        .execute()
+        .await
+        .expect("Failed to execute prepared statement");
+
+    // Verify FlightInfo has endpoints
+    assert!(!flight_info.endpoint.is_empty());
+
+    // Close the prepared statement
+    prepared_stmt
+        .close()
+        .await
+        .expect("Failed to close prepared statement");
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_prepared_statement_complex_query() {
+    use arrow_flight::sql::client::FlightSqlServiceClient;
+    use tonic::transport::Channel;
+
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    // Create FlightSQL client
+    let channel = Channel::from_static("http://127.0.0.1:50051")
+        .connect()
+        .await
+        .expect("Failed to connect to test server");
+    let mut client = FlightSqlServiceClient::new(channel);
+
+    // Create a prepared statement with a more complex query
+    let sql = "SELECT x, x * 2 as doubled FROM (VALUES (1), (2), (3)) as t(x)";
+    let mut prepared_stmt = client
+        .prepare(sql.to_string(), None)
+        .await
+        .expect("Failed to create prepared statement");
+
+    // Verify schema
+    let schema = prepared_stmt
+        .dataset_schema()
+        .expect("Failed to get schema");
+    assert_eq!(schema.fields().len(), 2);
+    assert_eq!(schema.field(0).name(), "x");
+    assert_eq!(schema.field(1).name(), "doubled");
+
+    // Execute to verify it works
+    let flight_info = prepared_stmt
+        .execute()
+        .await
+        .expect("Failed to execute prepared statement");
+
+    assert!(!flight_info.endpoint.is_empty());
+
+    // Close the prepared statement
+    prepared_stmt
+        .close()
+        .await
+        .expect("Failed to close prepared statement");
+
     fixture.shutdown_and_wait().await;
 }
