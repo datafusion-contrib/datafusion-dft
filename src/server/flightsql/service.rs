@@ -26,12 +26,13 @@ use arrow_flight::sql::{
     CommandGetSqlInfo, CommandGetTableTypes, CommandGetTables, CommandGetXdbcTypeInfo,
     CommandPreparedStatementQuery, CommandStatementQuery, SqlInfo, TicketStatementQuery,
 };
-use arrow_flight::{Action, FlightDescriptor, FlightEndpoint, FlightInfo, IpcMessage, SchemaAsIpc, Ticket};
-use datafusion::arrow::ipc::writer::IpcWriteOptions;
-use datafusion::arrow::error::ArrowError;
-use prost::bytes::Bytes;
+use arrow_flight::{
+    Action, FlightDescriptor, FlightEndpoint, FlightInfo, IpcMessage, SchemaAsIpc, Ticket,
+};
 use color_eyre::Result;
 use datafusion::arrow::datatypes::Schema;
+use datafusion::arrow::error::ArrowError;
+use datafusion::arrow::ipc::writer::IpcWriteOptions;
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::prelude::{col, lit};
 use datafusion::sql::parser::DFParser;
@@ -41,6 +42,7 @@ use futures::{StreamExt, TryStreamExt};
 use jiff::Timestamp;
 use log::{debug, error, info};
 use metrics::{counter, histogram};
+use prost::bytes::Bytes;
 use prost::Message;
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -373,15 +375,14 @@ impl FlightSqlService for FlightSqlServiceImpl {
 
     async fn get_flight_info_table_types(
         &self,
-            _query: CommandGetTableTypes,
+        _query: CommandGetTableTypes,
         request: Request<FlightDescriptor>,
     ) -> Result<Response<FlightInfo>, Status> {
         counter!("requests", "endpoint" => "get_flight_info_table_types").increment(1);
         let start = Timestamp::now();
         let request_id = uuid::Uuid::new_v4();
-        let query =
-            "SELECT DISTINCT table_type FROM information_schema.tables ORDER BY table_type"
-                .to_string();
+        let query = "SELECT DISTINCT table_type FROM information_schema.tables ORDER BY table_type"
+            .to_string();
         let res = self.create_flight_info(query, request_id, request).await;
 
         // TODO: Move recording to after response is sent to not impact response latency
@@ -600,7 +601,9 @@ impl FlightSqlService for FlightSqlServiceImpl {
         };
 
         {
-            let mut guard = self.prepared_statements.lock()
+            let mut guard = self
+                .prepared_statements
+                .lock()
                 .map_err(|_| Status::internal("Failed to acquire lock on prepared statements"))?;
             guard.insert(request_id, handle);
 
@@ -612,7 +615,9 @@ impl FlightSqlService for FlightSqlServiceImpl {
         let options = IpcWriteOptions::default();
         let IpcMessage(dataset_schema_bytes) = SchemaAsIpc::new(&dataset_schema, &options)
             .try_into()
-            .map_err(|e: ArrowError| Status::internal(format!("Failed to serialize schema: {}", e)))?;
+            .map_err(|e: ArrowError| {
+                Status::internal(format!("Failed to serialize schema: {}", e))
+            })?;
 
         // Build response
         let result = ActionCreatePreparedStatementResult {
@@ -623,7 +628,8 @@ impl FlightSqlService for FlightSqlServiceImpl {
 
         // Record metrics
         let duration = Timestamp::now() - start;
-        histogram!("do_action_create_prepared_statement_latency_ms").record(duration.get_milliseconds() as f64);
+        histogram!("do_action_create_prepared_statement_latency_ms")
+            .record(duration.get_milliseconds() as f64);
 
         #[cfg(feature = "observability")]
         {
@@ -637,7 +643,12 @@ impl FlightSqlService for FlightSqlServiceImpl {
                 rows: None,
                 status: 0,
             };
-            if let Err(e) = self.execution.observability().try_record_request(ctx, req).await {
+            if let Err(e) = self
+                .execution
+                .observability()
+                .try_record_request(ctx, req)
+                .await
+            {
                 error!("Error recording request: {}", e);
             }
         }
@@ -654,18 +665,24 @@ impl FlightSqlService for FlightSqlServiceImpl {
         let start = Timestamp::now();
 
         let handle_bytes = query.prepared_statement_handle.to_vec();
-        let request_id = Uuid::from_slice(&handle_bytes)
-            .map_err(|e| Status::invalid_argument(format!("Invalid prepared statement handle: {}", e)))?;
+        let request_id = Uuid::from_slice(&handle_bytes).map_err(|e| {
+            Status::invalid_argument(format!("Invalid prepared statement handle: {}", e))
+        })?;
 
         debug!("Closing prepared statement: {}", request_id);
 
         // Remove from storage
         {
-            let mut guard = self.prepared_statements.lock()
+            let mut guard = self
+                .prepared_statements
+                .lock()
                 .map_err(|_| Status::internal("Failed to acquire lock on prepared statements"))?;
 
             if guard.remove(&request_id).is_none() {
-                return Err(Status::not_found(format!("Prepared statement not found: {}", request_id)));
+                return Err(Status::not_found(format!(
+                    "Prepared statement not found: {}",
+                    request_id
+                )));
             }
 
             // Update active prepared statements gauge
@@ -674,7 +691,8 @@ impl FlightSqlService for FlightSqlServiceImpl {
 
         // Record metrics
         let duration = Timestamp::now() - start;
-        histogram!("do_action_close_prepared_statement_latency_ms").record(duration.get_milliseconds() as f64);
+        histogram!("do_action_close_prepared_statement_latency_ms")
+            .record(duration.get_milliseconds() as f64);
 
         #[cfg(feature = "observability")]
         {
@@ -688,7 +706,12 @@ impl FlightSqlService for FlightSqlServiceImpl {
                 rows: None,
                 status: 0,
             };
-            if let Err(e) = self.execution.observability().try_record_request(ctx, req).await {
+            if let Err(e) = self
+                .execution
+                .observability()
+                .try_record_request(ctx, req)
+                .await
+            {
                 error!("Error recording request: {}", e);
             }
         }
@@ -710,16 +733,21 @@ impl FlightSqlService for FlightSqlServiceImpl {
             Status::invalid_argument(format!("Invalid prepared statement handle: {}", e))
         })?;
 
-        debug!("Getting flight info for prepared statement: {}", handle_uuid);
+        debug!(
+            "Getting flight info for prepared statement: {}",
+            handle_uuid
+        );
 
         // Look up the prepared statement
         let prepared_stmt = {
-            let guard = self.prepared_statements.lock()
+            let guard = self
+                .prepared_statements
+                .lock()
                 .map_err(|_| Status::internal("Failed to acquire lock on prepared statements"))?;
 
-            guard.get(&handle_uuid)
-                .cloned()
-                .ok_or_else(|| Status::not_found(format!("Prepared statement not found: {}", handle_uuid)))?
+            guard.get(&handle_uuid).cloned().ok_or_else(|| {
+                Status::not_found(format!("Prepared statement not found: {}", handle_uuid))
+            })?
         };
 
         // Create a new request ID for this execution
@@ -745,9 +773,18 @@ impl FlightSqlService for FlightSqlServiceImpl {
                 start_ms: start.as_millisecond(),
                 duration_ms: duration.get_milliseconds(),
                 rows: None,
-                status: if res.is_ok() { 0 } else { tonic::Code::Internal as u16 },
+                status: if res.is_ok() {
+                    0
+                } else {
+                    tonic::Code::Internal as u16
+                },
             };
-            if let Err(e) = self.execution.observability().try_record_request(ctx, req).await {
+            if let Err(e) = self
+                .execution
+                .observability()
+                .try_record_request(ctx, req)
+                .await
+            {
                 error!("Error recording request: {}", e);
             }
         }
@@ -772,9 +809,12 @@ impl FlightSqlService for FlightSqlServiceImpl {
         // The request_id in the ticket should correspond to a logical plan in the requests HashMap
         // that was created by get_flight_info_prepared_statement
         let res = self
-            .do_get_statement_handler(request_id.clone(), TicketStatementQuery {
-                statement_handle: query.prepared_statement_handle,
-            })
+            .do_get_statement_handler(
+                request_id.clone(),
+                TicketStatementQuery {
+                    statement_handle: query.prepared_statement_handle,
+                },
+            )
             .await;
 
         // Record observability
@@ -792,9 +832,18 @@ impl FlightSqlService for FlightSqlServiceImpl {
                 start_ms: start.as_millisecond(),
                 duration_ms: duration.get_milliseconds(),
                 rows: None,
-                status: if res.is_ok() { 0 } else { tonic::Code::Internal as u16 },
+                status: if res.is_ok() {
+                    0
+                } else {
+                    tonic::Code::Internal as u16
+                },
             };
-            if let Err(e) = self.execution.observability().try_record_request(ctx, req).await {
+            if let Err(e) = self
+                .execution
+                .observability()
+                .try_record_request(ctx, req)
+                .await
+            {
                 error!("Error recording request: {}", e);
             }
         }

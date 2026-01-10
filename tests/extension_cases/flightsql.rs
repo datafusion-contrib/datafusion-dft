@@ -1109,8 +1109,14 @@ async fn test_get_sql_info() {
 
     // Check that we get basic server info back
     let output = String::from_utf8_lossy(&assert.get_output().stdout);
-    assert!(output.contains("datafusion-dft"), "Should contain server name");
-    assert!(output.contains("server_name"), "Should contain server_name column");
+    assert!(
+        output.contains("datafusion-dft"),
+        "Should contain server name"
+    );
+    assert!(
+        output.contains("server_name"),
+        "Should contain server_name column"
+    );
 
     fixture.shutdown_and_wait().await;
 }
@@ -1136,7 +1142,10 @@ async fn test_get_xdbc_type_info() {
 
     // Check that we get type information back
     let output = String::from_utf8_lossy(&assert.get_output().stdout);
-    assert!(output.contains("BIGINT") || output.contains("INTEGER"), "Should contain integer types");
+    assert!(
+        output.contains("BIGINT") || output.contains("INTEGER"),
+        "Should contain integer types"
+    );
     assert!(output.contains("VARCHAR"), "Should contain VARCHAR type");
 
     fixture.shutdown_and_wait().await;
@@ -1235,7 +1244,9 @@ pub async fn test_create_and_close_prepared_statement() {
         .expect("Failed to create prepared statement");
 
     // Verify we got a schema
-    let schema = prepared_stmt.dataset_schema().expect("Failed to get schema");
+    let schema = prepared_stmt
+        .dataset_schema()
+        .expect("Failed to get schema");
     assert_eq!(schema.fields().len(), 1);
     assert_eq!(schema.field(0).name(), "result");
 
@@ -1247,7 +1258,6 @@ pub async fn test_create_and_close_prepared_statement() {
 
     fixture.shutdown_and_wait().await;
 }
-
 
 #[tokio::test]
 pub async fn test_prepared_statement_execute() {
@@ -1274,7 +1284,9 @@ pub async fn test_prepared_statement_execute() {
         .expect("Failed to create prepared statement");
 
     // Verify schema
-    let schema = prepared_stmt.dataset_schema().expect("Failed to get schema");
+    let schema = prepared_stmt
+        .dataset_schema()
+        .expect("Failed to get schema");
     assert_eq!(schema.fields().len(), 1);
     assert_eq!(schema.field(0).name(), "answer");
 
@@ -1321,7 +1333,9 @@ pub async fn test_prepared_statement_complex_query() {
         .expect("Failed to create prepared statement");
 
     // Verify schema
-    let schema = prepared_stmt.dataset_schema().expect("Failed to get schema");
+    let schema = prepared_stmt
+        .dataset_schema()
+        .expect("Failed to get schema");
     assert_eq!(schema.fields().len(), 2);
     assert_eq!(schema.field(0).name(), "x");
     assert_eq!(schema.field(1).name(), "doubled");
