@@ -631,26 +631,23 @@ impl FlightSqlService for FlightSqlServiceImpl {
         histogram!("do_action_create_prepared_statement_latency_ms")
             .record(duration.get_milliseconds() as f64);
 
-        #[cfg(feature = "observability")]
+        let ctx = self.execution.session_ctx();
+        let req = ObservabilityRequestDetails {
+            request_id: Some(request_id.to_string()),
+            path: "/do_action/create_prepared_statement".to_string(),
+            sql: Some(query.query),
+            start_ms: start.as_millisecond(),
+            duration_ms: duration.get_milliseconds(),
+            rows: None,
+            status: 0,
+        };
+        if let Err(e) = self
+            .execution
+            .observability()
+            .try_record_request(ctx, req)
+            .await
         {
-            let ctx = self.execution.session_ctx();
-            let req = ObservabilityRequestDetails {
-                request_id: Some(request_id.to_string()),
-                path: "/do_action/create_prepared_statement".to_string(),
-                sql: Some(query.query),
-                start_ms: start.as_millisecond(),
-                duration_ms: duration.get_milliseconds(),
-                rows: None,
-                status: 0,
-            };
-            if let Err(e) = self
-                .execution
-                .observability()
-                .try_record_request(ctx, req)
-                .await
-            {
-                error!("Error recording request: {}", e);
-            }
+            error!("Error recording request: {}", e);
         }
 
         Ok(result)
@@ -694,26 +691,23 @@ impl FlightSqlService for FlightSqlServiceImpl {
         histogram!("do_action_close_prepared_statement_latency_ms")
             .record(duration.get_milliseconds() as f64);
 
-        #[cfg(feature = "observability")]
+        let ctx = self.execution.session_ctx();
+        let req = ObservabilityRequestDetails {
+            request_id: Some(request_id.to_string()),
+            path: "/do_action/close_prepared_statement".to_string(),
+            sql: None,
+            start_ms: start.as_millisecond(),
+            duration_ms: duration.get_milliseconds(),
+            rows: None,
+            status: 0,
+        };
+        if let Err(e) = self
+            .execution
+            .observability()
+            .try_record_request(ctx, req)
+            .await
         {
-            let ctx = self.execution.session_ctx();
-            let req = ObservabilityRequestDetails {
-                request_id: Some(request_id.to_string()),
-                path: "/do_action/close_prepared_statement".to_string(),
-                sql: None,
-                start_ms: start.as_millisecond(),
-                duration_ms: duration.get_milliseconds(),
-                rows: None,
-                status: 0,
-            };
-            if let Err(e) = self
-                .execution
-                .observability()
-                .try_record_request(ctx, req)
-                .await
-            {
-                error!("Error recording request: {}", e);
-            }
+            error!("Error recording request: {}", e);
         }
 
         Ok(())
@@ -763,30 +757,27 @@ impl FlightSqlService for FlightSqlServiceImpl {
         histogram!("get_flight_info_prepared_statement_latency_ms")
             .record(duration.get_milliseconds() as f64);
 
-        #[cfg(feature = "observability")]
+        let ctx = self.execution.session_ctx();
+        let req = ObservabilityRequestDetails {
+            request_id: Some(request_id.to_string()),
+            path: "/get_flight_info_prepared_statement".to_string(),
+            sql: None, // Don't log SQL for prepared statements
+            start_ms: start.as_millisecond(),
+            duration_ms: duration.get_milliseconds(),
+            rows: None,
+            status: if res.is_ok() {
+                0
+            } else {
+                tonic::Code::Internal as u16
+            },
+        };
+        if let Err(e) = self
+            .execution
+            .observability()
+            .try_record_request(ctx, req)
+            .await
         {
-            let ctx = self.execution.session_ctx();
-            let req = ObservabilityRequestDetails {
-                request_id: Some(request_id.to_string()),
-                path: "/get_flight_info_prepared_statement".to_string(),
-                sql: None, // Don't log SQL for prepared statements
-                start_ms: start.as_millisecond(),
-                duration_ms: duration.get_milliseconds(),
-                rows: None,
-                status: if res.is_ok() {
-                    0
-                } else {
-                    tonic::Code::Internal as u16
-                },
-            };
-            if let Err(e) = self
-                .execution
-                .observability()
-                .try_record_request(ctx, req)
-                .await
-            {
-                error!("Error recording request: {}", e);
-            }
+            error!("Error recording request: {}", e);
         }
 
         res
@@ -822,30 +813,27 @@ impl FlightSqlService for FlightSqlServiceImpl {
         histogram!("do_get_prepared_statement_latency_ms")
             .record(duration.get_milliseconds() as f64);
 
-        #[cfg(feature = "observability")]
+        let ctx = self.execution.session_ctx();
+        let req = ObservabilityRequestDetails {
+            request_id: Some(request_id),
+            path: "/do_get_prepared_statement".to_string(),
+            sql: None,
+            start_ms: start.as_millisecond(),
+            duration_ms: duration.get_milliseconds(),
+            rows: None,
+            status: if res.is_ok() {
+                0
+            } else {
+                tonic::Code::Internal as u16
+            },
+        };
+        if let Err(e) = self
+            .execution
+            .observability()
+            .try_record_request(ctx, req)
+            .await
         {
-            let ctx = self.execution.session_ctx();
-            let req = ObservabilityRequestDetails {
-                request_id: Some(request_id),
-                path: "/do_get_prepared_statement".to_string(),
-                sql: None,
-                start_ms: start.as_millisecond(),
-                duration_ms: duration.get_milliseconds(),
-                rows: None,
-                status: if res.is_ok() {
-                    0
-                } else {
-                    tonic::Code::Internal as u16
-                },
-            };
-            if let Err(e) = self
-                .execution
-                .observability()
-                .try_record_request(ctx, req)
-                .await
-            {
-                error!("Error recording request: {}", e);
-            }
+            error!("Error recording request: {}", e);
         }
 
         res

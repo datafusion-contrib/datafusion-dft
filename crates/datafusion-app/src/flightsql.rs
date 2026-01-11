@@ -20,8 +20,8 @@ use std::sync::Arc;
 use arrow_flight::{
     decode::FlightRecordBatchStream,
     sql::{
-        client::FlightSqlServiceClient, CommandGetDbSchemas, CommandGetSqlInfo,
-        CommandGetTableTypes, CommandGetTables, CommandGetXdbcTypeInfo,
+        client::FlightSqlServiceClient, CommandGetDbSchemas, CommandGetTables,
+        CommandGetXdbcTypeInfo,
     },
     FlightInfo,
 };
