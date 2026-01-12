@@ -21,11 +21,18 @@ use arrow_flight::error::FlightError;
 use arrow_flight::flight_service_server::{FlightService, FlightServiceServer};
 use arrow_flight::sql::server::FlightSqlService;
 use arrow_flight::sql::{
-    Any, CommandGetCatalogs, CommandGetDbSchemas, CommandGetTables, CommandStatementQuery, SqlInfo,
-    TicketStatementQuery,
+    ActionClosePreparedStatementRequest, ActionCreatePreparedStatementRequest,
+    ActionCreatePreparedStatementResult, Any, CommandGetCatalogs, CommandGetDbSchemas,
+    CommandGetSqlInfo, CommandGetTableTypes, CommandGetTables, CommandGetXdbcTypeInfo,
+    CommandPreparedStatementQuery, CommandStatementQuery, SqlInfo, TicketStatementQuery,
 };
-use arrow_flight::{FlightDescriptor, FlightEndpoint, FlightInfo, Ticket};
+use arrow_flight::{
+    Action, FlightDescriptor, FlightEndpoint, FlightInfo, IpcMessage, SchemaAsIpc, Ticket,
+};
 use color_eyre::Result;
+use datafusion::arrow::datatypes::Schema;
+use datafusion::arrow::error::ArrowError;
+use datafusion::arrow::ipc::writer::IpcWriteOptions;
 use datafusion::logical_expr::LogicalPlan;
 use datafusion::prelude::{col, lit};
 use datafusion::sql::parser::DFParser;
@@ -35,6 +42,7 @@ use futures::{StreamExt, TryStreamExt};
 use jiff::Timestamp;
 use log::{debug, error, info};
 use metrics::{counter, histogram};
+use prost::bytes::Bytes;
 use prost::Message;
 use std::collections::HashMap;
 use std::str::FromStr;
@@ -42,18 +50,30 @@ use std::sync::{Arc, Mutex};
 use tonic::{Code, Request, Response, Status};
 use uuid::Uuid;
 
+/// Prepared statement handle containing the logical plan and metadata
+#[derive(Clone)]
+pub struct PreparedStatementHandle {
+    pub plan: LogicalPlan,
+    pub parameter_schema: Option<Arc<Schema>>,
+    pub dataset_schema: Arc<Schema>,
+    pub created_at: Timestamp,
+}
+
 #[derive(Clone)]
 pub struct FlightSqlServiceImpl {
     requests: Arc<Mutex<HashMap<Uuid, LogicalPlan>>>,
+    prepared_statements: Arc<Mutex<HashMap<Uuid, PreparedStatementHandle>>>,
     execution: ExecutionContext,
 }
 
 impl FlightSqlServiceImpl {
     pub fn new(execution: AppExecution) -> Self {
         let requests = HashMap::new();
+        let prepared_statements = HashMap::new();
         Self {
             execution: execution.execution_ctx().clone(),
             requests: Arc::new(Mutex::new(requests)),
+            prepared_statements: Arc::new(Mutex::new(prepared_statements)),
         }
     }
 
@@ -353,6 +373,116 @@ impl FlightSqlService for FlightSqlServiceImpl {
         res
     }
 
+    async fn get_flight_info_table_types(
+        &self,
+        _query: CommandGetTableTypes,
+        request: Request<FlightDescriptor>,
+    ) -> Result<Response<FlightInfo>, Status> {
+        counter!("requests", "endpoint" => "get_flight_info_table_types").increment(1);
+        let start = Timestamp::now();
+        let request_id = uuid::Uuid::new_v4();
+        let query = "SELECT DISTINCT table_type FROM information_schema.tables ORDER BY table_type"
+            .to_string();
+        let res = self.create_flight_info(query, request_id, request).await;
+
+        // TODO: Move recording to after response is sent to not impact response latency
+        self.record_request(
+            start,
+            Some(request_id.to_string()),
+            res.as_ref().err(),
+            "/get_flight_info_table_types".to_string(),
+            "get_flight_info_table_types_latency_ms",
+        )
+        .await;
+        res
+    }
+
+    async fn get_flight_info_sql_info(
+        &self,
+        _query: CommandGetSqlInfo,
+        request: Request<FlightDescriptor>,
+    ) -> Result<Response<FlightInfo>, Status> {
+        counter!("requests", "endpoint" => "get_flight_info_sql_info").increment(1);
+        let start = Timestamp::now();
+        let request_id = uuid::Uuid::new_v4();
+
+        // For now, return basic server info via a simple SQL query
+        // TODO: Implement full SqlInfo support with DenseUnion schema
+        let query = format!(
+            "SELECT '{}' as server_name, '{}' as server_version, '57.0' as arrow_version, false as read_only",
+            "datafusion-dft",
+            env!("CARGO_PKG_VERSION")
+        );
+
+        let res = self.create_flight_info(query, request_id, request).await;
+
+        // TODO: Move recording to after response is sent to not impact response latency
+        self.record_request(
+            start,
+            Some(request_id.to_string()),
+            res.as_ref().err(),
+            "/get_flight_info_sql_info".to_string(),
+            "get_flight_info_sql_info_latency_ms",
+        )
+        .await;
+        res
+    }
+
+    async fn get_flight_info_xdbc_type_info(
+        &self,
+        query: CommandGetXdbcTypeInfo,
+        request: Request<FlightDescriptor>,
+    ) -> Result<Response<FlightInfo>, Status> {
+        counter!("requests", "endpoint" => "get_flight_info_xdbc_type_info").increment(1);
+        let start = Timestamp::now();
+        let request_id = uuid::Uuid::new_v4();
+
+        // Build query to return XDBC type info for DataFusion-supported types
+        // If data_type filter is provided, we would filter to that type
+        // For now, return all supported types
+        let type_filter = if let Some(data_type) = query.data_type {
+            format!(" WHERE data_type = {}", data_type)
+        } else {
+            String::new()
+        };
+
+        // Return basic type information for common Arrow/DataFusion types
+        // This is a simplified version - a full implementation would include all XDBC type metadata
+        let query = format!(
+            "SELECT * FROM (VALUES \
+                (-5, 'BIGINT', 19, NULL, NULL, NULL, 1, 0, 3, 0, 0, 0, 'BIGINT', -5, 0, 10, 0), \
+                (4, 'INTEGER', 10, NULL, NULL, NULL, 1, 0, 3, 0, 0, 0, 'INTEGER', 4, 0, 10, 0), \
+                (5, 'SMALLINT', 5, NULL, NULL, NULL, 1, 0, 3, 0, 0, 0, 'SMALLINT', 5, 0, 10, 0), \
+                (-6, 'TINYINT', 3, NULL, NULL, NULL, 1, 0, 3, 0, 0, 0, 'TINYINT', -6, 0, 10, 0), \
+                (8, 'DOUBLE', 15, NULL, NULL, NULL, 1, 0, 3, 0, 0, 0, 'DOUBLE PRECISION', 8, 0, 2, 0), \
+                (7, 'REAL', 7, NULL, NULL, NULL, 1, 0, 3, 0, 0, 0, 'REAL', 7, 0, 2, 0), \
+                (12, 'VARCHAR', 2147483647, '''', '''', 'length', 1, 1, 3, 0, 0, 0, 'VARCHAR', 12, 0, 0, 0), \
+                (91, 'DATE', 10, '''', '''', NULL, 1, 0, 3, 0, 0, 0, 'DATE', 91, 0, 0, 0), \
+                (93, 'TIMESTAMP', 23, '''', '''', NULL, 1, 0, 3, 0, 0, 0, 'TIMESTAMP', 93, 3, 0, 0), \
+                (-7, 'BOOLEAN', 1, NULL, NULL, NULL, 1, 0, 3, 0, 0, 0, 'BOOLEAN', -7, 0, 0, 0), \
+                (-2, 'BINARY', 2147483647, '''', '''', 'length', 1, 0, 3, 0, 0, 0, 'BINARY', -2, 0, 0, 0), \
+                (2, 'DECIMAL', 38, NULL, NULL, 'precision,scale', 1, 0, 3, 0, 0, 0, 'DECIMAL', 2, 0, 10, 0) \
+            ) AS types(\
+                type_name_num, type_name_str, column_size, literal_prefix, literal_suffix, create_params, \
+                nullable, case_sensitive, searchable, unsigned_attribute, fixed_prec_scale, auto_increment, \
+                local_type_name, data_type, minimum_scale, maximum_scale, sql_datetime_sub\
+            ){type_filter}"
+        );
+
+        let res = self.create_flight_info(query, request_id, request).await;
+
+        // TODO: Move recording to after response is sent to not impact response latency
+        self.record_request(
+            start,
+            Some(request_id.to_string()),
+            res.as_ref().err(),
+            "/get_flight_info_xdbc_type_info".to_string(),
+            "get_flight_info_xdbc_type_info_latency_ms",
+        )
+        .await;
+        res
+    }
+
     async fn get_flight_info_statement(
         &self,
         query: CommandStatementQuery,
@@ -427,6 +557,285 @@ impl FlightSqlService for FlightSqlServiceImpl {
             "do_get_fallback_latency_ms",
         )
         .await;
+        res
+    }
+
+    async fn do_action_create_prepared_statement(
+        &self,
+        query: ActionCreatePreparedStatementRequest,
+        _request: Request<Action>,
+    ) -> Result<ActionCreatePreparedStatementResult, Status> {
+        counter!("requests", "endpoint" => "do_action_create_prepared_statement").increment(1);
+        let start = Timestamp::now();
+        let request_id = Uuid::new_v4();
+
+        debug!("Creating prepared statement for SQL: {}", query.query);
+
+        // Parse and create logical plan
+        let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
+        let statements = DFParser::parse_sql_with_dialect(&query.query, &dialect)
+            .map_err(|e| Status::internal(format!("Failed to parse SQL: {}", e)))?;
+
+        if statements.is_empty() {
+            return Err(Status::invalid_argument("No SQL statement provided"));
+        }
+
+        let statement = statements[0].clone();
+        let logical_plan = self
+            .execution
+            .statement_to_logical_plan(statement)
+            .await
+            .map_err(|e| Status::internal(format!("Failed to create logical plan: {}", e)))?;
+
+        // Extract schemas
+        let dataset_schema = logical_plan.schema().as_arrow().clone();
+        // For now, we don't support parameterized queries, so parameter_schema is None
+        let parameter_schema = None;
+
+        // Store the prepared statement
+        let handle = PreparedStatementHandle {
+            plan: logical_plan,
+            parameter_schema,
+            dataset_schema: Arc::new(dataset_schema.clone()),
+            created_at: Timestamp::now(),
+        };
+
+        {
+            let mut guard = self
+                .prepared_statements
+                .lock()
+                .map_err(|_| Status::internal("Failed to acquire lock on prepared statements"))?;
+            guard.insert(request_id, handle);
+
+            // Update active prepared statements gauge
+            metrics::gauge!("prepared_statements_active").set(guard.len() as f64);
+        }
+
+        // Serialize dataset schema to IPC format
+        let options = IpcWriteOptions::default();
+        let IpcMessage(dataset_schema_bytes) = SchemaAsIpc::new(&dataset_schema, &options)
+            .try_into()
+            .map_err(|e: ArrowError| {
+                Status::internal(format!("Failed to serialize schema: {}", e))
+            })?;
+
+        // Build response
+        let result = ActionCreatePreparedStatementResult {
+            prepared_statement_handle: Bytes::from(request_id.as_bytes().to_vec()),
+            dataset_schema: dataset_schema_bytes,
+            parameter_schema: Bytes::new(), // No parameters supported yet
+        };
+
+        // Record metrics
+        let duration = Timestamp::now() - start;
+        histogram!("do_action_create_prepared_statement_latency_ms")
+            .record(duration.get_milliseconds() as f64);
+
+        let ctx = self.execution.session_ctx();
+        let req = ObservabilityRequestDetails {
+            request_id: Some(request_id.to_string()),
+            path: "/do_action/create_prepared_statement".to_string(),
+            sql: Some(query.query),
+            start_ms: start.as_millisecond(),
+            duration_ms: duration.get_milliseconds(),
+            rows: None,
+            status: 0,
+        };
+        if let Err(e) = self
+            .execution
+            .observability()
+            .try_record_request(ctx, req)
+            .await
+        {
+            error!("Error recording request: {}", e);
+        }
+
+        Ok(result)
+    }
+
+    async fn do_action_close_prepared_statement(
+        &self,
+        query: ActionClosePreparedStatementRequest,
+        _request: Request<Action>,
+    ) -> Result<(), Status> {
+        counter!("requests", "endpoint" => "do_action_close_prepared_statement").increment(1);
+        let start = Timestamp::now();
+
+        let handle_bytes = query.prepared_statement_handle.to_vec();
+        let request_id = Uuid::from_slice(&handle_bytes).map_err(|e| {
+            Status::invalid_argument(format!("Invalid prepared statement handle: {}", e))
+        })?;
+
+        debug!("Closing prepared statement: {}", request_id);
+
+        // Remove from storage
+        {
+            let mut guard = self
+                .prepared_statements
+                .lock()
+                .map_err(|_| Status::internal("Failed to acquire lock on prepared statements"))?;
+
+            if guard.remove(&request_id).is_none() {
+                return Err(Status::not_found(format!(
+                    "Prepared statement not found: {}",
+                    request_id
+                )));
+            }
+
+            // Update active prepared statements gauge
+            metrics::gauge!("prepared_statements_active").set(guard.len() as f64);
+        }
+
+        // Record metrics
+        let duration = Timestamp::now() - start;
+        histogram!("do_action_close_prepared_statement_latency_ms")
+            .record(duration.get_milliseconds() as f64);
+
+        let ctx = self.execution.session_ctx();
+        let req = ObservabilityRequestDetails {
+            request_id: Some(request_id.to_string()),
+            path: "/do_action/close_prepared_statement".to_string(),
+            sql: None,
+            start_ms: start.as_millisecond(),
+            duration_ms: duration.get_milliseconds(),
+            rows: None,
+            status: 0,
+        };
+        if let Err(e) = self
+            .execution
+            .observability()
+            .try_record_request(ctx, req)
+            .await
+        {
+            error!("Error recording request: {}", e);
+        }
+
+        Ok(())
+    }
+
+    async fn get_flight_info_prepared_statement(
+        &self,
+        query: CommandPreparedStatementQuery,
+        request: Request<FlightDescriptor>,
+    ) -> Result<Response<FlightInfo>, Status> {
+        counter!("requests", "endpoint" => "get_flight_info_prepared_statement").increment(1);
+        let start = Timestamp::now();
+
+        // Extract the prepared statement handle
+        let handle_bytes = query.prepared_statement_handle.to_vec();
+        let handle_uuid = Uuid::from_slice(&handle_bytes).map_err(|e| {
+            Status::invalid_argument(format!("Invalid prepared statement handle: {}", e))
+        })?;
+
+        debug!(
+            "Getting flight info for prepared statement: {}",
+            handle_uuid
+        );
+
+        // Look up the prepared statement
+        let prepared_stmt = {
+            let guard = self
+                .prepared_statements
+                .lock()
+                .map_err(|_| Status::internal("Failed to acquire lock on prepared statements"))?;
+
+            guard.get(&handle_uuid).cloned().ok_or_else(|| {
+                Status::not_found(format!("Prepared statement not found: {}", handle_uuid))
+            })?
+        };
+
+        // Create a new request ID for this execution
+        let request_id = Uuid::new_v4();
+
+        // Create FlightInfo from the stored logical plan
+        let res = self
+            .create_flight_info_for_logical_plan(prepared_stmt.plan, request_id, request)
+            .await;
+
+        // Record observability
+        let duration = Timestamp::now() - start;
+        histogram!("get_flight_info_prepared_statement_latency_ms")
+            .record(duration.get_milliseconds() as f64);
+
+        let ctx = self.execution.session_ctx();
+        let req = ObservabilityRequestDetails {
+            request_id: Some(request_id.to_string()),
+            path: "/get_flight_info_prepared_statement".to_string(),
+            sql: None, // Don't log SQL for prepared statements
+            start_ms: start.as_millisecond(),
+            duration_ms: duration.get_milliseconds(),
+            rows: None,
+            status: if res.is_ok() {
+                0
+            } else {
+                tonic::Code::Internal as u16
+            },
+        };
+        if let Err(e) = self
+            .execution
+            .observability()
+            .try_record_request(ctx, req)
+            .await
+        {
+            error!("Error recording request: {}", e);
+        }
+
+        res
+    }
+
+    async fn do_get_prepared_statement(
+        &self,
+        query: CommandPreparedStatementQuery,
+        request: Request<Ticket>,
+    ) -> Result<Response<<Self as FlightService>::DoGetStream>, Status> {
+        counter!("requests", "endpoint" => "do_get_prepared_statement").increment(1);
+        let start = Timestamp::now();
+
+        // Extract the request ID from the ticket
+        let request_id =
+            try_request_id_from_request(request).map_err(|e| Status::internal(e.to_string()))?;
+
+        debug!("do_get_prepared_statement for request_id: {}", &request_id);
+
+        // The request_id in the ticket should correspond to a logical plan in the requests HashMap
+        // that was created by get_flight_info_prepared_statement
+        let res = self
+            .do_get_statement_handler(
+                request_id.clone(),
+                TicketStatementQuery {
+                    statement_handle: query.prepared_statement_handle,
+                },
+            )
+            .await;
+
+        // Record observability
+        let duration = Timestamp::now() - start;
+        histogram!("do_get_prepared_statement_latency_ms")
+            .record(duration.get_milliseconds() as f64);
+
+        let ctx = self.execution.session_ctx();
+        let req = ObservabilityRequestDetails {
+            request_id: Some(request_id),
+            path: "/do_get_prepared_statement".to_string(),
+            sql: None,
+            start_ms: start.as_millisecond(),
+            duration_ms: duration.get_milliseconds(),
+            rows: None,
+            status: if res.is_ok() {
+                0
+            } else {
+                tonic::Code::Internal as u16
+            },
+        };
+        if let Err(e) = self
+            .execution
+            .observability()
+            .try_record_request(ctx, req)
+            .await
+        {
+            error!("Error recording request: {}", e);
+        }
+
         res
     }
 

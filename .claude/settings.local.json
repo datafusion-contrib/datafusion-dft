@@ -20,7 +20,10 @@
       "Bash(RUST_LOG=debug cargo run:*)",
       "Bash(cat:*)",
       "Bash(cargo clippy:*)",
-      "Bash(test:*)"
+      "Bash(find:*)",
+      "WebFetch(domain:arrow.apache.org)",
+      "Bash(timeout 90 cargo test:*)",
+      "Bash(test:*)",
       "WebFetch(domain:github.com)",
       "Bash(ls:*)",
       "Bash(grep:*)"

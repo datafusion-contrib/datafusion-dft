@@ -19,7 +19,10 @@ use std::sync::Arc;
 
 use arrow_flight::{
     decode::FlightRecordBatchStream,
-    sql::{client::FlightSqlServiceClient, CommandGetDbSchemas, CommandGetTables},
+    sql::{
+        client::FlightSqlServiceClient, CommandGetDbSchemas, CommandGetTables,
+        CommandGetXdbcTypeInfo,
+    },
     FlightInfo,
 };
 #[cfg(feature = "flightsql")]
@@ -278,6 +281,62 @@ impl FlightSQLContext {
             };
             client
                 .get_tables(cmd)
+                .await
+                .map_err(|e| DataFusionError::ArrowError(Box::new(e), None))
+        } else {
+            Err(DataFusionError::External(
+                "No FlightSQL client configured.  Add one in `~/.config/dft/config.toml`".into(),
+            ))
+        }
+    }
+
+    pub async fn get_table_types_flight_info(&self) -> DFResult<FlightInfo> {
+        let client = Arc::clone(&self.client);
+        let mut guard = client.lock().await;
+        if let Some(client) = guard.as_mut() {
+            client
+                .get_table_types()
+                .await
+                .map_err(|e| DataFusionError::ArrowError(Box::new(e), None))
+        } else {
+            Err(DataFusionError::External(
+                "No FlightSQL client configured.  Add one in `~/.config/dft/config.toml`".into(),
+            ))
+        }
+    }
+
+    pub async fn get_sql_info_flight_info(&self, info: Option<Vec<u32>>) -> DFResult<FlightInfo> {
+        let client = Arc::clone(&self.client);
+        let mut guard = client.lock().await;
+        if let Some(client) = guard.as_mut() {
+            use arrow_flight::sql::SqlInfo;
+            // Convert u32 IDs to SqlInfo enum variants if needed
+            let sql_info_list: Vec<SqlInfo> = info
+                .unwrap_or_default()
+                .into_iter()
+                .filter_map(|id| SqlInfo::try_from(id as i32).ok())
+                .collect();
+            client
+                .get_sql_info(sql_info_list)
+                .await
+                .map_err(|e| DataFusionError::ArrowError(Box::new(e), None))
+        } else {
+            Err(DataFusionError::External(
+                "No FlightSQL client configured.  Add one in `~/.config/dft/config.toml`".into(),
+            ))
+        }
+    }
+
+    pub async fn get_xdbc_type_info_flight_info(
+        &self,
+        data_type: Option<i32>,
+    ) -> DFResult<FlightInfo> {
+        let client = Arc::clone(&self.client);
+        let mut guard = client.lock().await;
+        if let Some(client) = guard.as_mut() {
+            let cmd = CommandGetXdbcTypeInfo { data_type };
+            client
+                .get_xdbc_type_info(cmd)
                 .await
                 .map_err(|e| DataFusionError::ArrowError(Box::new(e), None))
         } else {

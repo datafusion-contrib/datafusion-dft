@@ -171,6 +171,20 @@ pub enum FlightSqlCommand {
         #[clap(long)]
         table_types: Option<Vec<String>>,
     },
+    /// Executes `CommandGetTableTypes` and `DoGet` to return supported table types
+    GetTableTypes,
+    /// Executes `CommandGetSqlInfo` and `DoGet` to return server SQL capabilities
+    GetSqlInfo {
+        /// Specific SQL info IDs to retrieve (if not provided, returns all)
+        #[clap(long)]
+        info: Option<Vec<u32>>,
+    },
+    /// Executes `CommandGetXdbcTypeInfo` and `DoGet` to return type information
+    GetXdbcTypeInfo {
+        /// Optional data type to filter by
+        #[clap(long)]
+        data_type: Option<i32>,
+    },
 }
 
 #[derive(Clone, Debug, Subcommand)]
