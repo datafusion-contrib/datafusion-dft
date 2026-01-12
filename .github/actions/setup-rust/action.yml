@@ -42,6 +42,6 @@ runs:
     - name: Install Cargo tools
       shell: bash
       run: |
-        cargo install taplo-cli --locked
-        cargo install just
-        cargo install --version 0.8.0 cargo-machete --locked
+        command -v taplo &> /dev/null || cargo install taplo-cli --locked
+        command -v just &> /dev/null || cargo install just
+        command -v cargo-machete &> /dev/null || cargo install --version 0.8.0 cargo-machete --locked
