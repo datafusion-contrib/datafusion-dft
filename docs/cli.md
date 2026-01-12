@@ -38,6 +38,17 @@ dft flightsql get-db-schemas --db-schema-filter-pattern "my%"
 # List tables in a schema
 dft flightsql get-tables --catalog mycatalog --db-schema-filter-pattern myschema
 dft flightsql get-tables --table-name-filter-pattern "table" --table-types VIEW
+
+# Get supported table types
+dft flightsql get-table-types
+
+# Get SQL capabilities and server information
+dft flightsql get-sql-info
+dft flightsql get-sql-info --info 1 --info 2  # Query specific info IDs
+
+# Get data type information (XDBC/ODBC type metadata)
+dft flightsql get-xdbc-type-info
+dft flightsql get-xdbc-type-info --data-type 4  # Filter by specific SQL data type
 ```
 
 ## Auth

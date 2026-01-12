@@ -16,10 +16,23 @@ dft serve-flightsql --run-ddl
 
 The server implements the FlightSQL protocol, providing:
 
-- SQL query execution
-- Schema fetching (TODO)
-- Prepared statements (TODO)
-- Catalog browsing (TODO)
+### Core Query Execution
+- **SQL query execution** - Execute SQL statements via `CommandStatementQuery`
+- **Prepared statements** - Create, execute, and close prepared statements for improved performance
+  - `ActionCreatePreparedStatement` - Parse and prepare SQL statements
+  - `ActionClosePreparedStatement` - Release prepared statement resources
+  - `CommandPreparedStatementQuery` - Execute prepared statements
+
+### Metadata Discovery
+- **Catalog browsing** - Discover database structure and metadata
+  - `CommandGetCatalogs` - List available catalogs
+  - `CommandGetDbSchemas` - List schemas with optional filtering
+  - `CommandGetTables` - List tables with filtering by catalog, schema, name pattern, and type
+  - `CommandGetTableTypes` - Get supported table types (TABLE, VIEW, etc.)
+
+### Server Capabilities
+- **SQL information** - Query server capabilities and version information via `CommandGetSqlInfo`
+- **Type metadata** - Get XDBC/ODBC type information via `CommandGetXdbcTypeInfo` for understanding supported data types
 
 ## Client Connections (TODO - Test this)
 
@@ -54,10 +67,19 @@ server_metrics_addr = "0.0.0.0:9000"
 ```
 
 Available metrics include:
-- Query execution time
-- Active connections
-- Errors by type
-- Memory usage
+- Query execution time (by endpoint)
+  - `get_flight_info_latency_ms` - Flight info request latency
+  - `do_get_fallback_latency_ms` - Data fetch latency
+  - `get_flight_info_table_types_latency_ms` - Table types metadata latency
+  - `get_flight_info_sql_info_latency_ms` - SQL info metadata latency
+  - `get_flight_info_xdbc_type_info_latency_ms` - Type info metadata latency
+  - `do_action_create_prepared_statement_latency_ms` - Prepared statement creation latency
+  - `do_action_close_prepared_statement_latency_ms` - Prepared statement cleanup latency
+  - `get_flight_info_prepared_statement_latency_ms` - Prepared statement flight info latency
+  - `do_get_prepared_statement_latency_ms` - Prepared statement execution latency
+- Active prepared statements (`prepared_statements_active` gauge)
+- Request counts by endpoint
+- Observability request details (when enabled) stored in `dft.observability_requests` table
 
 ## Configuration
 
