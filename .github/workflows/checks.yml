@@ -62,18 +62,23 @@ jobs:
       - uses: actions/checkout@v2
         with:
           submodules: true
-      - name: Cache Cargo
+      - name: Cache Cargo registry and git
         uses: actions/cache@v4
         with:
-          path: /home/runner/.cargo
-          key: cargo-S3-cache-
+          path: /github/home/.cargo
+          key: cargo-clippy-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-clippy-${{ runner.os }}-
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
       - name: Cache Rust dependencies
         uses: actions/cache@v4
         with:
-          path: /home/runner/target
-          key: target-S3-cache-
+          path: /github/home/target
+          key: target-clippy-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
+          restore-keys: |
+            target-clippy-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-
+            target-clippy-${{ runner.os }}-
       - name: Run clippy
         run: |
           cargo clippy --all-features --workspace -- -D warnings

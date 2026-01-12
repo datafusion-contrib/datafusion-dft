@@ -22,7 +22,11 @@
       "Bash(cargo clippy:*)",
       "Bash(find:*)",
       "WebFetch(domain:arrow.apache.org)",
-      "Bash(timeout 90 cargo test:*)"
+      "Bash(timeout 90 cargo test:*)",
+      "Bash(test:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(ls:*)",
+      "Bash(grep:*)",
     ],
     "deny": [],
     "ask": []
