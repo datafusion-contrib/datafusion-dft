@@ -83,7 +83,14 @@ async fn test_s3_credential_chain_env_vars() {
 
     let mut config_builder = TestConfigBuilder::default();
     config_builder.with_ddl_path("cli", ddl_path);
-    config_builder.with_s3_credential_chain("cli", "s3", "test", "s3://test", true);
+    config_builder.with_s3_credential_chain(
+        "cli",
+        "s3",
+        "test",
+        "s3://test",
+        Some("http://localhost:4566"),
+        true,
+    );
     let config = config_builder.build("my_config.toml");
 
     let assert = Command::cargo_bin("dft")

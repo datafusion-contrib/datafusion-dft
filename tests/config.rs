@@ -92,6 +92,7 @@ impl TestConfigBuilder {
         store: &str,
         bucket_name: &str,
         object_store_url: &str,
+        endpoint: Option<&str>,
         allow_http: bool,
     ) -> &mut Self {
         self.config_text
@@ -103,6 +104,10 @@ impl TestConfigBuilder {
         self.config_text
             .push_str(&format!("object_store_url = '{}'\n", object_store_url));
         self.config_text.push_str("use_credential_chain = true\n");
+        if let Some(endpoint) = endpoint {
+            self.config_text
+                .push_str(&format!("aws_endpoint = '{}'\n", endpoint));
+        }
         self.config_text
             .push_str(&format!("aws_allow_http = {}\n", allow_http));
         self
