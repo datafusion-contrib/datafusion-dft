@@ -26,7 +26,13 @@
       "Bash(test:*)",
       "WebFetch(domain:github.com)",
       "Bash(ls:*)",
+<<<<<<< Updated upstream
       "Bash(grep:*)"
+=======
+      "Bash(grep:*)",
+      "Bash(cargo fmt:*)",
+      "Bash(./target/release/dft:*)"
+>>>>>>> Stashed changes
     ],
     "deny": [],
     "ask": []
