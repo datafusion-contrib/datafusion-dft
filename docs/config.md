@@ -44,18 +44,58 @@ dft --config /path/to/custom/config.toml
 
 ## Execution Config
 
-The execution config is where you can define query execution properties for each app (so the below would each expect to be in a relevant app section like `shared`, `tui`, `cli`, or `flightsql_server` (The FlightSQL client doesnt actually execute so doesnt have an execution config).  You can configure the `ObjectStore`s that you want to use in your queries and path of a DDL file that you want to run on startup.  For example, if you have an S3 bucket you want to query you could define it like so:
+The execution config is where you can define query execution properties for each app (so the below would each expect to be in a relevant app section like `shared`, `tui`, `cli`, or `flightsql_server` (The FlightSQL client doesnt actually execute so doesnt have an execution config).  You can configure the `ObjectStore`s that you want to use in your queries and path of a DDL file that you want to run on startup.
+
+### S3 Object Store Configuration
+
+There are multiple ways to configure S3 credentials:
+
+#### Option 1: Static Credentials (Existing behavior)
 
 ```toml
 [[execution.object_store.s3]]
 bucket_name = "my_bucket"
 object_store_url = "s3://my_bucket"
-aws_endpoint = "https://s3.amazonaws"
+aws_endpoint = "https://s3.amazonaws.com"
 aws_access_key_id = "MY_ACCESS_KEY"
-aws_secret = "MY SECRET"
+aws_secret_access_key = "MY_SECRET"
 aws_session_token = "MY_SESSION"
 aws_allow_http = false
 ```
+
+#### Option 2: AWS Credential Chain (New)
+
+Enable automatic credential resolution from environment variables, `~/.aws/credentials`, IAM roles, or EKS service accounts:
+
+```toml
+[[execution.object_store.s3]]
+bucket_name = "my_bucket"
+object_store_url = "s3://my_bucket"
+use_credential_chain = true
+aws_allow_http = false
+```
+
+When `use_credential_chain = true`, credentials are resolved in this order:
+1. TOML static credentials (if provided, override environment)
+2. `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` environment variables
+3. `AWS_WEB_IDENTITY_TOKEN_FILE` (for EKS/IRSA)
+4. ECS container credentials
+5. EC2 instance profile (via IMDSv2)
+
+#### Option 3: Hybrid Approach
+
+Use credential chain but override specific settings like endpoint:
+
+```toml
+[[execution.object_store.s3]]
+bucket_name = "my_bucket"
+object_store_url = "s3://my_bucket"
+use_credential_chain = true
+aws_endpoint = "https://custom-s3.example.com"
+aws_allow_http = false
+```
+
+**Security Note:** Credential chain is opt-in via the `use_credential_chain` flag. When false (default), only TOML credentials are used, preventing accidental exposure of unintended AWS accounts
 
 And define a custom DDL path like so (the default is `~/.config/dft/ddl.sql`).
 

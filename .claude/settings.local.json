@@ -26,7 +26,8 @@
       "Bash(test:*)",
       "WebFetch(domain:github.com)",
       "Bash(ls:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(cargo fmt:*)"
     ],
     "deny": [],
     "ask": []

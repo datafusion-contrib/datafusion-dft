@@ -82,6 +82,67 @@ impl TestConfigBuilder {
         self
     }
 
+    /// Configure S3 object store with AWS credential chain enabled.
+    /// Credentials will be resolved from environment variables, ~/.aws/credentials,
+    /// or IAM roles/instance profiles.
+    #[cfg(feature = "s3")]
+    pub fn with_s3_credential_chain(
+        &mut self,
+        app: &str,
+        store: &str,
+        bucket_name: &str,
+        object_store_url: &str,
+        allow_http: bool,
+    ) -> &mut Self {
+        self.config_text
+            .push_str(&format!("[{app}.execution.object_store]\n"));
+        self.config_text
+            .push_str(&format!("[[{app}.execution.object_store.{}]]\n", store));
+        self.config_text
+            .push_str(&format!("bucket_name = '{}'\n", bucket_name));
+        self.config_text
+            .push_str(&format!("object_store_url = '{}'\n", object_store_url));
+        self.config_text.push_str("use_credential_chain = true\n");
+        self.config_text
+            .push_str(&format!("aws_allow_http = {}\n", allow_http));
+        self
+    }
+
+    /// Configure S3 object store with credential chain enabled but with static credential overrides.
+    /// Static credentials will take precedence over environment-based credentials.
+    #[cfg(feature = "s3")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_s3_credential_chain_and_static_override(
+        &mut self,
+        app: &str,
+        store: &str,
+        bucket_name: &str,
+        object_store_url: &str,
+        endpoint: &str,
+        access_key: &str,
+        secret_key: &str,
+        allow_http: bool,
+    ) -> &mut Self {
+        self.config_text
+            .push_str(&format!("[{app}.execution.object_store]\n"));
+        self.config_text
+            .push_str(&format!("[[{app}.execution.object_store.{}]]\n", store));
+        self.config_text
+            .push_str(&format!("bucket_name = '{}'\n", bucket_name));
+        self.config_text
+            .push_str(&format!("object_store_url = '{}'\n", object_store_url));
+        self.config_text.push_str("use_credential_chain = true\n");
+        self.config_text
+            .push_str(&format!("aws_endpoint = '{}'\n", endpoint));
+        self.config_text
+            .push_str(&format!("aws_access_key_id = '{}'\n", access_key));
+        self.config_text
+            .push_str(&format!("aws_secret_access_key = '{}'\n", secret_key));
+        self.config_text
+            .push_str(&format!("aws_allow_http = {}\n", allow_http));
+        self
+    }
+
     pub fn with_benchmark_iterations(&mut self, app: &str, iterations: u64) -> &mut Self {
         self.config_text.push_str(&format!(
             "[{app}.execution]\nbenchmark_iterations = {}\n",
