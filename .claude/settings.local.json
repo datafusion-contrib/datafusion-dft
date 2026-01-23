@@ -27,7 +27,8 @@
       "WebFetch(domain:github.com)",
       "Bash(ls:*)",
       "Bash(grep:*)",
-      "Bash(cargo fmt:*)"
+      "Bash(cargo fmt:*)",
+      "Bash(./target/release/dft:*)"
     ],
     "deny": [],
     "ask": []
