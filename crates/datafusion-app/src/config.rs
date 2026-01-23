@@ -162,6 +162,11 @@ fn default_wasm_udf() -> WasmUdfConfig {
 pub struct S3Config {
     bucket_name: String,
     object_store_url: Option<String>,
+    /// Enable AWS credential chain (environment variables, ~/.aws/credentials, IAM roles).
+    /// When true, credentials are resolved via the standard AWS credential provider chain.
+    /// Static credentials in this config take precedence over environment-based credentials.
+    #[serde(default)]
+    use_credential_chain: bool,
     aws_access_key_id: Option<String>,
     aws_secret_access_key: Option<String>,
     _aws_default_region: Option<String>,
@@ -180,8 +185,25 @@ impl S3Config {
 #[cfg(feature = "s3")]
 impl S3Config {
     pub fn to_object_store(&self) -> Result<AmazonS3> {
-        let mut builder = AmazonS3Builder::new();
+        // Choose builder based on credential chain preference
+        let mut builder = if self.use_credential_chain {
+            // Use from_env() to enable AWS credential chain
+            // This reads AWS_* environment variables and enables:
+            // - Environment variable credentials (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
+            // - Web identity token authentication (AWS_WEB_IDENTITY_TOKEN_FILE for EKS/IRSA)
+            // - Container credentials (ECS via AWS_CONTAINER_CREDENTIALS_RELATIVE_URI)
+            // - EC2 instance profile via IMDSv2
+            AmazonS3Builder::from_env()
+        } else {
+            // Traditional static configuration only
+            AmazonS3Builder::new()
+        };
+
+        // Always set bucket name (required)
         builder = builder.with_bucket_name(&self.bucket_name);
+
+        // Apply TOML-specified credentials if provided
+        // These will override environment-based credentials due to precedence
         if let Some(access_key) = &self.aws_access_key_id {
             builder = builder.with_access_key_id(access_key)
         }
