@@ -168,6 +168,7 @@ impl TableFunctionImpl for ParquetMetadataFunc {
             Field::new("num_values", DataType::Int64, true),
             Field::new("path_in_schema", DataType::Utf8, true),
             Field::new("type", DataType::Utf8, true),
+            Field::new("logical_type", DataType::Utf8, true),
             Field::new("stats_min", DataType::Utf8, true),
             Field::new("stats_max", DataType::Utf8, true),
             Field::new("stats_null_count", DataType::Int64, true),
@@ -194,6 +195,7 @@ impl TableFunctionImpl for ParquetMetadataFunc {
         let mut num_values_arr = vec![];
         let mut path_in_schema_arr = vec![];
         let mut type_arr = vec![];
+        let mut logical_type_arr = vec![];
         let mut stats_min_arr = vec![];
         let mut stats_max_arr = vec![];
         let mut stats_null_count_arr = vec![];
@@ -219,6 +221,12 @@ impl TableFunctionImpl for ParquetMetadataFunc {
                 num_values_arr.push(column.num_values());
                 path_in_schema_arr.push(column.column_path().to_string());
                 type_arr.push(column.column_type().to_string());
+                logical_type_arr.push(
+                    column
+                        .column_descr()
+                        .logical_type_ref()
+                        .map(|lt| format!("{:?}", lt)),
+                );
                 let converted_type = column.column_descr().converted_type();
 
                 if let Some(s) = column.statistics() {
@@ -260,6 +268,7 @@ impl TableFunctionImpl for ParquetMetadataFunc {
                 Arc::new(Int64Array::from(num_values_arr)),
                 Arc::new(StringArray::from(path_in_schema_arr)),
                 Arc::new(StringArray::from(type_arr)),
+                Arc::new(StringArray::from(logical_type_arr)),
                 Arc::new(StringArray::from(stats_min_arr)),
                 Arc::new(StringArray::from(stats_max_arr)),
                 Arc::new(Int64Array::from(stats_null_count_arr)),
