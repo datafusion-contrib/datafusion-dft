@@ -222,8 +222,10 @@ impl TableFunctionImpl for ParquetMetadataFunc {
                 path_in_schema_arr.push(column.column_path().to_string());
                 type_arr.push(column.column_type().to_string());
                 logical_type_arr.push(
-                    column.column_descr().logical_type_ref()
-                        .map(|lt| format!("{:?}", lt))
+                    column
+                        .column_descr()
+                        .logical_type_ref()
+                        .map(|lt| format!("{:?}", lt)),
                 );
                 let converted_type = column.column_descr().converted_type();
 
