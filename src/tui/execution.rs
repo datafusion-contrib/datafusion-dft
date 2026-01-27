@@ -279,37 +279,42 @@ impl TuiExecution {
                                             if let Some(streams) =
                                                 self.flightsql_result_stream.lock().await.as_mut()
                                             {
-                                                match streams.next().await {
-                                                    Some((ticket, Ok(batch))) => {
-                                                        info!("Received batch for {ticket}");
-                                                        let duration = start.elapsed();
-                                                        let results = ExecutionResultsBatch {
-                                                            batch,
-                                                            duration,
-                                                            query: sql.to_string(),
-                                                        };
-                                                        sender.send(
-                                                            AppEvent::FlightSQLExecutionResultsNextBatch(
-                                                                results,
-                                                            ),
-                                                        )?;
+                                                // Collect all batches from the stream
+                                                while let Some((ticket, result)) =
+                                                    streams.next().await
+                                                {
+                                                    match result {
+                                                        Ok(batch) => {
+                                                            info!("Received batch for {ticket}");
+                                                            let duration = start.elapsed();
+                                                            let results = ExecutionResultsBatch {
+                                                                batch,
+                                                                duration,
+                                                                query: sql.to_string(),
+                                                            };
+                                                            sender.send(
+                                                                AppEvent::FlightSQLExecutionResultsNextBatch(
+                                                                    results,
+                                                                ),
+                                                            )?;
+                                                        }
+                                                        Err(e) => {
+                                                            error!(
+                                                                "Error executing stream for ticket {ticket}: {:?}",
+                                                                e
+                                                            );
+                                                            let elapsed = start.elapsed();
+                                                            let e = ExecutionError {
+                                                                query: sql.to_string(),
+                                                                error: e.to_string(),
+                                                                duration: elapsed,
+                                                            };
+                                                            sender.send(
+                                                                AppEvent::FlightSQLExecutionResultsError(e),
+                                                            )?;
+                                                            break;
+                                                        }
                                                     }
-                                                    Some((ticket, Err(e))) => {
-                                                        error!(
-                                                            "Error executing stream for ticket {ticket}: {:?}",
-                                                            e
-                                                        );
-                                                        let elapsed = start.elapsed();
-                                                        let e = ExecutionError {
-                                                            query: sql.to_string(),
-                                                            error: e.to_string(),
-                                                            duration: elapsed,
-                                                        };
-                                                        sender.send(
-                                                            AppEvent::FlightSQLExecutionResultsError(e),
-                                                        )?;
-                                                    }
-                                                    None => {}
                                                 }
                                             }
                                         }

@@ -21,7 +21,7 @@ use std::sync::Arc;
 use color_eyre::Result;
 use datafusion::arrow::{
     array::{Array, RecordBatch, UInt32Array},
-    compute::take_record_batch,
+    compute::{concat_batches, take_record_batch},
     datatypes::Schema,
     error::ArrowError,
 };
@@ -316,7 +316,11 @@ fn take_record_batches(
     match batches.len() {
         0 => Ok(RecordBatch::new_empty(Arc::new(Schema::empty()))),
         1 => take_record_batch(&batches[0], indices),
-        // For now we just get the first batch
-        _ => take_record_batch(&batches[0], indices),
+        _ => {
+            // Concatenate all batches into a single batch before taking indices
+            let schema = batches[0].schema();
+            let concatenated = concat_batches(&schema, batches)?;
+            take_record_batch(&concatenated, indices)
+        }
     }
 }
