@@ -19,11 +19,13 @@ use std::time::Duration;
 
 use crate::local_benchmarks::is_all_same;
 
+use crate::local_benchmarks::BenchmarkMode;
 use crate::local_benchmarks::DurationsSummary;
 
 pub struct FlightSQLBenchmarkStats {
     query: String,
     runs: usize,
+    mode: BenchmarkMode,
     rows: Vec<usize>,
     get_flight_info_durations: Vec<Duration>,
     ttfb_durations: Vec<Duration>,
@@ -35,6 +37,7 @@ impl FlightSQLBenchmarkStats {
     pub fn new(
         query: String,
         rows: Vec<usize>,
+        mode: BenchmarkMode,
         get_flight_info_durations: Vec<Duration>,
         ttfb_durations: Vec<Duration>,
         do_get_durations: Vec<Duration>,
@@ -44,6 +47,7 @@ impl FlightSQLBenchmarkStats {
         Self {
             query,
             runs,
+            mode,
             rows,
             get_flight_info_durations,
             ttfb_durations,
@@ -103,6 +107,8 @@ impl FlightSQLBenchmarkStats {
         csv.push_str(execution_summary.to_csv_fields().as_str());
         csv.push(',');
         csv.push_str(total_summary.to_csv_fields().as_str());
+        csv.push(',');
+        csv.push_str(&self.mode.to_string());
         csv
     }
 }
@@ -111,7 +117,7 @@ impl std::fmt::Display for FlightSQLBenchmarkStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f)?;
         writeln!(f, "----------------------------")?;
-        writeln!(f, "Benchmark Stats ({} runs)", self.runs)?;
+        writeln!(f, "Benchmark Stats ({} runs, {})", self.runs, self.mode)?;
         writeln!(f, "----------------------------")?;
         writeln!(f, "{}", self.query)?;
         writeln!(f, "----------------------------")?;

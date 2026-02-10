@@ -64,30 +64,68 @@ basic_auth.password = "Pass"
 
 ## Benchmark Queries
 
-You can benchmark queries by adding the `--bench` parameter.  This will run the query a configurable number of times and output a breakdown of the queries execution time with summary statistics for each component of the query (logical planning, physical planning, execution time, and total time).
+You can benchmark queries by adding the `--bench` parameter. This will run the query a configurable number of times and output a breakdown of the query's execution time with summary statistics for each component (logical planning, physical planning, execution time, and total time).
 
-Optionally you can use the `--run-before` param to run a query before the benchmark is run.  This is useful in cases where you want to hit a temp table or write a file to disk that your benchmark query will use.
+### Benchmark Modes
 
-To save benchmark results to a file use the `--save` parameter with a file path.  Further, you can use the `--append` parameter to append to the file instead of overwriting it.
+**Serial Benchmark (default):**
+Measures query performance in isolation, running iterations one after another. This shows the pure query execution time without any contention or resource sharing overhead.
 
-The number of benchmark iterations is defined in your configuration (default is 10) and can be configured per benchmark run with `-n` parameter.
+**Concurrent Benchmark (`--concurrent`):**
+Measures query performance under load by running iterations in parallel. This reveals:
+- Throughput (queries per second) with multiple concurrent clients
+- Resource contention and bottlenecks
+- Performance degradation under concurrent load
 
+Concurrent mode uses adaptive concurrency: `min(iterations, CPU cores)` to avoid overwhelming the system.
+
+### Options
+
+- **`--bench`**: Enable benchmarking mode
+- **`--concurrent`**: Run iterations in parallel (for concurrent benchmarking)
+- **`-n <count>`**: Number of iterations (default: 10, configured in config file)
+- **`--run-before <query>`**: Run a setup query before benchmarking (useful for cache warming)
+- **`--save <file>`**: Save results to CSV file
+- **`--append`**: Append to existing results file instead of overwriting
+
+### Examples
 
 ```sh
+# Serial benchmark (default)
 dft -c "SELECT * FROM my_table" --bench
 
-# Run a configurable number of benchmark iterations
-dft -c "SELECT ..." --bench -n 5
+# Concurrent benchmark
+dft -c "SELECT * FROM my_table" --bench --concurrent
 
-# Save benchmark results to a file
+# Custom iteration count
+dft -c "SELECT ..." --bench -n 100
+
+# Concurrent with custom iterations
+dft -c "SELECT ..." --bench -n 100 --concurrent
+
+# Save benchmark results to CSV
 dft -c "SELECT ..." --bench --save results.csv
 
-# Append benchmark results to existing file
-dft -c "SELECT ..." --bench --save results.csv --append
+# Append results (compare serial vs concurrent)
+dft -c "SELECT ..." --bench --save results.csv
+dft -c "SELECT ..." --bench --concurrent --save results.csv --append
 
-# Run a setup query prior to running benchmark.  This can be useful to quickly iterate on various paramters
+# Run a setup query before benchmarking
 dft -c "SELECT ..." --bench --run-before="CREATE TEMP TABLE my_temp AS SELECT ..."
+
+# FlightSQL benchmark (concurrent)
+dft -c "SELECT ..." --bench --concurrent --flightsql
 ```
+
+### Output
+
+Benchmark output includes:
+- **Mode**: `serial` or `concurrent(N)` where N is the concurrency level
+- **Timing breakdown**: Logical planning, physical planning, execution (min/max/mean/median)
+- **Row counts**: Validation that all runs returned the same number of rows
+- **CSV format**: Results include a `concurrency_mode` column for comparison
+
+**Note**: Concurrent benchmarks typically show higher mean/median times due to resource contention - this is expected and reveals how the system performs under load.
 
 ## Analyze Queries
 

@@ -68,6 +68,12 @@ dft -f query.sql
 # Benchmark a query (with stats)
 dft -c "SELECT * FROM my_table" --bench
 
+# Concurrent benchmark (measures throughput under load)
+dft -c "SELECT * FROM my_table" --bench --concurrent
+
+# Save benchmark results to CSV
+dft -c "SELECT * FROM my_table" --bench --save results.csv
+
 # Start FlightSQL Server (requires `flightsql` feature)
 dft serve-flightsql
 
@@ -77,6 +83,39 @@ dft serve-http
 # Generate TPC-H data in the configured DB path
 dft generate-tpch
 ```
+
+### Benchmarking
+
+`dft` includes built-in benchmarking to measure query performance with detailed timing breakdowns:
+
+```sh
+# Serial benchmark (default) - measures query performance in isolation
+dft -c "SELECT * FROM my_table" --bench
+
+# Concurrent benchmark - measures throughput under load
+dft -c "SELECT * FROM my_table" --bench --concurrent
+
+# Custom iteration count
+dft -c "SELECT * FROM my_table" --bench -n 100
+
+# Save results to CSV for analysis
+dft -c "SELECT * FROM my_table" --bench --save results.csv
+
+# Compare serial vs concurrent performance
+dft -c "SELECT * FROM my_table" --bench --save results.csv
+dft -c "SELECT * FROM my_table" --bench --concurrent --save results.csv --append
+```
+
+**Benchmark Output:**
+- Timing breakdown by phase: logical planning, physical planning, execution
+- Statistics: min, max, mean, median for each phase
+- Row counts validation across all runs
+- CSV export with `concurrency_mode` column for result comparison
+
+**Serial vs Concurrent:**
+- **Serial**: Pure query execution time without contention (baseline performance)
+- **Concurrent**: Throughput measurement with parallel execution (reveals bottlenecks and contention)
+- Concurrent mode uses adaptive concurrency: `min(iterations, CPU cores)`
 
 ### Setting Up Tables with DDL
 

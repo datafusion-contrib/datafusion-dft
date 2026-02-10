@@ -43,7 +43,8 @@ use tokio_stream::StreamExt;
 use tonic::{transport::Channel, IntoRequest};
 
 use crate::{
-    config::FlightSQLConfig, flightsql_benchmarks::FlightSQLBenchmarkStats, ExecOptions, ExecResult,
+    config::FlightSQLConfig, flightsql_benchmarks::FlightSQLBenchmarkStats,
+    local_benchmarks::BenchmarkMode, ExecOptions, ExecResult,
 };
 
 pub type FlightSQLClient = Arc<Mutex<Option<FlightSqlServiceClient<Channel>>>>;
@@ -120,70 +121,158 @@ impl FlightSQLContext {
         &self,
         query: &str,
         cli_iterations: Option<usize>,
+        concurrent: bool,
     ) -> Result<FlightSQLBenchmarkStats> {
         let iterations = cli_iterations.unwrap_or(self.config.benchmark_iterations);
+        let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
+        let statements = DFParser::parse_sql_with_dialect(query, &dialect)?;
+
+        if statements.len() != 1 {
+            return Err(eyre::eyre!("Only a single statement can be benchmarked"));
+        }
+
+        // Check that client exists
+        {
+            let guard = self.client.lock().await;
+            if guard.is_none() {
+                return Err(eyre::eyre!("No FlightSQL client configured"));
+            }
+        }
+
+        let concurrency = if concurrent {
+            std::cmp::min(iterations, num_cpus::get())
+        } else {
+            1
+        };
+        let mode = if concurrent {
+            BenchmarkMode::Concurrent(concurrency)
+        } else {
+            BenchmarkMode::Serial
+        };
+
+        info!(
+            "Benchmarking FlightSQL query with {} iterations (concurrency: {})",
+            iterations, concurrency
+        );
+
         let mut rows_returned = Vec::with_capacity(iterations);
         let mut get_flight_info_durations = Vec::with_capacity(iterations);
         let mut ttfb_durations = Vec::with_capacity(iterations);
         let mut do_get_durations = Vec::with_capacity(iterations);
         let mut total_durations = Vec::with_capacity(iterations);
 
-        let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
-        let statements = DFParser::parse_sql_with_dialect(query, &dialect)?;
-        if statements.len() == 1 {
-            if let Some(ref mut client) = *self.client.lock().await {
+        if !concurrent {
+            // Serial execution
+            let mut guard = self.client.lock().await;
+            if let Some(ref mut client) = *guard {
                 for _ in 0..iterations {
-                    let mut rows = 0;
-                    let start = std::time::Instant::now();
-                    let flight_info = client.execute(query.to_string(), None).await?;
-                    if flight_info.endpoint.len() > 1 {
-                        warn!("More than one endpoint: Benchmark results will not be reliable");
-                    }
-                    let get_flight_info_duration = start.elapsed();
-                    // Current logic wont properly handle having multiple endpoints
-                    for endpoint in flight_info.endpoint {
-                        if let Some(ticket) = &endpoint.ticket {
-                            match client.do_get(ticket.clone().into_request()).await {
-                                Ok(ref mut s) => {
-                                    let mut batch_count = 0;
-                                    while let Some(b) = s.next().await {
-                                        rows += b?.num_rows();
-                                        if batch_count == 0 {
-                                            let ttfb_duration =
-                                                start.elapsed() - get_flight_info_duration;
-                                            ttfb_durations.push(ttfb_duration);
-                                        }
-                                        batch_count += 1;
-                                    }
-                                    let do_get_duration =
-                                        start.elapsed() - get_flight_info_duration;
-                                    do_get_durations.push(do_get_duration);
-                                }
-                                Err(e) => {
-                                    error!("Error getting Flight stream: {:?}", e);
-                                }
-                            }
-                        }
-                    }
+                    let (rows, gfi_dur, ttfb_dur, dg_dur, total_dur) =
+                        Self::benchmark_single_iteration(client, query).await?;
                     rows_returned.push(rows);
-                    get_flight_info_durations.push(get_flight_info_duration);
-                    let total_duration = start.elapsed();
-                    total_durations.push(total_duration);
+                    get_flight_info_durations.push(gfi_dur);
+                    ttfb_durations.push(ttfb_dur);
+                    do_get_durations.push(dg_dur);
+                    total_durations.push(total_dur);
                 }
-            } else {
-                return Err(eyre::eyre!("No FlightSQL client configured"));
             }
-            Ok(FlightSQLBenchmarkStats::new(
-                query.to_string(),
-                rows_returned,
-                get_flight_info_durations,
-                ttfb_durations,
-                do_get_durations,
-                total_durations,
-            ))
         } else {
-            Err(eyre::eyre!("Only a single statement can be benchmarked"))
+            // Concurrent execution - spawn tasks that share the client
+            let mut completed = 0;
+
+            while completed < iterations {
+                let batch_size = std::cmp::min(concurrency, iterations - completed);
+                let mut join_set = tokio::task::JoinSet::new();
+
+                for _ in 0..batch_size {
+                    let client = Arc::clone(&self.client);
+                    let query_str = query.to_string();
+
+                    join_set.spawn(async move {
+                        let mut guard = client.lock().await;
+                        if let Some(ref mut c) = *guard {
+                            Self::benchmark_single_iteration(c, &query_str).await
+                        } else {
+                            Err(eyre::eyre!("No FlightSQL client configured"))
+                        }
+                    });
+                }
+
+                while let Some(result) = join_set.join_next().await {
+                    let (rows, gfi_dur, ttfb_dur, dg_dur, total_dur) = result??;
+                    rows_returned.push(rows);
+                    get_flight_info_durations.push(gfi_dur);
+                    ttfb_durations.push(ttfb_dur);
+                    do_get_durations.push(dg_dur);
+                    total_durations.push(total_dur);
+                }
+
+                completed += batch_size;
+            }
         }
+
+        Ok(FlightSQLBenchmarkStats::new(
+            query.to_string(),
+            rows_returned,
+            mode,
+            get_flight_info_durations,
+            ttfb_durations,
+            do_get_durations,
+            total_durations,
+        ))
+    }
+
+    async fn benchmark_single_iteration(
+        client: &mut FlightSqlServiceClient<Channel>,
+        query: &str,
+    ) -> Result<(
+        usize,
+        std::time::Duration,
+        std::time::Duration,
+        std::time::Duration,
+        std::time::Duration,
+    )> {
+        let mut rows = 0;
+        let start = std::time::Instant::now();
+        let flight_info = client.execute(query.to_string(), None).await?;
+
+        if flight_info.endpoint.len() > 1 {
+            warn!("More than one endpoint: Benchmark results will not be reliable");
+        }
+
+        let get_flight_info_duration = start.elapsed();
+        let mut ttfb_duration = std::time::Duration::from_secs(0);
+        let mut do_get_duration = std::time::Duration::from_secs(0);
+
+        for endpoint in flight_info.endpoint {
+            if let Some(ticket) = &endpoint.ticket {
+                match client.do_get(ticket.clone().into_request()).await {
+                    Ok(ref mut s) => {
+                        let mut batch_count = 0;
+                        while let Some(b) = s.next().await {
+                            rows += b?.num_rows();
+                            if batch_count == 0 {
+                                ttfb_duration = start.elapsed() - get_flight_info_duration;
+                            }
+                            batch_count += 1;
+                        }
+                        do_get_duration = start.elapsed() - get_flight_info_duration;
+                    }
+                    Err(e) => {
+                        error!("Error getting Flight stream: {:?}", e);
+                        return Err(e.into());
+                    }
+                }
+            }
+        }
+
+        let total_duration = start.elapsed();
+        Ok((
+            rows,
+            get_flight_info_duration,
+            ttfb_duration,
+            do_get_duration,
+            total_duration,
+        ))
     }
 
     pub async fn execute_sql_with_opts(

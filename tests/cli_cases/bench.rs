@@ -33,7 +33,7 @@ fn test_bench_command() {
 
     let expected = r##"
 ----------------------------
-Benchmark Stats (10 runs)
+Benchmark Stats (10 runs, serial)
 ----------------------------
 SELECT 1
 ----------------------------"##;
@@ -54,7 +54,7 @@ fn test_bench_files() {
 
     let expected_err = r##"
 ----------------------------
-Benchmark Stats (10 runs)
+Benchmark Stats (10 runs, serial)
 ----------------------------
 SELECT 1 + 1;
 ----------------------------"##;
@@ -75,7 +75,7 @@ fn test_bench_command_with_run_before() {
 
     let expected = r##"
 ----------------------------
-Benchmark Stats (10 runs)
+Benchmark Stats (10 runs, serial)
 ----------------------------
 SELECT * FROM t
 ----------------------------"##;
@@ -98,7 +98,7 @@ fn test_bench_files_with_run_before() {
 
     let expected_err = r##"
 ----------------------------
-Benchmark Stats (10 runs)
+Benchmark Stats (10 runs, serial)
 ----------------------------
 SELECT * FROM t;
 ----------------------------"##;
@@ -122,7 +122,7 @@ fn test_bench_command_with_save() {
 
     let expected = r##"
 ----------------------------
-Benchmark Stats (10 runs)
+Benchmark Stats (10 runs, serial)
 ----------------------------
 SELECT 1
 ----------------------------"##;
@@ -148,7 +148,7 @@ fn test_bench_command_with_save_and_append() {
 
     let expected = r##"
 ----------------------------
-Benchmark Stats (10 runs)
+Benchmark Stats (10 runs, serial)
 ----------------------------
 SELECT 1
 ----------------------------"##;
@@ -169,7 +169,7 @@ SELECT 1
 
     let expected = r##"
 ----------------------------
-Benchmark Stats (10 runs)
+Benchmark Stats (10 runs, serial)
 ----------------------------
 SELECT 1
 ----------------------------"##;
@@ -194,9 +194,98 @@ fn test_bench_command_with_custom_iterations() {
 
     let expected = r##"
 ----------------------------
-Benchmark Stats (3 runs)
+Benchmark Stats (3 runs, serial)
 ----------------------------
 SELECT 1
 ----------------------------"##;
     assert.stdout(contains_str(expected));
+}
+
+#[test]
+fn test_bench_command_concurrent() {
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT 1")
+        .arg("--bench")
+        .arg("-n")
+        .arg("5")
+        .arg("--concurrent")
+        .assert()
+        .success();
+
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+    // Check that output contains "concurrent"
+    assert!(output.contains("concurrent"));
+    // Check that it shows row counts match
+    assert!(output.contains("Row counts match across runs"));
+}
+
+#[test]
+fn test_bench_concurrent_csv_output() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let file = temp_dir.path().join("results.csv");
+
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT 1")
+        .arg("--bench")
+        .arg("-n")
+        .arg("3")
+        .arg("--concurrent")
+        .arg("--save")
+        .arg(file.to_str().unwrap())
+        .assert()
+        .success();
+
+    let contents = std::fs::read_to_string(&file).unwrap();
+    let lines: Vec<&str> = contents.lines().collect();
+
+    // Check header has new column
+    assert!(lines[0].ends_with("concurrency_mode"));
+
+    // Check data row has concurrency info
+    assert!(lines[1].ends_with(")") && lines[1].contains("concurrent"));
+}
+
+#[test]
+fn test_bench_serial_vs_concurrent_csv_compatibility() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let file = temp_dir.path().join("mixed_results.csv");
+
+    // Run serial benchmark
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT 1")
+        .arg("--bench")
+        .arg("-n")
+        .arg("3")
+        .arg("--save")
+        .arg(file.to_str().unwrap())
+        .assert()
+        .success();
+
+    // Append concurrent benchmark
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT 2")
+        .arg("--bench")
+        .arg("-n")
+        .arg("3")
+        .arg("--concurrent")
+        .arg("--append")
+        .arg("--save")
+        .arg(file.to_str().unwrap())
+        .assert()
+        .success();
+
+    let contents = std::fs::read_to_string(&file).unwrap();
+    let lines: Vec<&str> = contents.lines().collect();
+
+    assert_eq!(lines.len(), 3); // header + 2 data rows
+    assert!(lines[1].ends_with("serial"));
+    assert!(lines[2].contains("concurrent"));
 }

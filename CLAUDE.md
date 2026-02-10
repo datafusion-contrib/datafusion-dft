@@ -33,6 +33,55 @@ cargo run --features=flightsql -- serve-flightsql
 cargo run -- generate-tpch
 ```
 
+### Benchmarking
+
+Benchmarks measure query performance with detailed timing breakdowns:
+
+```bash
+# Serial benchmark (default, 10 iterations)
+cargo run -- -c "SELECT 1" --bench
+
+# Custom iteration count
+cargo run -- -c "SELECT 1" --bench -n 100
+
+# Concurrent benchmark (measures throughput under load)
+cargo run -- -c "SELECT 1" --bench --concurrent
+
+# With custom iterations and concurrency
+cargo run -- -c "SELECT 1" --bench -n 100 --concurrent
+
+# Save results to CSV
+cargo run -- -c "SELECT 1" --bench --save results.csv
+
+# Append to existing results
+cargo run -- -c "SELECT 2" --bench --concurrent --save results.csv --append
+
+# Warm up cache before benchmarking
+cargo run -- -c "SELECT * FROM t" --bench --run-before "CREATE TABLE t AS VALUES (1)"
+```
+
+**Benchmark Modes:**
+- **Serial** (default): Measures query performance in isolation
+  - Shows pure query execution time without contention
+  - Ideal for understanding baseline performance
+
+- **Concurrent** (`--concurrent`): Measures performance under load
+  - Runs iterations in parallel (concurrency = min(iterations, CPU cores))
+  - Shows throughput (queries/second) with multiple clients
+  - Reveals resource contention and bottlenecks
+  - Higher mean/median times are expected due to concurrent load
+
+**Output:**
+- Timing breakdown: logical planning, physical planning, execution, total
+- Statistics: min, max, mean, median for each phase
+- CSV format includes `concurrency_mode` column (serial or concurrent(N))
+
+**FlightSQL Benchmarks:**
+```bash
+# Benchmark FlightSQL server (requires --flightsql flag and server running)
+cargo run -- -c "SELECT 1" --bench --flightsql --concurrent
+```
+
 ### Testing
 
 Tests are organized by feature and component:
