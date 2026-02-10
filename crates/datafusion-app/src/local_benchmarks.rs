@@ -51,11 +51,34 @@ impl std::fmt::Display for DurationsSummary {
     }
 }
 
+/// Benchmark execution mode
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum BenchmarkMode {
+    Serial,
+    Concurrent(usize), // number of concurrent tasks
+}
+
+impl std::fmt::Display for BenchmarkMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BenchmarkMode::Serial => write!(f, "serial"),
+            BenchmarkMode::Concurrent(n) => write!(f, "concurrent({})", n),
+        }
+    }
+}
+
+impl Default for BenchmarkMode {
+    fn default() -> Self {
+        BenchmarkMode::Serial
+    }
+}
+
 /// Contains stats for all runs of a benchmarked query and provides methods for aggregating
 #[derive(Debug, Default)]
 pub struct LocalBenchmarkStats {
     query: String,
     runs: usize,
+    mode: BenchmarkMode,
     rows: Vec<usize>,
     logical_planning_durations: Vec<Duration>,
     physical_planning_durations: Vec<Duration>,
@@ -67,6 +90,7 @@ impl LocalBenchmarkStats {
     pub fn new(
         query: String,
         rows: Vec<usize>,
+        mode: BenchmarkMode,
         logical_planning_durations: Vec<Duration>,
         physical_planning_durations: Vec<Duration>,
         execution_durations: Vec<Duration>,
@@ -76,6 +100,7 @@ impl LocalBenchmarkStats {
         Self {
             query,
             runs,
+            mode,
             rows,
             logical_planning_durations,
             physical_planning_durations,
@@ -135,6 +160,8 @@ impl LocalBenchmarkStats {
         csv.push_str(execution_summary.to_csv_fields().as_str());
         csv.push(',');
         csv.push_str(total_summary.to_csv_fields().as_str());
+        csv.push(',');
+        csv.push_str(&self.mode.to_string());
         csv
     }
 }
@@ -147,7 +174,7 @@ impl std::fmt::Display for LocalBenchmarkStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f)?;
         writeln!(f, "----------------------------")?;
-        writeln!(f, "Benchmark Stats ({} runs)", self.runs)?;
+        writeln!(f, "Benchmark Stats ({} runs, {})", self.runs, self.mode)?;
         writeln!(f, "----------------------------")?;
         writeln!(f, "{}", self.query)?;
         writeln!(f, "----------------------------")?;

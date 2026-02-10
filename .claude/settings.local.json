@@ -28,7 +28,8 @@
       "Bash(ls:*)",
       "Bash(grep:*)",
       "Bash(cargo fmt:*)",
-      "Bash(./target/release/dft:*)"
+      "Bash(./target/release/dft:*)",
+      "Bash(/Users/matth/OpenSource/datafusion-tui/target/debug/dft:*)"
     ],
     "deny": [],
     "ask": []

@@ -38,7 +38,7 @@ use datafusion::sql::parser::{DFParser, Statement};
 use tokio_stream::StreamExt;
 
 use super::executor::dedicated::DedicatedExecutor;
-use super::local_benchmarks::LocalBenchmarkStats;
+use super::local_benchmarks::{BenchmarkMode, LocalBenchmarkStats};
 use super::stats::{ExecutionDurationStats, ExecutionStats};
 #[cfg(feature = "udfs-wasm")]
 use super::wasm::create_wasm_udfs;
@@ -363,58 +363,127 @@ impl ExecutionContext {
     }
 
     /// Benchmark the provided query.  Currently, only a single statement can be benchmarked
+    async fn benchmark_single_iteration(
+        &self,
+        statement: Statement,
+    ) -> Result<(
+        usize,
+        std::time::Duration,
+        std::time::Duration,
+        std::time::Duration,
+        std::time::Duration,
+    )> {
+        let start = std::time::Instant::now();
+        let logical_plan = self
+            .session_ctx()
+            .state()
+            .statement_to_plan(statement)
+            .await?;
+        let logical_planning_duration = start.elapsed();
+        let physical_plan = self
+            .session_ctx()
+            .state()
+            .create_physical_plan(&logical_plan)
+            .await?;
+        let physical_planning_duration = start.elapsed();
+        let task_ctx = self.session_ctx().task_ctx();
+        let mut stream = execute_stream(physical_plan, task_ctx)?;
+        let mut rows = 0;
+        while let Some(b) = stream.next().await {
+            rows += b?.num_rows();
+        }
+        let execution_duration = start.elapsed();
+        let total_duration = start.elapsed();
+        Ok((
+            rows,
+            logical_planning_duration,
+            physical_planning_duration - logical_planning_duration,
+            execution_duration - physical_planning_duration,
+            total_duration,
+        ))
+    }
+
     pub async fn benchmark_query(
         &self,
         query: &str,
         cli_iterations: Option<usize>,
+        concurrent: bool,
     ) -> Result<LocalBenchmarkStats> {
         let iterations = cli_iterations.unwrap_or(self.config.benchmark_iterations);
-        info!("Benchmarking query with {} iterations", iterations);
+        let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
+        let statements = DFParser::parse_sql_with_dialect(query, &dialect)?;
+
+        if statements.len() != 1 {
+            return Err(eyre::eyre!("Only a single statement can be benchmarked"));
+        }
+
+        let statement = statements[0].clone();
+        let concurrency = if concurrent {
+            std::cmp::min(iterations, num_cpus::get())
+        } else {
+            1
+        };
+        let mode = if concurrent {
+            BenchmarkMode::Concurrent(concurrency)
+        } else {
+            BenchmarkMode::Serial
+        };
+
+        info!(
+            "Benchmarking query with {} iterations (concurrency: {})",
+            iterations, concurrency
+        );
+
         let mut rows_returned = Vec::with_capacity(iterations);
         let mut logical_planning_durations = Vec::with_capacity(iterations);
         let mut physical_planning_durations = Vec::with_capacity(iterations);
         let mut execution_durations = Vec::with_capacity(iterations);
         let mut total_durations = Vec::with_capacity(iterations);
-        let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
-        let statements = DFParser::parse_sql_with_dialect(query, &dialect)?;
-        if statements.len() == 1 {
+
+        if !concurrent {
+            // Serial execution
             for _ in 0..iterations {
-                let statement = statements[0].clone();
-                let start = std::time::Instant::now();
-                let logical_plan = self
-                    .session_ctx()
-                    .state()
-                    .statement_to_plan(statement)
-                    .await?;
-                let logical_planning_duration = start.elapsed();
-                let physical_plan = self
-                    .session_ctx()
-                    .state()
-                    .create_physical_plan(&logical_plan)
-                    .await?;
-                let physical_planning_duration = start.elapsed();
-                let task_ctx = self.session_ctx().task_ctx();
-                let mut stream = execute_stream(physical_plan, task_ctx)?;
-                let mut rows = 0;
-                while let Some(b) = stream.next().await {
-                    rows += b?.num_rows();
-                }
+                let (rows, lp_dur, pp_dur, exec_dur, total_dur) =
+                    self.benchmark_single_iteration(statement.clone()).await?;
                 rows_returned.push(rows);
-                let execution_duration = start.elapsed();
-                let total_duration = start.elapsed();
-                logical_planning_durations.push(logical_planning_duration);
-                physical_planning_durations
-                    .push(physical_planning_duration - logical_planning_duration);
-                execution_durations.push(execution_duration - physical_planning_duration);
-                total_durations.push(total_duration);
+                logical_planning_durations.push(lp_dur);
+                physical_planning_durations.push(pp_dur);
+                execution_durations.push(exec_dur);
+                total_durations.push(total_dur);
             }
         } else {
-            return Err(eyre::eyre!("Only a single statement can be benchmarked"));
+            // Concurrent execution
+            let mut completed = 0;
+
+            while completed < iterations {
+                let batch_size = std::cmp::min(concurrency, iterations - completed);
+                let mut join_set = tokio::task::JoinSet::new();
+
+                for _ in 0..batch_size {
+                    let self_clone = self.clone();
+                    let statement_clone = statement.clone();
+                    join_set.spawn(async move {
+                        self_clone.benchmark_single_iteration(statement_clone).await
+                    });
+                }
+
+                while let Some(result) = join_set.join_next().await {
+                    let (rows, lp_dur, pp_dur, exec_dur, total_dur) = result??;
+                    rows_returned.push(rows);
+                    logical_planning_durations.push(lp_dur);
+                    physical_planning_durations.push(pp_dur);
+                    execution_durations.push(exec_dur);
+                    total_durations.push(total_dur);
+                }
+
+                completed += batch_size;
+            }
         }
 
         Ok(LocalBenchmarkStats::new(
             query.to_string(),
             rows_returned,
+            mode,
             logical_planning_durations,
             physical_planning_durations,
             execution_durations,
