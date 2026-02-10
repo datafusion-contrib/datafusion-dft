@@ -44,8 +44,10 @@ use tonic::{transport::Channel, IntoRequest};
 
 use crate::{
     config::FlightSQLConfig,
-    flightsql_benchmarks::{BenchmarkMode, FlightSQLBenchmarkStats},
-    ExecOptions, ExecResult,
+    flightsql_benchmarks::FlightSQLBenchmarkStats,
+    local_benchmarks::BenchmarkMode,
+    ExecOptions,
+    ExecResult,
 };
 
 pub type FlightSQLClient = Arc<Mutex<Option<FlightSqlServiceClient<Channel>>>>;
