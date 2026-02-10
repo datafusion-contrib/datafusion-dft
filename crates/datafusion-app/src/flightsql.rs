@@ -43,11 +43,8 @@ use tokio_stream::StreamExt;
 use tonic::{transport::Channel, IntoRequest};
 
 use crate::{
-    config::FlightSQLConfig,
-    flightsql_benchmarks::FlightSQLBenchmarkStats,
-    local_benchmarks::BenchmarkMode,
-    ExecOptions,
-    ExecResult,
+    config::FlightSQLConfig, flightsql_benchmarks::FlightSQLBenchmarkStats,
+    local_benchmarks::BenchmarkMode, ExecOptions, ExecResult,
 };
 
 pub type FlightSQLClient = Arc<Mutex<Option<FlightSqlServiceClient<Channel>>>>;
