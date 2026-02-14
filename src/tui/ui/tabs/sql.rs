@@ -42,10 +42,10 @@ pub fn render_sql_editor(area: Rect, buf: &mut Buffer, app: &App) {
         vec![Span::from(" Editor ").fg(tailwind::WHITE)]
     };
     let mode_text = format!(" {:?} ", sql_tab.mode());
-    let mode = Title::from(mode_text.as_str()).alignment(Alignment::Right);
+    let mode = Title::from(mode_text.as_str());
     let block = Block::default()
         .title(title)
-        .title(mode)
+        .title(mode.alignment(Alignment::Right))
         .borders(Borders::ALL)
         .fg(border_color);
     let mut editor = app.state.sql_tab.active_editor_cloned();
@@ -75,7 +75,9 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
             match maybe_table {
                 Ok(table) => {
                     let table = table
-                        .highlight_style(Style::default().bg(tailwind::WHITE).fg(tailwind::BLACK))
+                        .row_highlight_style(
+                            Style::default().bg(tailwind::WHITE).fg(tailwind::BLACK),
+                        )
                         .block(block);
 
                     let mut s = s.borrow_mut();

@@ -22,7 +22,6 @@ pub mod ui;
 
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
-use crossterm::event as ct;
 use datafusion_app::config::merge_configs;
 use datafusion_app::extensions::DftSessionStateBuilder;
 use datafusion_app::local::ExecutionContext;
@@ -237,7 +236,7 @@ impl<'app> App<'app> {
         let _event_tx = self.event_tx();
 
         self.task = tokio::spawn(async move {
-            let mut reader = ct::EventStream::new();
+            let mut reader = crossterm::event::EventStream::new();
             let mut render_interval = tokio::time::interval(render_delay);
             debug!("Render interval: {:?}", render_interval);
             _event_tx.send(AppEvent::Init).unwrap();

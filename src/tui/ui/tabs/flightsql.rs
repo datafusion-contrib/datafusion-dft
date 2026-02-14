@@ -73,7 +73,9 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
             match maybe_table {
                 Ok(table) => {
                     let table = table
-                        .highlight_style(Style::default().bg(tailwind::WHITE).fg(tailwind::BLACK))
+                        .row_highlight_style(
+                            Style::default().bg(tailwind::WHITE).fg(tailwind::BLACK),
+                        )
                         .block(block);
 
                     let mut s = s.borrow_mut();
