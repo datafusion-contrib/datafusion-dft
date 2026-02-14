@@ -135,9 +135,69 @@ To help with this the `--analyze` flag can used to generate a summary of the und
 
 This feature is still in it's early stages and is expected to evolve.  Once it has gone through enough real world testing and it has been confirmed the metrics make sense documentation will be added on the exact calculations - until then the source will need to be inspected to see the calculations.
 
+### Local Analyze
+
 ```sh
-dft -c "SELECT ..." --analyze
+# Analyze a query locally
+dft -c "SELECT * FROM table WHERE id > 100" --analyze
+
+# Analyze from a file
+dft -f query.sql --analyze
 ```
+
+### FlightSQL Analyze
+
+The `--analyze` flag also works with FlightSQL execution, providing identical output to local analyze:
+
+```sh
+# Analyze query on FlightSQL server
+dft -c "SELECT * FROM table WHERE id > 100" --analyze --flightsql
+
+# Analyze from a file via FlightSQL
+dft -f query.sql --analyze --flightsql
+```
+
+**Requirements:**
+- The FlightSQL server must support the `"analyze_query"` custom action
+- See the [FlightSQL Analyze Protocol Specification](flightsql_analyze_protocol.md) for implementation details
+- Servers without analyze support will return an "unimplemented" error
+
+**How it works:**
+1. Client sends a `do_action("analyze_query")` request with the SQL query
+2. Server executes the query with metrics collection enabled
+3. Server serializes execution statistics to Arrow IPC format (two batches: queries + metrics)
+4. Client deserializes and reconstructs the full execution statistics
+5. Output is formatted identically to local analyze
+
+### Analyze Output
+
+Both local and FlightSQL analyze produce identical output including:
+
+- **Execution Summary**: Output rows/bytes, batch counts, selectivity ratios
+- **Timing Breakdown**: Parsing, logical planning, physical planning, execution, total time
+- **I/O Statistics**: Bytes scanned, file opening/scanning times
+- **Parquet Metrics** (when applicable):
+  - Row group pruning effectiveness (statistics, bloom filters, page index)
+  - Per-row-group timing
+- **Compute Statistics**: Per-operator elapsed compute time by partition
+  - Breakdown by operator category (filter, sort, projection, join, aggregate)
+  - Min/median/mean/max timing per operator
+
+### Raw Metrics Mode
+
+For debugging or custom analysis, use `--analyze-raw` to print the raw metrics table without formatting:
+
+```sh
+# Local raw metrics
+dft -c "SELECT ..." --analyze-raw
+
+# FlightSQL raw metrics
+dft -c "SELECT ..." --analyze-raw --flightsql
+```
+
+This outputs two Arrow tables:
+1. **Queries table**: Contains the query text
+2. **Metrics table**: Flat table with columns (metric_name, value, value_type, operator_name, partition_id, operator_category)
 
 ## Generate TPC-H Data
 

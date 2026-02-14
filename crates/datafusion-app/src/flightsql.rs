@@ -472,4 +472,96 @@ impl FlightSQLContext {
             ))
         }
     }
+
+    /// Get raw metrics batches without reconstruction (for --analyze-raw)
+    pub async fn analyze_query_raw(
+        &self,
+        query: &str,
+    ) -> Result<(datafusion::arrow::array::RecordBatch, datafusion::arrow::array::RecordBatch)> {
+        self.fetch_analyze_batches(query).await
+    }
+
+    /// Reconstruct ExecutionStats from metrics (for --analyze)
+    pub async fn analyze_query(&self, query: &str) -> Result<crate::stats::ExecutionStats> {
+        use datafusion::arrow::array::StringArray;
+
+        let (queries_batch, metrics_batch) = self.fetch_analyze_batches(query).await?;
+
+        // Extract query string from queries batch
+        let query_array = queries_batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .ok_or_else(|| eyre::eyre!("Invalid queries batch schema"))?;
+        let query_str = query_array.value(0).to_string();
+
+        // Reconstruct ExecutionStats from metrics table
+        let stats = crate::stats::ExecutionStats::from_metrics_table(metrics_batch, query_str)?;
+
+        Ok(stats)
+    }
+
+    /// Shared logic to fetch analyze batches from server
+    async fn fetch_analyze_batches(
+        &self,
+        query: &str,
+    ) -> Result<(datafusion::arrow::array::RecordBatch, datafusion::arrow::array::RecordBatch)> {
+        use arrow_flight::utils::flight_data_to_batches;
+        use arrow_flight::{Action, FlightData};
+
+        // 1. Create Action with type "analyze_query" and SQL in body
+        let action = Action {
+            r#type: "analyze_query".to_string(),
+            body: query.as_bytes().to_vec().into(),
+        };
+
+        // 2. Call do_action on the FlightSQL service
+        let mut client = self.client.lock().await;
+        let client = client
+            .as_mut()
+            .ok_or_else(|| eyre::eyre!("No FlightSQL client configured"))?;
+
+        let mut stream = client
+            .do_action(action.into_request())
+            .await
+            .map_err(|e| eyre::eyre!("do_action failed: {}", e))?;
+
+        // 3. Collect all Result messages from stream
+        let mut result_messages = Vec::new();
+        while let Some(result) = stream.next().await {
+            let result = result.map_err(|e| eyre::eyre!("Stream error: {}", e))?;
+            result_messages.push(result);
+        }
+
+        // 4. Decode each Result message to FlightData
+        let mut all_flight_data = Vec::new();
+
+        for result in result_messages {
+            // Deserialize the FlightData from the Result.body bytes using prost
+            // Note: FlightData implements prost::Message
+            let flight_data = <FlightData as prost::Message>::decode(result.body.as_ref())
+                .map_err(|e| eyre::eyre!("Failed to decode FlightData: {}", e))?;
+
+            all_flight_data.push(flight_data);
+        }
+
+        // 5. Convert all FlightData to RecordBatches using flight_data_to_batches
+        let batches = flight_data_to_batches(&all_flight_data)
+            .map_err(|e| eyre::eyre!("Failed to decode batches: {}", e))?;
+
+        // 6. Split batches - first set is queries (1 batch with schema), second set is metrics
+        // The batches_to_flight_data function generates: [schema, data batch] for each table
+        // So we expect: [queries_schema, queries_batch, metrics_schema, metrics_batch]
+        // But flight_data_to_batches returns just the data batches, not schemas
+        // So we expect: [queries_batch, metrics_batch]
+
+        if batches.len() < 2 {
+            return Err(eyre::eyre!(
+                "Invalid analyze response: expected at least 2 batches, got {}",
+                batches.len()
+            ));
+        }
+
+        Ok((batches[0].clone(), batches[1].clone()))
+    }
 }

@@ -16,9 +16,14 @@
 // under the License.
 
 use datafusion::{
+    arrow::{
+        array::{Array, ArrayRef, Int32Array, RecordBatch, StringArray, UInt64Array},
+        datatypes::{DataType, Field, Schema, SchemaRef},
+    },
     datasource::{physical_plan::ParquetSource, source::DataSourceExec},
     physical_plan::{
         aggregates::AggregateExec,
+        empty::EmptyExec,
         filter::FilterExec,
         joins::{
             CrossJoinExec, HashJoinExec, NestedLoopJoinExec, SortMergeJoinExec,
@@ -31,7 +36,8 @@ use datafusion::{
     },
 };
 use itertools::Itertools;
-use std::{sync::Arc, time::Duration};
+use log::debug;
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 #[derive(Clone, Debug)]
 pub struct ExecutionStats {
@@ -750,6 +756,590 @@ pub fn collect_plan_compute_stats(plan: Arc<dyn ExecutionPlan>) -> Option<Execut
         Some(visitor.into())
     } else {
         None
+    }
+}
+
+/// Standard Arrow schema for analyze metrics
+pub fn analyze_metrics_schema() -> SchemaRef {
+    Arc::new(Schema::new(vec![
+        Field::new("metric_name", DataType::Utf8, false),
+        Field::new("value", DataType::UInt64, false),
+        Field::new("value_type", DataType::Utf8, false),
+        Field::new("operator_name", DataType::Utf8, true),
+        Field::new("partition_id", DataType::Int32, true),
+        Field::new("operator_category", DataType::Utf8, true),
+    ]))
+}
+
+/// Standard Arrow schema for queries batch
+fn queries_schema() -> SchemaRef {
+    Arc::new(Schema::new(vec![Field::new(
+        "query",
+        DataType::Utf8,
+        false,
+    )]))
+}
+
+/// Helper to build metrics table rows
+struct MetricsTableBuilder {
+    metric_names: Vec<String>,
+    values: Vec<u64>,
+    value_types: Vec<String>,
+    operator_names: Vec<Option<String>>,
+    partition_ids: Vec<Option<i32>>,
+    operator_categories: Vec<Option<String>>,
+}
+
+impl MetricsTableBuilder {
+    fn new() -> Self {
+        Self {
+            metric_names: Vec::new(),
+            values: Vec::new(),
+            value_types: Vec::new(),
+            operator_names: Vec::new(),
+            partition_ids: Vec::new(),
+            operator_categories: Vec::new(),
+        }
+    }
+
+    fn add(
+        &mut self,
+        metric_name: &str,
+        value: u64,
+        value_type: &str,
+        operator_name: Option<&str>,
+        partition_id: Option<i32>,
+        operator_category: Option<&str>,
+    ) {
+        self.metric_names.push(metric_name.to_string());
+        self.values.push(value);
+        self.value_types.push(value_type.to_string());
+        self.operator_names.push(operator_name.map(String::from));
+        self.partition_ids.push(partition_id);
+        self.operator_categories
+            .push(operator_category.map(String::from));
+    }
+
+    fn build(self, schema: SchemaRef) -> color_eyre::Result<RecordBatch> {
+        let metric_names_array: ArrayRef = Arc::new(StringArray::from(self.metric_names));
+        let values_array: ArrayRef = Arc::new(UInt64Array::from(self.values));
+        let value_types_array: ArrayRef = Arc::new(StringArray::from(self.value_types));
+        let operator_names_array: ArrayRef = Arc::new(StringArray::from(self.operator_names));
+        let partition_ids_array: ArrayRef = Arc::new(Int32Array::from(self.partition_ids));
+        let operator_categories_array: ArrayRef =
+            Arc::new(StringArray::from(self.operator_categories));
+
+        Ok(RecordBatch::try_new(
+            schema,
+            vec![
+                metric_names_array,
+                values_array,
+                value_types_array,
+                operator_names_array,
+                partition_ids_array,
+                operator_categories_array,
+            ],
+        )?)
+    }
+}
+
+/// Create a queries batch from a list of queries
+pub fn create_queries_batch(queries: Vec<String>) -> color_eyre::Result<RecordBatch> {
+    let schema = queries_schema();
+    let query_array: ArrayRef = Arc::new(StringArray::from(queries));
+    Ok(RecordBatch::try_new(schema, vec![query_array])?)
+}
+
+impl ExecutionStats {
+    /// Get raw metrics batches (for --analyze-raw)
+    pub fn to_raw_batches(&self) -> color_eyre::Result<(RecordBatch, RecordBatch)> {
+        let queries_batch = create_queries_batch(vec![self.query.clone()])?;
+        let metrics_batch = self.to_metrics_table()?;
+        Ok((queries_batch, metrics_batch))
+    }
+
+    /// Serialize ExecutionStats to metrics table format
+    pub fn to_metrics_table(&self) -> color_eyre::Result<RecordBatch> {
+        let schema = analyze_metrics_schema();
+        let mut rows = MetricsTableBuilder::new();
+
+        // Add basic metrics
+        rows.add("rows", self.rows as u64, "count", None, None, None);
+        rows.add("batches", self.batches as u64, "count", None, None, None);
+        rows.add("bytes", self.bytes as u64, "bytes", None, None, None);
+
+        // Add duration metrics
+        rows.add(
+            "parsing",
+            self.durations.parsing.as_nanos() as u64,
+            "duration_ns",
+            None,
+            None,
+            None,
+        );
+        rows.add(
+            "logical_planning",
+            self.durations.logical_planning.as_nanos() as u64,
+            "duration_ns",
+            None,
+            None,
+            None,
+        );
+        rows.add(
+            "physical_planning",
+            self.durations.physical_planning.as_nanos() as u64,
+            "duration_ns",
+            None,
+            None,
+            None,
+        );
+        rows.add(
+            "execution",
+            self.durations.execution.as_nanos() as u64,
+            "duration_ns",
+            None,
+            None,
+            None,
+        );
+        rows.add(
+            "total",
+            self.durations.total.as_nanos() as u64,
+            "duration_ns",
+            None,
+            None,
+            None,
+        );
+
+        // Add IO metrics if present
+        if let Some(io) = &self.io {
+            if let Some(bytes) = &io.bytes_scanned {
+                rows.add(
+                    "bytes_scanned",
+                    bytes.as_usize() as u64,
+                    "bytes",
+                    Some("ParquetExec"),
+                    None,
+                    Some("io"),
+                );
+            }
+            if let Some(time) = &io.time_opening {
+                rows.add(
+                    "time_opening",
+                    time.as_usize() as u64,
+                    "duration_ns",
+                    Some("ParquetExec"),
+                    None,
+                    Some("io"),
+                );
+            }
+            if let Some(time) = &io.time_scanning {
+                rows.add(
+                    "time_scanning",
+                    time.as_usize() as u64,
+                    "duration_ns",
+                    Some("ParquetExec"),
+                    None,
+                    Some("io"),
+                );
+            }
+            if let Some(output_rows) = io.parquet_output_rows {
+                rows.add(
+                    "output_rows",
+                    output_rows as u64,
+                    "count",
+                    Some("ParquetExec"),
+                    None,
+                    Some("io"),
+                );
+            }
+            if let Some(pruned) = &io.parquet_rg_pruned_stats {
+                rows.add(
+                    "parquet_rg_pruned",
+                    pruned.as_usize() as u64,
+                    "count",
+                    Some("ParquetExec"),
+                    None,
+                    Some("io"),
+                );
+            }
+            if let Some(matched) = &io.parquet_rg_matched_stats {
+                rows.add(
+                    "parquet_rg_matched",
+                    matched.as_usize() as u64,
+                    "count",
+                    Some("ParquetExec"),
+                    None,
+                    Some("io"),
+                );
+            }
+            if let Some(pruned) = &io.parquet_rg_pruned_bloom_filter {
+                rows.add(
+                    "parquet_bloom_pruned",
+                    pruned.as_usize() as u64,
+                    "count",
+                    Some("ParquetExec"),
+                    None,
+                    Some("io"),
+                );
+            }
+            if let Some(matched) = &io.parquet_rg_matched_bloom_filter {
+                rows.add(
+                    "parquet_bloom_matched",
+                    matched.as_usize() as u64,
+                    "count",
+                    Some("ParquetExec"),
+                    None,
+                    Some("io"),
+                );
+            }
+            if let Some(pruned) = &io.parquet_pruned_page_index {
+                rows.add(
+                    "parquet_page_index_pruned",
+                    pruned.as_usize() as u64,
+                    "count",
+                    Some("ParquetExec"),
+                    None,
+                    Some("io"),
+                );
+            }
+            if let Some(matched) = &io.parquet_matched_page_index {
+                rows.add(
+                    "parquet_page_index_matched",
+                    matched.as_usize() as u64,
+                    "count",
+                    Some("ParquetExec"),
+                    None,
+                    Some("io"),
+                );
+            }
+        }
+
+        // Add compute metrics if present
+        if let Some(compute) = &self.compute {
+            if let Some(elapsed) = compute.elapsed_compute {
+                rows.add("elapsed_compute", elapsed as u64, "duration_ns", None, None, None);
+            }
+
+            // Helper to add compute metrics for a category
+            let add_compute_category = |rows: &mut MetricsTableBuilder,
+                                         compute_stats: &Option<Vec<PartitionsComputeStats>>,
+                                         category: &str| {
+                if let Some(stats) = compute_stats {
+                    for stat in stats {
+                        for (partition_id, elapsed) in stat.elapsed_computes.iter().enumerate() {
+                            rows.add(
+                                "elapsed_compute",
+                                *elapsed as u64,
+                                "duration_ns",
+                                Some(&stat.name),
+                                Some(partition_id as i32),
+                                Some(category),
+                            );
+                        }
+                    }
+                }
+            };
+
+            add_compute_category(&mut rows, &compute.filter_compute, "filter");
+            add_compute_category(&mut rows, &compute.sort_compute, "sort");
+            add_compute_category(&mut rows, &compute.projection_compute, "projection");
+            add_compute_category(&mut rows, &compute.join_compute, "join");
+            add_compute_category(&mut rows, &compute.aggregate_compute, "aggregate");
+            add_compute_category(&mut rows, &compute.other_compute, "other");
+        }
+
+        rows.build(schema)
+    }
+
+    /// Deserialize ExecutionStats from metrics table
+    pub fn from_metrics_table(
+        batch: RecordBatch,
+        query: String,
+    ) -> color_eyre::Result<Self> {
+        let mut stats_builder = ExecutionStatsBuilder::new(query);
+
+        // Extract column arrays
+        let metric_names = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .ok_or_else(|| color_eyre::eyre::eyre!("Invalid metric_name column type"))?;
+        let values = batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .ok_or_else(|| color_eyre::eyre::eyre!("Invalid value column type"))?;
+        let value_types = batch
+            .column(2)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .ok_or_else(|| color_eyre::eyre::eyre!("Invalid value_type column type"))?;
+        let operator_names = batch
+            .column(3)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .ok_or_else(|| color_eyre::eyre::eyre!("Invalid operator_name column type"))?;
+        let partition_ids = batch
+            .column(4)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .ok_or_else(|| color_eyre::eyre::eyre!("Invalid partition_id column type"))?;
+        let operator_categories = batch
+            .column(5)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .ok_or_else(|| color_eyre::eyre::eyre!("Invalid operator_category column type"))?;
+
+        // Iterate rows and populate stats
+        for row_idx in 0..batch.num_rows() {
+            let metric_name = metric_names.value(row_idx);
+            let value = values.value(row_idx);
+            let value_type = value_types.value(row_idx);
+            let operator_name = if operator_names.is_null(row_idx) {
+                None
+            } else {
+                Some(operator_names.value(row_idx))
+            };
+            let partition_id = if partition_ids.is_null(row_idx) {
+                None
+            } else {
+                Some(partition_ids.value(row_idx))
+            };
+            let operator_category = if operator_categories.is_null(row_idx) {
+                None
+            } else {
+                Some(operator_categories.value(row_idx))
+            };
+
+            stats_builder.add_metric(
+                metric_name,
+                value,
+                value_type,
+                operator_name,
+                partition_id,
+                operator_category,
+            )?;
+        }
+
+        stats_builder.build()
+    }
+}
+
+/// Helper builder to construct ExecutionStats from metrics
+struct ExecutionStatsBuilder {
+    query: String,
+    rows: usize,
+    batches: i32,
+    bytes: usize,
+    parsing: Duration,
+    logical_planning: Duration,
+    physical_planning: Duration,
+    execution: Duration,
+    total: Duration,
+    io_metrics: HashMap<String, u64>,
+    compute_metrics: HashMap<String, Vec<(String, Option<i32>, u64)>>,
+    elapsed_compute: Option<usize>,
+}
+
+impl ExecutionStatsBuilder {
+    fn new(query: String) -> Self {
+        Self {
+            query,
+            rows: 0,
+            batches: 0,
+            bytes: 0,
+            parsing: Duration::ZERO,
+            logical_planning: Duration::ZERO,
+            physical_planning: Duration::ZERO,
+            execution: Duration::ZERO,
+            total: Duration::ZERO,
+            io_metrics: HashMap::new(),
+            compute_metrics: HashMap::new(),
+            elapsed_compute: None,
+        }
+    }
+
+    fn add_metric(
+        &mut self,
+        name: &str,
+        value: u64,
+        _value_type: &str,
+        operator: Option<&str>,
+        partition: Option<i32>,
+        category: Option<&str>,
+    ) -> color_eyre::Result<()> {
+        match (name, category) {
+            ("rows", None) => self.rows = value as usize,
+            ("batches", None) => self.batches = value as i32,
+            ("bytes", None) => self.bytes = value as usize,
+            ("parsing", None) => self.parsing = Duration::from_nanos(value),
+            ("logical_planning", None) => self.logical_planning = Duration::from_nanos(value),
+            ("physical_planning", None) => self.physical_planning = Duration::from_nanos(value),
+            ("execution", None) => self.execution = Duration::from_nanos(value),
+            ("total", None) => self.total = Duration::from_nanos(value),
+            ("elapsed_compute", None) => self.elapsed_compute = Some(value as usize),
+            (metric, Some("io")) => {
+                self.io_metrics.insert(metric.to_string(), value);
+            }
+            ("elapsed_compute", Some(cat)) => {
+                self.compute_metrics
+                    .entry(cat.to_string())
+                    .or_default()
+                    .push((
+                        operator.unwrap_or("Unknown").to_string(),
+                        partition,
+                        value,
+                    ));
+            }
+            _ => {
+                debug!("Unknown metric: {} (category: {:?})", name, category);
+            }
+        }
+        Ok(())
+    }
+
+    fn build(self) -> color_eyre::Result<ExecutionStats> {
+        // Build IO stats from collected metrics
+        let io = if !self.io_metrics.is_empty() {
+            Some(ExecutionIOStats::from_metrics(self.io_metrics)?)
+        } else {
+            None
+        };
+
+        // Build compute stats from collected metrics
+        let compute = if !self.compute_metrics.is_empty() || self.elapsed_compute.is_some() {
+            Some(ExecutionComputeStats::from_metrics(
+                self.compute_metrics,
+                self.elapsed_compute,
+            )?)
+        } else {
+            None
+        };
+
+        // Create dummy plan (not serialized)
+        let plan = Arc::new(EmptyExec::new(Arc::new(Schema::empty())));
+
+        let durations = ExecutionDurationStats::new(
+            self.parsing,
+            self.logical_planning,
+            self.physical_planning,
+            self.execution,
+            self.total,
+        );
+
+        Ok(ExecutionStats {
+            query: self.query,
+            rows: self.rows,
+            batches: self.batches,
+            bytes: self.bytes,
+            durations,
+            io,
+            compute,
+            plan,
+        })
+    }
+}
+
+impl ExecutionIOStats {
+    fn from_metrics(metrics: HashMap<String, u64>) -> color_eyre::Result<Self> {
+        use datafusion::physical_plan::metrics::{Count, Time};
+
+        // Helper to create Count from value
+        let create_count = |value: u64| -> MetricValue {
+            let count = Count::new();
+            count.add(value as usize);
+            MetricValue::Count {
+                name: "count".into(),
+                count,
+            }
+        };
+
+        // Helper to create Time from value
+        let create_time = |value: u64| -> MetricValue {
+            let time = Time::new();
+            time.add_duration(std::time::Duration::from_nanos(value));
+            MetricValue::Time {
+                name: "time".into(),
+                time,
+            }
+        };
+
+        Ok(Self {
+            bytes_scanned: metrics.get("bytes_scanned").map(|v| create_count(*v)),
+            time_opening: metrics.get("time_opening").map(|v| create_time(*v)),
+            time_scanning: metrics.get("time_scanning").map(|v| create_time(*v)),
+            parquet_output_rows: metrics.get("output_rows").map(|v| *v as usize),
+            parquet_pruned_page_index: metrics.get("parquet_page_index_pruned").map(|v| create_count(*v)),
+            parquet_matched_page_index: metrics.get("parquet_page_index_matched").map(|v| create_count(*v)),
+            parquet_rg_pruned_stats: metrics.get("parquet_rg_pruned").map(|v| create_count(*v)),
+            parquet_rg_matched_stats: metrics.get("parquet_rg_matched").map(|v| create_count(*v)),
+            parquet_rg_pruned_bloom_filter: metrics.get("parquet_bloom_pruned").map(|v| create_count(*v)),
+            parquet_rg_matched_bloom_filter: metrics.get("parquet_bloom_matched").map(|v| create_count(*v)),
+        })
+    }
+}
+
+impl ExecutionComputeStats {
+    fn from_metrics(
+        metrics: HashMap<String, Vec<(String, Option<i32>, u64)>>,
+        elapsed_compute: Option<usize>,
+    ) -> color_eyre::Result<Self> {
+        // Helper to convert metrics to PartitionsComputeStats
+        let to_partition_stats =
+            |entries: &[(String, Option<i32>, u64)]| -> Vec<PartitionsComputeStats> {
+                // Group by operator name
+                let mut by_operator: HashMap<String, Vec<(i32, u64)>> = HashMap::new();
+                for (op_name, partition_id, value) in entries {
+                    if let Some(pid) = partition_id {
+                        by_operator
+                            .entry(op_name.clone())
+                            .or_default()
+                            .push((*pid, *value));
+                    }
+                }
+
+                by_operator
+                    .into_iter()
+                    .map(|(name, mut partitions)| {
+                        // Sort by partition ID to ensure correct ordering
+                        partitions.sort_by_key(|(pid, _)| *pid);
+                        let elapsed_computes: Vec<usize> =
+                            partitions.iter().map(|(_, v)| *v as usize).collect();
+                        PartitionsComputeStats {
+                            name,
+                            elapsed_computes,
+                        }
+                    })
+                    .collect()
+            };
+
+        Ok(Self {
+            elapsed_compute,
+            projection_compute: metrics
+                .get("projection")
+                .map(|m| to_partition_stats(m))
+                .filter(|v| !v.is_empty()),
+            filter_compute: metrics
+                .get("filter")
+                .map(|m| to_partition_stats(m))
+                .filter(|v| !v.is_empty()),
+            sort_compute: metrics
+                .get("sort")
+                .map(|m| to_partition_stats(m))
+                .filter(|v| !v.is_empty()),
+            join_compute: metrics
+                .get("join")
+                .map(|m| to_partition_stats(m))
+                .filter(|v| !v.is_empty()),
+            aggregate_compute: metrics
+                .get("aggregate")
+                .map(|m| to_partition_stats(m))
+                .filter(|v| !v.is_empty()),
+            other_compute: metrics
+                .get("other")
+                .map(|m| to_partition_stats(m))
+                .filter(|v| !v.is_empty()),
+        })
     }
 }
 

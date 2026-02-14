@@ -839,6 +839,97 @@ impl FlightSqlService for FlightSqlServiceImpl {
         res
     }
 
+    async fn do_action_fallback(
+        &self,
+        request: Request<Action>,
+    ) -> Result<Response<<Self as FlightService>::DoActionStream>, Status> {
+        use arrow_flight::utils::batches_to_flight_data;
+        let action = request.into_inner();
+        counter!("requests", "endpoint" => "do_action_fallback").increment(1);
+        let start = Timestamp::now();
+
+        match action.r#type.as_str() {
+            "analyze_query" => {
+                // 1. Extract SQL query from action.body
+                let sql = String::from_utf8(action.body.to_vec())
+                    .map_err(|e| Status::invalid_argument(format!("Invalid UTF-8: {}", e)))?;
+
+                info!("Analyzing query via do_action: {}", sql);
+
+                // 2. Execute analyze_query on ExecutionContext
+                let mut stats = self
+                    .execution
+                    .analyze_query(&sql)
+                    .await
+                    .map_err(|e| Status::internal(format!("Analyze failed: {}", e)))?;
+
+                stats.collect_stats(); // Collect IO and compute metrics from plan
+
+                // 3. Convert ExecutionStats to metrics table format
+                let (queries_batch, metrics_batch) = stats
+                    .to_raw_batches()
+                    .map_err(|e| Status::internal(format!("Metrics serialization failed: {}", e)))?;
+
+                // 4. Encode both batches as FlightData and combine into a single stream
+                let queries_flight = batches_to_flight_data(&queries_batch.schema(), vec![queries_batch])
+                    .map_err(|e| Status::internal(format!("Failed to encode queries batch: {}", e)))?
+                    .into_iter();
+
+                let metrics_flight = batches_to_flight_data(&metrics_batch.schema(), vec![metrics_batch])
+                    .map_err(|e| Status::internal(format!("Failed to encode metrics batch: {}", e)))?
+                    .into_iter();
+
+                // Combine both iterators into a single vector
+                let all_flight_data: Vec<_> = queries_flight.chain(metrics_flight).collect();
+
+                // Convert FlightData to arrow_flight::Result messages
+                let results: Vec<arrow_flight::Result> = all_flight_data
+                    .into_iter()
+                    .map(|flight_data| {
+                        // Serialize FlightData to bytes
+                        let bytes = flight_data.encode_to_vec();
+                        arrow_flight::Result {
+                            body: bytes.into(),
+                        }
+                    })
+                    .collect();
+
+                // Create stream of Result messages
+                let stream = futures::stream::iter(results.into_iter().map(Ok)).boxed();
+
+                // Record metrics
+                let duration = Timestamp::now() - start;
+                histogram!("do_action_analyze_query_latency_ms")
+                    .record(duration.get_milliseconds() as f64);
+
+                let ctx = self.execution.session_ctx();
+                let req = ObservabilityRequestDetails {
+                    request_id: None,
+                    path: "/do_action/analyze_query".to_string(),
+                    sql: Some(sql),
+                    start_ms: start.as_millisecond(),
+                    duration_ms: duration.get_milliseconds(),
+                    rows: None,
+                    status: 0,
+                };
+                if let Err(e) = self
+                    .execution
+                    .observability()
+                    .try_record_request(ctx, req)
+                    .await
+                {
+                    error!("Error recording request: {}", e);
+                }
+
+                Ok(Response::new(stream))
+            }
+            _ => Err(Status::unimplemented(format!(
+                "Unknown action: {}",
+                action.r#type
+            ))),
+        }
+    }
+
     async fn register_sql_info(&self, _id: i32, _result: &SqlInfo) {}
 }
 

@@ -274,9 +274,6 @@ impl CliApp {
             (_, _, _, true, true) => Err(eyre!(
                 "The `benchmark` and `analyze` flags are mutually exclusive"
             )),
-            (_, _, true, false, true) => Err(eyre!(
-                "The `analyze` flag is not currently supported with FlightSQL"
-            )),
 
             // Execution cases
             (true, false, false, false, false) => self.execute_commands(&self.args.commands).await,
@@ -303,6 +300,12 @@ impl CliApp {
             // Analyze cases
             (true, false, false, false, true) => self.analyze_commands(&self.args.commands).await,
             (false, true, false, false, true) => self.analyze_files(&self.args.files).await,
+            (true, false, true, false, true) => {
+                self.flightsql_analyze_commands(&self.args.commands).await
+            }
+            (false, true, true, false, true) => {
+                self.flightsql_analyze_files(&self.args.files).await
+            }
         }
     }
 
@@ -525,6 +528,77 @@ impl CliApp {
         }
 
         Ok(())
+    }
+
+    #[cfg(feature = "flightsql")]
+    async fn flightsql_analyze_commands(&self, commands: &[String]) -> Result<()> {
+        info!("Analyzing FlightSQL commands: {:?}", commands);
+        for command in commands {
+            self.flightsql_analyze_from_string(command).await?;
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "flightsql")]
+    async fn flightsql_analyze_files(&self, files: &[PathBuf]) -> Result<()> {
+        info!("Analyzing FlightSQL files: {:?}", files);
+        for file in files {
+            let sql = std::fs::read_to_string(file)?;
+            // Split SQL into statements and analyze each one
+            let statements = self.split_sql(&sql);
+            for statement_sql in statements {
+                self.flightsql_analyze_from_string(&statement_sql).await?;
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "flightsql")]
+    async fn flightsql_analyze_from_string(&self, sql: &str) -> Result<()> {
+        if self.args.analyze_raw {
+            // Raw mode: print metrics table directly
+            let (queries_batch, metrics_batch) = self
+                .app_execution
+                .flightsql_ctx()
+                .analyze_query_raw(sql)
+                .await?;
+
+            println!("==================== Queries ====================");
+            self.print_batch(&queries_batch)?;
+            println!("\n==================== Metrics ====================");
+            self.print_batch(&metrics_batch)?;
+        } else {
+            // Normal mode: reconstruct and display ExecutionStats
+            let stats = self
+                .app_execution
+                .flightsql_ctx()
+                .analyze_query(sql)
+                .await?;
+
+            // Display using existing ExecutionStats::Display implementation
+            println!("{}", stats);
+        }
+        Ok(())
+    }
+
+    fn print_batch(&self, batch: &datafusion::arrow::array::RecordBatch) -> Result<()> {
+        use datafusion::arrow::util::pretty::print_batches;
+        print_batches(&[batch.clone()])?;
+        Ok(())
+    }
+
+    fn split_sql(&self, sql: &str) -> Vec<String> {
+        use datafusion::sql::parser::DFParser;
+        use datafusion::sql::sqlparser::dialect::GenericDialect;
+
+        let dialect = GenericDialect {};
+        let statements = DFParser::parse_sql_with_dialect(sql, &dialect)
+            .unwrap_or_default();
+
+        statements
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect()
     }
 
     async fn exec_from_string(&self, sql: &str) -> Result<()> {
