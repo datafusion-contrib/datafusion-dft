@@ -159,9 +159,9 @@ jobs:
           awslocal s3 mv data/aggregate_test_100.csv s3://test/
           awslocal s3 mb s3://tpch-db
           echo "Test Execution complete!"
-      - name: Run CLI tests
+      - name: Run TUI tests
         run: |
-          cargo test tui_cases
+          cargo test --features=tui tui_cases
 
   test-s3:
     name: Extension / S3

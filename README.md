@@ -14,10 +14,10 @@ Documentation is undergoing a significant revamp - the new documentation will be
 
 The project offers four complementary interfaces:
 
-1. **Text User Interface (TUI)**: An interactive SQL IDE with real-time query analysis, benchmarking, and catalog exploration
+1. **Text User Interface (TUI)**: An interactive SQL IDE with real-time query analysis, benchmarking, and catalog exploration (requires `tui` feature)
 2. **Command Line Interface (CLI)**: A scriptable engine for executing queries from files or command line
-3. **FlightSQL Server**: A standards-compliant SQL interface for programmatic access
-4. **HTTP Server**: A REST API for SQL queries and catalog exploration
+3. **FlightSQL Server**: A standards-compliant SQL interface for programmatic access (requires `flightsql` feature)
+4. **HTTP Server**: A REST API for SQL queries and catalog exploration (requires `http` feature)
 
 All interfaces share the same execution engine, allowing you to develop locally with the TUI and then seamlessly deploy with the server implementations.
 
@@ -29,10 +29,13 @@ All interfaces share the same execution engine, allowing you to develop locally 
 
 #### From crates.io (Recommended)
 ```sh
-# If you have Rust installed
+# Core CLI and server interfaces
 cargo install datafusion-dft
 
-# For full functionality with all features
+# With TUI interface
+cargo install datafusion-dft --features=tui
+
+# For full functionality with all features (including TUI)
 cargo install datafusion-dft --all-features
 ```
 
@@ -44,19 +47,27 @@ Common feature combinations:
 # Core with S3 support
 cargo install datafusion-dft --features=s3
 
+# With TUI interface
+cargo install datafusion-dft --features=tui
+
+# TUI with S3 and data lake formats
+cargo install datafusion-dft --features=tui,s3,deltalake
+
 # Data lake formats
 cargo install datafusion-dft --features=deltalake
 
 # With JSON and Parquet functions
-cargo install datafusion-dft --features=function-json,functions-parquet
+cargo install datafusion-dft --features=functions-json,functions-parquet
 ```
 
 See the [Features documentation](docs/features.md) for all available features.
 
+**Note**: The TUI (Text User Interface) is optional and requires the `tui` feature flag. The CLI, FlightSQL server, and HTTP server are always available.
+
 ### Running the apps
 
 ```sh
-# Interactive TUI (default)
+# Interactive TUI (requires `tui` feature)
 dft
 
 # CLI with direct query execution
@@ -155,7 +166,7 @@ LOCATION 's3://bucket/delta_table';
 
 #### Loading DDL
 
-- **TUI**: DDL is automatically loaded at startup
+- **TUI** (requires `tui` feature): DDL is automatically loaded at startup
 - **CLI**: Add `--run-ddl` flag to execute DDL before your query
 - **Custom Path**: Configure a custom DDL path in your config file
   ```toml

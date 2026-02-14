@@ -22,9 +22,11 @@ pub mod db;
 pub mod execution;
 #[cfg(any(feature = "flightsql", feature = "http"))]
 pub mod server;
+#[cfg(feature = "tui")]
 pub mod telemetry;
 pub mod test_utils;
 pub mod tpch;
+#[cfg(feature = "tui")]
 pub mod tui;
 
 pub const APP_NAME: &str = "dft";

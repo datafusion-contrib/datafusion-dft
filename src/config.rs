@@ -71,6 +71,7 @@ pub struct CliConfig {
     pub execution: ExecutionConfig,
 }
 
+#[cfg(feature = "tui")]
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct TuiConfig {
     #[serde(default = "default_execution_config")]
@@ -170,6 +171,7 @@ pub struct AppConfig {
     pub shared: ExecutionConfig,
     #[serde(default)]
     pub cli: CliConfig,
+    #[cfg(feature = "tui")]
     #[serde(default)]
     pub tui: TuiConfig,
     #[cfg(feature = "flightsql")]
@@ -189,10 +191,12 @@ fn default_execution_config() -> ExecutionConfig {
     ExecutionConfig::default()
 }
 
+#[cfg(feature = "tui")]
 fn default_display_config() -> DisplayConfig {
     DisplayConfig::default()
 }
 
+#[cfg(feature = "tui")]
 fn default_interaction_config() -> InteractionConfig {
     InteractionConfig::default()
 }
@@ -229,16 +233,19 @@ fn default_db_path() -> Url {
     Url::parse(&with_schema).unwrap()
 }
 
+#[cfg(feature = "tui")]
 #[derive(Clone, Debug, Deserialize)]
 pub struct DisplayConfig {
     #[serde(default = "default_frame_rate")]
     pub frame_rate: f64,
 }
 
+#[cfg(feature = "tui")]
 fn default_frame_rate() -> f64 {
     30.0
 }
 
+#[cfg(feature = "tui")]
 impl Default for DisplayConfig {
     fn default() -> Self {
         Self { frame_rate: 30.0 }
@@ -250,6 +257,7 @@ fn default_benchmark_iterations() -> usize {
     10
 }
 
+#[cfg(feature = "tui")]
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct InteractionConfig {
     #[serde(default = "default_mouse")]
@@ -258,10 +266,12 @@ pub struct InteractionConfig {
     pub paste: bool,
 }
 
+#[cfg(feature = "tui")]
 fn default_mouse() -> bool {
     false
 }
 
+#[cfg(feature = "tui")]
 fn default_paste() -> bool {
     false
 }
@@ -281,11 +291,13 @@ fn default_server_metrics_addr() -> SocketAddr {
     SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 9000)
 }
 
+#[cfg(feature = "tui")]
 #[derive(Clone, Debug, Default, Deserialize)]
 pub struct EditorConfig {
     pub experimental_syntax_highlighting: bool,
 }
 
+#[cfg(feature = "tui")]
 fn default_editor_config() -> EditorConfig {
     EditorConfig::default()
 }

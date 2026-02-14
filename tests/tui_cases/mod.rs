@@ -15,6 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#![cfg(feature = "tui")]
+
 mod ddl;
 #[cfg(feature = "flightsql")]
 mod flightsql_pagination;
