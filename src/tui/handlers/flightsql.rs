@@ -25,15 +25,20 @@ use crate::tui::{handlers::tab_navigation_handler, AppEvent};
 use super::App;
 
 pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
-    match key.code {
-        KeyCode::Char('q') => app.state.should_quit = true,
-        tab @ (KeyCode::Char('1')
-        | KeyCode::Char('2')
-        | KeyCode::Char('3')
-        | KeyCode::Char('4')
-        | KeyCode::Char('5')) => tab_navigation_handler(app, tab),
-        KeyCode::Char('c') => app.state.flightsql_tab.clear_editor(&app.state.config),
-        KeyCode::Char('e') => {
+    match (key.code, key.modifiers) {
+        (KeyCode::Char('q'), KeyModifiers::NONE) => app.state.should_quit = true,
+        (
+            tab @ (KeyCode::Char('1')
+            | KeyCode::Char('2')
+            | KeyCode::Char('3')
+            | KeyCode::Char('4')
+            | KeyCode::Char('5')),
+            KeyModifiers::NONE,
+        ) => tab_navigation_handler(app, tab),
+        (KeyCode::Char('c'), KeyModifiers::NONE) => {
+            app.state.flightsql_tab.clear_editor(&app.state.config)
+        }
+        (KeyCode::Char('e'), KeyModifiers::NONE) => {
             info!("Handling");
             let editor = app.state.flightsql_tab.editor();
             let lines = editor.lines();
@@ -46,14 +51,14 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
             }
             app.state.flightsql_tab.edit();
         }
-        KeyCode::Down => {
+        (KeyCode::Down, KeyModifiers::NONE) => {
             if let Some(s) = app.state.flightsql_tab.query_results_state() {
                 info!("Select next");
                 let mut s = s.borrow_mut();
                 s.select_next();
             }
         }
-        KeyCode::Up => {
+        (KeyCode::Up, KeyModifiers::NONE) => {
             if let Some(s) = app.state.flightsql_tab.query_results_state() {
                 info!("Select previous");
                 let mut s = s.borrow_mut();
@@ -61,7 +66,7 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
             }
         }
 
-        KeyCode::Enter => {
+        (KeyCode::Enter, KeyModifiers::NONE) => {
             info!("Executing FlightSQL query");
             let sql = app.state.flightsql_tab.sql();
             info!("SQL: {}", sql);
@@ -71,13 +76,13 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
             let handle = tokio::spawn(execution.run_flightsqls(sqls, _event_tx));
             app.state.flightsql_tab.set_execution_task(handle);
         }
-        KeyCode::Right => {
+        (KeyCode::Right, KeyModifiers::NONE) => {
             let _event_tx = app.event_tx();
             if let Err(e) = _event_tx.send(AppEvent::FlightSQLExecutionResultsNextPage) {
                 error!("Error going to next FlightSQL results page: {e}");
             }
         }
-        KeyCode::Left => {
+        (KeyCode::Left, KeyModifiers::NONE) => {
             let _event_tx = app.event_tx();
             if let Err(e) = _event_tx.send(AppEvent::FlightSQLExecutionResultsPreviousPage) {
                 error!("Error going to previous FlightSQL results page: {e}");
@@ -94,14 +99,14 @@ pub fn editable_handler(app: &mut App, key: KeyEvent) {
         (KeyCode::Backspace, KeyModifiers::ALT) => app.state.flightsql_tab.delete_word(),
         (KeyCode::Esc, _) => app.state.flightsql_tab.exit_edit(),
         (KeyCode::Enter, KeyModifiers::ALT) => {
-            // TODO: Encapsulate this logic
-            let sql = app.state.sql_tab.sql();
-            info!("Running query: {}", sql);
-            let _event_tx = app.event_tx().clone();
-            let execution = Arc::clone(&app.execution);
+            info!("Executing FlightSQL query");
+            let sql = app.state.flightsql_tab.sql();
+            info!("SQL: {}", sql);
             let sqls: Vec<String> = sql.split(';').map(|s| s.to_string()).collect();
-            let handle = tokio::spawn(execution.run_sqls(sqls, _event_tx));
-            app.state.sql_tab.set_execution_task(handle);
+            let execution = Arc::clone(&app.execution);
+            let _event_tx = app.event_tx();
+            let handle = tokio::spawn(execution.run_flightsqls(sqls, _event_tx));
+            app.state.flightsql_tab.set_execution_task(handle);
         }
 
         _ => app.state.flightsql_tab.update_editor_content(key),
