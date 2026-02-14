@@ -35,7 +35,6 @@ lazy_static = "1.4.0"
 log = "0.4.22"
 metrics = { optional = true, version = "0.24.0" }
 metrics-exporter-prometheus = { optional = true, version = "0.16.0" }
-num_cpus = "1.16"
 object_store = "0.12"
 parquet = "57"
 pin-project-lite = { version = "0.2.14" }

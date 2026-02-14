@@ -565,7 +565,10 @@ impl CliApp {
                 .benchmark_iterations,
         );
         let concurrency = if self.args.concurrent {
-            std::cmp::min(iterations, num_cpus::get())
+            let parallelism = std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(1);
+            std::cmp::min(iterations, parallelism)
         } else {
             1
         };
@@ -612,7 +615,10 @@ impl CliApp {
         // Use a default of 10 if not specified (matches default in FlightSQLConfig)
         let iterations = self.args.benchmark_iterations.unwrap_or(10);
         let concurrency = if self.args.concurrent {
-            std::cmp::min(iterations, num_cpus::get())
+            let parallelism = std::thread::available_parallelism()
+                .map(|n| n.get())
+                .unwrap_or(1);
+            std::cmp::min(iterations, parallelism)
         } else {
             1
         };

@@ -2405,7 +2405,6 @@ dependencies = [
  "log",
  "metrics",
  "metrics-exporter-prometheus",
- "num_cpus",
  "object_store",
  "parquet",
  "pin-project-lite",
