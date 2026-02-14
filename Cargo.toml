@@ -39,7 +39,7 @@ object_store = "0.12"
 parquet = "57"
 pin-project-lite = { version = "0.2.14" }
 prost = "0.14"
-ratatui = { optional = true, version = "0.28.0" }
+ratatui = { optional = true, version = "0.29.0" }
 serde = { features = ["derive"], version = "1.0.197" }
 strum = "0.26.2"
 tokio = { features = [
@@ -64,8 +64,8 @@ tracing = { features = ["log"], version = "0.1.41" }
 tracing-subscriber = { features = ["env-filter"], version = "0.3.19" }
 tui-logger = { features = [
   "tracing-support",
-], optional = true, version = "0.12" }
-tui-textarea = { features = ["search"], optional = true, version = "0.6.1" }
+], optional = true, version = "0.17" }
+tui-textarea = { features = ["search"], optional = true, version = "0.7.0" }
 url = { features = ["serde"], version = "2.5.2" }
 uuid = { optional = true, version = "1.10.0" }
 vortex = { optional = true, version = "0.58" }
