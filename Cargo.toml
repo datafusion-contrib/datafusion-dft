@@ -62,7 +62,9 @@ tpchgen = "2.0"
 tpchgen-arrow = "2.0"
 tracing = { features = ["log"], version = "0.1.41" }
 tracing-subscriber = { features = ["env-filter"], version = "0.3.19" }
-tui-logger = { features = ["tracing-support"], optional = true, version = "0.12" }
+tui-logger = { features = [
+  "tracing-support",
+], optional = true, version = "0.12" }
 tui-textarea = { features = ["search"], optional = true, version = "0.6.1" }
 url = { features = ["serde"], version = "2.5.2" }
 uuid = { optional = true, version = "1.10.0" }
@@ -113,12 +115,7 @@ http = [
 ]
 huggingface = ["datafusion-app/huggingface"]
 s3 = ["datafusion-app/s3"]
-tui = [
-  "dep:crossterm",
-  "dep:ratatui",
-  "dep:tui-logger",
-  "dep:tui-textarea",
-]
+tui = ["dep:crossterm", "dep:ratatui", "dep:tui-logger", "dep:tui-textarea"]
 udfs-wasm = ["datafusion-app/udfs-wasm"]
 vortex = [
   "datafusion-app/vortex",
