@@ -47,7 +47,6 @@ pub fn keyword_regex() -> String {
 
 pub fn keyword_style() -> Style {
     Style::default()
-        .bg(tailwind::BLACK)
         .fg(tailwind::YELLOW.c100)
         .add_modifier(Modifier::BOLD)
 }

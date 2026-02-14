@@ -22,7 +22,7 @@ use ratatui::crossterm::event;
 
 use crate::tui_cases::TestApp;
 
-/// Test that ALT+Enter in SQL tab's edit mode executes the query
+/// Test that ALT+Enter in SQL tab's edit mode executes the query and exits edit mode
 #[tokio::test(flavor = "multi_thread")]
 async fn sql_alt_enter_executes_in_edit_mode() {
     let mut test_app = TestApp::new().await;
@@ -44,7 +44,8 @@ async fn sql_alt_enter_executes_in_edit_mode() {
     let alt_enter = event::KeyEvent::new(event::KeyCode::Enter, event::KeyModifiers::ALT);
     test_app.handle_app_event(AppEvent::Key(alt_enter)).unwrap();
 
-    // Test passes if execution is triggered without panic
+    // Should exit edit mode after execution so user can scroll results
+    assert!(!test_app.state().sql_tab.editable());
 }
 
 /// Test that Enter key in SQL normal mode executes the query

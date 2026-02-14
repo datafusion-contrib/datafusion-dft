@@ -149,6 +149,8 @@ pub fn editable_handler(app: &mut App, key: KeyEvent) {
                     }
                 }
             }
+            // Exit edit mode after executing so user can scroll results
+            app.state.sql_tab.exit_edit();
         }
         _ => app.state.sql_tab.update_editor_content(key),
     }
