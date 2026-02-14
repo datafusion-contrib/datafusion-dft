@@ -20,7 +20,7 @@ arrow-flight = { features = [
 axum = { features = ["macros"], optional = true, version = "0.7.9" }
 clap = { features = ["derive"], version = "4.5.27" }
 color-eyre = "0.6.3"
-crossterm = { features = ["event-stream"], version = "0.28.1" }
+crossterm = { features = ["event-stream"], optional = true, version = "0.28.1" }
 datafusion = { version = "51" }
 datafusion-app = { path = "crates/datafusion-app", version = "0.1.0" }
 directories = "5.0.1"
@@ -39,7 +39,7 @@ object_store = "0.12"
 parquet = "57"
 pin-project-lite = { version = "0.2.14" }
 prost = "0.14"
-ratatui = "0.28.0"
+ratatui = { optional = true, version = "0.28.0" }
 serde = { features = ["derive"], version = "1.0.197" }
 strum = "0.26.2"
 tokio = { features = [
@@ -62,8 +62,10 @@ tpchgen = "2.0"
 tpchgen-arrow = "2.0"
 tracing = { features = ["log"], version = "0.1.41" }
 tracing-subscriber = { features = ["env-filter"], version = "0.3.19" }
-tui-logger = { features = ["tracing-support"], version = "0.12" }
-tui-textarea = { features = ["search"], version = "0.6.1" }
+tui-logger = { features = [
+  "tracing-support",
+], optional = true, version = "0.12" }
+tui-textarea = { features = ["search"], optional = true, version = "0.6.1" }
 url = { features = ["serde"], version = "2.5.2" }
 uuid = { optional = true, version = "1.10.0" }
 vortex = { optional = true, version = "0.58" }
@@ -113,6 +115,7 @@ http = [
 ]
 huggingface = ["datafusion-app/huggingface"]
 s3 = ["datafusion-app/s3"]
+tui = ["dep:crossterm", "dep:ratatui", "dep:tui-logger", "dep:tui-textarea"]
 udfs-wasm = ["datafusion-app/udfs-wasm"]
 vortex = [
   "datafusion-app/vortex",

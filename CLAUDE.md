@@ -14,11 +14,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Build the project (default features: functions-parquet, s3)
 cargo build
 
+# Build with TUI support
+cargo build --features=tui
+
 # Build with all features
 cargo build --all-features
 
-# Run the TUI (default interface)
-cargo run
+# Run the TUI (requires tui feature)
+cargo run --features=tui
 
 # Run CLI with a query
 cargo run -- -c "SELECT 1 + 2"
@@ -93,8 +96,8 @@ cargo test db
 # Run CLI tests
 cargo test cli_cases
 
-# Run TUI tests
-cargo test tui_cases
+# Run TUI tests (requires tui feature)
+cargo test --features=tui tui_cases
 
 # Run feature-specific tests
 cargo test --features=flightsql extension_cases::flightsql -- --test-threads=1
@@ -196,6 +199,7 @@ Both servers share the same `ExecutionContext` from `datafusion-app`.
 
 The project uses extensive feature flags to keep binary size manageable:
 
+- `tui` - Terminal user interface (ratatui-based)
 - `s3` - S3 object store integration (default)
 - `functions-parquet` - Parquet-specific functions (default)
 - `functions-json` - JSON functions
