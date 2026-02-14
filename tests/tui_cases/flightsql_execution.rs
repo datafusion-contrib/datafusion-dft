@@ -35,7 +35,9 @@ async fn flightsql_alt_enter_uses_flightsql_tab() {
 
     // Switch to FlightSQL tab
     let flightsql_key = event::KeyEvent::new(event::KeyCode::Char('2'), event::KeyModifiers::NONE);
-    test_app.handle_app_event(AppEvent::Key(flightsql_key)).unwrap();
+    test_app
+        .handle_app_event(AppEvent::Key(flightsql_key))
+        .unwrap();
 
     // Enter edit mode
     let edit_key = event::KeyEvent::new(event::KeyCode::Char('e'), event::KeyModifiers::NONE);
@@ -60,7 +62,9 @@ async fn flightsql_enter_in_normal_mode_executes() {
 
     // Switch to FlightSQL tab
     let flightsql_key = event::KeyEvent::new(event::KeyCode::Char('2'), event::KeyModifiers::NONE);
-    test_app.handle_app_event(AppEvent::Key(flightsql_key)).unwrap();
+    test_app
+        .handle_app_event(AppEvent::Key(flightsql_key))
+        .unwrap();
 
     // Should be in normal mode (not editable)
     assert!(!test_app.state().flightsql_tab.editor_editable());
@@ -124,7 +128,9 @@ async fn switching_tabs_maintains_separate_execution_contexts() {
 
     // Switch to FlightSQL tab
     let flightsql_key = event::KeyEvent::new(event::KeyCode::Char('2'), event::KeyModifiers::NONE);
-    test_app.handle_app_event(AppEvent::Key(flightsql_key)).unwrap();
+    test_app
+        .handle_app_event(AppEvent::Key(flightsql_key))
+        .unwrap();
 
     // Enter edit mode in FlightSQL tab
     let edit_key = event::KeyEvent::new(event::KeyCode::Char('e'), event::KeyModifiers::NONE);
@@ -145,7 +151,9 @@ async fn ctrl_enter_doesnt_execute_in_flightsql_edit_mode() {
 
     // Switch to FlightSQL tab
     let flightsql_key = event::KeyEvent::new(event::KeyCode::Char('2'), event::KeyModifiers::NONE);
-    test_app.handle_app_event(AppEvent::Key(flightsql_key)).unwrap();
+    test_app
+        .handle_app_event(AppEvent::Key(flightsql_key))
+        .unwrap();
 
     // Enter edit mode
     let edit_key = event::KeyEvent::new(event::KeyCode::Char('e'), event::KeyModifiers::NONE);
@@ -155,7 +163,9 @@ async fn ctrl_enter_doesnt_execute_in_flightsql_edit_mode() {
 
     // Try Ctrl+Enter (should not execute)
     let ctrl_enter = event::KeyEvent::new(event::KeyCode::Enter, event::KeyModifiers::CONTROL);
-    test_app.handle_app_event(AppEvent::Key(ctrl_enter)).unwrap();
+    test_app
+        .handle_app_event(AppEvent::Key(ctrl_enter))
+        .unwrap();
 
     // Should still be in edit mode (Ctrl+Enter shouldn't trigger execution or exit)
     assert!(test_app.state().flightsql_tab.editor_editable());
@@ -168,7 +178,9 @@ async fn plain_enter_doesnt_execute_in_flightsql_edit_mode() {
 
     // Switch to FlightSQL tab
     let flightsql_key = event::KeyEvent::new(event::KeyCode::Char('2'), event::KeyModifiers::NONE);
-    test_app.handle_app_event(AppEvent::Key(flightsql_key)).unwrap();
+    test_app
+        .handle_app_event(AppEvent::Key(flightsql_key))
+        .unwrap();
 
     // Enter edit mode
     let edit_key = event::KeyEvent::new(event::KeyCode::Char('e'), event::KeyModifiers::NONE);

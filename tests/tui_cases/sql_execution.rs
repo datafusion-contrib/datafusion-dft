@@ -94,7 +94,9 @@ async fn sql_ctrl_enter_doesnt_execute_in_edit_mode() {
 
     // Try Ctrl+Enter (should not execute)
     let ctrl_enter = event::KeyEvent::new(event::KeyCode::Enter, event::KeyModifiers::CONTROL);
-    test_app.handle_app_event(AppEvent::Key(ctrl_enter)).unwrap();
+    test_app
+        .handle_app_event(AppEvent::Key(ctrl_enter))
+        .unwrap();
 
     // Should still be in edit mode
     assert!(test_app.state().sql_tab.editable());
@@ -140,7 +142,9 @@ async fn sql_alt_word_navigation_in_edit_mode() {
 
     // Test ALT+Backspace (delete word)
     let alt_backspace = event::KeyEvent::new(event::KeyCode::Backspace, event::KeyModifiers::ALT);
-    test_app.handle_app_event(AppEvent::Key(alt_backspace)).unwrap();
+    test_app
+        .handle_app_event(AppEvent::Key(alt_backspace))
+        .unwrap();
 
     // Should still be in edit mode
     assert!(test_app.state().sql_tab.editable());

@@ -129,7 +129,9 @@ async fn ctrl_q_should_not_quit_history_tab() {
     #[cfg(not(feature = "flightsql"))]
     let history_key = event::KeyEvent::new(event::KeyCode::Char('2'), event::KeyModifiers::NONE);
 
-    test_app.handle_app_event(AppEvent::Key(history_key)).unwrap();
+    test_app
+        .handle_app_event(AppEvent::Key(history_key))
+        .unwrap();
 
     // Try Ctrl+Q
     let ctrl_q = event::KeyEvent::new(event::KeyCode::Char('q'), event::KeyModifiers::CONTROL);
@@ -171,7 +173,9 @@ async fn ctrl_q_should_not_quit_context_tab() {
     #[cfg(not(feature = "flightsql"))]
     let context_key = event::KeyEvent::new(event::KeyCode::Char('4'), event::KeyModifiers::NONE);
 
-    test_app.handle_app_event(AppEvent::Key(context_key)).unwrap();
+    test_app
+        .handle_app_event(AppEvent::Key(context_key))
+        .unwrap();
 
     // Try Ctrl+Q
     let ctrl_q = event::KeyEvent::new(event::KeyCode::Char('q'), event::KeyModifiers::CONTROL);
@@ -210,18 +214,17 @@ async fn ctrl_arrows_should_not_navigate() {
     let mut test_app = TestApp::new().await;
 
     // Try Ctrl+Left
-    let ctrl_left =
-        event::KeyEvent::new(event::KeyCode::Left, event::KeyModifiers::CONTROL);
+    let ctrl_left = event::KeyEvent::new(event::KeyCode::Left, event::KeyModifiers::CONTROL);
     test_app.handle_app_event(AppEvent::Key(ctrl_left)).unwrap();
 
     // Try Ctrl+Right
-    let ctrl_right =
-        event::KeyEvent::new(event::KeyCode::Right, event::KeyModifiers::CONTROL);
-    test_app.handle_app_event(AppEvent::Key(ctrl_right)).unwrap();
+    let ctrl_right = event::KeyEvent::new(event::KeyCode::Right, event::KeyModifiers::CONTROL);
+    test_app
+        .handle_app_event(AppEvent::Key(ctrl_right))
+        .unwrap();
 
     // Try Ctrl+Down
-    let ctrl_down =
-        event::KeyEvent::new(event::KeyCode::Down, event::KeyModifiers::CONTROL);
+    let ctrl_down = event::KeyEvent::new(event::KeyCode::Down, event::KeyModifiers::CONTROL);
     test_app.handle_app_event(AppEvent::Key(ctrl_down)).unwrap();
 
     // Try Ctrl+Up
@@ -239,7 +242,9 @@ async fn ctrl_q_should_not_quit_flightsql_tab() {
 
     // Switch to FlightSQL tab
     let flightsql_key = event::KeyEvent::new(event::KeyCode::Char('2'), event::KeyModifiers::NONE);
-    test_app.handle_app_event(AppEvent::Key(flightsql_key)).unwrap();
+    test_app
+        .handle_app_event(AppEvent::Key(flightsql_key))
+        .unwrap();
 
     // Try Ctrl+Q
     let ctrl_q = event::KeyEvent::new(event::KeyCode::Char('q'), event::KeyModifiers::CONTROL);
@@ -257,7 +262,9 @@ async fn ctrl_e_should_not_enter_edit_mode_flightsql() {
 
     // Switch to FlightSQL tab
     let flightsql_key = event::KeyEvent::new(event::KeyCode::Char('2'), event::KeyModifiers::NONE);
-    test_app.handle_app_event(AppEvent::Key(flightsql_key)).unwrap();
+    test_app
+        .handle_app_event(AppEvent::Key(flightsql_key))
+        .unwrap();
 
     // Should start in normal mode
     assert!(!test_app.state().flightsql_tab.editor_editable());
