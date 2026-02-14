@@ -19,8 +19,8 @@ use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{palette::tailwind, Style, Stylize},
-    text::Span,
-    widgets::{block::Title, Block, Borders, Paragraph, Row, StatefulWidget, Table, Widget, Wrap},
+    text::{Line, Span},
+    widgets::{Block, Borders, Paragraph, Row, StatefulWidget, Table, Widget, Wrap},
 };
 
 use crate::tui::ui::convert::record_batch_to_table;
@@ -55,7 +55,7 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
             let block = Block::default()
                 .title(" Results ")
                 .borders(Borders::ALL)
-                .title(Title::from(" Page ").alignment(Alignment::Right));
+                .title_top(Line::from(" Page ").right_aligned());
             let row = Row::new(vec!["Executing query..."]);
             let widths = vec![Constraint::Percentage(100)];
             let table = Table::new(vec![row], widths).block(block);
@@ -66,7 +66,7 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
             let block = Block::default()
                 .title(" Results ")
                 .borders(Borders::ALL)
-                .title(Title::from(format!(" Page {page} ")).alignment(Alignment::Right));
+                .title_top(Line::from(format!(" Page {page} ")).right_aligned());
             let maybe_table = record_batch_to_table(&batch);
 
             let block = block.title_bottom("Stats").fg(tailwind::ORANGE.c500);
@@ -94,7 +94,7 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
             let block = Block::default()
                 .title(" Results ")
                 .borders(Borders::ALL)
-                .title(Title::from(" Page ").alignment(Alignment::Right))
+                .title_top(Line::from(" Page ").right_aligned())
                 .title_bottom(format!(" {}ms ", dur));
             let p = Paragraph::new(e.error().to_string())
                 .block(block)
@@ -105,7 +105,7 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
             let block = Block::default()
                 .title(" Results ")
                 .borders(Borders::ALL)
-                .title(Title::from(" Page ").alignment(Alignment::Right));
+                .title_top(Line::from(" Page ").right_aligned());
             let row = Row::new(vec!["Run a query to generate results"]);
             let widths = vec![Constraint::Percentage(100)];
             let table = Table::new(vec![row], widths).block(block);
