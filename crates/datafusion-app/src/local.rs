@@ -38,7 +38,7 @@ use datafusion::sql::parser::{DFParser, Statement};
 use tokio_stream::StreamExt;
 
 use super::executor::dedicated::DedicatedExecutor;
-use super::local_benchmarks::{BenchmarkMode, LocalBenchmarkStats};
+use super::local_benchmarks::{BenchmarkMode, BenchmarkProgressReporter, LocalBenchmarkStats};
 use super::stats::{ExecutionDurationStats, ExecutionStats};
 #[cfg(feature = "udfs-wasm")]
 use super::wasm::create_wasm_udfs;
@@ -408,6 +408,7 @@ impl ExecutionContext {
         query: &str,
         cli_iterations: Option<usize>,
         concurrent: bool,
+        progress_reporter: Option<Arc<dyn BenchmarkProgressReporter>>,
     ) -> Result<LocalBenchmarkStats> {
         let iterations = cli_iterations.unwrap_or(self.config.benchmark_iterations);
         let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
@@ -442,7 +443,7 @@ impl ExecutionContext {
 
         if !concurrent {
             // Serial execution
-            for _ in 0..iterations {
+            for i in 0..iterations {
                 let (rows, lp_dur, pp_dur, exec_dur, total_dur) =
                     self.benchmark_single_iteration(statement.clone()).await?;
                 rows_returned.push(rows);
@@ -450,6 +451,10 @@ impl ExecutionContext {
                 physical_planning_durations.push(pp_dur);
                 execution_durations.push(exec_dur);
                 total_durations.push(total_dur);
+
+                if let Some(ref reporter) = progress_reporter {
+                    reporter.on_iteration_complete(i + 1, iterations, total_dur);
+                }
             }
         } else {
             // Concurrent execution
@@ -474,10 +479,17 @@ impl ExecutionContext {
                     physical_planning_durations.push(pp_dur);
                     execution_durations.push(exec_dur);
                     total_durations.push(total_dur);
-                }
 
-                completed += batch_size;
+                    completed += 1;
+                    if let Some(ref reporter) = progress_reporter {
+                        reporter.on_iteration_complete(completed, iterations, total_dur);
+                    }
+                }
             }
+        }
+
+        if let Some(ref reporter) = progress_reporter {
+            reporter.finish();
         }
 
         Ok(LocalBenchmarkStats::new(

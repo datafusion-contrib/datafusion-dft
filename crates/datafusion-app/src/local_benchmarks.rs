@@ -203,3 +203,12 @@ impl std::fmt::Display for LocalBenchmarkStats {
         writeln!(f, "{}", total_summary)
     }
 }
+
+/// Trait for reporting progress during benchmark execution
+pub trait BenchmarkProgressReporter: Send + Sync {
+    /// Called after each iteration completes
+    fn on_iteration_complete(&self, completed: usize, total: usize, last_duration: Duration);
+
+    /// Called when benchmark completes
+    fn finish(&self);
+}
