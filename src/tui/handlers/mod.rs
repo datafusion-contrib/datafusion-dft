@@ -21,7 +21,7 @@ pub mod sql;
 
 use color_eyre::Result;
 use log::{error, info, trace};
-use ratatui::crossterm::event::{self, KeyCode, KeyEvent};
+use ratatui::crossterm::event::{self, KeyCode, KeyEvent, KeyModifiers};
 use tui_logger::TuiWidgetEvent;
 
 #[cfg(feature = "flightsql")]
@@ -70,48 +70,51 @@ fn tab_navigation_handler(app: &mut App, key: KeyCode) {
 }
 
 fn logs_tab_key_event_handler(app: &mut App, key: KeyEvent) {
-    match key.code {
-        KeyCode::Char('q') => app.state.should_quit = true,
-        tab @ (KeyCode::Char('1')
-        | KeyCode::Char('2')
-        | KeyCode::Char('3')
-        | KeyCode::Char('4')
-        | KeyCode::Char('5')) => tab_navigation_handler(app, tab),
-        KeyCode::Char('f') => {
+    match (key.code, key.modifiers) {
+        (KeyCode::Char('q'), KeyModifiers::NONE) => app.state.should_quit = true,
+        (
+            tab @ (KeyCode::Char('1')
+            | KeyCode::Char('2')
+            | KeyCode::Char('3')
+            | KeyCode::Char('4')
+            | KeyCode::Char('5')),
+            KeyModifiers::NONE,
+        ) => tab_navigation_handler(app, tab),
+        (KeyCode::Char('f'), KeyModifiers::NONE) => {
             app.state.logs_tab.transition(TuiWidgetEvent::FocusKey);
         }
-        KeyCode::Char('h') => {
+        (KeyCode::Char('h'), KeyModifiers::NONE) => {
             app.state.logs_tab.transition(TuiWidgetEvent::HideKey);
         }
-        KeyCode::Char('+') => {
+        (KeyCode::Char('+'), KeyModifiers::NONE | KeyModifiers::SHIFT) => {
             app.state.logs_tab.transition(TuiWidgetEvent::PlusKey);
         }
-        KeyCode::Char('-') => {
+        (KeyCode::Char('-'), KeyModifiers::NONE) => {
             app.state.logs_tab.transition(TuiWidgetEvent::MinusKey);
         }
-        KeyCode::Char(' ') => {
+        (KeyCode::Char(' '), KeyModifiers::NONE) => {
             app.state.logs_tab.transition(TuiWidgetEvent::SpaceKey);
         }
-        KeyCode::Esc => {
+        (KeyCode::Esc, _) => {
             app.state.logs_tab.transition(TuiWidgetEvent::EscapeKey);
         }
-        KeyCode::Down => {
+        (KeyCode::Down, KeyModifiers::NONE) => {
             app.state.logs_tab.transition(TuiWidgetEvent::DownKey);
         }
-        KeyCode::Up => {
+        (KeyCode::Up, KeyModifiers::NONE) => {
             app.state.logs_tab.transition(TuiWidgetEvent::UpKey);
         }
-        KeyCode::Right => {
+        (KeyCode::Right, KeyModifiers::NONE) => {
             app.state.logs_tab.transition(TuiWidgetEvent::RightKey);
         }
-        KeyCode::Left => {
+        (KeyCode::Left, KeyModifiers::NONE) => {
             app.state.logs_tab.transition(TuiWidgetEvent::LeftKey);
         }
-        KeyCode::PageDown => {
+        (KeyCode::PageDown, KeyModifiers::NONE) => {
             app.state.logs_tab.transition(TuiWidgetEvent::NextPageKey);
         }
 
-        KeyCode::PageUp => {
+        (KeyCode::PageUp, KeyModifiers::NONE) => {
             app.state.logs_tab.transition(TuiWidgetEvent::PrevPageKey);
         }
         _ => {}
@@ -119,13 +122,16 @@ fn logs_tab_key_event_handler(app: &mut App, key: KeyEvent) {
 }
 
 fn context_tab_key_event_handler(app: &mut App, key: KeyEvent) {
-    match key.code {
-        KeyCode::Char('q') => app.state.should_quit = true,
-        tab @ (KeyCode::Char('1')
-        | KeyCode::Char('2')
-        | KeyCode::Char('3')
-        | KeyCode::Char('4')
-        | KeyCode::Char('5')) => tab_navigation_handler(app, tab),
+    match (key.code, key.modifiers) {
+        (KeyCode::Char('q'), KeyModifiers::NONE) => app.state.should_quit = true,
+        (
+            tab @ (KeyCode::Char('1')
+            | KeyCode::Char('2')
+            | KeyCode::Char('3')
+            | KeyCode::Char('4')
+            | KeyCode::Char('5')),
+            KeyModifiers::NONE,
+        ) => tab_navigation_handler(app, tab),
         _ => {}
     }
 }

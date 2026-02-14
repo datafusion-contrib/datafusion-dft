@@ -24,15 +24,20 @@ use super::App;
 use crate::tui::{handlers::tab_navigation_handler, state::tabs::sql::SQLTabMode, AppEvent};
 
 pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
-    match key.code {
-        KeyCode::Char('q') => app.state.should_quit = true,
-        tab @ (KeyCode::Char('1')
-        | KeyCode::Char('2')
-        | KeyCode::Char('3')
-        | KeyCode::Char('4')
-        | KeyCode::Char('5')) => tab_navigation_handler(app, tab),
-        KeyCode::Char('c') => app.state.sql_tab.clear_editor(&app.state.config),
-        KeyCode::Char('e') => {
+    match (key.code, key.modifiers) {
+        (KeyCode::Char('q'), KeyModifiers::NONE) => app.state.should_quit = true,
+        (
+            tab @ (KeyCode::Char('1')
+            | KeyCode::Char('2')
+            | KeyCode::Char('3')
+            | KeyCode::Char('4')
+            | KeyCode::Char('5')),
+            KeyModifiers::NONE,
+        ) => tab_navigation_handler(app, tab),
+        (KeyCode::Char('c'), KeyModifiers::NONE) => {
+            app.state.sql_tab.clear_editor(&app.state.config)
+        }
+        (KeyCode::Char('e'), KeyModifiers::NONE) => {
             let editor = app.state.sql_tab.editor();
             let lines = editor.lines();
             let content = lines.join("");
@@ -42,23 +47,23 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
             }
             app.state.sql_tab.edit();
         }
-        KeyCode::Char('d') => app.state.sql_tab.set_mode(SQLTabMode::DDL),
-        KeyCode::Char('n') => app.state.sql_tab.set_mode(SQLTabMode::Normal),
-        KeyCode::Char('s') => {
+        (KeyCode::Char('d'), KeyModifiers::NONE) => app.state.sql_tab.set_mode(SQLTabMode::DDL),
+        (KeyCode::Char('n'), KeyModifiers::NONE) => app.state.sql_tab.set_mode(SQLTabMode::Normal),
+        (KeyCode::Char('s'), KeyModifiers::NONE) => {
             if *app.state.sql_tab.mode() == SQLTabMode::DDL {
                 let textarea = app.state.sql_tab.active_editor_cloned();
                 let ddl = textarea.lines().join("\n");
                 app.execution.save_ddl(ddl)
             }
         }
-        KeyCode::Down => {
+        (KeyCode::Down, KeyModifiers::NONE) => {
             if let Some(s) = app.state.sql_tab.query_results_state() {
                 info!("Select next");
                 let mut s = s.borrow_mut();
                 s.select_next();
             }
         }
-        KeyCode::Up => {
+        (KeyCode::Up, KeyModifiers::NONE) => {
             if let Some(s) = app.state.sql_tab.query_results_state() {
                 info!("Select previous");
                 let mut s = s.borrow_mut();
@@ -66,7 +71,7 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
             }
         }
 
-        KeyCode::Enter => match app.state.sql_tab.mode() {
+        (KeyCode::Enter, KeyModifiers::NONE) => match app.state.sql_tab.mode() {
             SQLTabMode::Normal => {
                 let sql = app.state.sql_tab.sql();
                 info!("Running query: {}", sql);
@@ -86,7 +91,7 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
                 }
             }
         },
-        KeyCode::Right => {
+        (KeyCode::Right, KeyModifiers::NONE) => {
             let _event_tx = app.event_tx().clone();
             if let (Some(p), c) = (
                 app.state().sql_tab.current_page(),
@@ -108,7 +113,7 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
                 });
             }
         }
-        KeyCode::Left => {
+        (KeyCode::Left, KeyModifiers::NONE) => {
             app.state.sql_tab.previous_page();
             app.state.sql_tab.refresh_query_results_state();
         }
