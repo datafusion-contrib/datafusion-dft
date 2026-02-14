@@ -43,8 +43,10 @@ use tokio_stream::StreamExt;
 use tonic::{transport::Channel, IntoRequest};
 
 use crate::{
-    config::FlightSQLConfig, flightsql_benchmarks::FlightSQLBenchmarkStats,
-    local_benchmarks::BenchmarkMode, ExecOptions, ExecResult,
+    config::FlightSQLConfig,
+    flightsql_benchmarks::FlightSQLBenchmarkStats,
+    local_benchmarks::{BenchmarkMode, BenchmarkProgressReporter},
+    ExecOptions, ExecResult,
 };
 
 pub type FlightSQLClient = Arc<Mutex<Option<FlightSqlServiceClient<Channel>>>>;
@@ -122,6 +124,7 @@ impl FlightSQLContext {
         query: &str,
         cli_iterations: Option<usize>,
         concurrent: bool,
+        progress_reporter: Option<Arc<dyn BenchmarkProgressReporter>>,
     ) -> Result<FlightSQLBenchmarkStats> {
         let iterations = cli_iterations.unwrap_or(self.config.benchmark_iterations);
         let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
@@ -165,7 +168,7 @@ impl FlightSQLContext {
             // Serial execution
             let mut guard = self.client.lock().await;
             if let Some(ref mut client) = *guard {
-                for _ in 0..iterations {
+                for i in 0..iterations {
                     let (rows, gfi_dur, ttfb_dur, dg_dur, total_dur) =
                         Self::benchmark_single_iteration(client, query).await?;
                     rows_returned.push(rows);
@@ -173,6 +176,10 @@ impl FlightSQLContext {
                     ttfb_durations.push(ttfb_dur);
                     do_get_durations.push(dg_dur);
                     total_durations.push(total_dur);
+
+                    if let Some(ref reporter) = progress_reporter {
+                        reporter.on_iteration_complete(i + 1, iterations, total_dur);
+                    }
                 }
             }
         } else {
@@ -204,10 +211,17 @@ impl FlightSQLContext {
                     ttfb_durations.push(ttfb_dur);
                     do_get_durations.push(dg_dur);
                     total_durations.push(total_dur);
-                }
 
-                completed += batch_size;
+                    completed += 1;
+                    if let Some(ref reporter) = progress_reporter {
+                        reporter.on_iteration_complete(completed, iterations, total_dur);
+                    }
+                }
             }
+        }
+
+        if let Some(ref reporter) = progress_reporter {
+            reporter.finish();
         }
 
         Ok(FlightSQLBenchmarkStats::new(

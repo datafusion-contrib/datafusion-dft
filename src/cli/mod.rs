@@ -16,6 +16,8 @@
 // under the License.
 //! [`CliApp`]: Command Line User Interface
 
+mod progress;
+
 use crate::config::AppConfig;
 use crate::db::register_db;
 use crate::{args::DftArgs, execution::AppExecution};
@@ -553,10 +555,40 @@ impl CliApp {
     }
 
     async fn benchmark_from_string(&self, sql: &str) -> Result<LocalBenchmarkStats> {
+        use std::sync::Arc;
+
+        // Calculate iterations and concurrency
+        let iterations = self.args.benchmark_iterations.unwrap_or(
+            self.app_execution
+                .execution_ctx()
+                .config()
+                .benchmark_iterations,
+        );
+        let concurrency = if self.args.concurrent {
+            std::cmp::min(iterations, num_cpus::get())
+        } else {
+            1
+        };
+
+        // Create progress reporter
+        let progress_reporter = Some(Arc::new(progress::IndicatifProgressReporter::new(
+            sql,
+            iterations,
+            self.args.concurrent,
+            concurrency,
+        ))
+            as Arc<dyn datafusion_app::local_benchmarks::BenchmarkProgressReporter>);
+
+        // Call benchmark with reporter
         let stats = self
             .app_execution
             .execution_ctx()
-            .benchmark_query(sql, self.args.benchmark_iterations, self.args.concurrent)
+            .benchmark_query(
+                sql,
+                self.args.benchmark_iterations,
+                self.args.concurrent,
+                progress_reporter,
+            )
             .await?;
         Ok(stats)
     }
@@ -574,10 +606,36 @@ impl CliApp {
 
     #[cfg(feature = "flightsql")]
     async fn flightsql_benchmark_from_string(&self, sql: &str) -> Result<FlightSQLBenchmarkStats> {
+        use std::sync::Arc;
+
+        // Calculate iterations and concurrency
+        // Use a default of 10 if not specified (matches default in FlightSQLConfig)
+        let iterations = self.args.benchmark_iterations.unwrap_or(10);
+        let concurrency = if self.args.concurrent {
+            std::cmp::min(iterations, num_cpus::get())
+        } else {
+            1
+        };
+
+        // Create progress reporter
+        let progress_reporter = Some(Arc::new(progress::IndicatifProgressReporter::new(
+            sql,
+            iterations,
+            self.args.concurrent,
+            concurrency,
+        ))
+            as Arc<dyn datafusion_app::local_benchmarks::BenchmarkProgressReporter>);
+
+        // Call benchmark with reporter
         let stats = self
             .app_execution
             .flightsql_ctx()
-            .benchmark_query(sql, self.args.benchmark_iterations, self.args.concurrent)
+            .benchmark_query(
+                sql,
+                self.args.benchmark_iterations,
+                self.args.concurrent,
+                progress_reporter,
+            )
             .await?;
         Ok(stats)
     }
