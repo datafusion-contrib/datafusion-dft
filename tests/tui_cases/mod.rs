@@ -17,9 +17,13 @@
 
 mod ddl;
 #[cfg(feature = "flightsql")]
+mod flightsql_execution;
+#[cfg(feature = "flightsql")]
 mod flightsql_pagination;
+mod keyboard_modifiers;
 mod pagination;
 mod quit;
+mod sql_execution;
 
 use datafusion::arrow::array::RecordBatch;
 use datafusion::common::Result;
