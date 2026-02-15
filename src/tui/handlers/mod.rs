@@ -253,6 +253,27 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                 app.state.history_tab.refresh_history_table_state();
             } else {
                 app.state.flightsql_tab.refresh_query_results_state();
+
+                // Check if we have enough data for the next page now
+                // If not, automatically fetch another batch
+                if let Some(current_page) = app.state.flightsql_tab.current_page() {
+                    let next_page = current_page + 1;
+                    if app.state.flightsql_tab.needs_more_batches_for_page(next_page) {
+                        info!("Still need more batches for page {}, fetching next batch", next_page);
+                        let execution = Arc::clone(&app.execution);
+                        let sql = query.clone();
+                        let _event_tx = app.event_tx();
+                        tokio::spawn(async move {
+                            execution.next_flightsql_batch(sql, _event_tx).await;
+                        });
+                    } else {
+                        // We now have enough data, advance to the page
+                        info!("Sufficient data loaded, advancing to page {}", next_page);
+                        if let Err(e) = app.event_tx().send(AppEvent::FlightSQLExecutionResultsNextPage) {
+                            error!("Error advancing to next page: {e}");
+                        }
+                    }
+                }
             }
         }
         #[cfg(feature = "flightsql")]

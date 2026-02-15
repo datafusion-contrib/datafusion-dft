@@ -262,3 +262,164 @@ async fn multiple_batches_lazy_loading() {
         assert_eq!(page_results.num_rows(), 40);
     }
 }
+
+// Tests that multiple small batches are automatically loaded to fill a page
+// This verifies the fix for the issue where user would have to press Right multiple times
+// Scenario: Page needs 100 rows, but each batch only has 30 rows
+#[tokio::test]
+async fn multiple_small_batches_auto_load() {
+    let mut test_app = TestApp::new().await;
+
+    test_app
+        .handle_app_event(AppEvent::FlightSQLNewExecution)
+        .unwrap();
+
+    // Send first batch: 100 rows (fills page 0)
+    let batch1 = create_execution_results(&create_values_query(100)).await;
+    test_app
+        .handle_app_event(AppEvent::FlightSQLExecutionResultsNextBatch(batch1))
+        .unwrap();
+
+    // Verify we're on page 0 with 100 rows
+    {
+        let state = test_app.state();
+        assert_eq!(state.flightsql_tab.current_page().unwrap(), 0);
+        assert_eq!(state.flightsql_tab.total_loaded_rows(), 100);
+    }
+
+    // Send second batch: only 30 rows (NOT enough for page 1 which needs rows 100-199)
+    // The system should NOT advance the page yet
+    let batch2 = create_execution_results(&create_values_query_offset(30, 100)).await;
+    test_app
+        .handle_app_event(AppEvent::FlightSQLExecutionResultsNextBatch(batch2))
+        .unwrap();
+
+    // Verify we're still on page 0, but now have 130 rows total
+    {
+        let state = test_app.state();
+        assert_eq!(state.flightsql_tab.current_page().unwrap(), 0);
+        assert_eq!(state.flightsql_tab.total_loaded_rows(), 130);
+        // Verify we still need more batches for page 1
+        assert!(state.flightsql_tab.needs_more_batches_for_page(1));
+    }
+
+    // Send third batch: another 30 rows (total 160, still NOT enough)
+    let batch3 = create_execution_results(&create_values_query_offset(30, 130)).await;
+    test_app
+        .handle_app_event(AppEvent::FlightSQLExecutionResultsNextBatch(batch3))
+        .unwrap();
+
+    // Verify we're still on page 0, but now have 160 rows total
+    {
+        let state = test_app.state();
+        assert_eq!(state.flightsql_tab.current_page().unwrap(), 0);
+        assert_eq!(state.flightsql_tab.total_loaded_rows(), 160);
+        // Verify we still need more batches for page 1
+        assert!(state.flightsql_tab.needs_more_batches_for_page(1));
+    }
+
+    // Send fourth batch: another 40 rows (total 200, NOW enough for page 1!)
+    // The system should automatically advance to page 1
+    let batch4 = create_execution_results(&create_values_query_offset(40, 160)).await;
+    test_app
+        .handle_app_event(AppEvent::FlightSQLExecutionResultsNextBatch(batch4))
+        .unwrap();
+
+    // Process the automatic NextPage event that was queued
+    // In the real app, this happens automatically in the event loop
+    // In tests, we need to simulate it by checking for and processing the event
+    // Since we can't easily intercept the event queue in tests, we verify the state is ready
+    {
+        let state = test_app.state();
+        assert_eq!(state.flightsql_tab.total_loaded_rows(), 200);
+        // Verify we now have enough data for page 1
+        assert!(!state.flightsql_tab.needs_more_batches_for_page(1));
+    }
+
+    // Now when user manually advances (or automatic event processes), we can show page 1
+    test_app
+        .handle_app_event(AppEvent::FlightSQLExecutionResultsNextPage)
+        .unwrap();
+
+    {
+        let state = test_app.state();
+        assert_eq!(state.flightsql_tab.current_page().unwrap(), 1);
+        let page_results = state.flightsql_tab.current_page_results().unwrap();
+        assert_eq!(page_results.num_rows(), 100); // Page 1 shows rows 100-199
+    }
+}
+
+// Tests that the system correctly handles the case where exactly enough batches
+// are loaded to fill a page (boundary condition)
+#[tokio::test]
+async fn exact_batches_for_page() {
+    let mut test_app = TestApp::new().await;
+
+    test_app
+        .handle_app_event(AppEvent::FlightSQLNewExecution)
+        .unwrap();
+
+    // Send first batch: 50 rows
+    let batch1 = create_execution_results(&create_values_query(50)).await;
+    test_app
+        .handle_app_event(AppEvent::FlightSQLExecutionResultsNextBatch(batch1))
+        .unwrap();
+
+    // Verify page 0 shows 50 rows
+    {
+        let state = test_app.state();
+        assert_eq!(state.flightsql_tab.current_page().unwrap(), 0);
+        assert_eq!(state.flightsql_tab.total_loaded_rows(), 50);
+    }
+
+    // Send second batch: another 50 rows (total 100, exactly fills page 0)
+    let batch2 = create_execution_results(&create_values_query_offset(50, 50)).await;
+    test_app
+        .handle_app_event(AppEvent::FlightSQLExecutionResultsNextBatch(batch2))
+        .unwrap();
+
+    // Verify page 0 now shows 100 rows
+    {
+        let state = test_app.state();
+        assert_eq!(state.flightsql_tab.current_page().unwrap(), 0);
+        let page_results = state.flightsql_tab.current_page_results().unwrap();
+        assert_eq!(page_results.num_rows(), 100);
+        assert_eq!(state.flightsql_tab.total_loaded_rows(), 100);
+    }
+
+    // Send third batch: another 50 rows (total 150, NOT enough for full page 1)
+    let batch3 = create_execution_results(&create_values_query_offset(50, 100)).await;
+    test_app
+        .handle_app_event(AppEvent::FlightSQLExecutionResultsNextBatch(batch3))
+        .unwrap();
+
+    {
+        let state = test_app.state();
+        assert_eq!(state.flightsql_tab.total_loaded_rows(), 150);
+        assert!(state.flightsql_tab.needs_more_batches_for_page(1));
+    }
+
+    // Send fourth batch: exactly 50 more rows (total 200, exactly fills page 1)
+    let batch4 = create_execution_results(&create_values_query_offset(50, 150)).await;
+    test_app
+        .handle_app_event(AppEvent::FlightSQLExecutionResultsNextBatch(batch4))
+        .unwrap();
+
+    {
+        let state = test_app.state();
+        assert_eq!(state.flightsql_tab.total_loaded_rows(), 200);
+        assert!(!state.flightsql_tab.needs_more_batches_for_page(1));
+    }
+
+    // Advance to page 1
+    test_app
+        .handle_app_event(AppEvent::FlightSQLExecutionResultsNextPage)
+        .unwrap();
+
+    {
+        let state = test_app.state();
+        assert_eq!(state.flightsql_tab.current_page().unwrap(), 1);
+        let page_results = state.flightsql_tab.current_page_results().unwrap();
+        assert_eq!(page_results.num_rows(), 100);
+    }
+}
