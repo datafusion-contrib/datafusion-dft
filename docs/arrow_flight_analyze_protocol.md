@@ -106,10 +106,10 @@ The `operator_parent` and `operator_index` fields enable reconstruction of the e
 - **operator_index**: Position among siblings under the same parent (0-based)
 - **Query-level metrics** (where `operator_name = NULL`) have both `operator_parent` and `operator_index` set to NULL
 
-**Example**: For a plan like `ProjectionExec -> FilterExec -> ParquetExec`:
-- ParquetExec: `operator_parent = NULL`, `operator_index = NULL` (root)
-- FilterExec: `operator_parent = "ParquetExec"`, `operator_index = 0`
-- ProjectionExec: `operator_parent = "FilterExec"`, `operator_index = 0`
+**Example**: For a plan like `ProjectionExec -> FilterExec -> ParquetExec` (where ProjectionExec is the root/final output):
+- ProjectionExec: `operator_parent = NULL`, `operator_index = NULL` (root - produces final output)
+- FilterExec: `operator_parent = "ProjectionExec"`, `operator_index = 0` (child of ProjectionExec)
+- ParquetExec: `operator_parent = "FilterExec"`, `operator_index = 0` (child of FilterExec, leaf node)
 
 ## Metric Namespaces
 
@@ -278,23 +278,23 @@ stage.logical_planning         45000000      duration_ns  NULL             NULL 
 stage.physical_planning        78000000      duration_ns  NULL             NULL          NULL               NULL             NULL
 stage.execution                234000000     duration_ns  NULL             NULL          NULL               NULL             NULL
 stage.total                    369000000     duration_ns  NULL             NULL          NULL               NULL             NULL
-io.parquet.bytes_scanned       1000000       bytes        ParquetExec      NULL          io                 NULL             NULL
-io.parquet.time_opening        50000000      duration_ns  ParquetExec      NULL          io                 NULL             NULL
-io.parquet.time_scanning       150000000     duration_ns  ParquetExec      NULL          io                 NULL             NULL
-io.parquet.output_rows         10000         count        ParquetExec      NULL          io                 NULL             NULL
-io.parquet.rg_pruned           16            count        ParquetExec      NULL          io                 NULL             NULL
-io.parquet.rg_matched          4             count        ParquetExec      NULL          io                 NULL             NULL
-io.parquet.bloom_pruned        12            count        ParquetExec      NULL          io                 NULL             NULL
-io.parquet.bloom_matched       8             count        ParquetExec      NULL          io                 NULL             NULL
+io.parquet.bytes_scanned       1000000       bytes        ParquetExec      NULL          io                 FilterExec       0
+io.parquet.time_opening        50000000      duration_ns  ParquetExec      NULL          io                 FilterExec       0
+io.parquet.time_scanning       150000000     duration_ns  ParquetExec      NULL          io                 FilterExec       0
+io.parquet.output_rows         10000         count        ParquetExec      NULL          io                 FilterExec       0
+io.parquet.rg_pruned           16            count        ParquetExec      NULL          io                 FilterExec       0
+io.parquet.rg_matched          4             count        ParquetExec      NULL          io                 FilterExec       0
+io.parquet.bloom_pruned        12            count        ParquetExec      NULL          io                 FilterExec       0
+io.parquet.bloom_matched       8             count        ParquetExec      NULL          io                 FilterExec       0
 compute.elapsed_compute        12345678      duration_ns  NULL             NULL          NULL               NULL             NULL
-compute.elapsed_compute        1500          duration_ns  FilterExec       0             filter             ParquetExec      0
-compute.elapsed_compute        1400          duration_ns  FilterExec       1             filter             ParquetExec      0
-compute.elapsed_compute        1300          duration_ns  FilterExec       2             filter             ParquetExec      0
-compute.elapsed_compute        1200          duration_ns  FilterExec       3             filter             ParquetExec      0
-compute.elapsed_compute        1200          duration_ns  ProjectionExec   0             projection         FilterExec       0
-compute.elapsed_compute        1100          duration_ns  ProjectionExec   1             projection         FilterExec       0
-compute.elapsed_compute        1050          duration_ns  ProjectionExec   2             projection         FilterExec       0
-compute.elapsed_compute        1000          duration_ns  ProjectionExec   3             projection         FilterExec       0
+compute.elapsed_compute        1200          duration_ns  ProjectionExec   0             projection         NULL             NULL
+compute.elapsed_compute        1100          duration_ns  ProjectionExec   1             projection         NULL             NULL
+compute.elapsed_compute        1050          duration_ns  ProjectionExec   2             projection         NULL             NULL
+compute.elapsed_compute        1000          duration_ns  ProjectionExec   3             projection         NULL             NULL
+compute.elapsed_compute        1500          duration_ns  FilterExec       0             filter             ProjectionExec   0
+compute.elapsed_compute        1400          duration_ns  FilterExec       1             filter             ProjectionExec   0
+compute.elapsed_compute        1300          duration_ns  FilterExec       2             filter             ProjectionExec   0
+compute.elapsed_compute        1200          duration_ns  FilterExec       3             filter             ProjectionExec   0
 ```
 
 ## Implementation Guide

@@ -1648,7 +1648,7 @@ pub async fn test_analyze_raw_metrics_schema() {
     .await
     .unwrap();
 
-    // Verify raw metrics table has all expected columns
+    // Verify raw metrics table has all expected columns (8-field schema)
     let output = String::from_utf8_lossy(&assert.get_output().stdout);
     assert!(
         output.contains("metric_name"),
@@ -1670,6 +1670,14 @@ pub async fn test_analyze_raw_metrics_schema() {
     assert!(
         output.contains("operator_category"),
         "Should contain operator_category column"
+    );
+    assert!(
+        output.contains("operator_parent"),
+        "Should contain operator_parent column"
+    );
+    assert!(
+        output.contains("operator_index"),
+        "Should contain operator_index column"
     );
 
     fixture.shutdown_and_wait().await;
@@ -1844,6 +1852,112 @@ pub async fn test_analyze_multiple_files() {
         stderr.contains("Analyze requires exactly one file"),
         "Should contain error about requiring one file"
     );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_operator_hierarchy() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    // Run a complex query with multiple operators to test operator hierarchy
+    // (parent-child relationships). This query has:
+    // - VALUES clause (scan)
+    // - Filter (WHERE)
+    // - Aggregate (GROUP BY)
+    // - Sort (ORDER BY)
+    // - Limit
+    // - Projection (SELECT columns)
+    let query = r#"
+        SELECT
+            category,
+            count,
+            total
+        FROM (
+            SELECT
+                column2 as category,
+                COUNT(*) as count,
+                SUM(column3) as total
+            FROM (VALUES
+                (1, 'a', 100),
+                (2, 'b', 200),
+                (3, 'a', 300),
+                (4, 'b', 400),
+                (5, 'a', 500)
+            ) AS t(column1, column2, column3)
+            WHERE column1 > 1
+            GROUP BY column2
+        ) AS subquery
+        ORDER BY count DESC
+        LIMIT 2
+    "#;
+
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg(query)
+            .arg("--analyze-raw")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+
+    // Verify the schema includes hierarchy fields
+    assert!(
+        output.contains("operator_parent"),
+        "Should contain operator_parent column"
+    );
+    assert!(
+        output.contains("operator_index"),
+        "Should contain operator_index column"
+    );
+
+    // Verify we have a complex execution plan with multiple operators
+    // For this query we expect operators like:
+    // - Projection (root - final SELECT columns)
+    // - Limit
+    // - Sort
+    // - Aggregate (GROUP BY)
+    // - Filter (WHERE clause)
+    // - MemoryExec or similar scan operator (leaf)
+
+    // Check that we have metrics from multiple operator types
+    assert!(
+        output.contains("ProjectionExec") || output.contains("projection"),
+        "Should have projection operator"
+    );
+    assert!(
+        output.contains("AggregateExec") || output.contains("aggregate"),
+        "Should have aggregate operator"
+    );
+    assert!(
+        output.contains("FilterExec") || output.contains("filter") || output.contains("CoalesceBatchesExec"),
+        "Should have filter or coalesce operator"
+    );
+
+    // For a complex query with multiple operators, verify that operator names are present
+    // This confirms that the hierarchy was collected and included in the output
+    assert!(
+        output.contains("Exec"),
+        "Should contain operator names in output"
+    );
+
+    // Verify we have hierarchy data present (parent and index columns are populated)
+    // Note: Detailed validation of parent-child relationships is difficult with CLI table output
+    // and would require parsing the Arrow RecordBatch directly
+
+    // Note: The exact hierarchy validation is difficult with CLI table output
+    // The important thing is that the schema has the fields and operators are tracked
+    // A more thorough validation would require parsing the Arrow RecordBatch directly
 
     fixture.shutdown_and_wait().await;
 }

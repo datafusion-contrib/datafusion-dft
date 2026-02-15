@@ -97,7 +97,8 @@ impl ExecutionStats {
         plan: Arc<dyn ExecutionPlan>,
     ) -> color_eyre::Result<Self> {
         // Collect operator hierarchy
-        let operator_hierarchy = collect_operator_hierarchy(&plan, None, 0);
+        // Root node has no parent (None) and index -1 (represents NULL)
+        let operator_hierarchy = collect_operator_hierarchy(&plan, None, -1);
 
         Ok(Self {
             query,
@@ -854,6 +855,7 @@ fn is_io_plan_by_name(name: &str) -> bool {
 
 /// Collect operator hierarchy from execution plan tree
 /// Returns a map of operator_name -> (parent_name, child_index)
+/// Note: Root node should have parent=None and index=-1 (which represents NULL)
 fn collect_operator_hierarchy(
     plan: &Arc<dyn ExecutionPlan>,
     parent: Option<String>,
@@ -865,6 +867,7 @@ fn collect_operator_hierarchy(
     let operator_name = plan.name().to_string();
 
     // Store this operator's hierarchy info
+    // For root nodes (parent=None), index should be -1 to represent NULL
     hierarchy.insert(operator_name.clone(), (parent, index));
 
     // Recursively collect from children
