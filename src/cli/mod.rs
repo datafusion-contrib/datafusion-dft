@@ -25,6 +25,7 @@ use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use datafusion::arrow::array::{RecordBatch, RecordBatchWriter};
 use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::arrow::ipc::writer::FileWriter as ArrowIpcWriter;
 use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::arrow::{csv, json};
 use datafusion::sql::parser::DFParser;
@@ -869,6 +870,7 @@ enum AnyWriter {
     Csv(csv::writer::Writer<File>),
     Json(json::writer::LineDelimitedWriter<File>),
     Parquet(ArrowWriter<File>),
+    Arrow(ArrowIpcWriter<File>),
     #[cfg(feature = "vortex")]
     Vortex(VortexFileWriter),
 }
@@ -879,17 +881,22 @@ impl AnyWriter {
             AnyWriter::Csv(w) => Ok(w.write(batch)?),
             AnyWriter::Json(w) => Ok(w.write(batch)?),
             AnyWriter::Parquet(w) => Ok(w.write(batch)?),
+            AnyWriter::Arrow(w) => Ok(w.write(batch)?),
             #[cfg(feature = "vortex")]
             AnyWriter::Vortex(w) => Ok(w.write(batch)?),
         }
     }
 
-    async fn close(self) -> Result<()> {
+    async fn close(mut self) -> Result<()> {
         match self {
             AnyWriter::Csv(w) => Ok(w.close()?),
             AnyWriter::Json(w) => Ok(w.close()?),
             AnyWriter::Parquet(w) => {
                 w.close()?;
+                Ok(())
+            }
+            AnyWriter::Arrow(ref mut w) => {
+                w.finish()?;
                 Ok(())
             }
             #[cfg(feature = "vortex")]
@@ -912,6 +919,10 @@ fn path_to_writer(path: &Path, schema: SchemaRef) -> Result<AnyWriter> {
                     let writer = ArrowWriter::try_new(file, schema, Some(props))?;
                     Ok(AnyWriter::Parquet(writer))
                 }
+                "arrow" | "ipc" => {
+                    let writer = ArrowIpcWriter::try_new(file, &schema)?;
+                    Ok(AnyWriter::Arrow(writer))
+                }
                 #[cfg(feature = "vortex")]
                 "vortex" => Ok(AnyWriter::Vortex(VortexFileWriter::new(
                     file, schema, path,
@@ -919,11 +930,11 @@ fn path_to_writer(path: &Path, schema: SchemaRef) -> Result<AnyWriter> {
                 _ => {
                     #[cfg(feature = "vortex")]
                     return Err(eyre!(
-                        "Only 'csv', 'parquet', 'json', and 'vortex' file types can be output"
+                        "Only 'csv', 'parquet', 'json', 'arrow', and 'vortex' file types can be output"
                     ));
                     #[cfg(not(feature = "vortex"))]
                     return Err(eyre!(
-                        "Only 'csv', 'parquet', and 'json' file types can be output"
+                        "Only 'csv', 'parquet', 'json', and 'arrow' file types can be output"
                     ));
                 }
             };

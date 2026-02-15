@@ -235,6 +235,7 @@ impl std::fmt::Display for ExecutionDurationStats {
 
 #[derive(Clone, Debug)]
 pub struct ExecutionIOStats {
+    format_type: Option<IOFormatType>,
     bytes_scanned: Option<MetricValue>,
     time_opening: Option<MetricValue>,
     time_scanning: Option<MetricValue>,
@@ -363,9 +364,42 @@ impl std::fmt::Display for ExecutionIOStats {
 
 /// Visitor to collect IO metrics from an execution plan
 ///
+/// Represents the file format type for I/O operations
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum IOFormatType {
+    Csv,
+    Parquet,
+    Arrow,
+    Json,
+    Unknown,
+}
+
+impl IOFormatType {
+    fn namespace_prefix(&self) -> &'static str {
+        match self {
+            IOFormatType::Csv => "io.csv",
+            IOFormatType::Parquet => "io.parquet",
+            IOFormatType::Arrow => "io.arrow",
+            IOFormatType::Json => "io.json",
+            IOFormatType::Unknown => "io.unknown",
+        }
+    }
+
+    fn operator_name(&self) -> &'static str {
+        match self {
+            IOFormatType::Csv => "CsvExec",
+            IOFormatType::Parquet => "ParquetExec",
+            IOFormatType::Arrow => "ArrowExec",
+            IOFormatType::Json => "JsonExec",
+            IOFormatType::Unknown => "UnknownExec",
+        }
+    }
+}
+
 /// IO metrics are collected from nodes that perform IO operations, such as
-/// `CsvExec`, `ParquetExec`, and `ArrowExec`.
+/// `CsvExec`, `ParquetExec`, `ArrowExec`, and `JsonExec`.
 struct PlanIOVisitor {
+    format_type: Option<IOFormatType>,
     bytes_scanned: Option<MetricValue>,
     time_opening: Option<MetricValue>,
     time_scanning: Option<MetricValue>,
@@ -381,6 +415,7 @@ struct PlanIOVisitor {
 impl PlanIOVisitor {
     fn new() -> Self {
         Self {
+            format_type: None,
             bytes_scanned: None,
             time_opening: None,
             time_scanning: None,
@@ -395,6 +430,25 @@ impl PlanIOVisitor {
     }
 
     fn collect_io_metrics(&mut self, plan: &dyn ExecutionPlan) {
+        // Determine format type from plan name
+        let plan_name = plan.name();
+        let format = if plan_name.contains("CsvExec") {
+            IOFormatType::Csv
+        } else if plan_name.contains("ParquetExec") {
+            IOFormatType::Parquet
+        } else if plan_name.contains("ArrowExec") {
+            IOFormatType::Arrow
+        } else if plan_name.contains("JsonExec") {
+            IOFormatType::Json
+        } else {
+            IOFormatType::Unknown
+        };
+
+        // Only set format_type if not already set (take first I/O operator encountered)
+        if self.format_type.is_none() {
+            self.format_type = Some(format);
+        }
+
         let io_metrics = plan.metrics();
         if let Some(metrics) = io_metrics {
             self.bytes_scanned = metrics.sum_by_name("bytes_scanned");
@@ -422,6 +476,7 @@ impl PlanIOVisitor {
 impl From<PlanIOVisitor> for ExecutionIOStats {
     fn from(value: PlanIOVisitor) -> Self {
         Self {
+            format_type: value.format_type,
             bytes_scanned: value.bytes_scanned,
             time_opening: value.time_opening,
             time_scanning: value.time_scanning,
@@ -799,7 +854,7 @@ impl ExecutionPlanVisitor for PlanComputeVisitor {
 }
 
 fn is_io_plan(plan: &dyn ExecutionPlan) -> bool {
-    let io_plans = ["CsvExec", "ParquetExec", "ArrowExec"];
+    let io_plans = ["CsvExec", "ParquetExec", "ArrowExec", "JsonExec"];
     io_plans.contains(&plan.name())
 }
 
@@ -1082,12 +1137,17 @@ impl ExecutionStats {
         // Add IO metrics if present with namespacing
         // TODO: Populate operator_parent and operator_index from execution plan hierarchy
         if let Some(io) = &self.io {
+            // Determine the appropriate namespace and operator name based on format type
+            let format = io.format_type.unwrap_or(IOFormatType::Unknown);
+            let namespace = format.namespace_prefix();
+            let operator_name = format.operator_name();
+
             if let Some(bytes) = &io.bytes_scanned {
                 rows.add(
-                    "io.parquet.bytes_scanned",
+                    &format!("{}.bytes_scanned", namespace),
                     bytes.as_usize() as u64,
                     "bytes",
-                    Some("ParquetExec"),
+                    Some(operator_name),
                     None,
                     Some("io"),
                     None, // operator_parent - will be populated with hierarchy collection
@@ -1096,10 +1156,10 @@ impl ExecutionStats {
             }
             if let Some(time) = &io.time_opening {
                 rows.add(
-                    "io.parquet.time_opening",
+                    &format!("{}.time_opening", namespace),
                     time.as_usize() as u64,
                     "duration_ns",
-                    Some("ParquetExec"),
+                    Some(operator_name),
                     None,
                     Some("io"),
                     None,
@@ -1108,101 +1168,105 @@ impl ExecutionStats {
             }
             if let Some(time) = &io.time_scanning {
                 rows.add(
-                    "io.parquet.time_scanning",
+                    &format!("{}.time_scanning", namespace),
                     time.as_usize() as u64,
                     "duration_ns",
-                    Some("ParquetExec"),
+                    Some(operator_name),
                     None,
                     Some("io"),
                     None,
                     None,
                 );
             }
-            if let Some(output_rows) = io.parquet_output_rows {
-                rows.add(
-                    "io.parquet.output_rows",
-                    output_rows as u64,
-                    "count",
-                    Some("ParquetExec"),
-                    None,
-                    Some("io"),
-                    None,
-                    None,
-                );
-            }
-            if let Some(pruned) = &io.parquet_rg_pruned_stats {
-                rows.add(
-                    "io.parquet.rg_pruned",
-                    pruned.as_usize() as u64,
-                    "count",
-                    Some("ParquetExec"),
-                    None,
-                    Some("io"),
-                    None,
-                    None,
-                );
-            }
-            if let Some(matched) = &io.parquet_rg_matched_stats {
-                rows.add(
-                    "io.parquet.rg_matched",
-                    matched.as_usize() as u64,
-                    "count",
-                    Some("ParquetExec"),
-                    None,
-                    Some("io"),
-                    None,
-                    None,
-                );
-            }
-            if let Some(pruned) = &io.parquet_rg_pruned_bloom_filter {
-                rows.add(
-                    "io.parquet.bloom_pruned",
-                    pruned.as_usize() as u64,
-                    "count",
-                    Some("ParquetExec"),
-                    None,
-                    Some("io"),
-                    None,
-                    None,
-                );
-            }
-            if let Some(matched) = &io.parquet_rg_matched_bloom_filter {
-                rows.add(
-                    "io.parquet.bloom_matched",
-                    matched.as_usize() as u64,
-                    "count",
-                    Some("ParquetExec"),
-                    None,
-                    Some("io"),
-                    None,
-                    None,
-                );
-            }
-            if let Some(pruned) = &io.parquet_pruned_page_index {
-                rows.add(
-                    "io.parquet.page_index_pruned",
-                    pruned.as_usize() as u64,
-                    "count",
-                    Some("ParquetExec"),
-                    None,
-                    Some("io"),
-                    None,
-                    None,
-                );
-            }
-            if let Some(matched) = &io.parquet_matched_page_index {
-                rows.add(
-                    "io.parquet.page_index_matched",
-                    matched.as_usize() as u64,
-                    "count",
-                    Some("ParquetExec"),
-                    None,
-                    Some("io"),
-                    None,
-                    None,
-                );
-            }
-        }
+
+            // Parquet-specific metrics (only add if format is Parquet)
+            if format == IOFormatType::Parquet {
+                if let Some(output_rows) = io.parquet_output_rows {
+                    rows.add(
+                        &format!("{}.output_rows", namespace),
+                        output_rows as u64,
+                        "count",
+                        Some(operator_name),
+                        None,
+                        Some("io"),
+                        None,
+                        None,
+                    );
+                }
+                if let Some(pruned) = &io.parquet_rg_pruned_stats {
+                    rows.add(
+                        &format!("{}.rg_pruned", namespace),
+                        pruned.as_usize() as u64,
+                        "count",
+                        Some(operator_name),
+                        None,
+                        Some("io"),
+                        None,
+                        None,
+                    );
+                }
+                if let Some(matched) = &io.parquet_rg_matched_stats {
+                    rows.add(
+                        &format!("{}.rg_matched", namespace),
+                        matched.as_usize() as u64,
+                        "count",
+                        Some(operator_name),
+                        None,
+                        Some("io"),
+                        None,
+                        None,
+                    );
+                }
+                if let Some(pruned) = &io.parquet_rg_pruned_bloom_filter {
+                    rows.add(
+                        &format!("{}.bloom_pruned", namespace),
+                        pruned.as_usize() as u64,
+                        "count",
+                        Some(operator_name),
+                        None,
+                        Some("io"),
+                        None,
+                        None,
+                    );
+                }
+                if let Some(matched) = &io.parquet_rg_matched_bloom_filter {
+                    rows.add(
+                        &format!("{}.bloom_matched", namespace),
+                        matched.as_usize() as u64,
+                        "count",
+                        Some(operator_name),
+                        None,
+                        Some("io"),
+                        None,
+                        None,
+                    );
+                }
+                if let Some(pruned) = &io.parquet_pruned_page_index {
+                    rows.add(
+                        &format!("{}.page_index_pruned", namespace),
+                        pruned.as_usize() as u64,
+                        "count",
+                        Some(operator_name),
+                        None,
+                        Some("io"),
+                        None,
+                        None,
+                    );
+                }
+                if let Some(matched) = &io.parquet_matched_page_index {
+                    rows.add(
+                        &format!("{}.page_index_matched", namespace),
+                        matched.as_usize() as u64,
+                        "count",
+                        Some(operator_name),
+                        None,
+                        Some("io"),
+                        None,
+                        None,
+                    );
+                }
+            } // End of Parquet-specific metrics block
+        } // End of IO metrics block
 
         // Add compute metrics if present with namespacing
         // TODO: Populate operator_parent and operator_index from execution plan hierarchy
@@ -1500,15 +1564,34 @@ impl ExecutionIOStats {
             }
         };
 
-        // Helper to get metric value, trying both namespaced and legacy names
+        // Determine format type from metric keys
+        let format_type = if metrics.keys().any(|k| k.starts_with("io.csv.")) {
+            Some(IOFormatType::Csv)
+        } else if metrics.keys().any(|k| k.starts_with("io.parquet.")) {
+            Some(IOFormatType::Parquet)
+        } else if metrics.keys().any(|k| k.starts_with("io.arrow.")) {
+            Some(IOFormatType::Arrow)
+        } else if metrics.keys().any(|k| k.starts_with("io.json.")) {
+            Some(IOFormatType::Json)
+        } else {
+            None
+        };
+
+        // Helper to get metric value, trying all format-specific namespaces and legacy names
         let get_metric = |namespaced: &str, legacy: &str| -> Option<u64> {
+            // Try format-specific namespace
             metrics
-                .get(namespaced)
+                .get(&format!("io.csv.{}", namespaced.strip_prefix("io.parquet.").unwrap_or(namespaced)))
+                .or_else(|| metrics.get(&format!("io.parquet.{}", namespaced.strip_prefix("io.parquet.").unwrap_or(namespaced))))
+                .or_else(|| metrics.get(&format!("io.arrow.{}", namespaced.strip_prefix("io.parquet.").unwrap_or(namespaced))))
+                .or_else(|| metrics.get(&format!("io.json.{}", namespaced.strip_prefix("io.parquet.").unwrap_or(namespaced))))
+                .or_else(|| metrics.get(namespaced))
                 .or_else(|| metrics.get(legacy))
                 .copied()
         };
 
         Ok(Self {
+            format_type,
             bytes_scanned: get_metric("io.parquet.bytes_scanned", "bytes_scanned")
                 .map(|v| create_count(v)),
             time_opening: get_metric("io.parquet.time_opening", "time_opening")
