@@ -17,8 +17,11 @@
 
 pub mod execution;
 pub mod handlers;
+mod pagination;
 pub mod state;
 pub mod ui;
+
+pub use pagination::{extract_page, has_sufficient_rows, page_row_range, PAGE_SIZE};
 
 use color_eyre::eyre::eyre;
 use color_eyre::Result;

@@ -83,6 +83,12 @@ fn create_values_query(num: usize) -> String {
     format!("{base} {vals}")
 }
 
+fn create_values_query_offset(num: usize, offset: usize) -> String {
+    let base = "SELECT * FROM VALUES";
+    let vals = (offset..offset + num).map(|i| format!("({i})")).join(",");
+    format!("{base} {vals}")
+}
+
 // Tests that we can paginate through multiple pages and go back to the first page
 #[tokio::test]
 async fn multiple_pages_forward_and_back() {
@@ -197,5 +203,62 @@ async fn multiple_pages_forward_and_back_and_forward() {
             "+---------+",
         ];
         assert_batches_eq!(expected, &batches);
+    }
+}
+
+// Tests lazy loading: only load batches as needed for pagination
+// Simulates 3 batches: 60 rows, 60 rows, 20 rows (140 total)
+#[tokio::test]
+async fn multiple_batches_lazy_loading() {
+    let mut test_app = TestApp::new().await;
+
+    test_app
+        .handle_app_event(AppEvent::FlightSQLNewExecution)
+        .unwrap();
+
+    // Send only first batch initially (lazy loading)
+    let batch1 = create_execution_results(&create_values_query(60)).await;
+    test_app
+        .handle_app_event(AppEvent::FlightSQLExecutionResultsNextBatch(batch1))
+        .unwrap();
+
+    // Verify page 0 shows 60 rows (only first batch loaded)
+    {
+        let state = test_app.state();
+        assert_eq!(state.flightsql_tab.current_page().unwrap(), 0);
+        let page_results = state.flightsql_tab.current_page_results().unwrap();
+        assert_eq!(page_results.num_rows(), 60);
+    }
+
+    // Send second batch (simulating lazy load)
+    let batch2 = create_execution_results(&create_values_query_offset(60, 60)).await;
+    test_app
+        .handle_app_event(AppEvent::FlightSQLExecutionResultsNextBatch(batch2))
+        .unwrap();
+
+    // Now page 0 should show 100 rows (spanning both batches)
+    {
+        let state = test_app.state();
+        let page_results = state.flightsql_tab.current_page_results().unwrap();
+        assert_eq!(page_results.num_rows(), 100);
+    }
+
+    // Go to page 1
+    test_app
+        .handle_app_event(AppEvent::FlightSQLExecutionResultsNextPage)
+        .unwrap();
+
+    // Send third batch
+    let batch3 = create_execution_results(&create_values_query_offset(20, 120)).await;
+    test_app
+        .handle_app_event(AppEvent::FlightSQLExecutionResultsNextBatch(batch3))
+        .unwrap();
+
+    // Verify page 1 shows remaining rows
+    {
+        let state = test_app.state();
+        assert_eq!(state.flightsql_tab.current_page().unwrap(), 1);
+        let page_results = state.flightsql_tab.current_page_results().unwrap();
+        assert_eq!(page_results.num_rows(), 40);
     }
 }
