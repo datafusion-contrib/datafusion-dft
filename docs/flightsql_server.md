@@ -36,7 +36,7 @@ The server implements the FlightSQL protocol, providing:
 
 ### Custom Actions
 - **Query Analysis** - Get detailed execution metrics via custom `"analyze_query"` action
-  - See [FlightSQL Analyze Protocol](flightsql_analyze_protocol.md) for the complete specification
+  - See [Arrow Flight Analyze Protocol](arrow_flight_analyze_protocol.md) for the complete specification
 
 ## Client Connections (TODO - Test this)
 
@@ -104,7 +104,7 @@ See the [Config Reference](config.md) for all available options.
 
 ## Query Analysis Support
 
-The `dft` FlightSQL server implements the [FlightSQL Analyze Protocol](flightsql_analyze_protocol.md), which provides detailed query execution metrics through a custom action.
+The `dft` FlightSQL server implements the [Arrow Flight Analyze Protocol](arrow_flight_analyze_protocol.md), which provides detailed query execution metrics through a custom action.
 
 ### Quick Start
 
@@ -145,7 +145,7 @@ The `dft` server implementation:
 
 ### For Other Implementers
 
-If you're implementing a FlightSQL server and want to support the analyze protocol, see the complete [FlightSQL Analyze Protocol Specification](flightsql_analyze_protocol.md).
+If you're implementing an Arrow Flight service and want to support the analyze protocol, see the complete [Arrow Flight Analyze Protocol Specification](arrow_flight_analyze_protocol.md).
 
 The protocol is designed to be:
 - Implementation-agnostic (works with any query engine)

@@ -871,18 +871,13 @@ impl FlightSqlService for FlightSqlServiceImpl {
                 })?;
 
                 // 4. Encode metrics batch as FlightData
-                let mut flight_data =
+                let flight_data =
                     batches_to_flight_data(&metrics_batch.schema(), vec![metrics_batch]).map_err(
                         |e| Status::internal(format!("Failed to encode metrics batch: {}", e)),
                     )?;
 
-                // 5. Add SQL query to schema message metadata
-                // The first FlightData message contains the schema
-                if let Some(schema_msg) = flight_data.first_mut() {
-                    schema_msg.app_metadata = sql.as_bytes().to_vec().into();
-                }
-
-                // 6. Convert FlightData to arrow_flight::Result messages
+                // 5. Convert FlightData to arrow_flight::Result messages
+                // Note: SQL query is NOT included in metadata; clients must retain the original query
                 let results: Vec<arrow_flight::Result> = flight_data
                     .into_iter()
                     .map(|fd| {
@@ -892,7 +887,7 @@ impl FlightSqlService for FlightSqlServiceImpl {
                     })
                     .collect();
 
-                // 7. Create stream of Result messages
+                // 6. Create stream of Result messages
                 let stream = futures::stream::iter(results.into_iter().map(Ok)).boxed();
 
                 // Record metrics

@@ -1,0 +1,28 @@
+Stage 1
+1. Namespace the metric names and add this to the spec
+2. Add "operator_parent" and "operator_index" fields to the schema
+3. Remove SQL from metadata - client must retain the query
+4. New compute categories for window, distinct, limit, union. Make clear in spec this is up to the implementation to decide what belongs in each category.
+5. Make clear this is not specific to FlightSQL - it is specific to Arrow Flight although its natural to pair with FlightSQL 
+6. Clients dont need to ugnore unknown metric names, in fact thats almost the opposite of whats desired.  As long as they are assigned to a group it should be okay to display them.
+
+
+
+3. Add validation step on the client that received metrics are compliant with 1
+4. Check how units are provided - should be up to the implementation
+5. New categories "index", "distributed" in metrics namespace
+8. Decide on 0 or null for operators without metrics
+10. streaming...
+12. Partition Skew to compute analysis
+14. Config options / resources - in metadata?
+15. "analyze_query_capabilities" action for listing metrics / operators
+16. "analyze_query_live" stream stats
+17. Standardize units
+
+Done
+6. New compute categories window, distinct, limit, union
+7. Ambiguous compute categories are up to the implementation to decide
+13. Add "operator_parent" and "operator_index"
+9. No SQL in metadata, client is expected to retain this
+11. Make clear this is not specific to FlightSQL - it is specific to Arrow Flight although its natural to pair with FlightSQL 
+2. Clients dont need to ugnore unknown metric names, in fact thats almost the opposite of whats desired.  As long as they are assigned to a group it should be okay to display them.  Optionally, there can config to determine if unknown metrics throw error or are included

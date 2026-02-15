@@ -530,29 +530,19 @@ impl FlightSQLContext {
             result_messages.push(result);
         }
 
-        // 4. Decode each Result message to FlightData and extract query from metadata
+        // 4. Decode each Result message to FlightData
         let mut all_flight_data = Vec::new();
-        let mut sql_query = None;
 
         for result in result_messages {
             // Deserialize the FlightData from the Result.body bytes using prost
             let flight_data = <FlightData as prost::Message>::decode(result.body.as_ref())
                 .map_err(|e| eyre::eyre!("Failed to decode FlightData: {}", e))?;
 
-            // Extract SQL from schema message (first message) metadata
-            if sql_query.is_none() && !flight_data.app_metadata.is_empty() {
-                sql_query = Some(
-                    String::from_utf8(flight_data.app_metadata.to_vec())
-                        .map_err(|e| eyre::eyre!("Invalid UTF-8 in metadata: {}", e))?,
-                );
-            }
-
             all_flight_data.push(flight_data);
         }
 
-        // 5. Validate we got the SQL query in metadata
-        let query_str =
-            sql_query.ok_or_else(|| eyre::eyre!("SQL query not found in response metadata"))?;
+        // 5. Use the original query (client retains it, server doesn't send it back)
+        let query_str = query.to_string();
 
         // 6. Decode metrics batch
         // batches_to_flight_data creates [schema, data] for the batch

@@ -160,8 +160,8 @@ dft -f query.sql --analyze --flightsql
 ```
 
 **Requirements:**
-- The FlightSQL server must support the `"analyze_query"` custom action
-- See the [FlightSQL Analyze Protocol Specification](flightsql_analyze_protocol.md) for implementation details
+- The Arrow Flight service must support the `"analyze_query"` custom action
+- See the [Arrow Flight Analyze Protocol Specification](arrow_flight_analyze_protocol.md) for implementation details
 - Servers without analyze support will return an "unimplemented" error
 
 **How it works:**

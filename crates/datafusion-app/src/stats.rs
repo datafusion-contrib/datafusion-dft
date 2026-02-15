@@ -49,6 +49,8 @@ pub struct ExecutionStats {
     io: Option<ExecutionIOStats>,
     compute: Option<ExecutionComputeStats>,
     plan: Arc<dyn ExecutionPlan>,
+    /// Maps operator name to (parent_name, child_index)
+    operator_hierarchy: HashMap<String, (Option<String>, i32)>,
 }
 
 impl ExecutionStats {
@@ -60,6 +62,9 @@ impl ExecutionStats {
         bytes: usize,
         plan: Arc<dyn ExecutionPlan>,
     ) -> color_eyre::Result<Self> {
+        // Collect operator hierarchy
+        let operator_hierarchy = collect_operator_hierarchy(&plan, None, 0);
+
         Ok(Self {
             query,
             durations,
@@ -69,6 +74,7 @@ impl ExecutionStats {
             plan,
             io: None,
             compute: None,
+            operator_hierarchy,
         })
     }
 
@@ -747,6 +753,76 @@ fn is_io_plan(plan: &dyn ExecutionPlan) -> bool {
     io_plans.contains(&plan.name())
 }
 
+/// Classify an operator into a category based on its name
+fn classify_operator_category(operator_name: &str) -> &'static str {
+    // Check for specific operator types
+    if operator_name.contains("Filter") {
+        return "filter";
+    }
+    if operator_name.contains("Sort") {
+        return "sort";
+    }
+    if operator_name.contains("Projection") {
+        return "projection";
+    }
+    if operator_name.contains("Join") {
+        return "join";
+    }
+    if operator_name.contains("Aggregate") || operator_name.contains("GroupBy") {
+        return "aggregate";
+    }
+    if operator_name.contains("Window") {
+        return "window";
+    }
+    if operator_name.contains("Distinct") || operator_name.contains("Deduplicate") {
+        return "distinct";
+    }
+    if operator_name.contains("Limit") || operator_name.contains("TopK") {
+        return "limit";
+    }
+    if operator_name.contains("Union") {
+        return "union";
+    }
+    if is_io_plan_by_name(operator_name) {
+        return "io";
+    }
+
+    "other"
+}
+
+fn is_io_plan_by_name(name: &str) -> bool {
+    let io_plans = ["CsvExec", "ParquetExec", "ArrowExec", "JsonExec", "AvroExec"];
+    io_plans.iter().any(|p| name.contains(p))
+}
+
+/// Collect operator hierarchy from execution plan tree
+/// Returns a map of operator_name -> (parent_name, child_index)
+fn collect_operator_hierarchy(
+    plan: &Arc<dyn ExecutionPlan>,
+    parent: Option<String>,
+    index: i32,
+) -> HashMap<String, (Option<String>, i32)> {
+    let mut hierarchy = HashMap::new();
+
+    // Get operator name - use the plan's name
+    let operator_name = plan.name().to_string();
+
+    // Store this operator's hierarchy info
+    hierarchy.insert(operator_name.clone(), (parent, index));
+
+    // Recursively collect from children
+    for (child_index, child) in plan.children().iter().enumerate() {
+        let child_hierarchy = collect_operator_hierarchy(
+            child,
+            Some(operator_name.clone()),
+            child_index as i32,
+        );
+        hierarchy.extend(child_hierarchy);
+    }
+
+    hierarchy
+}
+
 pub fn collect_plan_io_stats(plan: Arc<dyn ExecutionPlan>) -> Option<ExecutionIOStats> {
     let mut visitor = PlanIOVisitor::new();
     if visit_execution_plan(plan.as_ref(), &mut visitor).is_ok() {
@@ -774,6 +850,8 @@ pub fn analyze_metrics_schema() -> SchemaRef {
         Field::new("operator_name", DataType::Utf8, true),
         Field::new("partition_id", DataType::Int32, true),
         Field::new("operator_category", DataType::Utf8, true),
+        Field::new("operator_parent", DataType::Utf8, true),
+        Field::new("operator_index", DataType::Int32, true),
     ]))
 }
 
@@ -785,6 +863,8 @@ struct MetricsTableBuilder {
     operator_names: Vec<Option<String>>,
     partition_ids: Vec<Option<i32>>,
     operator_categories: Vec<Option<String>>,
+    operator_parents: Vec<Option<String>>,
+    operator_indices: Vec<Option<i32>>,
 }
 
 impl MetricsTableBuilder {
@@ -796,9 +876,12 @@ impl MetricsTableBuilder {
             operator_names: Vec::new(),
             partition_ids: Vec::new(),
             operator_categories: Vec::new(),
+            operator_parents: Vec::new(),
+            operator_indices: Vec::new(),
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn add(
         &mut self,
         metric_name: &str,
@@ -807,6 +890,8 @@ impl MetricsTableBuilder {
         operator_name: Option<&str>,
         partition_id: Option<i32>,
         operator_category: Option<&str>,
+        operator_parent: Option<&str>,
+        operator_index: Option<i32>,
     ) {
         self.metric_names.push(metric_name.to_string());
         self.values.push(value);
@@ -815,6 +900,8 @@ impl MetricsTableBuilder {
         self.partition_ids.push(partition_id);
         self.operator_categories
             .push(operator_category.map(String::from));
+        self.operator_parents.push(operator_parent.map(String::from));
+        self.operator_indices.push(operator_index);
     }
 
     fn build(self, schema: SchemaRef) -> color_eyre::Result<RecordBatch> {
@@ -825,6 +912,9 @@ impl MetricsTableBuilder {
         let partition_ids_array: ArrayRef = Arc::new(Int32Array::from(self.partition_ids));
         let operator_categories_array: ArrayRef =
             Arc::new(StringArray::from(self.operator_categories));
+        let operator_parents_array: ArrayRef =
+            Arc::new(StringArray::from(self.operator_parents));
+        let operator_indices_array: ArrayRef = Arc::new(Int32Array::from(self.operator_indices));
 
         Ok(RecordBatch::try_new(
             schema,
@@ -835,6 +925,8 @@ impl MetricsTableBuilder {
                 operator_names_array,
                 partition_ids_array,
                 operator_categories_array,
+                operator_parents_array,
+                operator_indices_array,
             ],
         )?)
     }
@@ -846,164 +938,198 @@ impl ExecutionStats {
         let schema = analyze_metrics_schema();
         let mut rows = MetricsTableBuilder::new();
 
-        // Add basic metrics
-        rows.add("rows", self.rows as u64, "count", None, None, None);
-        rows.add("batches", self.batches as u64, "count", None, None, None);
-        rows.add("bytes", self.bytes as u64, "bytes", None, None, None);
+        // Add basic metrics with namespacing
+        rows.add("query.rows", self.rows as u64, "count", None, None, None, None, None);
+        rows.add("query.batches", self.batches as u64, "count", None, None, None, None, None);
+        rows.add("query.bytes", self.bytes as u64, "bytes", None, None, None, None, None);
 
-        // Add duration metrics
+        // Add duration metrics with namespacing
         rows.add(
-            "parsing",
+            "stage.parsing",
             self.durations.parsing.as_nanos() as u64,
             "duration_ns",
             None,
             None,
             None,
+            None,
+            None,
         );
         rows.add(
-            "logical_planning",
+            "stage.logical_planning",
             self.durations.logical_planning.as_nanos() as u64,
             "duration_ns",
             None,
             None,
             None,
+            None,
+            None,
         );
         rows.add(
-            "physical_planning",
+            "stage.physical_planning",
             self.durations.physical_planning.as_nanos() as u64,
             "duration_ns",
             None,
             None,
             None,
+            None,
+            None,
         );
         rows.add(
-            "execution",
+            "stage.execution",
             self.durations.execution.as_nanos() as u64,
             "duration_ns",
             None,
             None,
             None,
+            None,
+            None,
         );
         rows.add(
-            "total",
+            "stage.total",
             self.durations.total.as_nanos() as u64,
             "duration_ns",
             None,
             None,
             None,
+            None,
+            None,
         );
 
-        // Add IO metrics if present
+        // Add IO metrics if present with namespacing
+        // TODO: Populate operator_parent and operator_index from execution plan hierarchy
         if let Some(io) = &self.io {
             if let Some(bytes) = &io.bytes_scanned {
                 rows.add(
-                    "bytes_scanned",
+                    "io.parquet.bytes_scanned",
                     bytes.as_usize() as u64,
                     "bytes",
                     Some("ParquetExec"),
                     None,
                     Some("io"),
+                    None, // operator_parent - will be populated with hierarchy collection
+                    None, // operator_index - will be populated with hierarchy collection
                 );
             }
             if let Some(time) = &io.time_opening {
                 rows.add(
-                    "time_opening",
+                    "io.parquet.time_opening",
                     time.as_usize() as u64,
                     "duration_ns",
                     Some("ParquetExec"),
                     None,
                     Some("io"),
+                    None,
+                    None,
                 );
             }
             if let Some(time) = &io.time_scanning {
                 rows.add(
-                    "time_scanning",
+                    "io.parquet.time_scanning",
                     time.as_usize() as u64,
                     "duration_ns",
                     Some("ParquetExec"),
                     None,
                     Some("io"),
+                    None,
+                    None,
                 );
             }
             if let Some(output_rows) = io.parquet_output_rows {
                 rows.add(
-                    "output_rows",
+                    "io.parquet.output_rows",
                     output_rows as u64,
                     "count",
                     Some("ParquetExec"),
                     None,
                     Some("io"),
+                    None,
+                    None,
                 );
             }
             if let Some(pruned) = &io.parquet_rg_pruned_stats {
                 rows.add(
-                    "parquet_rg_pruned",
+                    "io.parquet.rg_pruned",
                     pruned.as_usize() as u64,
                     "count",
                     Some("ParquetExec"),
                     None,
                     Some("io"),
+                    None,
+                    None,
                 );
             }
             if let Some(matched) = &io.parquet_rg_matched_stats {
                 rows.add(
-                    "parquet_rg_matched",
+                    "io.parquet.rg_matched",
                     matched.as_usize() as u64,
                     "count",
                     Some("ParquetExec"),
                     None,
                     Some("io"),
+                    None,
+                    None,
                 );
             }
             if let Some(pruned) = &io.parquet_rg_pruned_bloom_filter {
                 rows.add(
-                    "parquet_bloom_pruned",
+                    "io.parquet.bloom_pruned",
                     pruned.as_usize() as u64,
                     "count",
                     Some("ParquetExec"),
                     None,
                     Some("io"),
+                    None,
+                    None,
                 );
             }
             if let Some(matched) = &io.parquet_rg_matched_bloom_filter {
                 rows.add(
-                    "parquet_bloom_matched",
+                    "io.parquet.bloom_matched",
                     matched.as_usize() as u64,
                     "count",
                     Some("ParquetExec"),
                     None,
                     Some("io"),
+                    None,
+                    None,
                 );
             }
             if let Some(pruned) = &io.parquet_pruned_page_index {
                 rows.add(
-                    "parquet_page_index_pruned",
+                    "io.parquet.page_index_pruned",
                     pruned.as_usize() as u64,
                     "count",
                     Some("ParquetExec"),
                     None,
                     Some("io"),
+                    None,
+                    None,
                 );
             }
             if let Some(matched) = &io.parquet_matched_page_index {
                 rows.add(
-                    "parquet_page_index_matched",
+                    "io.parquet.page_index_matched",
                     matched.as_usize() as u64,
                     "count",
                     Some("ParquetExec"),
                     None,
                     Some("io"),
+                    None,
+                    None,
                 );
             }
         }
 
-        // Add compute metrics if present
+        // Add compute metrics if present with namespacing
+        // TODO: Populate operator_parent and operator_index from execution plan hierarchy
         if let Some(compute) = &self.compute {
             if let Some(elapsed) = compute.elapsed_compute {
                 rows.add(
-                    "elapsed_compute",
+                    "compute.elapsed_compute",
                     elapsed as u64,
                     "duration_ns",
+                    None,
+                    None,
                     None,
                     None,
                     None,
@@ -1018,12 +1144,14 @@ impl ExecutionStats {
                     for stat in stats {
                         for (partition_id, elapsed) in stat.elapsed_computes.iter().enumerate() {
                             rows.add(
-                                "elapsed_compute",
+                                "compute.elapsed_compute",
                                 *elapsed as u64,
                                 "duration_ns",
                                 Some(&stat.name),
                                 Some(partition_id as i32),
                                 Some(category),
+                                None, // operator_parent - will be populated with hierarchy collection
+                                None, // operator_index - will be populated with hierarchy collection
                             );
                         }
                     }
@@ -1076,6 +1204,16 @@ impl ExecutionStats {
             .as_any()
             .downcast_ref::<StringArray>()
             .ok_or_else(|| color_eyre::eyre::eyre!("Invalid operator_category column type"))?;
+        let operator_parents = batch
+            .column(6)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .ok_or_else(|| color_eyre::eyre::eyre!("Invalid operator_parent column type"))?;
+        let operator_indices = batch
+            .column(7)
+            .as_any()
+            .downcast_ref::<Int32Array>()
+            .ok_or_else(|| color_eyre::eyre::eyre!("Invalid operator_index column type"))?;
 
         // Iterate rows and populate stats
         for row_idx in 0..batch.num_rows() {
@@ -1096,6 +1234,17 @@ impl ExecutionStats {
                 None
             } else {
                 Some(operator_categories.value(row_idx))
+            };
+            // Extract operator_parent and operator_index (not currently used but preserved for future)
+            let _operator_parent = if operator_parents.is_null(row_idx) {
+                None
+            } else {
+                Some(operator_parents.value(row_idx))
+            };
+            let _operator_index = if operator_indices.is_null(row_idx) {
+                None
+            } else {
+                Some(operator_indices.value(row_idx))
             };
 
             stats_builder.add_metric(
@@ -1155,25 +1304,42 @@ impl ExecutionStatsBuilder {
         partition: Option<i32>,
         category: Option<&str>,
     ) -> color_eyre::Result<()> {
+        // Support both namespaced (e.g., "query.rows") and legacy (e.g., "rows") metric names
         match (name, category) {
-            ("rows", None) => self.rows = value as usize,
-            ("batches", None) => self.batches = value as i32,
-            ("bytes", None) => self.bytes = value as usize,
-            ("parsing", None) => self.parsing = Duration::from_nanos(value),
-            ("logical_planning", None) => self.logical_planning = Duration::from_nanos(value),
-            ("physical_planning", None) => self.physical_planning = Duration::from_nanos(value),
-            ("execution", None) => self.execution = Duration::from_nanos(value),
-            ("total", None) => self.total = Duration::from_nanos(value),
-            ("elapsed_compute", None) => self.elapsed_compute = Some(value as usize),
-            (metric, Some("io")) => {
-                self.io_metrics.insert(metric.to_string(), value);
+            // Query-level metrics (support both forms)
+            ("rows" | "query.rows", None) => self.rows = value as usize,
+            ("batches" | "query.batches", None) => self.batches = value as i32,
+            ("bytes" | "query.bytes", None) => self.bytes = value as usize,
+
+            // Stage duration metrics (support both forms)
+            ("parsing" | "stage.parsing", None) => self.parsing = Duration::from_nanos(value),
+            ("logical_planning" | "stage.logical_planning", None) => {
+                self.logical_planning = Duration::from_nanos(value)
             }
-            ("elapsed_compute", Some(cat)) => {
+            ("physical_planning" | "stage.physical_planning", None) => {
+                self.physical_planning = Duration::from_nanos(value)
+            }
+            ("execution" | "stage.execution", None) => self.execution = Duration::from_nanos(value),
+            ("total" | "stage.total", None) => self.total = Duration::from_nanos(value),
+
+            // Compute metrics (support both forms)
+            ("elapsed_compute" | "compute.elapsed_compute", None) => {
+                self.elapsed_compute = Some(value as usize)
+            }
+            ("elapsed_compute" | "compute.elapsed_compute", Some(cat)) => {
                 self.compute_metrics
                     .entry(cat.to_string())
                     .or_default()
                     .push((operator.unwrap_or("Unknown").to_string(), partition, value));
             }
+
+            // I/O metrics (all io.* namespace)
+            (metric, Some("io")) => {
+                // Store with original metric name (might be namespaced or legacy)
+                self.io_metrics.insert(metric.to_string(), value);
+            }
+
+            // Unknown metrics - log but don't fail
             _ => {
                 debug!("Unknown metric: {} (category: {:?})", name, category);
             }
@@ -1219,6 +1385,9 @@ impl ExecutionStatsBuilder {
             io,
             compute,
             plan,
+            // When deserializing from metrics, we don't reconstruct the hierarchy
+            // The hierarchy info is preserved in the metrics table itself
+            operator_hierarchy: HashMap::new(),
         })
     }
 }
@@ -1247,25 +1416,44 @@ impl ExecutionIOStats {
             }
         };
 
+        // Helper to get metric value, trying both namespaced and legacy names
+        let get_metric = |namespaced: &str, legacy: &str| -> Option<u64> {
+            metrics.get(namespaced).or_else(|| metrics.get(legacy)).copied()
+        };
+
         Ok(Self {
-            bytes_scanned: metrics.get("bytes_scanned").map(|v| create_count(*v)),
-            time_opening: metrics.get("time_opening").map(|v| create_time(*v)),
-            time_scanning: metrics.get("time_scanning").map(|v| create_time(*v)),
-            parquet_output_rows: metrics.get("output_rows").map(|v| *v as usize),
-            parquet_pruned_page_index: metrics
-                .get("parquet_page_index_pruned")
-                .map(|v| create_count(*v)),
-            parquet_matched_page_index: metrics
-                .get("parquet_page_index_matched")
-                .map(|v| create_count(*v)),
-            parquet_rg_pruned_stats: metrics.get("parquet_rg_pruned").map(|v| create_count(*v)),
-            parquet_rg_matched_stats: metrics.get("parquet_rg_matched").map(|v| create_count(*v)),
-            parquet_rg_pruned_bloom_filter: metrics
-                .get("parquet_bloom_pruned")
-                .map(|v| create_count(*v)),
-            parquet_rg_matched_bloom_filter: metrics
-                .get("parquet_bloom_matched")
-                .map(|v| create_count(*v)),
+            bytes_scanned: get_metric("io.parquet.bytes_scanned", "bytes_scanned")
+                .map(|v| create_count(v)),
+            time_opening: get_metric("io.parquet.time_opening", "time_opening")
+                .map(|v| create_time(v)),
+            time_scanning: get_metric("io.parquet.time_scanning", "time_scanning")
+                .map(|v| create_time(v)),
+            parquet_output_rows: get_metric("io.parquet.output_rows", "output_rows")
+                .map(|v| v as usize),
+            parquet_pruned_page_index: get_metric(
+                "io.parquet.page_index_pruned",
+                "parquet_page_index_pruned",
+            )
+            .map(|v| create_count(v)),
+            parquet_matched_page_index: get_metric(
+                "io.parquet.page_index_matched",
+                "parquet_page_index_matched",
+            )
+            .map(|v| create_count(v)),
+            parquet_rg_pruned_stats: get_metric("io.parquet.rg_pruned", "parquet_rg_pruned")
+                .map(|v| create_count(v)),
+            parquet_rg_matched_stats: get_metric("io.parquet.rg_matched", "parquet_rg_matched")
+                .map(|v| create_count(v)),
+            parquet_rg_pruned_bloom_filter: get_metric(
+                "io.parquet.bloom_pruned",
+                "parquet_bloom_pruned",
+            )
+            .map(|v| create_count(v)),
+            parquet_rg_matched_bloom_filter: get_metric(
+                "io.parquet.bloom_matched",
+                "parquet_bloom_matched",
+            )
+            .map(|v| create_count(v)),
         })
     }
 }
