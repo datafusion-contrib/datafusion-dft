@@ -19,12 +19,7 @@ use core::cell::RefCell;
 use std::sync::Arc;
 
 use color_eyre::Result;
-use datafusion::arrow::{
-    array::{Array, RecordBatch, UInt32Array},
-    compute::take_record_batch,
-    datatypes::Schema,
-    error::ArrowError,
-};
+use datafusion::arrow::{array::RecordBatch, datatypes::Schema};
 use log::{error, info};
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::palette::tailwind;
@@ -34,10 +29,9 @@ use tokio::task::JoinHandle;
 use tui_textarea::TextArea;
 
 use crate::config::AppConfig;
+use crate::tui::pagination::{extract_page, has_sufficient_rows, PAGE_SIZE};
 use crate::tui::state::tabs::sql;
 use crate::tui::ExecutionError;
-
-const PAGE_SIZE: usize = 100;
 
 #[derive(Debug, Default)]
 pub enum FlightSQLConnectionStatus {
@@ -216,29 +210,26 @@ impl FlightSQLTabState<'_> {
 
     pub fn current_page_results(&self) -> Option<RecordBatch> {
         match (self.current_page, self.result_batches.as_ref()) {
-            (Some(page), Some(batches)) => {
-                let total_rows: usize = batches.iter().map(|b| b.num_rows()).sum();
-                let indices = if total_rows < PAGE_SIZE {
-                    UInt32Array::from_iter_values(0_u32..(total_rows as u32))
-                } else {
-                    let start = page * PAGE_SIZE;
-                    let remaining = total_rows - start;
-                    // On the last page there could be less than PAGE_SIZE results to view
-                    let page_records = remaining.min(PAGE_SIZE);
-                    let end = (start as u32) + (page_records as u32);
-                    info!("Current page start({start}) end({end})");
-                    UInt32Array::from_iter_values((start as u32)..end)
-                };
-                match take_record_batches(batches, &indices) {
-                    Ok(batch) => Some(batch),
-                    Err(err) => {
-                        error!("Error getting record batch: {}", err);
-                        None
-                    }
+            (Some(page), Some(batches)) => match extract_page(batches, page, PAGE_SIZE) {
+                Ok(batch) => Some(batch),
+                Err(err) => {
+                    error!("Error getting page {}: {}", page, err);
+                    None
                 }
-            }
+            },
             _ => Some(RecordBatch::new_empty(Arc::new(Schema::empty()))),
         }
+    }
+
+    pub fn total_loaded_rows(&self) -> usize {
+        self.result_batches
+            .as_ref()
+            .map(|batches| batches.iter().map(|b| b.num_rows()).sum())
+            .unwrap_or(0)
+    }
+
+    pub fn needs_more_batches_for_page(&self, page: usize) -> bool {
+        !has_sufficient_rows(self.total_loaded_rows(), page, PAGE_SIZE)
     }
 
     pub fn next_page(&mut self) {
@@ -306,17 +297,5 @@ impl FlightSQLTabState<'_> {
         } else {
             self.editor.lines().join("\n")
         }
-    }
-}
-
-fn take_record_batches(
-    batches: &[RecordBatch],
-    indices: &dyn Array,
-) -> Result<RecordBatch, ArrowError> {
-    match batches.len() {
-        0 => Ok(RecordBatch::new_empty(Arc::new(Schema::empty()))),
-        1 => take_record_batch(&batches[0], indices),
-        // For now we just get the first batch
-        _ => take_record_batch(&batches[0], indices),
     }
 }

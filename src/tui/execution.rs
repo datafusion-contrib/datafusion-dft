@@ -403,6 +403,35 @@ impl TuiExecution {
         }
     }
 
+    #[cfg(feature = "flightsql")]
+    pub async fn next_flightsql_batch(&self, sql: String, sender: UnboundedSender<AppEvent>) {
+        let mut streams = self.flightsql_result_stream.lock().await;
+        if let Some(s) = streams.as_mut() {
+            let start = std::time::Instant::now();
+            if let Some((ticket, batch_result)) = s.next().await {
+                match batch_result {
+                    Ok(batch) => {
+                        info!(
+                            "Fetched next FlightSQL batch from {}: {} rows",
+                            ticket,
+                            batch.num_rows()
+                        );
+                        let duration = start.elapsed();
+                        let results = ExecutionResultsBatch {
+                            query: sql,
+                            batch,
+                            duration,
+                        };
+                        let _ = sender.send(AppEvent::FlightSQLExecutionResultsNextBatch(results));
+                    }
+                    Err(e) => {
+                        error!("Error getting next FlightSQL batch: {:?}", e);
+                    }
+                }
+            }
+        }
+    }
+
     // TODO: Maybe just expose `inner` and use that rather than re-implementing the same
     // functions here.
     #[cfg(feature = "flightsql")]

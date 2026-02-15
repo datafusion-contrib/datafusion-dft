@@ -78,6 +78,30 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
         }
         (KeyCode::Right, KeyModifiers::NONE) => {
             let _event_tx = app.event_tx();
+
+            if let Some(current_page) = app.state.flightsql_tab.current_page() {
+                let next_page = current_page + 1;
+
+                // Check if we need more batches for the next page
+                if app
+                    .state
+                    .flightsql_tab
+                    .needs_more_batches_for_page(next_page)
+                {
+                    info!("Fetching more batches for page {}", next_page);
+
+                    if let Some(last_query) = app.state.history_tab.history().last() {
+                        let execution = Arc::clone(&app.execution);
+                        let sql = last_query.sql().clone();
+                        tokio::spawn(async move {
+                            execution.next_flightsql_batch(sql, _event_tx).await;
+                        });
+                    }
+                    return; // Wait for batch to load before advancing page
+                }
+            }
+
+            // Sufficient data available, advance page
             if let Err(e) = _event_tx.send(AppEvent::FlightSQLExecutionResultsNextPage) {
                 error!("Error going to next FlightSQL results page: {e}");
             }

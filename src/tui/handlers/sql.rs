@@ -92,25 +92,29 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
             }
         },
         (KeyCode::Right, KeyModifiers::NONE) => {
-            let _event_tx = app.event_tx().clone();
-            if let (Some(p), c) = (
-                app.state().sql_tab.current_page(),
-                app.state().sql_tab.batches_count(),
-            ) {
-                // We don't need to fetch the next batch if moving forward a page and we're not
-                // on the last page since we would have already fetched it.
-                if p < c - 1 {
-                    app.state.sql_tab.next_page();
-                    app.state.sql_tab.refresh_query_results_state();
-                    return;
+            let _event_tx = app.event_tx();
+
+            if let Some(current_page) = app.state.sql_tab.current_page() {
+                let next_page = current_page + 1;
+
+                // Check if we need more batches for the next page
+                if app.state.sql_tab.needs_more_batches_for_page(next_page) {
+                    info!("Fetching more batches for page {}", next_page);
+
+                    if let Some(last_query) = app.state.history_tab.history().last() {
+                        let execution = Arc::clone(&app.execution);
+                        let sql = last_query.sql().clone();
+                        tokio::spawn(async move {
+                            execution.next_batch(sql, _event_tx).await;
+                        });
+                    }
+                    return; // Wait for batch to load before advancing page
                 }
             }
-            if let Some(p) = app.state.history_tab.history().last() {
-                let execution = Arc::clone(&app.execution);
-                let sql = p.sql().clone();
-                tokio::spawn(async move {
-                    execution.next_batch(sql, _event_tx).await;
-                });
+
+            // Sufficient data available, advance page
+            if let Err(e) = app.event_tx().send(AppEvent::ExecutionResultsNextPage) {
+                error!("Error going to next SQL results page: {e}");
             }
         }
         (KeyCode::Left, KeyModifiers::NONE) => {
