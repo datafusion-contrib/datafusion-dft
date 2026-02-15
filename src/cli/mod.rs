@@ -242,9 +242,9 @@ impl CliApp {
             (_, _, false, true, true) => Err(eyre!(
                 "The `benchmark` and `analyze` flags are mutually exclusive"
             )),
-            (false, false, _, _, true) => Err(eyre!(
-                "Analyze requires exactly one command or file"
-            )),
+            (false, false, _, _, true) => {
+                Err(eyre!("Analyze requires exactly one command or file"))
+            }
 
             // Execution cases
             (false, true, _, false, false) => self.execute_files(&self.args.files).await,
@@ -287,9 +287,9 @@ impl CliApp {
             (_, _, _, true, true) => Err(eyre!(
                 "The `benchmark` and `analyze` flags are mutually exclusive"
             )),
-            (false, false, _, _, true) => Err(eyre!(
-                "Analyze requires exactly one command or file"
-            )),
+            (false, false, _, _, true) => {
+                Err(eyre!("Analyze requires exactly one command or file"))
+            }
 
             // Execution cases
             (true, false, false, false, false) => self.execute_commands(&self.args.commands).await,

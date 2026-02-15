@@ -1023,13 +1023,20 @@ impl ExecutionStats {
         // Add compute metrics if present
         if let Some(compute) = &self.compute {
             if let Some(elapsed) = compute.elapsed_compute {
-                rows.add("elapsed_compute", elapsed as u64, "duration_ns", None, None, None);
+                rows.add(
+                    "elapsed_compute",
+                    elapsed as u64,
+                    "duration_ns",
+                    None,
+                    None,
+                    None,
+                );
             }
 
             // Helper to add compute metrics for a category
             let add_compute_category = |rows: &mut MetricsTableBuilder,
-                                         compute_stats: &Option<Vec<PartitionsComputeStats>>,
-                                         category: &str| {
+                                        compute_stats: &Option<Vec<PartitionsComputeStats>>,
+                                        category: &str| {
                 if let Some(stats) = compute_stats {
                     for stat in stats {
                         for (partition_id, elapsed) in stat.elapsed_computes.iter().enumerate() {
@@ -1058,10 +1065,7 @@ impl ExecutionStats {
     }
 
     /// Deserialize ExecutionStats from metrics table
-    pub fn from_metrics_table(
-        batch: RecordBatch,
-        query: String,
-    ) -> color_eyre::Result<Self> {
+    pub fn from_metrics_table(batch: RecordBatch, query: String) -> color_eyre::Result<Self> {
         let mut stats_builder = ExecutionStatsBuilder::new(query);
 
         // Extract column arrays
@@ -1191,11 +1195,7 @@ impl ExecutionStatsBuilder {
                 self.compute_metrics
                     .entry(cat.to_string())
                     .or_default()
-                    .push((
-                        operator.unwrap_or("Unknown").to_string(),
-                        partition,
-                        value,
-                    ));
+                    .push((operator.unwrap_or("Unknown").to_string(), partition, value));
             }
             _ => {
                 debug!("Unknown metric: {} (category: {:?})", name, category);
@@ -1275,12 +1275,20 @@ impl ExecutionIOStats {
             time_opening: metrics.get("time_opening").map(|v| create_time(*v)),
             time_scanning: metrics.get("time_scanning").map(|v| create_time(*v)),
             parquet_output_rows: metrics.get("output_rows").map(|v| *v as usize),
-            parquet_pruned_page_index: metrics.get("parquet_page_index_pruned").map(|v| create_count(*v)),
-            parquet_matched_page_index: metrics.get("parquet_page_index_matched").map(|v| create_count(*v)),
+            parquet_pruned_page_index: metrics
+                .get("parquet_page_index_pruned")
+                .map(|v| create_count(*v)),
+            parquet_matched_page_index: metrics
+                .get("parquet_page_index_matched")
+                .map(|v| create_count(*v)),
             parquet_rg_pruned_stats: metrics.get("parquet_rg_pruned").map(|v| create_count(*v)),
             parquet_rg_matched_stats: metrics.get("parquet_rg_matched").map(|v| create_count(*v)),
-            parquet_rg_pruned_bloom_filter: metrics.get("parquet_bloom_pruned").map(|v| create_count(*v)),
-            parquet_rg_matched_bloom_filter: metrics.get("parquet_bloom_matched").map(|v| create_count(*v)),
+            parquet_rg_pruned_bloom_filter: metrics
+                .get("parquet_bloom_pruned")
+                .map(|v| create_count(*v)),
+            parquet_rg_matched_bloom_filter: metrics
+                .get("parquet_bloom_matched")
+                .map(|v| create_count(*v)),
         })
     }
 }

@@ -551,8 +551,8 @@ impl FlightSQLContext {
         }
 
         // 5. Validate we got the SQL query in metadata
-        let query_str = sql_query
-            .ok_or_else(|| eyre::eyre!("SQL query not found in response metadata"))?;
+        let query_str =
+            sql_query.ok_or_else(|| eyre::eyre!("SQL query not found in response metadata"))?;
 
         // 6. Decode metrics batch
         // batches_to_flight_data creates [schema, data] for the batch

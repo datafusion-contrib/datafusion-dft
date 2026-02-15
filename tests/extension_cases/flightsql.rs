@@ -1618,7 +1618,10 @@ pub async fn test_analyze_with_timing_metrics() {
         output.contains("Physical Planning"),
         "Should contain Physical Planning time"
     );
-    assert!(output.contains("Execution"), "Should contain Execution time");
+    assert!(
+        output.contains("Execution"),
+        "Should contain Execution time"
+    );
     assert!(output.contains("Total"), "Should contain Total time");
 
     fixture.shutdown_and_wait().await;

@@ -866,13 +866,15 @@ impl FlightSqlService for FlightSqlServiceImpl {
                 stats.collect_stats(); // Collect IO and compute metrics from plan
 
                 // 3. Convert ExecutionStats to metrics table format
-                let metrics_batch = stats
-                    .to_metrics_table()
-                    .map_err(|e| Status::internal(format!("Metrics serialization failed: {}", e)))?;
+                let metrics_batch = stats.to_metrics_table().map_err(|e| {
+                    Status::internal(format!("Metrics serialization failed: {}", e))
+                })?;
 
                 // 4. Encode metrics batch as FlightData
-                let mut flight_data = batches_to_flight_data(&metrics_batch.schema(), vec![metrics_batch])
-                    .map_err(|e| Status::internal(format!("Failed to encode metrics batch: {}", e)))?;
+                let mut flight_data =
+                    batches_to_flight_data(&metrics_batch.schema(), vec![metrics_batch]).map_err(
+                        |e| Status::internal(format!("Failed to encode metrics batch: {}", e)),
+                    )?;
 
                 // 5. Add SQL query to schema message metadata
                 // The first FlightData message contains the schema
@@ -886,9 +888,7 @@ impl FlightSqlService for FlightSqlServiceImpl {
                     .map(|fd| {
                         // Serialize FlightData to bytes
                         let bytes = fd.encode_to_vec();
-                        arrow_flight::Result {
-                            body: bytes.into(),
-                        }
+                        arrow_flight::Result { body: bytes.into() }
                     })
                     .collect();
 
