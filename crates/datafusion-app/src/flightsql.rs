@@ -506,10 +506,14 @@ impl FlightSQLContext {
             return Err(eyre::eyre!("Only a single SQL statement can be analyzed"));
         }
 
-        // 1. Create Action with type "analyze_query" and SQL in body
+        // 1. Create JSON request and encode as Action body
+        let request = crate::stats::AnalyzeQueryRequest::with_sql(query);
+        let request_body = serde_json::to_vec(&request)
+            .map_err(|e| eyre::eyre!("Failed to serialize request: {}", e))?;
+
         let action = Action {
             r#type: "analyze_query".to_string(),
-            body: query.as_bytes().to_vec().into(),
+            body: request_body.into(),
         };
 
         // 2. Call do_action on the FlightSQL service

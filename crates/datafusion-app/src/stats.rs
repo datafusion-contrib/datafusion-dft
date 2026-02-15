@@ -37,7 +37,39 @@ use datafusion::{
 };
 use itertools::Itertools;
 use log::debug;
+use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc, time::Duration};
+
+/// Request structure for the analyze_query action
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnalyzeQueryRequest {
+    /// SQL query to analyze (currently the only supported format)
+    pub sql: Option<String>,
+
+    // Future extensibility fields (not yet implemented):
+    // /// Substrait query plan (binary or JSON)
+    // pub substrait: Option<Vec<u8>>,
+    // /// Serialized logical plan
+    // pub logical_plan: Option<String>,
+    // /// Serialized physical plan
+    // pub physical_plan: Option<String>,
+}
+
+impl AnalyzeQueryRequest {
+    /// Create a new request with a SQL query
+    pub fn with_sql(sql: impl Into<String>) -> Self {
+        Self {
+            sql: Some(sql.into()),
+        }
+    }
+
+    /// Get the SQL query, returning an error if not present
+    pub fn sql(&self) -> color_eyre::Result<&str> {
+        self.sql
+            .as_deref()
+            .ok_or_else(|| color_eyre::eyre::eyre!("sql field is required"))
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct ExecutionStats {

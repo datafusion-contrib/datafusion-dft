@@ -37,19 +37,42 @@ The examples in this specification use SQL for illustration, but the protocol wo
 
 ### Request Format
 
-**Request Body**: UTF-8 encoded SQL query string
+**Request Body**: JSON-encoded query request structure
 
-**Important**: The SQL query must contain exactly one SQL statement. Multiple statements (e.g., separated by semicolons) are not supported and will result in an error.
+The request body should be a JSON object with the following structure:
 
-**Example**:
-```rust
-Action {
-    r#type: "analyze_query".to_string(),
-    body: "SELECT * FROM table WHERE id > 100".as_bytes().to_vec().into()
+```json
+{
+  "sql": "SELECT * FROM table WHERE id > 100"
 }
 ```
 
-**Request Encoding**: The SQL query string should be encoded as UTF-8 bytes in the `Action.body` field.
+**Current Fields**:
+- `sql` (string, required): The SQL query to analyze. Must contain exactly one SQL statement. Multiple statements (e.g., separated by semicolons) are not supported and will result in an error.
+
+**Future Extensibility**:
+The protocol is designed to be extensible. Future versions may support additional query representation fields:
+- `substrait` (bytes): Substrait query plan (binary or JSON)
+- `logical_plan` (string): Serialized logical plan
+- `physical_plan` (string): Serialized physical plan
+
+Servers should ignore unknown fields and clients should only send one query representation field at a time.
+
+**Example**:
+```rust
+use serde_json::json;
+
+let request_body = json!({
+    "sql": "SELECT * FROM table WHERE id > 100"
+});
+
+Action {
+    r#type: "analyze_query".to_string(),
+    body: serde_json::to_vec(&request_body)?.into()
+}
+```
+
+**Request Encoding**: The JSON object should be serialized to UTF-8 bytes in the `Action.body` field.
 
 ### Response Format
 
@@ -306,29 +329,46 @@ To implement this protocol in an Arrow Flight service:
 
 **Pseudo-code**:
 ```rust
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Deserialize, Serialize)]
+struct AnalyzeQueryRequest {
+    sql: Option<String>,
+    // Future fields:
+    // substrait: Option<Vec<u8>>,
+    // logical_plan: Option<String>,
+    // physical_plan: Option<String>,
+}
+
 async fn do_action_fallback(&self, request: Request<Action>) -> Result<Response<Stream>> {
     let action = request.into_inner();
 
     if action.r#type == "analyze_query" {
-        // 1. Extract query
-        let query = String::from_utf8(action.body.to_vec())?;
+        // 1. Parse JSON request
+        let request: AnalyzeQueryRequest = serde_json::from_slice(&action.body)?;
 
-        // 2. Execute with metrics
+        // 2. Extract SQL query (only supported format for now)
+        let query = request.sql.ok_or_else(||
+            Status::invalid_argument("sql field is required")
+        )?;
+
+        // 3. Execute with metrics
         let stats = self.analyze_query(&query).await?;
 
-        // 3. Convert to metrics batch (8-field schema with namespaced metrics)
+        // 4. Convert to metrics batch (8-field schema with namespaced metrics)
         let metrics_batch = stats.to_metrics_table()?;
 
-        // 4. Encode as FlightData (no metadata needed)
+        // 5. Encode as FlightData (no metadata needed)
         let flight_data = batches_to_flight_data(&metrics_batch.schema(), vec![metrics_batch])?;
 
-        // 5. Serialize and wrap in Result messages
+        // 6. Serialize and wrap in Result messages
+        // Note: Query is NOT included in response; clients must retain the original request
         let results: Vec<arrow_flight::Result> = flight_data
             .into_iter()
             .map(|fd| arrow_flight::Result { body: fd.encode_to_vec().into() })
             .collect();
 
-        // 6. Return stream
+        // 7. Return stream
         Ok(Response::new(stream::iter(results.into_iter().map(Ok))))
     } else {
         Err(Status::unimplemented("Unknown action"))
@@ -342,10 +382,18 @@ To consume this protocol:
 
 1. **Send Request**
    ```rust
+   use serde_json::json;
+
    let query = "SELECT * FROM table WHERE id > 100";
+
+   // Construct JSON request
+   let request_body = json!({
+       "sql": query
+   });
+
    let action = Action {
        r#type: "analyze_query".to_string(),
-       body: query.as_bytes().to_vec().into(),
+       body: serde_json::to_vec(&request_body)?.into(),
    };
    let stream = client.do_action(action).await?;
    ```

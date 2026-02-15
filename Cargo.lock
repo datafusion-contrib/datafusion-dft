@@ -2153,6 +2153,7 @@ dependencies = [
  "parking_lot",
  "prost",
  "serde",
+ "serde_json",
  "tokio",
  "tokio-metrics",
  "tokio-stream",

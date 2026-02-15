@@ -850,34 +850,41 @@ impl FlightSqlService for FlightSqlServiceImpl {
 
         match action.r#type.as_str() {
             "analyze_query" => {
-                // 1. Extract SQL query from action.body
-                let sql = String::from_utf8(action.body.to_vec())
-                    .map_err(|e| Status::invalid_argument(format!("Invalid UTF-8: {}", e)))?;
+                // 1. Parse JSON request body
+                let request: datafusion_app::stats::AnalyzeQueryRequest =
+                    serde_json::from_slice(&action.body).map_err(|e| {
+                        Status::invalid_argument(format!("Invalid JSON request: {}", e))
+                    })?;
+
+                // 2. Extract SQL query (only supported format for now)
+                let sql = request
+                    .sql()
+                    .map_err(|e| Status::invalid_argument(e.to_string()))?;
 
                 info!("Analyzing query via do_action: {}", sql);
 
-                // 2. Execute analyze_query on ExecutionContext
+                // 3. Execute analyze_query on ExecutionContext
                 let mut stats = self
                     .execution
-                    .analyze_query(&sql)
+                    .analyze_query(sql)
                     .await
                     .map_err(|e| Status::internal(format!("Analyze failed: {}", e)))?;
 
                 stats.collect_stats(); // Collect IO and compute metrics from plan
 
-                // 3. Convert ExecutionStats to metrics table format
+                // 4. Convert ExecutionStats to metrics table format
                 let metrics_batch = stats.to_metrics_table().map_err(|e| {
                     Status::internal(format!("Metrics serialization failed: {}", e))
                 })?;
 
-                // 4. Encode metrics batch as FlightData
+                // 5. Encode metrics batch as FlightData
                 let flight_data =
                     batches_to_flight_data(&metrics_batch.schema(), vec![metrics_batch]).map_err(
                         |e| Status::internal(format!("Failed to encode metrics batch: {}", e)),
                     )?;
 
-                // 5. Convert FlightData to arrow_flight::Result messages
-                // Note: SQL query is NOT included in metadata; clients must retain the original query
+                // 6. Convert FlightData to arrow_flight::Result messages
+                // Note: Query is NOT included in response; clients must retain the original request
                 let results: Vec<arrow_flight::Result> = flight_data
                     .into_iter()
                     .map(|fd| {
@@ -887,7 +894,7 @@ impl FlightSqlService for FlightSqlServiceImpl {
                     })
                     .collect();
 
-                // 6. Create stream of Result messages
+                // 7. Create stream of Result messages
                 let stream = futures::stream::iter(results.into_iter().map(Ok)).boxed();
 
                 // Record metrics
@@ -899,7 +906,7 @@ impl FlightSqlService for FlightSqlServiceImpl {
                 let req = ObservabilityRequestDetails {
                     request_id: None,
                     path: "/do_action/analyze_query".to_string(),
-                    sql: Some(sql),
+                    sql: Some(sql.to_string()),
                     start_ms: start.as_millisecond(),
                     duration_ms: duration.get_milliseconds(),
                     rows: None,
