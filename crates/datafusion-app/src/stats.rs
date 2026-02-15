@@ -50,6 +50,8 @@ pub struct ExecutionStats {
     compute: Option<ExecutionComputeStats>,
     plan: Arc<dyn ExecutionPlan>,
     /// Maps operator name to (parent_name, child_index)
+    #[allow(dead_code)]
+    // TODO: Use for populating operator_parent/operator_index in to_metrics_table
     operator_hierarchy: HashMap<String, (Option<String>, i32)>,
 }
 
@@ -446,6 +448,10 @@ pub struct ExecutionComputeStats {
     sort_compute: Option<Vec<PartitionsComputeStats>>,
     join_compute: Option<Vec<PartitionsComputeStats>>,
     aggregate_compute: Option<Vec<PartitionsComputeStats>>,
+    window_compute: Option<Vec<PartitionsComputeStats>>,
+    distinct_compute: Option<Vec<PartitionsComputeStats>>,
+    limit_compute: Option<Vec<PartitionsComputeStats>>,
+    union_compute: Option<Vec<PartitionsComputeStats>>,
     other_compute: Option<Vec<PartitionsComputeStats>>,
 }
 
@@ -513,8 +519,7 @@ impl std::fmt::Display for ExecutionComputeStats {
         )?;
         writeln!(f)?;
 
-        // Always display all categories in the same order as FlightSQL protocol:
-        // Projection, Filter, Sort, Aggregate, Join, Other
+        // Display all categories in order
         self.display_compute(f, &self.projection_compute, "Projection")?;
         writeln!(f)?;
         self.display_compute(f, &self.filter_compute, "Filter")?;
@@ -524,6 +529,14 @@ impl std::fmt::Display for ExecutionComputeStats {
         self.display_compute(f, &self.aggregate_compute, "Aggregate")?;
         writeln!(f)?;
         self.display_compute(f, &self.join_compute, "Join")?;
+        writeln!(f)?;
+        self.display_compute(f, &self.window_compute, "Window")?;
+        writeln!(f)?;
+        self.display_compute(f, &self.distinct_compute, "Distinct")?;
+        writeln!(f)?;
+        self.display_compute(f, &self.limit_compute, "Limit")?;
+        writeln!(f)?;
+        self.display_compute(f, &self.union_compute, "Union")?;
         writeln!(f)?;
         self.display_compute(f, &self.other_compute, "Other")?;
         writeln!(f)
@@ -732,6 +745,10 @@ impl From<PlanComputeVisitor> for ExecutionComputeStats {
             projection_compute: Some(value.projection_computes),
             join_compute: Some(value.join_computes),
             aggregate_compute: Some(value.aggregate_computes),
+            window_compute: None,   // TODO: Collect from visitor
+            distinct_compute: None, // TODO: Collect from visitor
+            limit_compute: None,    // TODO: Collect from visitor
+            union_compute: None,    // TODO: Collect from visitor
             other_compute: Some(value.other_computes),
         }
     }
@@ -754,6 +771,7 @@ fn is_io_plan(plan: &dyn ExecutionPlan) -> bool {
 }
 
 /// Classify an operator into a category based on its name
+#[allow(dead_code)] // TODO: Use in compute visitor for better categorization
 fn classify_operator_category(operator_name: &str) -> &'static str {
     // Check for specific operator types
     if operator_name.contains("Filter") {
@@ -790,8 +808,15 @@ fn classify_operator_category(operator_name: &str) -> &'static str {
     "other"
 }
 
+#[allow(dead_code)] // Used by classify_operator_category
 fn is_io_plan_by_name(name: &str) -> bool {
-    let io_plans = ["CsvExec", "ParquetExec", "ArrowExec", "JsonExec", "AvroExec"];
+    let io_plans = [
+        "CsvExec",
+        "ParquetExec",
+        "ArrowExec",
+        "JsonExec",
+        "AvroExec",
+    ];
     io_plans.iter().any(|p| name.contains(p))
 }
 
@@ -812,11 +837,8 @@ fn collect_operator_hierarchy(
 
     // Recursively collect from children
     for (child_index, child) in plan.children().iter().enumerate() {
-        let child_hierarchy = collect_operator_hierarchy(
-            child,
-            Some(operator_name.clone()),
-            child_index as i32,
-        );
+        let child_hierarchy =
+            collect_operator_hierarchy(child, Some(operator_name.clone()), child_index as i32);
         hierarchy.extend(child_hierarchy);
     }
 
@@ -900,7 +922,8 @@ impl MetricsTableBuilder {
         self.partition_ids.push(partition_id);
         self.operator_categories
             .push(operator_category.map(String::from));
-        self.operator_parents.push(operator_parent.map(String::from));
+        self.operator_parents
+            .push(operator_parent.map(String::from));
         self.operator_indices.push(operator_index);
     }
 
@@ -912,8 +935,7 @@ impl MetricsTableBuilder {
         let partition_ids_array: ArrayRef = Arc::new(Int32Array::from(self.partition_ids));
         let operator_categories_array: ArrayRef =
             Arc::new(StringArray::from(self.operator_categories));
-        let operator_parents_array: ArrayRef =
-            Arc::new(StringArray::from(self.operator_parents));
+        let operator_parents_array: ArrayRef = Arc::new(StringArray::from(self.operator_parents));
         let operator_indices_array: ArrayRef = Arc::new(Int32Array::from(self.operator_indices));
 
         Ok(RecordBatch::try_new(
@@ -939,9 +961,36 @@ impl ExecutionStats {
         let mut rows = MetricsTableBuilder::new();
 
         // Add basic metrics with namespacing
-        rows.add("query.rows", self.rows as u64, "count", None, None, None, None, None);
-        rows.add("query.batches", self.batches as u64, "count", None, None, None, None, None);
-        rows.add("query.bytes", self.bytes as u64, "bytes", None, None, None, None, None);
+        rows.add(
+            "query.rows",
+            self.rows as u64,
+            "count",
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+        rows.add(
+            "query.batches",
+            self.batches as u64,
+            "count",
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+        rows.add(
+            "query.bytes",
+            self.bytes as u64,
+            "bytes",
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
 
         // Add duration metrics with namespacing
         rows.add(
@@ -1418,7 +1467,10 @@ impl ExecutionIOStats {
 
         // Helper to get metric value, trying both namespaced and legacy names
         let get_metric = |namespaced: &str, legacy: &str| -> Option<u64> {
-            metrics.get(namespaced).or_else(|| metrics.get(legacy)).copied()
+            metrics
+                .get(namespaced)
+                .or_else(|| metrics.get(legacy))
+                .copied()
         };
 
         Ok(Self {
@@ -1512,6 +1564,22 @@ impl ExecutionComputeStats {
                 .filter(|v| !v.is_empty()),
             aggregate_compute: metrics
                 .get("aggregate")
+                .map(|m| to_partition_stats(m))
+                .filter(|v| !v.is_empty()),
+            window_compute: metrics
+                .get("window")
+                .map(|m| to_partition_stats(m))
+                .filter(|v| !v.is_empty()),
+            distinct_compute: metrics
+                .get("distinct")
+                .map(|m| to_partition_stats(m))
+                .filter(|v| !v.is_empty()),
+            limit_compute: metrics
+                .get("limit")
+                .map(|m| to_partition_stats(m))
+                .filter(|v| !v.is_empty()),
+            union_compute: metrics
+                .get("union")
                 .map(|m| to_partition_stats(m))
                 .filter(|v| !v.is_empty()),
             other_compute: metrics
