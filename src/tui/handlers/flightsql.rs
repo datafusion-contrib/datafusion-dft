@@ -83,7 +83,11 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
                 let next_page = current_page + 1;
 
                 // Check if we need more batches for the next page
-                if app.state.flightsql_tab.needs_more_batches_for_page(next_page) {
+                if app
+                    .state
+                    .flightsql_tab
+                    .needs_more_batches_for_page(next_page)
+                {
                     info!("Fetching more batches for page {}", next_page);
 
                     if let Some(last_query) = app.state.history_tab.history().last() {

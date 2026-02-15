@@ -411,7 +411,11 @@ impl TuiExecution {
             if let Some((ticket, batch_result)) = s.next().await {
                 match batch_result {
                     Ok(batch) => {
-                        info!("Fetched next FlightSQL batch from {}: {} rows", ticket, batch.num_rows());
+                        info!(
+                            "Fetched next FlightSQL batch from {}: {} rows",
+                            ticket,
+                            batch.num_rows()
+                        );
                         let duration = start.elapsed();
                         let results = ExecutionResultsBatch {
                             query: sql,

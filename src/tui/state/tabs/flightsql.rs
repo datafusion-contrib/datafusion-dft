@@ -19,10 +19,7 @@ use core::cell::RefCell;
 use std::sync::Arc;
 
 use color_eyre::Result;
-use datafusion::arrow::{
-    array::RecordBatch,
-    datatypes::Schema,
-};
+use datafusion::arrow::{array::RecordBatch, datatypes::Schema};
 use log::{error, info};
 use ratatui::crossterm::event::KeyEvent;
 use ratatui::style::palette::tailwind;
@@ -213,15 +210,13 @@ impl FlightSQLTabState<'_> {
 
     pub fn current_page_results(&self) -> Option<RecordBatch> {
         match (self.current_page, self.result_batches.as_ref()) {
-            (Some(page), Some(batches)) => {
-                match extract_page(batches, page, PAGE_SIZE) {
-                    Ok(batch) => Some(batch),
-                    Err(err) => {
-                        error!("Error getting page {}: {}", page, err);
-                        None
-                    }
+            (Some(page), Some(batches)) => match extract_page(batches, page, PAGE_SIZE) {
+                Ok(batch) => Some(batch),
+                Err(err) => {
+                    error!("Error getting page {}: {}", page, err);
+                    None
                 }
-            }
+            },
             _ => Some(RecordBatch::new_empty(Arc::new(Schema::empty()))),
         }
     }
@@ -304,4 +299,3 @@ impl FlightSQLTabState<'_> {
         }
     }
 }
-
