@@ -777,15 +777,6 @@ pub fn analyze_metrics_schema() -> SchemaRef {
     ]))
 }
 
-/// Standard Arrow schema for queries batch
-fn queries_schema() -> SchemaRef {
-    Arc::new(Schema::new(vec![Field::new(
-        "query",
-        DataType::Utf8,
-        false,
-    )]))
-}
-
 /// Helper to build metrics table rows
 struct MetricsTableBuilder {
     metric_names: Vec<String>,
@@ -849,21 +840,7 @@ impl MetricsTableBuilder {
     }
 }
 
-/// Create a queries batch from a list of queries
-pub fn create_queries_batch(queries: Vec<String>) -> color_eyre::Result<RecordBatch> {
-    let schema = queries_schema();
-    let query_array: ArrayRef = Arc::new(StringArray::from(queries));
-    Ok(RecordBatch::try_new(schema, vec![query_array])?)
-}
-
 impl ExecutionStats {
-    /// Get raw metrics batches (for --analyze-raw)
-    pub fn to_raw_batches(&self) -> color_eyre::Result<(RecordBatch, RecordBatch)> {
-        let queries_batch = create_queries_batch(vec![self.query.clone()])?;
-        let metrics_batch = self.to_metrics_table()?;
-        Ok((queries_batch, metrics_batch))
-    }
-
     /// Serialize ExecutionStats to metrics table format
     pub fn to_metrics_table(&self) -> color_eyre::Result<RecordBatch> {
         let schema = analyze_metrics_schema();

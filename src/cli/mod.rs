@@ -612,7 +612,7 @@ impl CliApp {
     #[cfg(feature = "flightsql")]
     fn print_batch(&self, batch: &datafusion::arrow::array::RecordBatch) -> Result<()> {
         use datafusion::arrow::util::pretty::print_batches;
-        print_batches(&[batch.clone()])?;
+        print_batches(std::slice::from_ref(batch))?;
         Ok(())
     }
 
