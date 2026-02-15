@@ -243,19 +243,17 @@ impl SQLTabState<'_> {
     }
 
     pub fn current_page_results(&self) -> Option<RecordBatch> {
-        use std::sync::Arc;
         use datafusion::arrow::datatypes::Schema;
+        use std::sync::Arc;
 
         match (self.current_page, self.result_batches.as_ref()) {
-            (Some(page), Some(batches)) => {
-                match extract_page(batches, page, PAGE_SIZE) {
-                    Ok(batch) => Some(batch),
-                    Err(err) => {
-                        log::error!("Error getting page {}: {}", page, err);
-                        None
-                    }
+            (Some(page), Some(batches)) => match extract_page(batches, page, PAGE_SIZE) {
+                Ok(batch) => Some(batch),
+                Err(err) => {
+                    log::error!("Error getting page {}: {}", page, err);
+                    None
                 }
-            }
+            },
             _ => Some(RecordBatch::new_empty(Arc::new(Schema::empty()))),
         }
     }

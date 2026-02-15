@@ -58,9 +58,7 @@ fn create_values_query_offset(num: usize, offset: usize) -> String {
 async fn single_page() {
     let mut test_app = TestApp::new().await;
 
-    test_app
-        .handle_app_event(AppEvent::NewExecution)
-        .unwrap();
+    test_app.handle_app_event(AppEvent::NewExecution).unwrap();
     let res1 = create_execution_results("SELECT 1").await;
     let event1 = AppEvent::ExecutionResultsNextBatch(res1);
     test_app.handle_app_event(event1).unwrap();
@@ -97,9 +95,7 @@ async fn multiple_pages_forward_and_back() {
     let res1 = create_execution_results(&query).await;
     let event1 = AppEvent::ExecutionResultsNextBatch(res1);
 
-    test_app
-        .handle_app_event(AppEvent::NewExecution)
-        .unwrap();
+    test_app.handle_app_event(AppEvent::NewExecution).unwrap();
     test_app.handle_app_event(event1).unwrap();
 
     {
@@ -165,9 +161,7 @@ async fn multiple_pages_forward_and_back_and_forward() {
     let res1 = create_execution_results(&query).await;
     let event1 = AppEvent::ExecutionResultsNextBatch(res1);
 
-    test_app
-        .handle_app_event(AppEvent::NewExecution)
-        .unwrap();
+    test_app.handle_app_event(AppEvent::NewExecution).unwrap();
     test_app.handle_app_event(event1).unwrap();
 
     {
@@ -219,9 +213,7 @@ async fn multiple_pages_forward_and_back_and_forward() {
 async fn multiple_batches_lazy_loading() {
     let mut test_app = TestApp::new().await;
 
-    test_app
-        .handle_app_event(AppEvent::NewExecution)
-        .unwrap();
+    test_app.handle_app_event(AppEvent::NewExecution).unwrap();
 
     // Send only first batch initially (lazy loading)
     let batch1 = create_execution_results(&create_values_query(60)).await;
@@ -277,9 +269,7 @@ async fn multiple_batches_lazy_loading() {
 async fn multiple_small_batches_auto_load() {
     let mut test_app = TestApp::new().await;
 
-    test_app
-        .handle_app_event(AppEvent::NewExecution)
-        .unwrap();
+    test_app.handle_app_event(AppEvent::NewExecution).unwrap();
 
     // Send first batch: 100 rows (fills page 0)
     let batch1 = create_execution_results(&create_values_query(100)).await;
@@ -359,9 +349,7 @@ async fn multiple_small_batches_auto_load() {
 async fn exact_batches_for_page() {
     let mut test_app = TestApp::new().await;
 
-    test_app
-        .handle_app_event(AppEvent::NewExecution)
-        .unwrap();
+    test_app.handle_app_event(AppEvent::NewExecution).unwrap();
 
     // Send first batch: 50 rows
     let batch1 = create_execution_results(&create_values_query(50)).await;

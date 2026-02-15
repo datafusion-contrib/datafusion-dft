@@ -241,7 +241,10 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                 if let Some(current_page) = app.state.sql_tab.current_page() {
                     let next_page = current_page + 1;
                     if app.state.sql_tab.needs_more_batches_for_page(next_page) {
-                        info!("Still need more batches for page {}, fetching next batch", next_page);
+                        info!(
+                            "Still need more batches for page {}, fetching next batch",
+                            next_page
+                        );
                         let execution = Arc::clone(&app.execution);
                         let sql = query.clone();
                         let _event_tx = app.event_tx();
