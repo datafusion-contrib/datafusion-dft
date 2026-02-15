@@ -226,7 +226,7 @@ impl CliApp {
             self.args.commands.is_empty(),
             self.args.flightsql,
             self.args.bench,
-            self.args.analyze,
+            self.args.analyze || self.args.analyze_raw,
         ) {
             // Error cases
             (_, _, true, _, _) => Err(eyre!(
@@ -236,11 +236,14 @@ impl CliApp {
                 Err(eyre!("Cannot benchmark without a command or file"))
             }
             (true, true, _, _, _) => Err(eyre!("No files or commands provided to execute")),
-            (false, false, _, false, _) => Err(eyre!(
+            (false, false, _, false, false) => Err(eyre!(
                 "Cannot execute both files and commands at the same time"
             )),
             (_, _, false, true, true) => Err(eyre!(
                 "The `benchmark` and `analyze` flags are mutually exclusive"
+            )),
+            (false, false, _, _, true) => Err(eyre!(
+                "Analyze requires exactly one command or file"
             )),
 
             // Execution cases
@@ -252,8 +255,18 @@ impl CliApp {
             (true, false, _, true, false) => self.benchmark_commands(&self.args.commands).await,
 
             // Analyze cases
-            (false, true, _, false, true) => self.analyze_files(&self.args.files).await,
-            (true, false, _, false, true) => self.analyze_commands(&self.args.commands).await,
+            (false, true, _, false, true) => {
+                if self.args.files.len() > 1 {
+                    return Err(eyre!("Analyze requires exactly one file"));
+                }
+                self.analyze_files(&self.args.files).await
+            }
+            (true, false, _, false, true) => {
+                if self.args.commands.len() > 1 {
+                    return Err(eyre!("Analyze requires exactly one command"));
+                }
+                self.analyze_commands(&self.args.commands).await
+            }
         }
         #[cfg(feature = "flightsql")]
         match (
@@ -261,18 +274,21 @@ impl CliApp {
             self.args.commands.is_empty(),
             self.args.flightsql,
             self.args.bench,
-            self.args.analyze,
+            self.args.analyze || self.args.analyze_raw,
         ) {
             // Error cases
             (true, true, _, _, _) => Err(eyre!("No files or commands provided to execute")),
             (false, false, false, true, _) => {
                 Err(eyre!("Cannot benchmark without a command or file"))
             }
-            (false, false, _, _, _) => Err(eyre!(
+            (false, false, _, _, false) => Err(eyre!(
                 "Cannot execute both files and commands at the same time"
             )),
             (_, _, _, true, true) => Err(eyre!(
                 "The `benchmark` and `analyze` flags are mutually exclusive"
+            )),
+            (false, false, _, _, true) => Err(eyre!(
+                "Analyze requires exactly one command or file"
             )),
 
             // Execution cases
@@ -298,12 +314,28 @@ impl CliApp {
             (true, false, false, true, false) => self.benchmark_commands(&self.args.commands).await,
 
             // Analyze cases
-            (true, false, false, false, true) => self.analyze_commands(&self.args.commands).await,
-            (false, true, false, false, true) => self.analyze_files(&self.args.files).await,
+            (true, false, false, false, true) => {
+                if self.args.commands.len() > 1 {
+                    return Err(eyre!("Analyze requires exactly one command"));
+                }
+                self.analyze_commands(&self.args.commands).await
+            }
+            (false, true, false, false, true) => {
+                if self.args.files.len() > 1 {
+                    return Err(eyre!("Analyze requires exactly one file"));
+                }
+                self.analyze_files(&self.args.files).await
+            }
             (true, false, true, false, true) => {
+                if self.args.commands.len() > 1 {
+                    return Err(eyre!("Analyze requires exactly one command"));
+                }
                 self.flightsql_analyze_commands(&self.args.commands).await
             }
             (false, true, true, false, true) => {
+                if self.args.files.len() > 1 {
+                    return Err(eyre!("Analyze requires exactly one file"));
+                }
                 self.flightsql_analyze_files(&self.args.files).await
             }
         }
@@ -544,11 +576,7 @@ impl CliApp {
         info!("Analyzing FlightSQL files: {:?}", files);
         for file in files {
             let sql = std::fs::read_to_string(file)?;
-            // Split SQL into statements and analyze each one
-            let statements = self.split_sql(&sql);
-            for statement_sql in statements {
-                self.flightsql_analyze_from_string(&statement_sql).await?;
-            }
+            self.flightsql_analyze_from_string(&sql).await?;
         }
         Ok(())
     }
@@ -557,14 +585,14 @@ impl CliApp {
     async fn flightsql_analyze_from_string(&self, sql: &str) -> Result<()> {
         if self.args.analyze_raw {
             // Raw mode: print metrics table directly
-            let (queries_batch, metrics_batch) = self
+            let (query_str, metrics_batch) = self
                 .app_execution
                 .flightsql_ctx()
                 .analyze_query_raw(sql)
                 .await?;
 
-            println!("==================== Queries ====================");
-            self.print_batch(&queries_batch)?;
+            println!("==================== Query ====================");
+            println!("{}", query_str);
             println!("\n==================== Metrics ====================");
             self.print_batch(&metrics_batch)?;
         } else {
@@ -581,24 +609,11 @@ impl CliApp {
         Ok(())
     }
 
+    #[cfg(feature = "flightsql")]
     fn print_batch(&self, batch: &datafusion::arrow::array::RecordBatch) -> Result<()> {
         use datafusion::arrow::util::pretty::print_batches;
         print_batches(&[batch.clone()])?;
         Ok(())
-    }
-
-    fn split_sql(&self, sql: &str) -> Vec<String> {
-        use datafusion::sql::parser::DFParser;
-        use datafusion::sql::sqlparser::dialect::GenericDialect;
-
-        let dialect = GenericDialect {};
-        let statements = DFParser::parse_sql_with_dialect(sql, &dialect)
-            .unwrap_or_default();
-
-        statements
-            .into_iter()
-            .map(|s| s.to_string())
-            .collect()
     }
 
     async fn exec_from_string(&self, sql: &str) -> Result<()> {

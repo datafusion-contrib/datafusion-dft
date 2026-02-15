@@ -450,39 +450,42 @@ impl ExecutionComputeStats {
         compute: &Option<Vec<PartitionsComputeStats>>,
         label: &str,
     ) -> std::fmt::Result {
-        if let (Some(filter_compute), Some(elapsed_compute)) = (compute, &self.elapsed_compute) {
-            let partitions = filter_compute.iter().fold(0, |acc, c| acc + c.partitions());
-            writeln!(
-                f,
-                "{label} Stats ({} nodes, {} partitions)",
-                filter_compute.len(),
-                partitions
-            )?;
-            writeln!(
-                f,
-                "{:<30} {:<16} {:<16} {:<16} {:<16} {:<16}",
-                "Node(Partitions)", "Min", "Median", "Mean", "Max", "Total (%)"
-            )?;
-            filter_compute.iter().try_for_each(|node| {
-                let (min, median, mean, max, total) = node.summary_stats();
-                let total = format!(
-                    "{} ({:.2}%)",
-                    total,
-                    (total as f32 / *elapsed_compute as f32) * 100.0
-                );
+        match (compute, &self.elapsed_compute) {
+            (Some(filter_compute), Some(elapsed_compute)) if !filter_compute.is_empty() => {
+                let partitions = filter_compute.iter().fold(0, |acc, c| acc + c.partitions());
+                writeln!(
+                    f,
+                    "{label}: {} nodes, {} partitions",
+                    filter_compute.len(),
+                    partitions
+                )?;
                 writeln!(
                     f,
                     "{:<30} {:<16} {:<16} {:<16} {:<16} {:<16}",
-                    format!("{}({})", node.name, node.elapsed_computes.len()),
-                    min,
-                    median,
-                    mean,
-                    max,
-                    total,
-                )
-            })
-        } else {
-            writeln!(f, "No {label} Stats")
+                    "Node(Partitions)", "Min", "Median", "Mean", "Max", "Total (%)"
+                )?;
+                filter_compute.iter().try_for_each(|node| {
+                    let (min, median, mean, max, total) = node.summary_stats();
+                    let total = format!(
+                        "{} ({:.2}%)",
+                        total,
+                        (total as f32 / *elapsed_compute as f32) * 100.0
+                    );
+                    writeln!(
+                        f,
+                        "{:<30} {:<16} {:<16} {:<16} {:<16} {:<16}",
+                        format!("{}({})", node.name, node.elapsed_computes.len()),
+                        min,
+                        median,
+                        mean,
+                        max,
+                        total,
+                    )
+                })
+            }
+            _ => {
+                writeln!(f, "{label}: No data")
+            }
         }
     }
 }
@@ -503,15 +506,18 @@ impl std::fmt::Display for ExecutionComputeStats {
                 .unwrap_or("None".to_string()),
         )?;
         writeln!(f)?;
+
+        // Always display all categories in the same order as FlightSQL protocol:
+        // Projection, Filter, Sort, Aggregate, Join, Other
         self.display_compute(f, &self.projection_compute, "Projection")?;
         writeln!(f)?;
         self.display_compute(f, &self.filter_compute, "Filter")?;
         writeln!(f)?;
         self.display_compute(f, &self.sort_compute, "Sort")?;
         writeln!(f)?;
-        self.display_compute(f, &self.join_compute, "Join")?;
-        writeln!(f)?;
         self.display_compute(f, &self.aggregate_compute, "Aggregate")?;
+        writeln!(f)?;
+        self.display_compute(f, &self.join_compute, "Join")?;
         writeln!(f)?;
         self.display_compute(f, &self.other_compute, "Other")?;
         writeln!(f)

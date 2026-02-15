@@ -79,13 +79,13 @@ pub struct DftArgs {
 
     #[clap(
         long,
-        help = "Print a summary of the query's execution plan and statistics. Works with both local and FlightSQL execution (requires server support)."
+        help = "Print a summary of the query's execution plan and statistics. Only a single SQL statement is allowed. Works with both local and FlightSQL execution (requires server support)."
     )]
     pub analyze: bool,
 
     #[clap(
         long,
-        help = "Print raw execution metrics as Arrow table without formatting. Useful for debugging and custom analysis. Implies --analyze."
+        help = "Print raw execution metrics as Arrow table without formatting. Only a single SQL statement is allowed. Useful for debugging and custom analysis. Implies --analyze."
     )]
     pub analyze_raw: bool,
 

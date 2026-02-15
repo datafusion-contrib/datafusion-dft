@@ -47,7 +47,9 @@ pub async fn test_execute_with_no_flightsql_server() {
 
 #[tokio::test]
 pub async fn test_execute() {
-    let test_server = TestFlightSqlServiceImpl::new();
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
     let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
 
     let assert = tokio::task::spawn_blocking(|| {
@@ -76,7 +78,9 @@ pub async fn test_execute() {
 
 #[tokio::test]
 pub async fn test_invalid_sql_command() {
-    let test_server = TestFlightSqlServiceImpl::new();
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
     let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
 
     let assert = tokio::task::spawn_blocking(|| {
@@ -136,7 +140,9 @@ pub async fn test_execute_multiple_commands() {
 
 #[tokio::test]
 pub async fn test_command_in_file() {
-    let test_server = TestFlightSqlServiceImpl::new();
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
     let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
     let file = sql_in_file("SELECT 1 + 1");
     let assert = tokio::task::spawn_blocking(move || {
@@ -163,7 +169,9 @@ pub async fn test_command_in_file() {
 
 #[tokio::test]
 pub async fn test_invalid_sql_command_in_file() {
-    let test_server = TestFlightSqlServiceImpl::new();
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
     let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
     let file = sql_in_file("SELEC 1");
     let assert = tokio::task::spawn_blocking(move || {
@@ -292,7 +300,9 @@ SELECT 1
 
 #[tokio::test]
 pub async fn test_bench_files() {
-    let test_server = TestFlightSqlServiceImpl::new();
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
     let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
     let file = sql_in_file(r#"SELECT 1 + 1;"#);
     let assert = tokio::task::spawn_blocking(move || {
@@ -383,7 +393,9 @@ SELECT 1
 
 #[tokio::test]
 pub async fn test_bench_files_and_save() {
-    let test_server = TestFlightSqlServiceImpl::new();
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
     let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
     let file = sql_in_file(r#"SELECT 1 + 1;"#);
 
@@ -1354,6 +1366,481 @@ pub async fn test_prepared_statement_complex_query() {
         .close()
         .await
         .expect("Failed to close prepared statement");
+
+    fixture.shutdown_and_wait().await;
+}
+
+// ============================================================================
+// FlightSQL Analyze Tests
+// ============================================================================
+
+#[tokio::test]
+pub async fn test_analyze_command() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1 + 2")
+            .arg("--analyze")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    // Verify output contains expected sections
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(output.contains("Query"), "Should contain Query section");
+    assert!(
+        output.contains("Execution Summary"),
+        "Should contain Execution Summary"
+    );
+    assert!(
+        output.contains("Output Rows"),
+        "Should contain Output Rows metric"
+    );
+    assert!(
+        output.contains("Parsing"),
+        "Should contain timing breakdown"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_raw_command() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1 + 2")
+            .arg("--analyze-raw")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    // Verify raw mode outputs query string and metrics table
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(output.contains("Query"), "Should contain Query header");
+    assert!(output.contains("Metrics"), "Should contain Metrics header");
+    assert!(
+        output.contains("SELECT 1 + 2"),
+        "Should contain the SQL query"
+    );
+    assert!(
+        output.contains("metric_name"),
+        "Should contain metric_name column"
+    );
+    assert!(output.contains("value"), "Should contain value column");
+    assert!(
+        output.contains("value_type"),
+        "Should contain value_type column"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_file() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+    let file = sql_in_file("SELECT 1 + 1");
+
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-f")
+            .arg(file.path())
+            .arg("--analyze")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    // Verify output contains expected sections
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(
+        output.contains("Execution Summary"),
+        "Should contain Execution Summary"
+    );
+    assert!(
+        output.contains("Output Rows"),
+        "Should contain Output Rows metric"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_raw_file() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+    let file = sql_in_file("SELECT 1 + 1");
+
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-f")
+            .arg(file.path())
+            .arg("--analyze-raw")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    // Verify raw mode outputs query string and metrics table
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(output.contains("Query"), "Should contain Query header");
+    assert!(output.contains("Metrics"), "Should contain Metrics header");
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_multiple_commands() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("-c")
+            .arg("SELECT 2")
+            .arg("--analyze")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .failure()
+    })
+    .await
+    .unwrap();
+
+    // Verify error message about requiring exactly one command
+    let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
+    assert!(
+        stderr.contains("Analyze requires exactly one command"),
+        "Should contain error about requiring one command"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_invalid_sql() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELEC 1")
+            .arg("--analyze")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .failure()
+    })
+    .await
+    .unwrap();
+
+    // Verify error is reported
+    let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
+    assert!(
+        stderr.contains("Error") || stderr.contains("error"),
+        "Should contain error message"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_with_timing_metrics() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("--analyze")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    // Verify all timing metrics are present
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(output.contains("Parsing"), "Should contain Parsing time");
+    assert!(
+        output.contains("Logical Planning"),
+        "Should contain Logical Planning time"
+    );
+    assert!(
+        output.contains("Physical Planning"),
+        "Should contain Physical Planning time"
+    );
+    assert!(output.contains("Execution"), "Should contain Execution time");
+    assert!(output.contains("Total"), "Should contain Total time");
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_raw_metrics_schema() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("--analyze-raw")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    // Verify raw metrics table has all expected columns
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(
+        output.contains("metric_name"),
+        "Should contain metric_name column"
+    );
+    assert!(output.contains("value"), "Should contain value column");
+    assert!(
+        output.contains("value_type"),
+        "Should contain value_type column"
+    );
+    assert!(
+        output.contains("operator_name"),
+        "Should contain operator_name column"
+    );
+    assert!(
+        output.contains("partition_id"),
+        "Should contain partition_id column"
+    );
+    assert!(
+        output.contains("operator_category"),
+        "Should contain operator_category column"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_raw_duration_metrics() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("--analyze-raw")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    // Verify duration metrics are in the raw output
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(output.contains("parsing"), "Should contain parsing metric");
+    assert!(
+        output.contains("logical_planning"),
+        "Should contain logical_planning metric"
+    );
+    assert!(
+        output.contains("physical_planning"),
+        "Should contain physical_planning metric"
+    );
+    assert!(
+        output.contains("execution"),
+        "Should contain execution metric"
+    );
+    assert!(output.contains("total"), "Should contain total metric");
+    assert!(
+        output.contains("duration_ns"),
+        "Should contain duration_ns value_type"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_output_metrics() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("--analyze-raw")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    // Verify output metrics (rows, batches, bytes) are present
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(output.contains("rows"), "Should contain rows metric");
+    assert!(output.contains("batches"), "Should contain batches metric");
+    assert!(output.contains("bytes"), "Should contain bytes metric");
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_multiple_statements_in_single_command() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1; SELECT 2")
+            .arg("--analyze")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .failure()
+    })
+    .await
+    .unwrap();
+
+    // Verify error message about single statement requirement
+    let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
+    assert!(
+        stderr.contains("Only a single SQL statement can be analyzed"),
+        "Should contain error about single statement requirement"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_file_with_multiple_statements() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+    let file = sql_in_file("SELECT 1; SELECT 2");
+
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-f")
+            .arg(file.path())
+            .arg("--analyze")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .failure()
+    })
+    .await
+    .unwrap();
+
+    // Verify error message about single statement requirement
+    let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
+    assert!(
+        stderr.contains("Only a single SQL statement can be analyzed"),
+        "Should contain error about single statement requirement"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_multiple_files() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+    let file1 = sql_in_file("SELECT 1");
+    let file2 = sql_in_file("SELECT 2");
+
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-f")
+            .arg(file1.path())
+            .arg("-f")
+            .arg(file2.path())
+            .arg("--analyze")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .failure()
+    })
+    .await
+    .unwrap();
+
+    // Verify error message about requiring exactly one file
+    let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
+    assert!(
+        stderr.contains("Analyze requires exactly one file"),
+        "Should contain error about requiring one file"
+    );
 
     fixture.shutdown_and_wait().await;
 }

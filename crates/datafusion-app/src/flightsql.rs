@@ -473,27 +473,17 @@ impl FlightSQLContext {
         }
     }
 
-    /// Get raw metrics batches without reconstruction (for --analyze-raw)
+    /// Get raw metrics batch without reconstruction (for --analyze-raw)
     pub async fn analyze_query_raw(
         &self,
         query: &str,
-    ) -> Result<(datafusion::arrow::array::RecordBatch, datafusion::arrow::array::RecordBatch)> {
+    ) -> Result<(String, datafusion::arrow::array::RecordBatch)> {
         self.fetch_analyze_batches(query).await
     }
 
     /// Reconstruct ExecutionStats from metrics (for --analyze)
     pub async fn analyze_query(&self, query: &str) -> Result<crate::stats::ExecutionStats> {
-        use datafusion::arrow::array::StringArray;
-
-        let (queries_batch, metrics_batch) = self.fetch_analyze_batches(query).await?;
-
-        // Extract query string from queries batch
-        let query_array = queries_batch
-            .column(0)
-            .as_any()
-            .downcast_ref::<StringArray>()
-            .ok_or_else(|| eyre::eyre!("Invalid queries batch schema"))?;
-        let query_str = query_array.value(0).to_string();
+        let (query_str, metrics_batch) = self.fetch_analyze_batches(query).await?;
 
         // Reconstruct ExecutionStats from metrics table
         let stats = crate::stats::ExecutionStats::from_metrics_table(metrics_batch, query_str)?;
@@ -501,13 +491,20 @@ impl FlightSQLContext {
         Ok(stats)
     }
 
-    /// Shared logic to fetch analyze batches from server
+    /// Shared logic to fetch analyze batch and query from server
     async fn fetch_analyze_batches(
         &self,
         query: &str,
-    ) -> Result<(datafusion::arrow::array::RecordBatch, datafusion::arrow::array::RecordBatch)> {
+    ) -> Result<(String, datafusion::arrow::array::RecordBatch)> {
         use arrow_flight::utils::flight_data_to_batches;
         use arrow_flight::{Action, FlightData};
+
+        // Validate that query contains only a single statement
+        let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
+        let statements = DFParser::parse_sql_with_dialect(query, &dialect)?;
+        if statements.len() != 1 {
+            return Err(eyre::eyre!("Only a single SQL statement can be analyzed"));
+        }
 
         // 1. Create Action with type "analyze_query" and SQL in body
         let action = Action {
@@ -533,35 +530,46 @@ impl FlightSQLContext {
             result_messages.push(result);
         }
 
-        // 4. Decode each Result message to FlightData
+        // 4. Decode each Result message to FlightData and extract query from metadata
         let mut all_flight_data = Vec::new();
+        let mut sql_query = None;
 
         for result in result_messages {
             // Deserialize the FlightData from the Result.body bytes using prost
-            // Note: FlightData implements prost::Message
             let flight_data = <FlightData as prost::Message>::decode(result.body.as_ref())
                 .map_err(|e| eyre::eyre!("Failed to decode FlightData: {}", e))?;
+
+            // Extract SQL from schema message (first message) metadata
+            if sql_query.is_none() && !flight_data.app_metadata.is_empty() {
+                sql_query = Some(
+                    String::from_utf8(flight_data.app_metadata.to_vec())
+                        .map_err(|e| eyre::eyre!("Invalid UTF-8 in metadata: {}", e))?,
+                );
+            }
 
             all_flight_data.push(flight_data);
         }
 
-        // 5. Convert all FlightData to RecordBatches using flight_data_to_batches
-        let batches = flight_data_to_batches(&all_flight_data)
-            .map_err(|e| eyre::eyre!("Failed to decode batches: {}", e))?;
+        // 5. Validate we got the SQL query in metadata
+        let query_str = sql_query
+            .ok_or_else(|| eyre::eyre!("SQL query not found in response metadata"))?;
 
-        // 6. Split batches - first set is queries (1 batch with schema), second set is metrics
-        // The batches_to_flight_data function generates: [schema, data batch] for each table
-        // So we expect: [queries_schema, queries_batch, metrics_schema, metrics_batch]
-        // But flight_data_to_batches returns just the data batches, not schemas
-        // So we expect: [queries_batch, metrics_batch]
-
-        if batches.len() < 2 {
+        // 6. Decode metrics batch
+        // batches_to_flight_data creates [schema, data] for the batch
+        if all_flight_data.len() < 2 {
             return Err(eyre::eyre!(
-                "Invalid analyze response: expected at least 2 batches, got {}",
-                batches.len()
+                "Invalid analyze response: expected at least 2 FlightData messages (schema + data), got {}",
+                all_flight_data.len()
             ));
         }
 
-        Ok((batches[0].clone(), batches[1].clone()))
+        let metrics_batches = flight_data_to_batches(&all_flight_data)
+            .map_err(|e| eyre::eyre!("Failed to decode metrics batch: {}", e))?;
+
+        if metrics_batches.is_empty() {
+            return Err(eyre::eyre!("No metrics batch found in response"));
+        }
+
+        Ok((query_str, metrics_batches[0].clone()))
     }
 }

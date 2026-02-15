@@ -27,6 +27,8 @@ The FlightSQL Analyze Protocol enables clients to retrieve detailed execution me
 
 **Request Body**: UTF-8 encoded SQL query string
 
+**Important**: The SQL query must contain exactly one SQL statement. Multiple statements (e.g., separated by semicolons) are not supported and will result in an error.
+
 **Example**:
 ```rust
 Action {
@@ -39,29 +41,20 @@ Action {
 
 ### Response Format
 
-The response is a stream of `arrow_flight::Result` messages. Each `Result.body` contains serialized `FlightData` messages. The stream provides two Arrow RecordBatches:
+The response is a stream of `arrow_flight::Result` messages. Each `Result.body` contains serialized `FlightData` messages.
 
-#### Batch 1: Queries Batch
+#### Response Metadata
 
-**Purpose**: Contains the analyzed query text
+The first `FlightData` message (schema message) contains the query text in its metadata:
 
-**Schema**:
-| Column | Type | Nullable | Description |
-|--------|------|----------|-------------|
-| query | Utf8 | false | The SQL query that was analyzed |
+**Metadata Key**: `"sql_query"`
+**Metadata Value**: UTF-8 encoded SQL query string
 
-**Cardinality**: Exactly 1 row
+This allows the client to correlate the metrics with the original query without requiring a separate record batch.
 
-**Example**:
-```
-query
---------------------------------------------------
-SELECT * FROM table WHERE id > 100
-```
+#### Metrics Batch
 
-#### Batch 2: Metrics Batch
-
-**Purpose**: Flat table where each row represents a single metric
+**Purpose**: Single Arrow RecordBatch containing a flat table where each row represents a single metric
 
 **Schema**:
 | Column | Type | Nullable | Description |
@@ -183,11 +176,10 @@ Detailed breakdown by operator and partition:
 
 ## Example Response
 
-### Queries Batch
+### Response Metadata
 ```
-query
---------------------------------------------------
-SELECT * FROM table WHERE id > 100
+Metadata in schema FlightData message:
+  sql_query: "SELECT * FROM table WHERE id > 100"
 ```
 
 ### Metrics Batch
@@ -243,8 +235,9 @@ To implement this protocol in a FlightSQL server:
    - Emit one row per metric value
 
 5. **Build Response**
-   - Create two RecordBatches (queries + metrics)
+   - Create metrics RecordBatch
    - Encode as FlightData using `batches_to_flight_data()` or equivalent
+   - Add SQL query to the schema FlightData message metadata with key `"sql_query"`
    - Serialize each FlightData to bytes (protobuf encoding)
    - Wrap each serialized FlightData in `arrow_flight::Result { body: bytes }`
    - Stream Result messages to client
@@ -261,18 +254,20 @@ async fn do_action_fallback(&self, request: Request<Action>) -> Result<Response<
         // 2. Execute with metrics
         let stats = self.analyze_query(&sql).await?;
 
-        // 3. Convert to batches
-        let queries_batch = create_queries_batch(vec![sql])?;
+        // 3. Convert to metrics batch
         let metrics_batch = stats.to_metrics_table()?;
 
-        // 4. Encode as FlightData
-        let queries_flight_data = batches_to_flight_data(&queries_batch.schema(), vec![queries_batch])?;
-        let metrics_flight_data = batches_to_flight_data(&metrics_batch.schema(), vec![metrics_batch])?;
+        // 4. Encode as FlightData with SQL in metadata
+        let mut flight_data = batches_to_flight_data(&metrics_batch.schema(), vec![metrics_batch])?;
+
+        // Add SQL query to schema message metadata
+        if let Some(schema_msg) = flight_data.first_mut() {
+            schema_msg.app_metadata = sql.as_bytes().to_vec().into();
+        }
 
         // 5. Serialize and wrap in Result messages
-        let results: Vec<arrow_flight::Result> = queries_flight_data
+        let results: Vec<arrow_flight::Result> = flight_data
             .into_iter()
-            .chain(metrics_flight_data.into_iter())
             .map(|fd| arrow_flight::Result { body: fd.encode_to_vec().into() })
             .collect();
 
@@ -300,37 +295,46 @@ To consume this protocol:
 2. **Receive Stream**
    - Collect `arrow_flight::Result` messages from stream
 
-3. **Decode FlightData**
+3. **Decode FlightData and Extract Metadata**
    ```rust
    let mut flight_data_vec = Vec::new();
+   let mut sql_query = None;
+
    for result in result_messages {
        let flight_data = FlightData::decode(result.body.as_ref())?;
+
+       // Extract SQL from first message (schema) metadata
+       if sql_query.is_none() && !flight_data.app_metadata.is_empty() {
+           sql_query = Some(String::from_utf8(flight_data.app_metadata.to_vec())?);
+       }
+
        flight_data_vec.push(flight_data);
    }
    ```
 
-4. **Convert to RecordBatches**
+4. **Convert to RecordBatch**
    ```rust
    let batches = flight_data_to_batches(&flight_data_vec)?;
-   let queries_batch = batches[0].clone();
-   let metrics_batch = batches[1].clone();
+   let metrics_batch = batches[0].clone();
+   let query_text = sql_query.expect("SQL query not found in metadata");
    ```
 
-5. **Extract Data**
-   - Parse queries batch to get SQL text
+5. **Reconstruct Statistics**
+   - Use query text from metadata
    - Parse metrics batch to reconstruct execution statistics
 
 ### Error Handling
 
 **Server Errors**:
 - `Status::unimplemented` - Server doesn't support analyze protocol
-- `Status::invalid_argument` - Invalid SQL or malformed request
+- `Status::invalid_argument` - Invalid SQL, malformed request, or multiple SQL statements provided
 - `Status::internal` - Query execution or serialization failure
 
 **Client Handling**:
 - Gracefully handle `unimplemented` with clear user message
 - Retry transient errors as appropriate
-- Validate response format (expect 2+ batches)
+- Validate response format (expect metadata with `sql_query` and at least one batch)
+- Handle missing metadata gracefully (older protocol versions)
 
 ## Extensibility
 

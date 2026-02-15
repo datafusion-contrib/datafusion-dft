@@ -866,35 +866,33 @@ impl FlightSqlService for FlightSqlServiceImpl {
                 stats.collect_stats(); // Collect IO and compute metrics from plan
 
                 // 3. Convert ExecutionStats to metrics table format
-                let (queries_batch, metrics_batch) = stats
-                    .to_raw_batches()
+                let metrics_batch = stats
+                    .to_metrics_table()
                     .map_err(|e| Status::internal(format!("Metrics serialization failed: {}", e)))?;
 
-                // 4. Encode both batches as FlightData and combine into a single stream
-                let queries_flight = batches_to_flight_data(&queries_batch.schema(), vec![queries_batch])
-                    .map_err(|e| Status::internal(format!("Failed to encode queries batch: {}", e)))?
-                    .into_iter();
+                // 4. Encode metrics batch as FlightData
+                let mut flight_data = batches_to_flight_data(&metrics_batch.schema(), vec![metrics_batch])
+                    .map_err(|e| Status::internal(format!("Failed to encode metrics batch: {}", e)))?;
 
-                let metrics_flight = batches_to_flight_data(&metrics_batch.schema(), vec![metrics_batch])
-                    .map_err(|e| Status::internal(format!("Failed to encode metrics batch: {}", e)))?
-                    .into_iter();
+                // 5. Add SQL query to schema message metadata
+                // The first FlightData message contains the schema
+                if let Some(schema_msg) = flight_data.first_mut() {
+                    schema_msg.app_metadata = sql.as_bytes().to_vec().into();
+                }
 
-                // Combine both iterators into a single vector
-                let all_flight_data: Vec<_> = queries_flight.chain(metrics_flight).collect();
-
-                // Convert FlightData to arrow_flight::Result messages
-                let results: Vec<arrow_flight::Result> = all_flight_data
+                // 6. Convert FlightData to arrow_flight::Result messages
+                let results: Vec<arrow_flight::Result> = flight_data
                     .into_iter()
-                    .map(|flight_data| {
+                    .map(|fd| {
                         // Serialize FlightData to bytes
-                        let bytes = flight_data.encode_to_vec();
+                        let bytes = fd.encode_to_vec();
                         arrow_flight::Result {
                             body: bytes.into(),
                         }
                     })
                     .collect();
 
-                // Create stream of Result messages
+                // 7. Create stream of Result messages
                 let stream = futures::stream::iter(results.into_iter().map(Ok)).boxed();
 
                 // Record metrics

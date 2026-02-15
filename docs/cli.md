@@ -133,6 +133,8 @@ The output from `EXPLAIN ANALYZE` provides a wealth of information on a queries 
 
 To help with this the `--analyze` flag can used to generate a summary of the underlying `ExecutionPlan` `MetricSet`s.  The summary presents the information in a way that is hopefully easier to understand and easier to draw conclusions on a query's performance.
 
+**Important**: The analyze feature only supports a single SQL statement. If you provide multiple statements (e.g., separated by semicolons) or multiple files/commands, an error will be returned.
+
 This feature is still in it's early stages and is expected to evolve.  Once it has gone through enough real world testing and it has been confirmed the metrics make sense documentation will be added on the exact calculations - until then the source will need to be inspected to see the calculations.
 
 ### Local Analyze
