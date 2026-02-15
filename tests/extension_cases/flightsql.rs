@@ -1940,7 +1940,9 @@ pub async fn test_analyze_operator_hierarchy() {
         "Should have aggregate operator"
     );
     assert!(
-        output.contains("FilterExec") || output.contains("filter") || output.contains("CoalesceBatchesExec"),
+        output.contains("FilterExec")
+            || output.contains("filter")
+            || output.contains("CoalesceBatchesExec"),
         "Should have filter or coalesce operator"
     );
 
@@ -1971,7 +1973,11 @@ pub async fn test_analyze_operator_hierarchy_with_csv() {
 
     // Register the aggregate_test_100.csv file
     ctx.session_ctx()
-        .register_csv("test_data", "data/aggregate_test_100.csv", CsvReadOptions::new())
+        .register_csv(
+            "test_data",
+            "data/aggregate_test_100.csv",
+            CsvReadOptions::new(),
+        )
         .await
         .expect("Failed to register CSV table");
 
@@ -2141,7 +2147,9 @@ pub async fn test_analyze_io_metrics_parquet_namespace() {
             "Should NOT use io.json.* namespace for Parquet files"
         );
     } else {
-        eprintln!("Note: No I/O metrics reported (expected for small datasets or registered tables)");
+        eprintln!(
+            "Note: No I/O metrics reported (expected for small datasets or registered tables)"
+        );
     }
 
     // Verify compute metrics are always present
@@ -2223,7 +2231,9 @@ pub async fn test_analyze_io_metrics_json_namespace() {
             "Should NOT use io.parquet.* namespace for JSON files"
         );
     } else {
-        eprintln!("Note: No I/O metrics reported (expected for small datasets or registered tables)");
+        eprintln!(
+            "Note: No I/O metrics reported (expected for small datasets or registered tables)"
+        );
     }
 
     // Verify compute metrics are always present
@@ -2310,7 +2320,9 @@ pub async fn test_analyze_io_metrics_arrow_namespace() {
             "Should NOT use io.json.* namespace for Arrow files"
         );
     } else {
-        eprintln!("Note: No I/O metrics reported (expected for small datasets or registered tables)");
+        eprintln!(
+            "Note: No I/O metrics reported (expected for small datasets or registered tables)"
+        );
     }
 
     // Verify compute metrics are always present
@@ -2321,4 +2333,3 @@ pub async fn test_analyze_io_metrics_arrow_namespace() {
 
     fixture.shutdown_and_wait().await;
 }
-

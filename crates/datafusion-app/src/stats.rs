@@ -45,7 +45,6 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 pub struct AnalyzeQueryRequest {
     /// SQL query to analyze (currently the only supported format)
     pub sql: Option<String>,
-
     // Future extensibility fields (not yet implemented):
     // /// Substrait query plan (binary or JSON)
     // pub substrait: Option<Vec<u8>>,
@@ -1581,10 +1580,28 @@ impl ExecutionIOStats {
         let get_metric = |namespaced: &str, legacy: &str| -> Option<u64> {
             // Try format-specific namespace
             metrics
-                .get(&format!("io.csv.{}", namespaced.strip_prefix("io.parquet.").unwrap_or(namespaced)))
-                .or_else(|| metrics.get(&format!("io.parquet.{}", namespaced.strip_prefix("io.parquet.").unwrap_or(namespaced))))
-                .or_else(|| metrics.get(&format!("io.arrow.{}", namespaced.strip_prefix("io.parquet.").unwrap_or(namespaced))))
-                .or_else(|| metrics.get(&format!("io.json.{}", namespaced.strip_prefix("io.parquet.").unwrap_or(namespaced))))
+                .get(&format!(
+                    "io.csv.{}",
+                    namespaced.strip_prefix("io.parquet.").unwrap_or(namespaced)
+                ))
+                .or_else(|| {
+                    metrics.get(&format!(
+                        "io.parquet.{}",
+                        namespaced.strip_prefix("io.parquet.").unwrap_or(namespaced)
+                    ))
+                })
+                .or_else(|| {
+                    metrics.get(&format!(
+                        "io.arrow.{}",
+                        namespaced.strip_prefix("io.parquet.").unwrap_or(namespaced)
+                    ))
+                })
+                .or_else(|| {
+                    metrics.get(&format!(
+                        "io.json.{}",
+                        namespaced.strip_prefix("io.parquet.").unwrap_or(namespaced)
+                    ))
+                })
                 .or_else(|| metrics.get(namespaced))
                 .or_else(|| metrics.get(legacy))
                 .copied()
