@@ -55,11 +55,11 @@ async fn single_page() {
     let page = state.sql_tab.current_page().unwrap();
     assert_eq!(page, 0);
 
-    let batch = state.sql_tab.current_batch();
+    let batch = state.sql_tab.current_page_results();
     assert!(batch.is_some());
 
     let batch = batch.unwrap();
-    let batches = vec![batch.clone()];
+    let batches = vec![batch];
     let expected = [
         "+---+---+",
         "| a | b |",
@@ -103,11 +103,11 @@ async fn multiple_pages_forward_and_back() {
 
     {
         let state = test_app.state();
-        let batch = state.sql_tab.current_batch();
+        let batch = state.sql_tab.current_page_results();
         assert!(batch.is_some());
 
         let batch = batch.unwrap();
-        let batches = vec![batch.clone()];
+        let batches = vec![batch];
         let expected = [
             "+---+---+",
             "| a | b |",
@@ -134,11 +134,11 @@ async fn multiple_pages_forward_and_back() {
 
     {
         let state = test_app.state();
-        let batch = state.sql_tab.current_batch();
+        let batch = state.sql_tab.current_page_results();
         assert!(batch.is_some());
 
         let batch = batch.unwrap();
-        let batches = vec![batch.clone()];
+        let batches = vec![batch];
         let expected = [
             "+---+---+",
             "| a | b |",
@@ -194,11 +194,11 @@ async fn multiple_pages_forward_and_back_and_forward() {
 
     {
         let state = test_app.state();
-        let batch = state.sql_tab.current_batch();
+        let batch = state.sql_tab.current_page_results();
         assert!(batch.is_some());
 
         let batch = batch.unwrap();
-        let batches = vec![batch.clone()];
+        let batches = vec![batch];
         let expected = [
             "+---+---+",
             "| a | b |",

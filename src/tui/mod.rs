@@ -72,6 +72,7 @@ pub enum AppEvent {
     // Query Execution
     NewExecution,
     ExecutionResultsNextBatch(ExecutionResultsBatch),
+    ExecutionResultsNextPage,
     ExecutionResultsPreviousPage,
     ExecutionResultsError(ExecutionError),
     // FlightSQL

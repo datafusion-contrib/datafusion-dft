@@ -58,7 +58,7 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
     // TODO: Change this to a match on state and batch
     let sql_tab = &app.state.sql_tab;
     match (
-        sql_tab.current_batch(),
+        sql_tab.current_page_results(),
         sql_tab.current_page(),
         sql_tab.query_results_state(),
         sql_tab.execution_error(),
@@ -68,7 +68,7 @@ pub fn render_sql_results(area: Rect, buf: &mut Buffer, app: &App) {
                 .title(" Results ")
                 .borders(Borders::ALL)
                 .title_top(Line::from(format!(" Page {p} ")).right_aligned());
-            let batches = vec![batch];
+            let batches = vec![&batch];
             let maybe_table = record_batches_to_table(&batches);
 
             let block = block.title_bottom("Stats").fg(tailwind::ORANGE.c500);

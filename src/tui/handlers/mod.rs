@@ -28,8 +28,6 @@ use tui_logger::TuiWidgetEvent;
 use crate::tui::state::tabs::flightsql::FlightSQLConnectionStatus;
 use crate::tui::state::tabs::history::Context;
 use crate::tui::ExecutionResultsBatch;
-
-#[cfg(feature = "flightsql")]
 use std::sync::Arc;
 
 use super::App;
@@ -222,13 +220,47 @@ pub fn app_event_handler(app: &mut App, event: AppEvent) -> Result<()> {
                 duration,
                 batch,
             } = r;
+
+            let is_first_batch = app.state.sql_tab.current_page().is_none();
+
             app.state.sql_tab.add_batch(batch);
+
+            if is_first_batch {
+                app.state.sql_tab.next_page();
+                app.state.sql_tab.refresh_query_results_state();
+
+                let history_query =
+                    HistoryQuery::new(Context::Local, query.to_string(), duration, None, None);
+                app.state.history_tab.add_to_history(history_query);
+                app.state.history_tab.refresh_history_table_state();
+            } else {
+                app.state.sql_tab.refresh_query_results_state();
+
+                // Check if we have enough data for the next page now
+                // If not, automatically fetch another batch
+                if let Some(current_page) = app.state.sql_tab.current_page() {
+                    let next_page = current_page + 1;
+                    if app.state.sql_tab.needs_more_batches_for_page(next_page) {
+                        info!("Still need more batches for page {}, fetching next batch", next_page);
+                        let execution = Arc::clone(&app.execution);
+                        let sql = query.clone();
+                        let _event_tx = app.event_tx();
+                        tokio::spawn(async move {
+                            execution.next_batch(sql, _event_tx).await;
+                        });
+                    } else {
+                        // We now have enough data, advance to the page
+                        info!("Sufficient data loaded, advancing to page {}", next_page);
+                        if let Err(e) = app.event_tx().send(AppEvent::ExecutionResultsNextPage) {
+                            error!("Error advancing to next page: {e}");
+                        }
+                    }
+                }
+            }
+        }
+        AppEvent::ExecutionResultsNextPage => {
             app.state.sql_tab.next_page();
             app.state.sql_tab.refresh_query_results_state();
-            let history_query =
-                HistoryQuery::new(Context::Local, query.to_string(), duration, None, None);
-            app.state.history_tab.add_to_history(history_query);
-            app.state.history_tab.refresh_history_table_state();
         }
         #[cfg(feature = "flightsql")]
         AppEvent::FlightSQLExecutionResultsNextBatch(r) => {

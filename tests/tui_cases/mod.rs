@@ -26,6 +26,7 @@ mod keyboard_modifiers;
 mod pagination;
 mod quit;
 mod sql_execution;
+mod sql_pagination;
 
 use datafusion::arrow::array::RecordBatch;
 use datafusion::common::Result;

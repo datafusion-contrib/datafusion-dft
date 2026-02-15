@@ -29,6 +29,7 @@ use tokio::task::JoinHandle;
 use tui_textarea::TextArea;
 
 use crate::config::AppConfig;
+use crate::tui::pagination::{extract_page, has_sufficient_rows, PAGE_SIZE};
 use crate::tui::ExecutionError;
 
 pub fn get_keywords() -> Vec<String> {
@@ -241,19 +242,33 @@ impl SQLTabState<'_> {
         }
     }
 
-    pub fn current_batch(&self) -> Option<&RecordBatch> {
+    pub fn current_page_results(&self) -> Option<RecordBatch> {
+        use std::sync::Arc;
+        use datafusion::arrow::datatypes::Schema;
+
         match (self.current_page, self.result_batches.as_ref()) {
-            (Some(page), Some(batches)) => batches.get(page),
-            _ => None,
+            (Some(page), Some(batches)) => {
+                match extract_page(batches, page, PAGE_SIZE) {
+                    Ok(batch) => Some(batch),
+                    Err(err) => {
+                        log::error!("Error getting page {}: {}", page, err);
+                        None
+                    }
+                }
+            }
+            _ => Some(RecordBatch::new_empty(Arc::new(Schema::empty()))),
         }
     }
 
-    pub fn batches_count(&self) -> usize {
-        if let Some(batches) = &self.result_batches {
-            batches.len()
-        } else {
-            0
-        }
+    pub fn total_loaded_rows(&self) -> usize {
+        self.result_batches
+            .as_ref()
+            .map(|batches| batches.iter().map(|b| b.num_rows()).sum())
+            .unwrap_or(0)
+    }
+
+    pub fn needs_more_batches_for_page(&self, page: usize) -> bool {
+        !has_sufficient_rows(self.total_loaded_rows(), page, PAGE_SIZE)
     }
 
     pub fn execution_error(&self) -> &Option<ExecutionError> {
