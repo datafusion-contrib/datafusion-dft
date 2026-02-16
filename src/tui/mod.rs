@@ -389,14 +389,36 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
 
     #[cfg(feature = "flightsql")]
     {
+        use crate::args::parse_headers_file;
         use datafusion_app::config::FlightSQLConfig;
         use datafusion_app::flightsql::FlightSQLContext;
+
+        // Merge headers: config < file (CLI headers are merged later in the handler)
+        let mut all_headers = config.flightsql_client.headers.clone();
+
+        // Load headers from file if specified in config or CLI args
+        let headers_file = cli
+            .headers_file
+            .as_ref()
+            .or(config.flightsql_client.headers_file.as_ref());
+
+        if let Some(file_path) = headers_file {
+            match parse_headers_file(file_path) {
+                Ok(file_headers) => {
+                    all_headers.extend(file_headers);
+                }
+                Err(e) => {
+                    // TUI silently logs file errors to avoid disrupting UI
+                    error!("Error reading headers file: {}", e);
+                }
+            }
+        }
 
         let flightsql_config = FlightSQLConfig::new(
             config.flightsql_client.connection_url.clone(),
             config.flightsql_client.benchmark_iterations,
             config.flightsql_client.auth.clone(),
-            config.flightsql_client.headers.clone(),
+            all_headers,
         );
         app_execution.with_flightsql_ctx(FlightSQLContext::new(flightsql_config));
     }

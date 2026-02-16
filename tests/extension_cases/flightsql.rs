@@ -1357,3 +1357,235 @@ pub async fn test_prepared_statement_complex_query() {
 
     fixture.shutdown_and_wait().await;
 }
+
+#[tokio::test]
+pub async fn test_execute_with_headers_file() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    // Create a temporary headers file
+    let mut headers_file = tempfile::NamedTempFile::new().unwrap();
+    use std::io::Write;
+    writeln!(headers_file, "# Test headers file").unwrap();
+    writeln!(headers_file, "x-test-header: test-value").unwrap();
+    writeln!(headers_file, "database: test_db").unwrap();
+    headers_file.flush().unwrap();
+
+    let headers_path = headers_file.path().to_path_buf();
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1 + 2;")
+            .arg("--flightsql")
+            .arg("--headers-file")
+            .arg(headers_path)
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r##"
++---------------------+
+| Int64(1) + Int64(2) |
++---------------------+
+| 3                   |
++---------------------+
+    "##;
+    assert.stdout(contains_str(expected));
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_headers_file_with_curl_format() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    // Create a headers file with curl config format
+    let mut headers_file = tempfile::NamedTempFile::new().unwrap();
+    use std::io::Write;
+    writeln!(headers_file, "header = x-api-key: secret123").unwrap();
+    writeln!(headers_file, "-H \"database: production\"").unwrap();
+    headers_file.flush().unwrap();
+
+    let headers_path = headers_file.path().to_path_buf();
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1;")
+            .arg("--flightsql")
+            .arg("--headers-file")
+            .arg(headers_path)
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r##"
++----------+
+| Int64(1) |
++----------+
+| 1        |
++----------+
+    "##;
+    assert.stdout(contains_str(expected));
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_headers_file_and_cli_headers() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    // Create a headers file
+    let mut headers_file = tempfile::NamedTempFile::new().unwrap();
+    use std::io::Write;
+    writeln!(headers_file, "x-file-header: from-file").unwrap();
+    writeln!(headers_file, "database: file_db").unwrap();
+    headers_file.flush().unwrap();
+
+    let headers_path = headers_file.path().to_path_buf();
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1;")
+            .arg("--flightsql")
+            .arg("--headers-file")
+            .arg(headers_path)
+            .arg("--header")
+            .arg("x-cli-header: from-cli")
+            .arg("--header")
+            .arg("database: cli_db") // This should override file header
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let expected = r##"
++----------+
+| Int64(1) |
++----------+
+| 1        |
++----------+
+    "##;
+    assert.stdout(contains_str(expected));
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_headers_file_not_found_error() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1;")
+            .arg("--flightsql")
+            .arg("--headers-file")
+            .arg("/nonexistent/headers.txt")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .failure()
+    })
+    .await
+    .unwrap();
+
+    assert.stderr(contains_str("Failed to read headers file"));
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_headers_file_invalid_format_error() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    // Create a headers file with invalid format
+    let mut headers_file = tempfile::NamedTempFile::new().unwrap();
+    use std::io::Write;
+    writeln!(headers_file, "valid-header: value").unwrap();
+    writeln!(headers_file, "invalid-line-without-colon").unwrap();
+    headers_file.flush().unwrap();
+
+    let headers_path = headers_file.path().to_path_buf();
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1;")
+            .arg("--flightsql")
+            .arg("--headers-file")
+            .arg(headers_path)
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .failure()
+    })
+    .await
+    .unwrap();
+
+    assert.stderr(contains_str("Invalid header format at line 2"));
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_headers_file_precedence() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    // Create headers file
+    let mut headers_file = tempfile::NamedTempFile::new().unwrap();
+    use std::io::Write;
+    writeln!(headers_file, "x-priority: from-file").unwrap();
+    writeln!(headers_file, "x-file-only: file-value").unwrap();
+    headers_file.flush().unwrap();
+
+    // Create config file with headers
+    let mut config_builder = TestConfigBuilder::default();
+    config_builder.with_client_headers(Some(HashMap::from([
+        ("x-priority".to_string(), "from-config".to_string()),
+        ("x-config-only".to_string(), "config-value".to_string()),
+    ])));
+    let config = config_builder.build("precedence_config.toml");
+
+    let headers_path = headers_file.path().to_path_buf();
+    let config_path = config.path.clone();
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1;")
+            .arg("--flightsql")
+            .arg("--config")
+            .arg(config_path)
+            .arg("--headers-file")
+            .arg(headers_path)
+            .arg("--header")
+            .arg("x-priority: from-cli") // CLI should have highest precedence
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    // The query should succeed with headers merged (config < file < CLI)
+    // CLI 'x-priority: from-cli' should override file and config
+    let expected = r##"
++----------+
+| Int64(1) |
++----------+
+| 1        |
++----------+
+    "##;
+    assert.stdout(contains_str(expected));
+    fixture.shutdown_and_wait().await;
+}

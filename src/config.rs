@@ -120,6 +120,8 @@ pub struct FlightSQLClientConfig {
     pub auth: AuthConfig,
     #[serde(default = "default_headers")]
     pub headers: HashMap<String, String>,
+    #[serde(default)]
+    pub headers_file: Option<PathBuf>,
 }
 
 #[cfg(feature = "flightsql")]
@@ -130,6 +132,7 @@ impl Default for FlightSQLClientConfig {
             benchmark_iterations: default_benchmark_iterations(),
             auth: default_auth_config(),
             headers: default_headers(),
+            headers_file: None,
         }
     }
 }
