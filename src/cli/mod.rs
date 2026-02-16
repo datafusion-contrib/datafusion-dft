@@ -41,7 +41,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 #[cfg(feature = "flightsql")]
 use {
-    crate::args::{Command, FlightSqlCommand},
+    crate::args::{parse_headers_file, Command, FlightSqlCommand},
     datafusion_app::{
         config::{AuthConfig, FlightSQLConfig},
         flightsql::FlightSQLContext,
@@ -870,10 +870,41 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
                 config.flightsql_client.connection_url,
                 config.flightsql_client.benchmark_iterations,
                 auth,
-                config.flightsql_client.headers,
+                config.flightsql_client.headers.clone(),
             );
             let flightsql_ctx = FlightSQLContext::new(flightsql_cfg);
-            let headers = cli.header.clone().map(|vec| vec.into_iter().collect());
+
+            // Three-way header merge: config < file < CLI
+            let mut all_headers = config.flightsql_client.headers.clone();
+
+            // Merge headers from file (if specified in config or CLI)
+            let headers_file = cli
+                .headers_file
+                .as_ref()
+                .or(config.flightsql_client.headers_file.as_ref());
+
+            if let Some(file_path) = headers_file {
+                match parse_headers_file(file_path) {
+                    Ok(file_headers) => {
+                        all_headers.extend(file_headers);
+                    }
+                    Err(e) => {
+                        return Err(eyre!("Error reading headers file: {}", e));
+                    }
+                }
+            }
+
+            // Merge CLI headers (highest precedence)
+            if let Some(cli_headers) = &cli.header {
+                all_headers.extend(cli_headers.iter().cloned());
+            }
+
+            let headers = if all_headers.is_empty() {
+                None
+            } else {
+                Some(all_headers)
+            };
+
             flightsql_ctx
                 .create_client(cli.host.clone(), headers)
                 .await?;
