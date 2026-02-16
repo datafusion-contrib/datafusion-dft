@@ -83,8 +83,6 @@ pub struct ExecutionStats {
     compute: Option<ExecutionComputeStats>,
     plan: Arc<dyn ExecutionPlan>,
     /// Maps operator name to (parent_name, child_index)
-    #[allow(dead_code)]
-    // TODO: Use for populating operator_parent/operator_index in to_metrics_table
     operator_hierarchy: HashMap<String, (Option<String>, i32)>,
 }
 
@@ -1249,12 +1247,18 @@ impl ExecutionStats {
         );
 
         // Add IO metrics if present with namespacing
-        // TODO: Populate operator_parent and operator_index from execution plan hierarchy
         if let Some(io) = &self.io {
             // Determine the appropriate namespace and operator name based on format type
             let format = io.format_type.unwrap_or(IOFormatType::Unknown);
             let namespace = format.namespace_prefix();
             let operator_name = format.operator_name();
+
+            // Look up hierarchy info for this operator
+            let (parent, index) = self
+                .operator_hierarchy
+                .get(operator_name)
+                .map(|(p, i)| (p.as_deref(), if *i == -1 { None } else { Some(*i) }))
+                .unwrap_or((None, None));
 
             if let Some(bytes) = &io.bytes_scanned {
                 rows.add(
@@ -1264,8 +1268,8 @@ impl ExecutionStats {
                     Some(operator_name),
                     None,
                     Some("io"),
-                    None, // operator_parent - will be populated with hierarchy collection
-                    None, // operator_index - will be populated with hierarchy collection
+                    parent,
+                    index,
                 );
             }
             if let Some(time) = &io.time_opening {
@@ -1276,8 +1280,8 @@ impl ExecutionStats {
                     Some(operator_name),
                     None,
                     Some("io"),
-                    None,
-                    None,
+                    parent,
+                    index,
                 );
             }
             if let Some(time) = &io.time_scanning {
@@ -1288,8 +1292,8 @@ impl ExecutionStats {
                     Some(operator_name),
                     None,
                     Some("io"),
-                    None,
-                    None,
+                    parent,
+                    index,
                 );
             }
 
@@ -1303,8 +1307,8 @@ impl ExecutionStats {
                         Some(operator_name),
                         None,
                         Some("io"),
-                        None,
-                        None,
+                        parent,
+                        index,
                     );
                 }
                 if let Some(pruned) = &io.parquet_rg_pruned_stats {
@@ -1315,8 +1319,8 @@ impl ExecutionStats {
                         Some(operator_name),
                         None,
                         Some("io"),
-                        None,
-                        None,
+                        parent,
+                        index,
                     );
                 }
                 if let Some(matched) = &io.parquet_rg_matched_stats {
@@ -1327,8 +1331,8 @@ impl ExecutionStats {
                         Some(operator_name),
                         None,
                         Some("io"),
-                        None,
-                        None,
+                        parent,
+                        index,
                     );
                 }
                 if let Some(pruned) = &io.parquet_rg_pruned_bloom_filter {
@@ -1339,8 +1343,8 @@ impl ExecutionStats {
                         Some(operator_name),
                         None,
                         Some("io"),
-                        None,
-                        None,
+                        parent,
+                        index,
                     );
                 }
                 if let Some(matched) = &io.parquet_rg_matched_bloom_filter {
@@ -1351,8 +1355,8 @@ impl ExecutionStats {
                         Some(operator_name),
                         None,
                         Some("io"),
-                        None,
-                        None,
+                        parent,
+                        index,
                     );
                 }
                 if let Some(pruned) = &io.parquet_pruned_page_index {
@@ -1363,8 +1367,8 @@ impl ExecutionStats {
                         Some(operator_name),
                         None,
                         Some("io"),
-                        None,
-                        None,
+                        parent,
+                        index,
                     );
                 }
                 if let Some(matched) = &io.parquet_matched_page_index {
@@ -1375,15 +1379,14 @@ impl ExecutionStats {
                         Some(operator_name),
                         None,
                         Some("io"),
-                        None,
-                        None,
+                        parent,
+                        index,
                     );
                 }
             } // End of Parquet-specific metrics block
         } // End of IO metrics block
 
         // Add compute metrics if present with namespacing
-        // TODO: Populate operator_parent and operator_index from execution plan hierarchy
         if let Some(compute) = &self.compute {
             if let Some(elapsed) = compute.elapsed_compute {
                 rows.add(
@@ -1399,11 +1402,18 @@ impl ExecutionStats {
             }
 
             // Helper to add compute metrics for a category
+            let hierarchy = &self.operator_hierarchy;
             let add_compute_category = |rows: &mut MetricsTableBuilder,
                                         compute_stats: &Option<Vec<PartitionsComputeStats>>,
                                         category: &str| {
                 if let Some(stats) = compute_stats {
                     for stat in stats {
+                        // Look up hierarchy info for this operator
+                        let (parent, index) = hierarchy
+                            .get(&stat.name)
+                            .map(|(p, i)| (p.as_deref(), if *i == -1 { None } else { Some(*i) }))
+                            .unwrap_or((None, None));
+
                         for (partition_id, elapsed) in stat.elapsed_computes.iter().enumerate() {
                             rows.add(
                                 "compute.elapsed_compute",
@@ -1412,8 +1422,8 @@ impl ExecutionStats {
                                 Some(&stat.name),
                                 Some(partition_id as i32),
                                 Some(category),
-                                None, // operator_parent - will be populated with hierarchy collection
-                                None, // operator_index - will be populated with hierarchy collection
+                                parent,
+                                index,
                             );
                         }
                     }

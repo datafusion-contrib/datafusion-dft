@@ -51,7 +51,7 @@ The request body should be a JSON object with the following structure:
 - `sql` (string, required): The SQL query to analyze. Must contain exactly one SQL statement. Multiple statements (e.g., separated by semicolons) are not supported and will result in an error.
 
 **Future Extensibility**:
-The protocol is designed to be extensible. Future versions may support additional query representation fields:
+The protocol is designed to be extensible. Additional query representation fields may be supported in the future:
 - `substrait` (bytes): Substrait query plan (binary or JSON)
 - `logical_plan` (string): Serialized logical plan
 - `physical_plan` (string): Serialized physical plan
@@ -130,8 +130,6 @@ Metric names use a hierarchical namespace structure to prevent collisions and pr
 - `distributed.*` - Distributed execution metrics (future: bytes_sent, rpc_calls)
 
 **Important**: There is no generic `io.*` namespace. Each file format reports its own complete set of I/O metrics under its specific namespace (e.g., `io.parquet.*`, `io.csv.*`). This prevents mixing aggregated and raw data.
-
-**Backward Compatibility**: Legacy metric names without namespaces (e.g., `rows` instead of `query.rows`) may be supported by implementations for transition purposes, but new implementations should use namespaced names.
 
 ## Standard Metrics
 
@@ -420,21 +418,23 @@ To consume this protocol:
 5. **Reconstruct Statistics**
    - Use the original query string retained by the client
    - Parse metrics batch (8-field schema) to reconstruct execution statistics
-   - Support both namespaced (e.g., `query.rows`) and legacy (e.g., `rows`) metric names for backward compatibility
    - Extract `operator_parent` and `operator_index` to reconstruct execution plan hierarchy if needed
 
 ### Error Handling
 
-**Server Errors**:
+**Server Behavior**:
+Any error during request parsing, query execution, metrics collection, or response serialization results in complete failure. No partial metrics are returned.
+
+**Error Codes**:
 - `Status::unimplemented` - Server doesn't support analyze protocol
 - `Status::invalid_argument` - Invalid SQL, malformed request, or multiple SQL statements provided
-- `Status::internal` - Query execution or serialization failure
+- `Status::internal` - Query execution, metrics collection, or serialization failure
 
 **Client Handling**:
-- Gracefully handle `unimplemented` with clear user message
+- Handle `unimplemented` gracefully with clear user message
 - Retry transient errors as appropriate
 - Validate response format (expect at least one batch with 8-field schema)
-- Fail fast if server sends old 6-field schema (schema version mismatch)
+- Any error response means no metrics were collected
 
 ## Extensibility
 
@@ -495,20 +495,6 @@ Clients should handle metrics according to these principles:
    - Stage durations: `stage.parsing`, `stage.logical_planning`, `stage.physical_planning`, `stage.execution`, `stage.total`
 
 6. **Do not fail** on missing optional metrics (format-specific, compute per-partition, etc.)
-
-7. **Support backward compatibility** by accepting both namespaced (`query.rows`) and legacy (`rows`) metric names during transition periods
-
-## Version History
-
-**Version 1.0** (2026-02):
-- Initial specification with Stage 1 improvements
-- Namespaced metric names (query.*, stage.*, io.{format}.*, compute.*)
-- 8-field schema with operator_parent and operator_index for execution plan hierarchy
-- No SQL in response metadata (client retains query)
-- Extended operator categories: filter, sort, projection, join, aggregate, window, distinct, limit, union, io, other
-- Clarified as Arrow Flight extension (not FlightSQL-specific)
-- Client guidance to display unknown metrics with valid categories
-- Standard metric definitions for Parquet, CSV, JSON formats
 
 ## References
 
