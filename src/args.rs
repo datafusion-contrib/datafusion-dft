@@ -79,9 +79,15 @@ pub struct DftArgs {
 
     #[clap(
         long,
-        help = "Print a summary of the query's execution plan and statistics"
+        help = "Print a summary of the query's execution plan and statistics. Only a single SQL statement is allowed. Works with both local and FlightSQL execution (requires server support)."
     )]
     pub analyze: bool,
+
+    #[clap(
+        long,
+        help = "Print raw execution metrics as Arrow table without formatting. Only a single SQL statement is allowed. Useful for debugging and custom analysis. Implies --analyze."
+    )]
+    pub analyze_raw: bool,
 
     #[clap(long, help = "Run the provided query before running the benchmark")]
     pub run_before: Option<String>,

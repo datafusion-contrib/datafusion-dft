@@ -472,4 +472,98 @@ impl FlightSQLContext {
             ))
         }
     }
+
+    /// Get raw metrics batch without reconstruction (for --analyze-raw)
+    pub async fn analyze_query_raw(
+        &self,
+        query: &str,
+    ) -> Result<(String, datafusion::arrow::array::RecordBatch)> {
+        self.fetch_analyze_batches(query).await
+    }
+
+    /// Reconstruct ExecutionStats from metrics (for --analyze)
+    pub async fn analyze_query(&self, query: &str) -> Result<crate::stats::ExecutionStats> {
+        let (query_str, metrics_batch) = self.fetch_analyze_batches(query).await?;
+
+        // Reconstruct ExecutionStats from metrics table
+        let stats = crate::stats::ExecutionStats::from_metrics_table(metrics_batch, query_str)?;
+
+        Ok(stats)
+    }
+
+    /// Shared logic to fetch analyze batch and query from server
+    async fn fetch_analyze_batches(
+        &self,
+        query: &str,
+    ) -> Result<(String, datafusion::arrow::array::RecordBatch)> {
+        use arrow_flight::utils::flight_data_to_batches;
+        use arrow_flight::{Action, FlightData};
+
+        // Validate that query contains only a single statement
+        let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
+        let statements = DFParser::parse_sql_with_dialect(query, &dialect)?;
+        if statements.len() != 1 {
+            return Err(eyre::eyre!("Only a single SQL statement can be analyzed"));
+        }
+
+        // 1. Create JSON request and encode as Action body
+        let request = crate::stats::AnalyzeQueryRequest::with_sql(query);
+        let request_body = serde_json::to_vec(&request)
+            .map_err(|e| eyre::eyre!("Failed to serialize request: {}", e))?;
+
+        let action = Action {
+            r#type: "analyze_query".to_string(),
+            body: request_body.into(),
+        };
+
+        // 2. Call do_action on the FlightSQL service
+        let mut client = self.client.lock().await;
+        let client = client
+            .as_mut()
+            .ok_or_else(|| eyre::eyre!("No FlightSQL client configured"))?;
+
+        let mut stream = client
+            .do_action(action.into_request())
+            .await
+            .map_err(|e| eyre::eyre!("do_action failed: {}", e))?;
+
+        // 3. Collect all Result messages from stream
+        let mut result_messages = Vec::new();
+        while let Some(result) = stream.next().await {
+            let result = result.map_err(|e| eyre::eyre!("Stream error: {}", e))?;
+            result_messages.push(result);
+        }
+
+        // 4. Decode each Result message to FlightData
+        let mut all_flight_data = Vec::new();
+
+        for result in result_messages {
+            // Deserialize the FlightData from the Result.body bytes using prost
+            let flight_data = <FlightData as prost::Message>::decode(result.body.as_ref())
+                .map_err(|e| eyre::eyre!("Failed to decode FlightData: {}", e))?;
+
+            all_flight_data.push(flight_data);
+        }
+
+        // 5. Use the original query (client retains it, server doesn't send it back)
+        let query_str = query.to_string();
+
+        // 6. Decode metrics batch
+        // batches_to_flight_data creates [schema, data] for the batch
+        if all_flight_data.len() < 2 {
+            return Err(eyre::eyre!(
+                "Invalid analyze response: expected at least 2 FlightData messages (schema + data), got {}",
+                all_flight_data.len()
+            ));
+        }
+
+        let metrics_batches = flight_data_to_batches(&all_flight_data)
+            .map_err(|e| eyre::eyre!("Failed to decode metrics batch: {}", e))?;
+
+        if metrics_batches.is_empty() {
+            return Err(eyre::eyre!("No metrics batch found in response"));
+        }
+
+        Ok((query_str, metrics_batches[0].clone()))
+    }
 }

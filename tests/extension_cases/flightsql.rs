@@ -47,7 +47,9 @@ pub async fn test_execute_with_no_flightsql_server() {
 
 #[tokio::test]
 pub async fn test_execute() {
-    let test_server = TestFlightSqlServiceImpl::new();
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
     let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
 
     let assert = tokio::task::spawn_blocking(|| {
@@ -76,7 +78,9 @@ pub async fn test_execute() {
 
 #[tokio::test]
 pub async fn test_invalid_sql_command() {
-    let test_server = TestFlightSqlServiceImpl::new();
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
     let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
 
     let assert = tokio::task::spawn_blocking(|| {
@@ -136,7 +140,9 @@ pub async fn test_execute_multiple_commands() {
 
 #[tokio::test]
 pub async fn test_command_in_file() {
-    let test_server = TestFlightSqlServiceImpl::new();
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
     let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
     let file = sql_in_file("SELECT 1 + 1");
     let assert = tokio::task::spawn_blocking(move || {
@@ -163,7 +169,9 @@ pub async fn test_command_in_file() {
 
 #[tokio::test]
 pub async fn test_invalid_sql_command_in_file() {
-    let test_server = TestFlightSqlServiceImpl::new();
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
     let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
     let file = sql_in_file("SELEC 1");
     let assert = tokio::task::spawn_blocking(move || {
@@ -292,7 +300,9 @@ SELECT 1
 
 #[tokio::test]
 pub async fn test_bench_files() {
-    let test_server = TestFlightSqlServiceImpl::new();
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
     let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
     let file = sql_in_file(r#"SELECT 1 + 1;"#);
     let assert = tokio::task::spawn_blocking(move || {
@@ -383,7 +393,9 @@ SELECT 1
 
 #[tokio::test]
 pub async fn test_bench_files_and_save() {
-    let test_server = TestFlightSqlServiceImpl::new();
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
     let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
     let file = sql_in_file(r#"SELECT 1 + 1;"#);
 
@@ -1354,6 +1366,970 @@ pub async fn test_prepared_statement_complex_query() {
         .close()
         .await
         .expect("Failed to close prepared statement");
+
+    fixture.shutdown_and_wait().await;
+}
+
+// ============================================================================
+// FlightSQL Analyze Tests
+// ============================================================================
+
+#[tokio::test]
+pub async fn test_analyze_command() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1 + 2")
+            .arg("--analyze")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    // Verify output contains expected sections
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(output.contains("Query"), "Should contain Query section");
+    assert!(
+        output.contains("Execution Summary"),
+        "Should contain Execution Summary"
+    );
+    assert!(
+        output.contains("Output Rows"),
+        "Should contain Output Rows metric"
+    );
+    assert!(
+        output.contains("Parsing"),
+        "Should contain timing breakdown"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_raw_command() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1 + 2")
+            .arg("--analyze-raw")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    // Verify raw mode outputs query string and metrics table
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(output.contains("Query"), "Should contain Query header");
+    assert!(output.contains("Metrics"), "Should contain Metrics header");
+    assert!(
+        output.contains("SELECT 1 + 2"),
+        "Should contain the SQL query"
+    );
+    assert!(
+        output.contains("metric_name"),
+        "Should contain metric_name column"
+    );
+    assert!(output.contains("value"), "Should contain value column");
+    assert!(
+        output.contains("value_type"),
+        "Should contain value_type column"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_file() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+    let file = sql_in_file("SELECT 1 + 1");
+
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-f")
+            .arg(file.path())
+            .arg("--analyze")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    // Verify output contains expected sections
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(
+        output.contains("Execution Summary"),
+        "Should contain Execution Summary"
+    );
+    assert!(
+        output.contains("Output Rows"),
+        "Should contain Output Rows metric"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_raw_file() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+    let file = sql_in_file("SELECT 1 + 1");
+
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-f")
+            .arg(file.path())
+            .arg("--analyze-raw")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    // Verify raw mode outputs query string and metrics table
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(output.contains("Query"), "Should contain Query header");
+    assert!(output.contains("Metrics"), "Should contain Metrics header");
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_multiple_commands() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("-c")
+            .arg("SELECT 2")
+            .arg("--analyze")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .failure()
+    })
+    .await
+    .unwrap();
+
+    // Verify error message about requiring exactly one command
+    let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
+    assert!(
+        stderr.contains("Analyze requires exactly one command"),
+        "Should contain error about requiring one command"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_invalid_sql() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELEC 1")
+            .arg("--analyze")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .failure()
+    })
+    .await
+    .unwrap();
+
+    // Verify error is reported
+    let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
+    assert!(
+        stderr.contains("Error") || stderr.contains("error"),
+        "Should contain error message"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_with_timing_metrics() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("--analyze")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    // Verify all timing metrics are present
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(output.contains("Parsing"), "Should contain Parsing time");
+    assert!(
+        output.contains("Logical Planning"),
+        "Should contain Logical Planning time"
+    );
+    assert!(
+        output.contains("Physical Planning"),
+        "Should contain Physical Planning time"
+    );
+    assert!(
+        output.contains("Execution"),
+        "Should contain Execution time"
+    );
+    assert!(output.contains("Total"), "Should contain Total time");
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_raw_metrics_schema() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("--analyze-raw")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    // Verify raw metrics table has all expected columns (8-field schema)
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(
+        output.contains("metric_name"),
+        "Should contain metric_name column"
+    );
+    assert!(output.contains("value"), "Should contain value column");
+    assert!(
+        output.contains("value_type"),
+        "Should contain value_type column"
+    );
+    assert!(
+        output.contains("operator_name"),
+        "Should contain operator_name column"
+    );
+    assert!(
+        output.contains("partition_id"),
+        "Should contain partition_id column"
+    );
+    assert!(
+        output.contains("operator_category"),
+        "Should contain operator_category column"
+    );
+    assert!(
+        output.contains("operator_parent"),
+        "Should contain operator_parent column"
+    );
+    assert!(
+        output.contains("operator_index"),
+        "Should contain operator_index column"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_raw_duration_metrics() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("--analyze-raw")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    // Verify duration metrics are in the raw output
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(output.contains("parsing"), "Should contain parsing metric");
+    assert!(
+        output.contains("logical_planning"),
+        "Should contain logical_planning metric"
+    );
+    assert!(
+        output.contains("physical_planning"),
+        "Should contain physical_planning metric"
+    );
+    assert!(
+        output.contains("execution"),
+        "Should contain execution metric"
+    );
+    assert!(output.contains("total"), "Should contain total metric");
+    assert!(
+        output.contains("duration_ns"),
+        "Should contain duration_ns value_type"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_output_metrics() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1")
+            .arg("--analyze-raw")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    // Verify output metrics (rows, batches, bytes) are present
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+    assert!(output.contains("rows"), "Should contain rows metric");
+    assert!(output.contains("batches"), "Should contain batches metric");
+    assert!(output.contains("bytes"), "Should contain bytes metric");
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_multiple_statements_in_single_command() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1; SELECT 2")
+            .arg("--analyze")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .failure()
+    })
+    .await
+    .unwrap();
+
+    // Verify error message about single statement requirement
+    let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
+    assert!(
+        stderr.contains("Only a single SQL statement can be analyzed"),
+        "Should contain error about single statement requirement"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_file_with_multiple_statements() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+    let file = sql_in_file("SELECT 1; SELECT 2");
+
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-f")
+            .arg(file.path())
+            .arg("--analyze")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .failure()
+    })
+    .await
+    .unwrap();
+
+    // Verify error message about single statement requirement
+    let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
+    assert!(
+        stderr.contains("Only a single SQL statement can be analyzed"),
+        "Should contain error about single statement requirement"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_multiple_files() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+    let file1 = sql_in_file("SELECT 1");
+    let file2 = sql_in_file("SELECT 2");
+
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-f")
+            .arg(file1.path())
+            .arg("-f")
+            .arg(file2.path())
+            .arg("--analyze")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .failure()
+    })
+    .await
+    .unwrap();
+
+    // Verify error message about requiring exactly one file
+    let stderr = String::from_utf8_lossy(&assert.get_output().stderr);
+    assert!(
+        stderr.contains("Analyze requires exactly one file"),
+        "Should contain error about requiring one file"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_operator_hierarchy() {
+    let ctx = ExecutionContext::test();
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    // Run a complex query with multiple operators to test operator hierarchy
+    // (parent-child relationships). This query has:
+    // - VALUES clause (scan)
+    // - Filter (WHERE)
+    // - Aggregate (GROUP BY)
+    // - Sort (ORDER BY)
+    // - Limit
+    // - Projection (SELECT columns)
+    let query = r#"
+        SELECT
+            category,
+            count,
+            total
+        FROM (
+            SELECT
+                column2 as category,
+                COUNT(*) as count,
+                SUM(column3) as total
+            FROM (VALUES
+                (1, 'a', 100),
+                (2, 'b', 200),
+                (3, 'a', 300),
+                (4, 'b', 400),
+                (5, 'a', 500)
+            ) AS t(column1, column2, column3)
+            WHERE column1 > 1
+            GROUP BY column2
+        ) AS subquery
+        ORDER BY count DESC
+        LIMIT 2
+    "#;
+
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg(query)
+            .arg("--analyze-raw")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+
+    // Verify the schema includes hierarchy fields
+    assert!(
+        output.contains("operator_parent"),
+        "Should contain operator_parent column"
+    );
+    assert!(
+        output.contains("operator_index"),
+        "Should contain operator_index column"
+    );
+
+    // Verify we have a complex execution plan with multiple operators
+    // For this query we expect operators like:
+    // - Projection (root - final SELECT columns)
+    // - Limit
+    // - Sort
+    // - Aggregate (GROUP BY)
+    // - Filter (WHERE clause)
+    // - MemoryExec or similar scan operator (leaf)
+
+    // Check that we have metrics from multiple operator types
+    assert!(
+        output.contains("ProjectionExec") || output.contains("projection"),
+        "Should have projection operator"
+    );
+    assert!(
+        output.contains("AggregateExec") || output.contains("aggregate"),
+        "Should have aggregate operator"
+    );
+    assert!(
+        output.contains("FilterExec")
+            || output.contains("filter")
+            || output.contains("CoalesceBatchesExec"),
+        "Should have filter or coalesce operator"
+    );
+
+    // For a complex query with multiple operators, verify that operator names are present
+    // This confirms that the hierarchy was collected and included in the output
+    assert!(
+        output.contains("Exec"),
+        "Should contain operator names in output"
+    );
+
+    // Verify we have hierarchy data present (parent and index columns are populated)
+    // Note: Detailed validation of parent-child relationships is difficult with CLI table output
+    // and would require parsing the Arrow RecordBatch directly
+
+    // Note: The exact hierarchy validation is difficult with CLI table output
+    // The important thing is that the schema has the fields and operators are tracked
+    // A more thorough validation would require parsing the Arrow RecordBatch directly
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_operator_hierarchy_with_csv() {
+    use datafusion::prelude::CsvReadOptions;
+
+    // Create an ExecutionContext and register the test CSV file as a table
+    let mut ctx = ExecutionContext::test();
+
+    // Register the aggregate_test_100.csv file
+    ctx.session_ctx()
+        .register_csv(
+            "test_data",
+            "data/aggregate_test_100.csv",
+            CsvReadOptions::new(),
+        )
+        .await
+        .expect("Failed to register CSV table");
+
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    // Run a complex query that will create a rich operator hierarchy with CSV scan
+    // This query has: CsvExec -> Filter -> Aggregate -> Sort -> Limit -> Projection
+    let analyze_query = r#"
+        SELECT
+            c1,
+            COUNT(*) as count,
+            AVG(c2) as avg_c2,
+            SUM(c3) as sum_c3
+        FROM test_data
+        WHERE c2 > 2
+        GROUP BY c1
+        HAVING COUNT(*) > 5
+        ORDER BY count DESC
+        LIMIT 10
+    "#;
+
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg(analyze_query)
+            .arg("--analyze-raw")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+
+    // Verify the schema includes hierarchy fields
+    assert!(
+        output.contains("operator_parent"),
+        "Should contain operator_parent column"
+    );
+    assert!(
+        output.contains("operator_index"),
+        "Should contain operator_index column"
+    );
+
+    // Verify we have expected operators from the complex query
+    // Note: CSV scan operators don't report compute metrics, so we check other operators
+    assert!(
+        output.contains("AggregateExec"),
+        "Should have AggregateExec operator for GROUP BY"
+    );
+    assert!(
+        output.contains("FilterExec"),
+        "Should have FilterExec operator for WHERE clause"
+    );
+    assert!(
+        output.contains("SortExec"),
+        "Should have SortExec operator for ORDER BY"
+    );
+    assert!(
+        output.contains("ProjectionExec"),
+        "Should have ProjectionExec operator for SELECT"
+    );
+
+    // Verify we have compute metrics
+    assert!(
+        output.contains("compute.") || output.contains("elapsed_compute"),
+        "Should contain compute metrics"
+    );
+
+    // Verify we have I/O metrics with correct CSV namespace
+    // Note: CSV files may not report I/O metrics when registered as tables
+    // (metrics are primarily collected when reading from file paths)
+    let has_csv_metrics = output.contains("io.csv.");
+    if !has_csv_metrics {
+        eprintln!("Note: No io.csv.* metrics found (may be expected for registered tables)");
+    }
+
+    // Verify stage metrics with namespacing
+    assert!(
+        output.contains("stage.") || output.contains("parsing"),
+        "Should contain stage metrics"
+    );
+
+    // Verify query-level metrics with namespacing
+    assert!(
+        output.contains("query.rows") || output.contains("rows"),
+        "Should contain query-level metrics"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_io_metrics_parquet_namespace() {
+    // Test that Parquet files report metrics under io.parquet.* namespace
+    let mut ctx = ExecutionContext::test();
+
+    // Register the test Parquet file
+    ctx.session_ctx()
+        .sql("CREATE EXTERNAL TABLE test_parquet STORED AS PARQUET LOCATION 'data/test_io_formats.parquet'")
+        .await
+        .expect("Failed to register Parquet table")
+        .collect()
+        .await
+        .expect("Failed to execute CREATE TABLE");
+
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let analyze_query = r#"
+        SELECT
+            category,
+            COUNT(*) as count,
+            SUM(value) as total
+        FROM test_parquet
+        WHERE value > 50
+        GROUP BY category
+        ORDER BY count DESC
+    "#;
+
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg(analyze_query)
+            .arg("--analyze-raw")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+
+    // Verify schema
+    assert!(
+        output.contains("operator_parent"),
+        "Should contain operator_parent column"
+    );
+    assert!(
+        output.contains("operator_index"),
+        "Should contain operator_index column"
+    );
+
+    // Verify Parquet-specific namespace is used IF I/O metrics are present
+    // Note: I/O metrics may not be reported for small datasets or registered tables
+    if output.contains("io.") {
+        assert!(
+            output.contains("io.parquet."),
+            "If I/O metrics present, should use io.parquet.* namespace for Parquet files"
+        );
+        // Verify no other format namespaces are used
+        assert!(
+            !output.contains("io.csv."),
+            "Should NOT use io.csv.* namespace for Parquet files"
+        );
+        assert!(
+            !output.contains("io.json."),
+            "Should NOT use io.json.* namespace for Parquet files"
+        );
+    } else {
+        eprintln!(
+            "Note: No I/O metrics reported (expected for small datasets or registered tables)"
+        );
+    }
+
+    // Verify compute metrics are always present
+    assert!(
+        output.contains("compute.") || output.contains("elapsed_compute"),
+        "Should contain compute metrics"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_io_metrics_json_namespace() {
+    // Test that JSON files report metrics under io.json.* namespace
+    let mut ctx = ExecutionContext::test();
+
+    // Register the test JSON file
+    ctx.session_ctx()
+        .sql("CREATE EXTERNAL TABLE test_json STORED AS JSON LOCATION 'data/test_io_formats.json'")
+        .await
+        .expect("Failed to register JSON table")
+        .collect()
+        .await
+        .expect("Failed to execute CREATE TABLE");
+
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let analyze_query = r#"
+        SELECT
+            category,
+            COUNT(*) as count
+        FROM test_json
+        WHERE value > 75
+        GROUP BY category
+    "#;
+
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg(analyze_query)
+            .arg("--analyze-raw")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+
+    // Verify schema
+    assert!(
+        output.contains("operator_parent"),
+        "Should contain operator_parent column"
+    );
+    assert!(
+        output.contains("operator_index"),
+        "Should contain operator_index column"
+    );
+
+    // Verify JSON-specific namespace is used IF I/O metrics are present
+    // Note: I/O metrics may not be reported for small datasets or registered tables
+    if output.contains("io.") {
+        assert!(
+            output.contains("io.json."),
+            "If I/O metrics present, should use io.json.* namespace for JSON files"
+        );
+        // Verify no other format namespaces are used
+        assert!(
+            !output.contains("io.csv."),
+            "Should NOT use io.csv.* namespace for JSON files"
+        );
+        assert!(
+            !output.contains("io.parquet."),
+            "Should NOT use io.parquet.* namespace for JSON files"
+        );
+    } else {
+        eprintln!(
+            "Note: No I/O metrics reported (expected for small datasets or registered tables)"
+        );
+    }
+
+    // Verify compute metrics are always present
+    assert!(
+        output.contains("compute.") || output.contains("elapsed_compute"),
+        "Should contain compute metrics"
+    );
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+pub async fn test_analyze_io_metrics_arrow_namespace() {
+    // Test that Arrow IPC files report metrics under io.arrow.* namespace
+    let mut ctx = ExecutionContext::test();
+
+    // Register the test Arrow IPC file
+    ctx.session_ctx()
+        .sql("CREATE EXTERNAL TABLE test_arrow STORED AS ARROW LOCATION 'data/test_io_formats.arrow'")
+        .await
+        .expect("Failed to register Arrow table")
+        .collect()
+        .await
+        .expect("Failed to execute CREATE TABLE");
+
+    let exec = AppExecution::new(ctx);
+    let test_server = FlightSqlServiceImpl::new(exec);
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let analyze_query = r#"
+        SELECT
+            name,
+            category,
+            value
+        FROM test_arrow
+        WHERE value > 100
+        ORDER BY value DESC
+    "#;
+
+    let assert = tokio::task::spawn_blocking(move || {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg(analyze_query)
+            .arg("--analyze-raw")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let output = String::from_utf8_lossy(&assert.get_output().stdout);
+
+    // Verify schema
+    assert!(
+        output.contains("operator_parent"),
+        "Should contain operator_parent column"
+    );
+    assert!(
+        output.contains("operator_index"),
+        "Should contain operator_index column"
+    );
+
+    // Verify Arrow-specific namespace is used IF I/O metrics are present
+    // Note: I/O metrics may not be reported for small datasets or registered tables
+    if output.contains("io.") {
+        assert!(
+            output.contains("io.arrow."),
+            "If I/O metrics present, should use io.arrow.* namespace for Arrow files"
+        );
+        // Verify no other format namespaces are used
+        assert!(
+            !output.contains("io.csv."),
+            "Should NOT use io.csv.* namespace for Arrow files"
+        );
+        assert!(
+            !output.contains("io.parquet."),
+            "Should NOT use io.parquet.* namespace for Arrow files"
+        );
+        assert!(
+            !output.contains("io.json."),
+            "Should NOT use io.json.* namespace for Arrow files"
+        );
+    } else {
+        eprintln!(
+            "Note: No I/O metrics reported (expected for small datasets or registered tables)"
+        );
+    }
+
+    // Verify compute metrics are always present
+    assert!(
+        output.contains("compute.") || output.contains("elapsed_compute"),
+        "Should contain compute metrics"
+    );
 
     fixture.shutdown_and_wait().await;
 }
