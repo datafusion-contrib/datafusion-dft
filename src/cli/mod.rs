@@ -592,10 +592,19 @@ impl CliApp {
                 .analyze_query_raw(sql)
                 .await?;
 
-            println!("==================== Query ====================");
-            println!("{}", query_str);
-            println!("\n==================== Metrics ====================");
-            self.print_batch(&metrics_batch)?;
+            if let Some(output_path) = &self.args.output {
+                // Write metrics batch to file
+                let schema = metrics_batch.schema();
+                let mut writer = path_to_writer(output_path, schema)?;
+                writer.write(&metrics_batch)?;
+                writer.close().await?;
+            } else {
+                // Print to stdout
+                println!("==================== Query ====================");
+                println!("{}", query_str);
+                println!("\n==================== Metrics ====================");
+                self.print_batch(&metrics_batch)?;
+            }
         } else {
             // Normal mode: reconstruct and display ExecutionStats
             let stats = self
