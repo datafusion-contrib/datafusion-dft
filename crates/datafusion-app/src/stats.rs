@@ -29,9 +29,11 @@ use datafusion::{
             CrossJoinExec, HashJoinExec, NestedLoopJoinExec, SortMergeJoinExec,
             SymmetricHashJoinExec,
         },
+        limit::{GlobalLimitExec, LocalLimitExec},
         metrics::MetricValue,
         projection::ProjectionExec,
         sorts::{sort::SortExec, sort_preserving_merge::SortPreservingMergeExec},
+        union::UnionExec,
         visit_execution_plan, ExecutionPlan, ExecutionPlanVisitor,
     },
 };
@@ -638,6 +640,10 @@ pub struct PlanComputeVisitor {
     projection_computes: Vec<PartitionsComputeStats>,
     join_computes: Vec<PartitionsComputeStats>,
     aggregate_computes: Vec<PartitionsComputeStats>,
+    window_computes: Vec<PartitionsComputeStats>,
+    distinct_computes: Vec<PartitionsComputeStats>,
+    limit_computes: Vec<PartitionsComputeStats>,
+    union_computes: Vec<PartitionsComputeStats>,
     other_computes: Vec<PartitionsComputeStats>,
 }
 
@@ -662,6 +668,10 @@ impl PlanComputeVisitor {
         self.collect_projection_metrics(plan);
         self.collect_join_metrics(plan);
         self.collect_aggregate_metrics(plan);
+        self.collect_window_metrics(plan);
+        self.collect_distinct_metrics(plan);
+        self.collect_limit_metrics(plan);
+        self.collect_union_metrics(plan);
         self.collect_other_metrics(plan);
     }
 
@@ -766,12 +776,96 @@ impl PlanComputeVisitor {
         }
     }
 
+    fn collect_window_metrics(&mut self, plan: &dyn ExecutionPlan) {
+        if is_window_plan(plan) {
+            if let Some(metrics) = plan.metrics() {
+                let sorted_computes: Vec<usize> = metrics
+                    .iter()
+                    .filter_map(|m| match m.value() {
+                        MetricValue::ElapsedCompute(t) => Some(t.value()),
+                        _ => None,
+                    })
+                    .sorted()
+                    .collect();
+                let p = PartitionsComputeStats {
+                    name: plan.name().to_string(),
+                    elapsed_computes: sorted_computes,
+                };
+                self.window_computes.push(p)
+            }
+        }
+    }
+
+    fn collect_distinct_metrics(&mut self, plan: &dyn ExecutionPlan) {
+        if is_distinct_plan(plan) {
+            if let Some(metrics) = plan.metrics() {
+                let sorted_computes: Vec<usize> = metrics
+                    .iter()
+                    .filter_map(|m| match m.value() {
+                        MetricValue::ElapsedCompute(t) => Some(t.value()),
+                        _ => None,
+                    })
+                    .sorted()
+                    .collect();
+                let p = PartitionsComputeStats {
+                    name: plan.name().to_string(),
+                    elapsed_computes: sorted_computes,
+                };
+                self.distinct_computes.push(p)
+            }
+        }
+    }
+
+    fn collect_limit_metrics(&mut self, plan: &dyn ExecutionPlan) {
+        if is_limit_plan(plan) {
+            if let Some(metrics) = plan.metrics() {
+                let sorted_computes: Vec<usize> = metrics
+                    .iter()
+                    .filter_map(|m| match m.value() {
+                        MetricValue::ElapsedCompute(t) => Some(t.value()),
+                        _ => None,
+                    })
+                    .sorted()
+                    .collect();
+                let p = PartitionsComputeStats {
+                    name: plan.name().to_string(),
+                    elapsed_computes: sorted_computes,
+                };
+                self.limit_computes.push(p)
+            }
+        }
+    }
+
+    fn collect_union_metrics(&mut self, plan: &dyn ExecutionPlan) {
+        if is_union_plan(plan) {
+            if let Some(metrics) = plan.metrics() {
+                let sorted_computes: Vec<usize> = metrics
+                    .iter()
+                    .filter_map(|m| match m.value() {
+                        MetricValue::ElapsedCompute(t) => Some(t.value()),
+                        _ => None,
+                    })
+                    .sorted()
+                    .collect();
+                let p = PartitionsComputeStats {
+                    name: plan.name().to_string(),
+                    elapsed_computes: sorted_computes,
+                };
+                self.union_computes.push(p)
+            }
+        }
+    }
+
     fn collect_other_metrics(&mut self, plan: &dyn ExecutionPlan) {
         if !is_filter_plan(plan)
             && !is_sort_plan(plan)
             && !is_projection_plan(plan)
             && !is_aggregate_plan(plan)
             && !is_join_plan(plan)
+            && !is_window_plan(plan)
+            && !is_distinct_plan(plan)
+            && !is_limit_plan(plan)
+            && !is_union_plan(plan)
         {
             if let Some(metrics) = plan.metrics() {
                 let sorted_computes: Vec<usize> = metrics
@@ -823,6 +917,27 @@ fn is_aggregate_plan(plan: &dyn ExecutionPlan) -> bool {
     plan.as_any().downcast_ref::<AggregateExec>().is_some()
 }
 
+fn is_window_plan(plan: &dyn ExecutionPlan) -> bool {
+    // Check by name since there are multiple window exec types
+    let name = plan.name();
+    name.contains("Window")
+}
+
+fn is_distinct_plan(plan: &dyn ExecutionPlan) -> bool {
+    // Check by name since distinct may be handled various ways
+    let name = plan.name();
+    name.contains("Distinct") || name.contains("Deduplicate")
+}
+
+fn is_limit_plan(plan: &dyn ExecutionPlan) -> bool {
+    plan.as_any().downcast_ref::<GlobalLimitExec>().is_some()
+        || plan.as_any().downcast_ref::<LocalLimitExec>().is_some()
+}
+
+fn is_union_plan(plan: &dyn ExecutionPlan) -> bool {
+    plan.as_any().downcast_ref::<UnionExec>().is_some()
+}
+
 impl From<PlanComputeVisitor> for ExecutionComputeStats {
     fn from(value: PlanComputeVisitor) -> Self {
         Self {
@@ -832,10 +947,10 @@ impl From<PlanComputeVisitor> for ExecutionComputeStats {
             projection_compute: Some(value.projection_computes),
             join_compute: Some(value.join_computes),
             aggregate_compute: Some(value.aggregate_computes),
-            window_compute: None,   // TODO: Collect from visitor
-            distinct_compute: None, // TODO: Collect from visitor
-            limit_compute: None,    // TODO: Collect from visitor
-            union_compute: None,    // TODO: Collect from visitor
+            window_compute: Some(value.window_computes),
+            distinct_compute: Some(value.distinct_computes),
+            limit_compute: Some(value.limit_computes),
+            union_compute: Some(value.union_computes),
             other_compute: Some(value.other_computes),
         }
     }
