@@ -26,3 +26,13 @@ Done
 9. No SQL in metadata, client is expected to retain this
 11. Make clear this is not specific to FlightSQL - it is specific to Arrow Flight although its natural to pair with FlightSQL 
 2. Clients dont need to ugnore unknown metric names, in fact thats almost the opposite of whats desired.  As long as they are assigned to a group it should be okay to display them.  Optionally, there can config to determine if unknown metrics throw error or are included
+
+
+
+
+TODO
+- Test only single statement allowed
+- Are the namespaces for metric name redundant with the operator category
+- For operator index, should it be 0 based where root is 0 and then null for query level metrics that arent part of tree
+- Start and end timestamp (duration) per operator / partition
+- Add UDTF to analyze (`SELECT * FROM analyze('')`)

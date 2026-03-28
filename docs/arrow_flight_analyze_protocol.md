@@ -1,6 +1,6 @@
 # Arrow Flight Analyze Protocol Specification
 
-**Version**: 1.0
+**Version**: 0.1
 **Status**: Experimental
 
 This document specifies a protocol extension for Apache Arrow Flight services to provide detailed query execution metrics. The protocol is designed to be implementation-agnostic and can be adopted by any Arrow Flight service.
@@ -19,11 +19,6 @@ The Arrow Flight Analyze Protocol enables clients to retrieve detailed execution
 ### Protocol Scope
 
 This protocol is an **Apache Arrow Flight** extension, not specific to Flight SQL. While it naturally pairs with Flight SQL for SQL query analysis, any Arrow Flight service can implement the `analyze_query` action to provide execution metrics.
-
-**Compatible Services**:
-- Flight SQL servers (SQL queries)
-- DataFrame API servers (DataFrame expressions)
-- Custom query engines using Arrow Flight for transport
 
 The examples in this specification use SQL for illustration, but the protocol works with any query representation that the Flight service supports.
 
@@ -123,8 +118,7 @@ Metric names use a hierarchical namespace structure to prevent collisions and pr
 - `io.parquet.*` - Parquet-specific I/O metrics (bytes_scanned, time_opening, time_scanning, output_rows, rg_pruned, bloom_pruned, etc.)
 - `io.csv.*` - CSV-specific I/O metrics (bytes_scanned, time_opening, time_scanning, output_rows, rows_parsed, parse_errors)
 - `io.json.*` - JSON-specific I/O metrics (bytes_scanned, time_opening, time_scanning, output_rows, invalid_rows, parse_errors)
-- `io.orc.*` - ORC-specific I/O metrics (future: bytes_scanned, stripe_pruned, etc.)
-- `io.arrow.*` - Arrow IPC-specific I/O metrics (future: dictionary_hits, etc.)
+- `io.arrow.*` - Arrow IPC-specific I/O metrics
 - `compute.*` - Compute metrics (elapsed_compute with operator breakdown)
 - `index.*` - Index-related metrics (future: index_hits, index_scans)
 - `distributed.*` - Distributed execution metrics (future: bytes_sent, rpc_calls)
@@ -258,7 +252,7 @@ Detailed breakdown by operator and partition:
 - `operator_parent`: Parent operator in execution plan
 - `operator_index`: Child index under parent
 
-**Note**: Category assignment for ambiguous operators (e.g., hash aggregate with filtering) is implementation-defined.
+**Note**: Category assignment for ambiguous operators is implementation-defined.
 
 ## Example Response
 
