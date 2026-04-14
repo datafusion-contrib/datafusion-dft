@@ -17,6 +17,6 @@ datafusion = { version = "51" }
 parquet = { default-features = false, version = "57" }
 
 [dev-dependencies]
-parquet = { version = "57", features = ["arrow"] }
+parquet = { features = ["arrow"], version = "57" }
 tempfile = "3"
-tokio = { version = "1", features = ["macros", "rt"] }
+tokio = { features = ["macros", "rt"], version = "1" }
