@@ -37,6 +37,9 @@ use parquet::file::statistics::Statistics;
 use std::fs::File;
 use std::sync::Arc;
 
+mod page_index;
+pub use page_index::ParquetPageIndexFunc;
+
 // Copied from https://github.com/apache/datafusion/blob/main/datafusion-cli/src/functions.rs
 /// PARQUET_META table function
 #[derive(Debug)]
@@ -219,7 +222,7 @@ impl TableFunctionImpl for ParquetMetadataFunc {
                 column_id_arr.push(col_idx as i64);
                 file_offset_arr.push(column.file_offset());
                 num_values_arr.push(column.num_values());
-                path_in_schema_arr.push(column.column_path().to_string());
+                path_in_schema_arr.push(column.column_path().string());
                 type_arr.push(column.column_type().to_string());
                 logical_type_arr.push(
                     column

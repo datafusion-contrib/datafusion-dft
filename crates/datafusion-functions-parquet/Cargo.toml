@@ -15,3 +15,8 @@ arrow = { version = "57" }
 async-trait = "0.1.41"
 datafusion = { version = "51" }
 parquet = { default-features = false, version = "57" }
+
+[dev-dependencies]
+parquet = { version = "57", features = ["arrow"] }
+tempfile = "3"
+tokio = { version = "1", features = ["macros", "rt"] }

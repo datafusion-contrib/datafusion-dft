@@ -115,6 +115,10 @@ impl ExecutionContext {
             "parquet_metadata",
             Arc::new(datafusion_functions_parquet::ParquetMetadataFunc {}),
         );
+        session_ctx.register_udtf(
+            "parquet_page_index",
+            Arc::new(datafusion_functions_parquet::ParquetPageIndexFunc {}),
+        );
 
         let catalog = create_app_catalog(config, app_name, app_version)?;
         session_ctx.register_catalog(&config.catalog.name, catalog);
