@@ -119,6 +119,10 @@ impl ExecutionContext {
             "parquet_page_index",
             Arc::new(datafusion_functions_parquet::ParquetPageIndexFunc {}),
         );
+        session_ctx.register_udtf(
+            "parquet_kv_metadata",
+            Arc::new(datafusion_functions_parquet::ParquetKvMetadataFunc {}),
+        );
 
         #[cfg(feature = "websocket")]
         session_ctx.register_udtf(
