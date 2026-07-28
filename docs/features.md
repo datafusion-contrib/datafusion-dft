@@ -12,6 +12,12 @@ Includes functions from [datafusion-function-parquet] for querying Parquet files
 SELECT * FROM parquet_metadata('my_parquet_file.parquet')
 ```
 
+Or for reading the key-value metadata from a file's footer:
+
+```sql
+SELECT * FROM parquet_kv_metadata('my_parquet_file.parquet')
+```
+
 ### WASM UDF Functions (`--features=udfs-wasm`)
 
 Adds the ability to register WASM UDFs. Currently two different input types are supported:

@@ -37,7 +37,9 @@ use parquet::file::statistics::Statistics;
 use std::fs::File;
 use std::sync::Arc;
 
+mod kv_metadata;
 mod page_index;
+pub use kv_metadata::ParquetKvMetadataFunc;
 pub use page_index::ParquetPageIndexFunc;
 
 // Copied from https://github.com/apache/datafusion/blob/main/datafusion-cli/src/functions.rs

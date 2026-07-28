@@ -17,6 +17,7 @@ datafusion = { version = "54" }
 parquet = { default-features = false, version = "58" }
 
 [dev-dependencies]
+base64 = "0.22"
 parquet = { features = ["arrow"], version = "58" }
 tempfile = "3"
 tokio = { features = ["macros", "rt"], version = "1" }
