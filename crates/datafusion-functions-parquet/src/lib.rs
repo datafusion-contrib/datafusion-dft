@@ -37,8 +37,10 @@ use parquet::file::statistics::Statistics;
 use std::fs::File;
 use std::sync::Arc;
 
+mod bloom_filter;
 mod kv_metadata;
 mod page_index;
+pub use bloom_filter::{ParquetBloomFilterCheckFunc, ParquetBloomFilterFunc};
 pub use kv_metadata::ParquetKvMetadataFunc;
 pub use page_index::ParquetPageIndexFunc;
 

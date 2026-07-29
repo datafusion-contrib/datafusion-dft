@@ -14,7 +14,7 @@ version = "0.1.0"
 arrow = { version = "58" }
 async-trait = "0.1.41"
 datafusion = { version = "54" }
-parquet = { default-features = false, version = "58" }
+parquet = { default-features = false, version = "58.3" }
 
 [dev-dependencies]
 base64 = "0.22"

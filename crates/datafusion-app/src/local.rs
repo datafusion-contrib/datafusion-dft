@@ -123,6 +123,14 @@ impl ExecutionContext {
             "parquet_kv_metadata",
             Arc::new(datafusion_functions_parquet::ParquetKvMetadataFunc {}),
         );
+        session_ctx.register_udtf(
+            "parquet_bloom_filter",
+            Arc::new(datafusion_functions_parquet::ParquetBloomFilterFunc {}),
+        );
+        session_ctx.register_udtf(
+            "parquet_bloom_filter_check",
+            Arc::new(datafusion_functions_parquet::ParquetBloomFilterCheckFunc {}),
+        );
 
         #[cfg(feature = "websocket")]
         session_ctx.register_udtf(
