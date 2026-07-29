@@ -18,6 +18,18 @@ Or for reading the key-value metadata from a file's footer:
 SELECT * FROM parquet_kv_metadata('my_parquet_file.parquet')
 ```
 
+Bloom filter details (presence, location, and size per column chunk) can be inspected with:
+
+```sql
+SELECT * FROM parquet_bloom_filter('my_parquet_file.parquet')
+```
+
+And a column's bloom filter can be probed for a value, returning one row per row group. A `false` in `might_contain` guarantees the value is absent from that row group, while `true` means it might be present (subject to the filter's false positive probability):
+
+```sql
+SELECT * FROM parquet_bloom_filter_check('my_parquet_file.parquet', 'user_id', 'abc123')
+```
+
 ### WASM UDF Functions (`--features=udfs-wasm`)
 
 Adds the ability to register WASM UDFs. Currently two different input types are supported:
