@@ -13,11 +13,11 @@ version = "0.1.0"
 [dependencies]
 arrow = { version = "58" }
 async-trait = "0.1.41"
+base64 = "0.22"
 datafusion = { version = "54" }
 parquet = { default-features = false, version = "58.3" }
 
 [dev-dependencies]
-base64 = "0.22"
 parquet = { features = ["arrow"], version = "58" }
 tempfile = "3"
 tokio = { features = ["macros", "rt"], version = "1" }

@@ -124,6 +124,10 @@ impl ExecutionContext {
             Arc::new(datafusion_functions_parquet::ParquetKvMetadataFunc {}),
         );
         session_ctx.register_udtf(
+            "parquet_arrow_schema",
+            Arc::new(datafusion_functions_parquet::ParquetArrowSchemaFunc {}),
+        );
+        session_ctx.register_udtf(
             "parquet_bloom_filter",
             Arc::new(datafusion_functions_parquet::ParquetBloomFilterFunc {}),
         );

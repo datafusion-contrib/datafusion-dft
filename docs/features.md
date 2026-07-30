@@ -18,6 +18,12 @@ Or for reading the key-value metadata from a file's footer:
 SELECT * FROM parquet_kv_metadata('my_parquet_file.parquet')
 ```
 
+The Arrow schema embedded in the `ARROW:schema` key-value metadata entry (written by Arrow-based writers) can be decoded and printed with one row per field:
+
+```sql
+SELECT * FROM parquet_arrow_schema('my_parquet_file.parquet')
+```
+
 Bloom filter details (presence, location, and size per column chunk) can be inspected with:
 
 ```sql
