@@ -217,6 +217,7 @@ The project uses extensive feature flags to keep binary size manageable:
 - `http` - HTTP server
 - `huggingface` - HuggingFace dataset integration
 - `net` - Query network packet captures (pcap files and live capture) via SQL
+- `websocket` - WebSocket table function for streaming WebSocket messages as rows
 - `udfs-wasm` - WASM UDF support
 - `observability` - Metrics and tracing (required by servers)
 
@@ -316,3 +317,15 @@ When modifying TUI code, ensure proper separation between state management and r
 - CPU-intensive query execution uses dedicated executors
 - FlightSQL tests must run with `--test-threads=1` due to port conflicts
 - All server implementations share the same execution engine
+
+## Documentation Maintenance
+
+The README and `docs/` must stay in sync with the actual project state. Before editing `README.md` or `CLAUDE.md`, reconcile claims against the source of truth:
+
+- **Feature flags**: cross-check against the `[features]` section of the root `Cargo.toml` (and `crates/*/Cargo.toml` for crate-local features). Do not reference features that do not exist, and do not omit installed-by-default features (currently `functions-parquet` and `s3`).
+- **CLI commands and flags**: cross-check against `src/args.rs` (`DftArgs` and the `Command` / `FlightSqlCommand` enums). Verify every `dft ...` example has a matching clap definition.
+- **Docs links**: every `docs/*.md` link in the README Quick Reference table must resolve to an existing file. Do not add links to docs that do not exist.
+- **No time-bound banners**: never add "under construction", "coming soon", or release-date banners to the README. If a section is incomplete, link to the corresponding `docs/` page instead.
+- **No speculative features**: do not advertise features that are not implemented (e.g. "soon Python UDFs"). Only describe features that have a corresponding feature flag and code path.
+
+When adding a new feature, update in one pass: the `[features]` table in `Cargo.toml`, the Feature Flags section of `CLAUDE.md`, `docs/features.md`, the README install examples, and the CI matrix in `.github/workflows/test.yml`.
