@@ -256,8 +256,8 @@ fn parse_server_name_extension(data: &[u8]) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
-    use datafusion::arrow::array::StringArray;
     use super::*;
+    use datafusion::arrow::array::StringArray;
 
     /// Builds a minimal ClientHello record whose only extension is SNI for
     /// `host`
