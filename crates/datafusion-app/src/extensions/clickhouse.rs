@@ -25,6 +25,7 @@ use datafusion_table_providers::sql::db_connection_pool::clickhousepool::ClickHo
 use datafusion_table_providers::util::secrets::to_secret_map;
 use log::info;
 use std::sync::Arc;
+use std::time::Duration;
 
 #[derive(Debug, Default)]
 pub struct ClickHouseExtension {}
@@ -44,14 +45,42 @@ impl Extension for ClickHouseExtension {
     ) -> Result<()> {
         for clickhouse_config in config.clickhouse.iter().flatten() {
             let params = to_secret_map(clickhouse_config.to_params());
-            let pool = ClickHouseConnectionPool::new(params)
-                .await
-                .map_err(|e| DataFusionError::External(Box::new(e)))?;
-            let catalog = ClickHouseCatalogProvider::try_new(
-                Arc::new(pool),
-                clickhouse_config.database.clone(),
-            )
-            .await?;
+            let timeout = Duration::from_secs(clickhouse_config.connect_timeout);
+
+            let pool_fut = ClickHouseConnectionPool::new(params);
+            let pool = if clickhouse_config.connect_timeout == 0 {
+                pool_fut
+                    .await
+                    .map_err(|e| DataFusionError::External(Box::new(e)))?
+            } else {
+                tokio::time::timeout(timeout, pool_fut)
+                    .await
+                    .map_err(|_| {
+                        DataFusionError::Execution(format!(
+                            "Timed out connecting to ClickHouse catalog '{}' at {} after {timeout:?}. \
+                             Is the database reachable?",
+                            clickhouse_config.name, clickhouse_config.url
+                        ))
+                    })?
+                    .map_err(|e| DataFusionError::External(Box::new(e)))?
+            };
+
+            let database = clickhouse_config.database.clone();
+            let catalog_fut = ClickHouseCatalogProvider::try_new(Arc::new(pool), database);
+            let catalog = if clickhouse_config.connect_timeout == 0 {
+                catalog_fut.await?
+            } else {
+                tokio::time::timeout(timeout, catalog_fut)
+                    .await
+                    .map_err(|_| {
+                        DataFusionError::Execution(format!(
+                            "Timed out discovering schemas for ClickHouse catalog '{}' at {} \
+                             after {timeout:?}.",
+                            clickhouse_config.name, clickhouse_config.url
+                        ))
+                    })??
+            };
+
             builder.add_catalog_provider(&clickhouse_config.name, Arc::new(catalog));
             info!(
                 "Registered ClickHouse catalog '{}' for {}",
