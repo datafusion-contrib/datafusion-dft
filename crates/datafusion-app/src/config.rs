@@ -270,6 +270,11 @@ fn default_clickhouse_catalog_name() -> String {
     "clickhouse".to_string()
 }
 
+#[cfg(any(feature = "clickhouse", feature = "mongodb"))]
+fn default_connect_timeout_secs() -> u64 {
+    5
+}
+
 /// Connection details for a ClickHouse instance that is registered as a catalog. All of the
 /// tables from the instance (excluding system tables) are available under the registered catalog
 /// name.
@@ -288,6 +293,10 @@ pub struct ClickHouseConfig {
     pub database: Option<String>,
     /// Compression to use for transport ("lz4" or "none")
     pub compression: Option<String>,
+    /// Maximum number of seconds to wait for a connection (and initial schema discovery) to
+    /// the ClickHouse instance before failing. Set to 0 to disable the timeout.
+    #[serde(default = "default_connect_timeout_secs")]
+    pub connect_timeout: u64,
     /// Additional ClickHouse client settings applied to queries. For example
     /// `output_format_arrow_string_as_string = "1"` returns ClickHouse `String` columns as
     /// Arrow `Utf8` instead of `Binary`.
@@ -346,6 +355,10 @@ pub struct MongoDbConfig {
     /// Limit the catalog to a single MongoDB database. When unset (and no `connection_string` is
     /// provided) all non-system databases are registered as schemas.
     pub database: Option<String>,
+    /// Maximum number of seconds to wait for a connection (and initial schema discovery) to
+    /// the MongoDB instance before failing. Set to 0 to disable the timeout.
+    #[serde(default = "default_connect_timeout_secs")]
+    pub connect_timeout: u64,
     /// Additional connection parameters passed through to the underlying pool, such as
     /// `auth_source`, `srv`, `sslmode`, `unnest_depth` or `schema_infer_max_records`.
     #[serde(default)]
