@@ -29,14 +29,11 @@ use datafusion::error::{DataFusionError, Result};
 use datafusion::logical_expr::Expr;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion::scalar::ScalarValue;
+use parquet::arrow::ARROW_SCHEMA_META_KEY;
 use parquet::file::reader::FileReader;
 use parquet::file::serialized_reader::SerializedFileReader;
 use std::fs::File;
 use std::sync::Arc;
-
-// Same value as `parquet::arrow::ARROW_SCHEMA_META_KEY`, which is unavailable
-// here because this crate builds `parquet` without its `arrow` feature.
-const ARROW_SCHEMA_META_KEY: &str = "ARROW:schema";
 
 #[derive(Debug)]
 struct ParquetArrowSchemaTable {

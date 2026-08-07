@@ -128,6 +128,10 @@ impl ExecutionContext {
             Arc::new(datafusion_functions_parquet::ParquetArrowSchemaFunc {}),
         );
         session_ctx.register_udtf(
+            "parquet_row_groups",
+            Arc::new(datafusion_functions_parquet::ParquetRowGroupsFunc {}),
+        );
+        session_ctx.register_udtf(
             "parquet_bloom_filter",
             Arc::new(datafusion_functions_parquet::ParquetBloomFilterFunc {}),
         );

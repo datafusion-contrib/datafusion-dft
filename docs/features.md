@@ -24,6 +24,13 @@ The Arrow schema embedded in the `ARROW:schema` key-value metadata entry (writte
 SELECT * FROM parquet_arrow_schema('my_parquet_file.parquet')
 ```
 
+The data from specific row groups can be read by passing either a single row group index or an inclusive start and end index:
+
+```sql
+SELECT * FROM parquet_row_groups('my_parquet_file.parquet', 1)
+SELECT * FROM parquet_row_groups('my_parquet_file.parquet', 1, 3)
+```
+
 Bloom filter details (presence, location, and size per column chunk) can be inspected with:
 
 ```sql
