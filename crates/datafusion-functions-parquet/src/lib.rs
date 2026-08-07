@@ -41,10 +41,12 @@ mod arrow_schema;
 mod bloom_filter;
 mod kv_metadata;
 mod page_index;
+mod row_groups;
 pub use arrow_schema::ParquetArrowSchemaFunc;
 pub use bloom_filter::{ParquetBloomFilterCheckFunc, ParquetBloomFilterFunc};
 pub use kv_metadata::ParquetKvMetadataFunc;
 pub use page_index::ParquetPageIndexFunc;
+pub use row_groups::ParquetRowGroupsFunc;
 
 // Copied from https://github.com/apache/datafusion/blob/main/datafusion-cli/src/functions.rs
 /// PARQUET_META table function

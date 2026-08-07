@@ -15,7 +15,7 @@ arrow = { version = "58" }
 async-trait = "0.1.41"
 base64 = "0.22"
 datafusion = { version = "54" }
-parquet = { default-features = false, version = "58.3" }
+parquet = { default-features = false, features = ["arrow"], version = "58.3" }
 
 [dev-dependencies]
 parquet = { features = ["arrow"], version = "58" }
