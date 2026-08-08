@@ -139,6 +139,10 @@ impl ExecutionContext {
             "parquet_bloom_filter_check",
             Arc::new(datafusion_functions_parquet::ParquetBloomFilterCheckFunc {}),
         );
+        session_ctx.register_udtf(
+            "parquet_dictionary",
+            Arc::new(datafusion_functions_parquet::ParquetDictionaryFunc {}),
+        );
 
         #[cfg(feature = "websocket")]
         session_ctx.register_udtf(

@@ -43,6 +43,12 @@ And a column's bloom filter can be probed for a value, returning one row per row
 SELECT * FROM parquet_bloom_filter_check('my_parquet_file.parquet', 'user_id', 'abc123')
 ```
 
+The dictionary for a column can be read with one row per dictionary entry per row group (row groups where the column has no dictionary page produce no rows):
+
+```sql
+SELECT * FROM parquet_dictionary('my_parquet_file.parquet', 'user_id')
+```
+
 ### WASM UDF Functions (`--features=udfs-wasm`)
 
 Adds the ability to register WASM UDFs. Currently two different input types are supported:
