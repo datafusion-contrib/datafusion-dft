@@ -143,6 +143,10 @@ impl ExecutionContext {
             "parquet_dictionary",
             Arc::new(datafusion_functions_parquet::ParquetDictionaryFunc {}),
         );
+        session_ctx.register_udtf(
+            "parquet_compression",
+            Arc::new(datafusion_functions_parquet::ParquetCompressionFunc {}),
+        );
 
         #[cfg(feature = "websocket")]
         session_ctx.register_udtf(

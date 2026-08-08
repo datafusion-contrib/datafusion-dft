@@ -39,12 +39,14 @@ use std::sync::Arc;
 
 mod arrow_schema;
 mod bloom_filter;
+mod compression;
 mod dictionary;
 mod kv_metadata;
 mod page_index;
 mod row_groups;
 pub use arrow_schema::ParquetArrowSchemaFunc;
 pub use bloom_filter::{ParquetBloomFilterCheckFunc, ParquetBloomFilterFunc};
+pub use compression::ParquetCompressionFunc;
 pub use dictionary::ParquetDictionaryFunc;
 pub use kv_metadata::ParquetKvMetadataFunc;
 pub use page_index::ParquetPageIndexFunc;

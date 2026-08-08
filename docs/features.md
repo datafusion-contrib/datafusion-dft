@@ -49,6 +49,12 @@ The dictionary for a column can be read with one row per dictionary entry per ro
 SELECT * FROM parquet_dictionary('my_parquet_file.parquet', 'user_id')
 ```
 
+Compression details can be inspected with one row per column chunk per row group, including the codec, encodings, uncompressed (pre-compression) and compressed (post-compression) sizes, and the compression efficiency as the percentage of space saved:
+
+```sql
+SELECT * FROM parquet_compression('my_parquet_file.parquet')
+```
+
 ### WASM UDF Functions (`--features=udfs-wasm`)
 
 Adds the ability to register WASM UDFs. Currently two different input types are supported:
