@@ -15,13 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use crate::expr_to_string;
 use arrow::array::{BooleanArray, Int64Array, StringArray};
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef};
 use arrow::record_batch::RecordBatch;
 use async_trait::async_trait;
 use datafusion::catalog::Session;
 use datafusion::catalog::TableFunctionImpl;
-use datafusion::common::{plan_err, Column};
+use datafusion::common::plan_err;
 use datafusion::datasource::memory::MemorySourceConfig;
 use datafusion::datasource::TableProvider;
 use datafusion::error::Result;
@@ -65,14 +66,6 @@ impl TableProvider for ParquetBloomFilterTable {
             TableProvider::schema(self),
             projection.cloned(),
         )?)
-    }
-}
-
-fn expr_to_string(expr: Option<&Expr>, func: &str, arg: &str) -> Result<String> {
-    match expr {
-        Some(Expr::Literal(ScalarValue::Utf8(Some(s)), _)) => Ok(s.clone()),
-        Some(Expr::Column(Column { name, .. })) => Ok(name.clone()),
-        _ => plan_err!("{func} requires a string {arg} argument"),
     }
 }
 

@@ -39,11 +39,13 @@ use std::sync::Arc;
 
 mod arrow_schema;
 mod bloom_filter;
+mod dictionary;
 mod kv_metadata;
 mod page_index;
 mod row_groups;
 pub use arrow_schema::ParquetArrowSchemaFunc;
 pub use bloom_filter::{ParquetBloomFilterCheckFunc, ParquetBloomFilterFunc};
+pub use dictionary::ParquetDictionaryFunc;
 pub use kv_metadata::ParquetKvMetadataFunc;
 pub use page_index::ParquetPageIndexFunc;
 pub use row_groups::ParquetRowGroupsFunc;
@@ -126,6 +128,16 @@ fn convert_parquet_statistics(
             val.min_opt().map(|v| v.to_string()),
             val.max_opt().map(|v| v.to_string()),
         ),
+    }
+}
+
+/// Extract a string argument from a table function expression, accepting
+/// either a single-quoted literal or a double-quoted (column) identifier
+fn expr_to_string(expr: Option<&Expr>, func: &str, arg: &str) -> Result<String> {
+    match expr {
+        Some(Expr::Literal(ScalarValue::Utf8(Some(s)), _)) => Ok(s.clone()),
+        Some(Expr::Column(Column { name, .. })) => Ok(name.clone()),
+        _ => plan_err!("{func} requires a string {arg} argument"),
     }
 }
 
