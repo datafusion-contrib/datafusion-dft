@@ -115,6 +115,7 @@ cargo test --features=net extension_cases::net  # Requires libpcap (libpcap-dev 
 # Run tests for specific crates
 cargo test --manifest-path crates/datafusion-app/Cargo.toml --all-features
 cargo test --manifest-path crates/datafusion-functions-parquet/Cargo.toml
+cargo test --manifest-path crates/datafusion-functions-arrow/Cargo.toml
 cargo test --manifest-path crates/datafusion-udfs-wasm/Cargo.toml
 cargo test --manifest-path crates/datafusion-net/Cargo.toml --all-features
 
@@ -168,6 +169,8 @@ The project is organized as a workspace with multiple crates:
 
 - **`crates/datafusion-functions-parquet`**: Parquet-specific UDFs
 
+- **`crates/datafusion-functions-arrow`**: Arrow IPC file inspection table functions
+
 - **`crates/datafusion-udfs-wasm`**: WASM-based UDF support
 
 - **`crates/datafusion-net`**: Network packet capture querying — `pcap` (capture files), `capture` (live capture), `interfaces` (list capture devices), and `tcp_conversations` (per-connection TCP flow analytics) table functions (`capture`/`interfaces` behind its `live` feature); the `reverse_dns` (IP → hostname via PTR lookup) and `geoip` (IP → location via MaxMind `.mmdb` database) scalar UDFs; the `dns_query` and `tls_sni` payload-decoding scalar UDFs; and `pcap_wide` / `capture_wide` variants that append DNS and geolocation enrichment columns
@@ -208,6 +211,7 @@ The project uses extensive feature flags to keep binary size manageable:
 - `tui` - Terminal user interface (ratatui-based)
 - `s3` - S3 object store integration (default)
 - `functions-parquet` - Parquet-specific functions (default)
+- `functions-arrow` - Arrow IPC file inspection functions
 - `functions-json` - JSON functions
 - `clickhouse` - Register ClickHouse instances as catalogs
 - `mongodb` - Register MongoDB instances as catalogs

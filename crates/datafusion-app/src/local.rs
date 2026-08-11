@@ -148,6 +148,30 @@ impl ExecutionContext {
             Arc::new(datafusion_functions_parquet::ParquetCompressionFunc {}),
         );
 
+        #[cfg(feature = "functions-arrow")]
+        {
+            session_ctx.register_udtf(
+                "arrow_schema",
+                Arc::new(datafusion_functions_arrow::ArrowSchemaFunc {}),
+            );
+            session_ctx.register_udtf(
+                "arrow_metadata",
+                Arc::new(datafusion_functions_arrow::ArrowMetadataFunc {}),
+            );
+            session_ctx.register_udtf(
+                "arrow_batches",
+                Arc::new(datafusion_functions_arrow::ArrowBatchesFunc {}),
+            );
+            session_ctx.register_udtf(
+                "arrow_dictionaries",
+                Arc::new(datafusion_functions_arrow::ArrowDictionariesFunc {}),
+            );
+            session_ctx.register_udtf(
+                "arrow_file_metadata",
+                Arc::new(datafusion_functions_arrow::ArrowFileMetadataFunc {}),
+            );
+        }
+
         #[cfg(feature = "websocket")]
         session_ctx.register_udtf(
             "websocket",

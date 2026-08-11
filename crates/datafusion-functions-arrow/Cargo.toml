@@ -1,0 +1,22 @@
+[package]
+authors = ["Matthew Turner <matthew.m.turner@outlook.com>"]
+description = "DataFusion helper functions for working with Arrow IPC files"
+edition = "2021"
+homepage = "https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-functions-arrow"
+keywords = ["arrow", "datafusion", "ipc", "query", "sql"]
+license = "Apache-2.0"
+name = "datafusion-functions-arrow"
+readme = "README.md"
+repository = "https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-functions-arrow"
+version = "0.1.0"
+
+[dependencies]
+arrow = { version = "58" }
+async-trait = "0.1.41"
+datafusion = { version = "54" }
+flatbuffers = { default-features = false, version = "25.2.10" }
+
+[dev-dependencies]
+arrow = { features = ["ipc_compression"], version = "58" }
+tempfile = "3"
+tokio = { features = ["macros", "rt"], version = "1" }

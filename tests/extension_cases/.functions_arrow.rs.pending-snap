@@ -1,0 +1,9 @@
+{"run_id":"1786486663-399979180","line":138,"new":{"module_name":"r#mod__extension_cases__functions_arrow","snapshot_name":"arrow_batches","metadata":{"source":"tests/extension_cases/functions_arrow.rs","assertion_line":138,"expression":"actual"},"snapshot":"- +-------------+----------+-------------------+\n- \"| batch_index | num_rows | compression_codec |\"\n- +-------------+----------+-------------------+\n- \"| 0           | 2        |                   |\"\n- \"| 1           | 2        |                   |\"\n- +-------------+----------+-------------------+"},"old":{"module_name":"r#mod__extension_cases__functions_arrow","metadata":{},"snapshot":"- +-------------+----------+-------------------+\"\n- \"| batch_index | num_rows | compression_codec |\"\n- +-------------+----------+-------------------+\"\n- \"| 0           | 2        |                   |\"\n- \"| 1           | 2        |                   |\"\n- +-------------+----------+-------------------+\""}}
+{"run_id":"1786486676-692375986","line":138,"new":null,"old":null}
+{"run_id":"1786486676-692375986","line":65,"new":null,"old":null}
+{"run_id":"1786486676-692375986","line":89,"new":null,"old":null}
+{"run_id":"1786486676-692375986","line":114,"new":null,"old":null}
+{"run_id":"1786486983-207504457","line":114,"new":null,"old":null}
+{"run_id":"1786486983-207504457","line":89,"new":null,"old":null}
+{"run_id":"1786486983-207504457","line":138,"new":null,"old":null}
+{"run_id":"1786486983-207504457","line":65,"new":null,"old":null}
