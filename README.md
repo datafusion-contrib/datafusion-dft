@@ -56,6 +56,9 @@ cargo install datafusion-dft --features=deltalake
 # With JSON and Parquet functions
 cargo install datafusion-dft --features=functions-json,functions-parquet
 
+# With Arrow IPC file inspection functions
+cargo install datafusion-dft --features=functions-arrow
+
 # With the websocket table function for streaming WebSocket messages
 cargo install datafusion-dft --features=websocket
 

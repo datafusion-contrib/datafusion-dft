@@ -107,6 +107,7 @@ flightsql = [
   "dep:tower-http",
   "dep:uuid",
 ]
+functions-arrow = ["datafusion-app/functions-arrow"]
 functions-json = ["datafusion-app/functions-json"]
 functions-parquet = ["datafusion-app/functions-parquet"]
 http = [

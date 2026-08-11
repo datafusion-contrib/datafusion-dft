@@ -2640,6 +2640,7 @@ dependencies = [
  "base64 0.22.1",
  "color-eyre",
  "datafusion",
+ "datafusion-functions-arrow",
  "datafusion-functions-json",
  "datafusion-functions-parquet",
  "datafusion-net",
@@ -3079,6 +3080,16 @@ dependencies = [
  "datafusion-common",
  "datafusion-expr-common",
  "datafusion-physical-expr-common",
+]
+
+[[package]]
+name = "datafusion-functions-arrow"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "async-trait",
+ "datafusion",
+ "flatbuffers",
 ]
 
 [[package]]

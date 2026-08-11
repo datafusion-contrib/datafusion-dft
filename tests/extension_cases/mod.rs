@@ -27,6 +27,8 @@ mod clickhouse;
 mod deltalake;
 #[cfg(feature = "flightsql")]
 mod flightsql;
+#[cfg(feature = "functions-arrow")]
+mod functions_arrow;
 #[cfg(feature = "functions-json")]
 mod functions_json;
 #[cfg(feature = "huggingface")]

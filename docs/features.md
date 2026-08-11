@@ -55,6 +55,40 @@ Compression details can be inspected with one row per column chunk per row group
 SELECT * FROM parquet_compression('my_parquet_file.parquet')
 ```
 
+### Arrow Functions (`--features=functions-arrow`)
+
+Includes functions from [datafusion-functions-arrow] for inspecting Arrow IPC files (the Arrow "file format", also used by Feather V2) in `dft`.
+
+The file's schema can be inspected with one row per top-level field:
+
+```sql
+SELECT * FROM arrow_schema('my_arrow_file.arrow')
+```
+
+The custom key-value metadata stored in the file's footer can be read with:
+
+```sql
+SELECT * FROM arrow_metadata('my_arrow_file.arrow')
+```
+
+Details on each record batch block (file offset, metadata and body sizes, row count, and compression codec) can be inspected with:
+
+```sql
+SELECT * FROM arrow_batches('my_arrow_file.arrow')
+```
+
+Details on each dictionary block (dictionary id, delta flag, offset, sizes, and entry count) can be inspected with:
+
+```sql
+SELECT * FROM arrow_dictionaries('my_arrow_file.arrow')
+```
+
+And a single-row file summary (IPC metadata version, batch and dictionary counts, total rows, and total body bytes) can be read with:
+
+```sql
+SELECT * FROM arrow_file_metadata('my_arrow_file.arrow')
+```
+
 ### WASM UDF Functions (`--features=udfs-wasm`)
 
 Adds the ability to register WASM UDFs. Currently two different input types are supported:
@@ -307,6 +341,7 @@ select * from foo where json_get(attributes, 'bar')::string='ham'
 ```
 
 [datafusion-function-json]: https://github.com/datafusion-contrib/datafusion-functions-json
+[datafusion-functions-arrow]: https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-functions-arrow
 
 ### HuggingFace (`--features=huggingface`)
 
