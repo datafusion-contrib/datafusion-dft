@@ -55,6 +55,25 @@ Compression details can be inspected with one row per column chunk per row group
 SELECT * FROM parquet_compression('my_parquet_file.parquet')
 ```
 
+The physical page layout can be inspected with one row per page (dictionary and data pages), including the page type, encoding, value counts, and sizes. An optional column name restricts the output to a single column. The `offset`, `compressed_page_size`, and `first_row_index` columns come from the offset index and are null for files written without a page index:
+
+```sql
+SELECT * FROM parquet_pages('my_parquet_file.parquet')
+SELECT * FROM parquet_pages('my_parquet_file.parquet', 'user_id')
+```
+
+The raw Parquet schema tree (as opposed to the embedded Arrow schema shown by `parquet_arrow_schema`) can be inspected with one row per schema node in depth-first order, including each node's repetition, physical/logical/converted type, field id, and, for leaf columns, the maximum definition and repetition levels:
+
+```sql
+SELECT * FROM parquet_schema('my_parquet_file.parquet')
+```
+
+And a single-row file summary (writer and format version, row/row group/column counts, file and footer sizes, total compressed and uncompressed data sizes, and whether the file has column statistics, a page index, or bloom filters) can be read with:
+
+```sql
+SELECT * FROM parquet_file_metadata('my_parquet_file.parquet')
+```
+
 ### Arrow Functions (`--features=functions-arrow`)
 
 Includes functions from [datafusion-functions-arrow] for inspecting Arrow IPC files (the Arrow "file format", also used by Feather V2) in `dft`.
@@ -75,6 +94,13 @@ Details on each record batch block (file offset, metadata and body sizes, row co
 
 ```sql
 SELECT * FROM arrow_batches('my_arrow_file.arrow')
+```
+
+The data from specific record batches can be read by passing either a single batch index or an inclusive start and end index (the indexes match the `batch_index` column of `arrow_batches`):
+
+```sql
+SELECT * FROM arrow_batch('my_arrow_file.arrow', 1)
+SELECT * FROM arrow_batch('my_arrow_file.arrow', 1, 3)
 ```
 
 Details on each dictionary block (dictionary id, delta flag, offset, sizes, and entry count) can be inspected with:

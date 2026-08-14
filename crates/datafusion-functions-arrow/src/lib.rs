@@ -15,12 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
+mod batch;
 mod batches;
 mod dictionaries;
 mod file_metadata;
 mod metadata;
 mod schema;
 
+pub use batch::ArrowBatchFunc;
 pub use batches::ArrowBatchesFunc;
 pub use dictionaries::ArrowDictionariesFunc;
 pub use file_metadata::ArrowFileMetadataFunc;

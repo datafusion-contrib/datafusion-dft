@@ -120,6 +120,31 @@ async fn test_arrow_metadata() {
     "###);
 }
 
+/// Ensure the arrow batch function is registered and reads specific batches
+#[tokio::test(flavor = "multi_thread")]
+async fn test_arrow_batch() {
+    let execution = TestExecution::new().await;
+
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("test.arrow");
+    write_ipc(&path);
+
+    let sql = format!(
+        "SELECT id, name FROM arrow_batch('{}', 1) ORDER BY id",
+        path.display()
+    );
+    let actual = execution.run_and_format(&sql).await;
+
+    insta::assert_yaml_snapshot!(actual, @r###"
+    - +----+------+
+    - "| id | name |"
+    - +----+------+
+    - "| 2  | a    |"
+    - "| 3  | b    |"
+    - +----+------+
+    "###);
+}
+
 /// Ensure the arrow batches function is registered and returns one row per batch
 #[tokio::test(flavor = "multi_thread")]
 async fn test_arrow_batches() {
