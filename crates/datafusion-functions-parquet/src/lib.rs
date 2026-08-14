@@ -41,16 +41,22 @@ mod arrow_schema;
 mod bloom_filter;
 mod compression;
 mod dictionary;
+mod file_metadata;
 mod kv_metadata;
 mod page_index;
+mod pages;
 mod row_groups;
+mod schema;
 pub use arrow_schema::ParquetArrowSchemaFunc;
 pub use bloom_filter::{ParquetBloomFilterCheckFunc, ParquetBloomFilterFunc};
 pub use compression::ParquetCompressionFunc;
 pub use dictionary::ParquetDictionaryFunc;
+pub use file_metadata::ParquetFileMetadataFunc;
 pub use kv_metadata::ParquetKvMetadataFunc;
 pub use page_index::ParquetPageIndexFunc;
+pub use pages::ParquetPagesFunc;
 pub use row_groups::ParquetRowGroupsFunc;
+pub use schema::ParquetSchemaFunc;
 
 // Copied from https://github.com/apache/datafusion/blob/main/datafusion-cli/src/functions.rs
 /// PARQUET_META table function

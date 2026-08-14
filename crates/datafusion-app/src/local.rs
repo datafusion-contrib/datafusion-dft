@@ -147,6 +147,18 @@ impl ExecutionContext {
             "parquet_compression",
             Arc::new(datafusion_functions_parquet::ParquetCompressionFunc {}),
         );
+        session_ctx.register_udtf(
+            "parquet_pages",
+            Arc::new(datafusion_functions_parquet::ParquetPagesFunc {}),
+        );
+        session_ctx.register_udtf(
+            "parquet_schema",
+            Arc::new(datafusion_functions_parquet::ParquetSchemaFunc {}),
+        );
+        session_ctx.register_udtf(
+            "parquet_file_metadata",
+            Arc::new(datafusion_functions_parquet::ParquetFileMetadataFunc {}),
+        );
 
         #[cfg(feature = "functions-arrow")]
         {
@@ -169,6 +181,10 @@ impl ExecutionContext {
             session_ctx.register_udtf(
                 "arrow_file_metadata",
                 Arc::new(datafusion_functions_arrow::ArrowFileMetadataFunc {}),
+            );
+            session_ctx.register_udtf(
+                "arrow_batch",
+                Arc::new(datafusion_functions_arrow::ArrowBatchFunc {}),
             );
         }
 
