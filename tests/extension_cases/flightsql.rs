@@ -1671,13 +1671,10 @@ pub async fn test_analyze_raw_metrics_schema() {
         output.contains("operator_category"),
         "Should contain operator_category column"
     );
+    assert!(output.contains("node_id"), "Should contain node_id column");
     assert!(
-        output.contains("operator_parent"),
-        "Should contain operator_parent column"
-    );
-    assert!(
-        output.contains("operator_index"),
-        "Should contain operator_index column"
+        output.contains("parent_node_id"),
+        "Should contain parent_node_id column"
     );
 
     fixture.shutdown_and_wait().await;
@@ -1912,13 +1909,10 @@ pub async fn test_analyze_operator_hierarchy() {
     let output = String::from_utf8_lossy(&assert.get_output().stdout);
 
     // Verify the schema includes hierarchy fields
+    assert!(output.contains("node_id"), "Should contain node_id column");
     assert!(
-        output.contains("operator_parent"),
-        "Should contain operator_parent column"
-    );
-    assert!(
-        output.contains("operator_index"),
-        "Should contain operator_index column"
+        output.contains("parent_node_id"),
+        "Should contain parent_node_id column"
     );
 
     // Verify we have a complex execution plan with multiple operators
@@ -1953,13 +1947,20 @@ pub async fn test_analyze_operator_hierarchy() {
         "Should contain operator names in output"
     );
 
-    // Verify we have hierarchy data present (parent and index columns are populated)
-    // Note: Detailed validation of parent-child relationships is difficult with CLI table output
-    // and would require parsing the Arrow RecordBatch directly
-
-    // Note: The exact hierarchy validation is difficult with CLI table output
-    // The important thing is that the schema has the fields and operators are tracked
-    // A more thorough validation would require parsing the Arrow RecordBatch directly
+    // A GROUP BY plans two AggregateExec nodes (partial + final). With
+    // node-id based identity they must appear as distinct nodes, not be
+    // merged under one operator name. Extract the node_id column (7th field
+    // in the pretty-printed table) for every AggregateExec row.
+    let agg_node_ids: std::collections::HashSet<String> = output
+        .lines()
+        .filter(|l| l.contains("AggregateExec"))
+        .filter_map(|l| l.split('|').map(str::trim).nth(7).map(str::to_string))
+        .collect();
+    assert!(
+        agg_node_ids.len() >= 2,
+        "Partial and final AggregateExec should have distinct node ids, got: {:?}",
+        agg_node_ids
+    );
 
     fixture.shutdown_and_wait().await;
 }
@@ -2018,13 +2019,10 @@ pub async fn test_analyze_operator_hierarchy_with_csv() {
     let output = String::from_utf8_lossy(&assert.get_output().stdout);
 
     // Verify the schema includes hierarchy fields
+    assert!(output.contains("node_id"), "Should contain node_id column");
     assert!(
-        output.contains("operator_parent"),
-        "Should contain operator_parent column"
-    );
-    assert!(
-        output.contains("operator_index"),
-        "Should contain operator_index column"
+        output.contains("parent_node_id"),
+        "Should contain parent_node_id column"
     );
 
     // Verify we have expected operators from the complex query
@@ -2053,12 +2051,14 @@ pub async fn test_analyze_operator_hierarchy_with_csv() {
     );
 
     // Verify we have I/O metrics with correct CSV namespace
-    // Note: CSV files may not report I/O metrics when registered as tables
-    // (metrics are primarily collected when reading from file paths)
-    let has_csv_metrics = output.contains("io.csv.");
-    if !has_csv_metrics {
-        eprintln!("Note: No io.csv.* metrics found (may be expected for registered tables)");
-    }
+    assert!(
+        output.contains("io.csv."),
+        "Should contain io.csv.* metrics for a CSV scan"
+    );
+    assert!(
+        output.contains("io.csv.time_scanning"),
+        "Should contain io.csv.time_scanning metric"
+    );
 
     // Verify stage metrics with namespacing
     assert!(
@@ -2121,36 +2121,34 @@ pub async fn test_analyze_io_metrics_parquet_namespace() {
     let output = String::from_utf8_lossy(&assert.get_output().stdout);
 
     // Verify schema
+    assert!(output.contains("node_id"), "Should contain node_id column");
     assert!(
-        output.contains("operator_parent"),
-        "Should contain operator_parent column"
-    );
-    assert!(
-        output.contains("operator_index"),
-        "Should contain operator_index column"
+        output.contains("parent_node_id"),
+        "Should contain parent_node_id column"
     );
 
-    // Verify Parquet-specific namespace is used IF I/O metrics are present
-    // Note: I/O metrics may not be reported for small datasets or registered tables
-    if output.contains("io.") {
-        assert!(
-            output.contains("io.parquet."),
-            "If I/O metrics present, should use io.parquet.* namespace for Parquet files"
-        );
-        // Verify no other format namespaces are used
-        assert!(
-            !output.contains("io.csv."),
-            "Should NOT use io.csv.* namespace for Parquet files"
-        );
-        assert!(
-            !output.contains("io.json."),
-            "Should NOT use io.json.* namespace for Parquet files"
-        );
-    } else {
-        eprintln!(
-            "Note: No I/O metrics reported (expected for small datasets or registered tables)"
-        );
-    }
+    // Verify Parquet-specific I/O metrics are present with the right namespace
+    assert!(
+        output.contains("io.parquet.bytes_scanned"),
+        "Should contain io.parquet.bytes_scanned for a Parquet scan"
+    );
+    assert!(
+        output.contains("io.parquet.rg_pruned"),
+        "Should contain io.parquet.rg_pruned for a Parquet scan"
+    );
+    assert!(
+        output.contains("io.parquet.rg_matched"),
+        "Should contain io.parquet.rg_matched for a Parquet scan"
+    );
+    // Verify no other format namespaces are used
+    assert!(
+        !output.contains("io.csv."),
+        "Should NOT use io.csv.* namespace for Parquet files"
+    );
+    assert!(
+        !output.contains("io.json."),
+        "Should NOT use io.json.* namespace for Parquet files"
+    );
 
     // Verify compute metrics are always present
     assert!(
@@ -2205,36 +2203,26 @@ pub async fn test_analyze_io_metrics_json_namespace() {
     let output = String::from_utf8_lossy(&assert.get_output().stdout);
 
     // Verify schema
+    assert!(output.contains("node_id"), "Should contain node_id column");
     assert!(
-        output.contains("operator_parent"),
-        "Should contain operator_parent column"
-    );
-    assert!(
-        output.contains("operator_index"),
-        "Should contain operator_index column"
+        output.contains("parent_node_id"),
+        "Should contain parent_node_id column"
     );
 
-    // Verify JSON-specific namespace is used IF I/O metrics are present
-    // Note: I/O metrics may not be reported for small datasets or registered tables
-    if output.contains("io.") {
-        assert!(
-            output.contains("io.json."),
-            "If I/O metrics present, should use io.json.* namespace for JSON files"
-        );
-        // Verify no other format namespaces are used
-        assert!(
-            !output.contains("io.csv."),
-            "Should NOT use io.csv.* namespace for JSON files"
-        );
-        assert!(
-            !output.contains("io.parquet."),
-            "Should NOT use io.parquet.* namespace for JSON files"
-        );
-    } else {
-        eprintln!(
-            "Note: No I/O metrics reported (expected for small datasets or registered tables)"
-        );
-    }
+    // Verify JSON-specific I/O metrics are present with the right namespace
+    assert!(
+        output.contains("io.json."),
+        "Should contain io.json.* metrics for a JSON scan"
+    );
+    // Verify no other format namespaces are used
+    assert!(
+        !output.contains("io.csv."),
+        "Should NOT use io.csv.* namespace for JSON files"
+    );
+    assert!(
+        !output.contains("io.parquet."),
+        "Should NOT use io.parquet.* namespace for JSON files"
+    );
 
     // Verify compute metrics are always present
     assert!(
@@ -2290,40 +2278,30 @@ pub async fn test_analyze_io_metrics_arrow_namespace() {
     let output = String::from_utf8_lossy(&assert.get_output().stdout);
 
     // Verify schema
+    assert!(output.contains("node_id"), "Should contain node_id column");
     assert!(
-        output.contains("operator_parent"),
-        "Should contain operator_parent column"
-    );
-    assert!(
-        output.contains("operator_index"),
-        "Should contain operator_index column"
+        output.contains("parent_node_id"),
+        "Should contain parent_node_id column"
     );
 
-    // Verify Arrow-specific namespace is used IF I/O metrics are present
-    // Note: I/O metrics may not be reported for small datasets or registered tables
-    if output.contains("io.") {
-        assert!(
-            output.contains("io.arrow."),
-            "If I/O metrics present, should use io.arrow.* namespace for Arrow files"
-        );
-        // Verify no other format namespaces are used
-        assert!(
-            !output.contains("io.csv."),
-            "Should NOT use io.csv.* namespace for Arrow files"
-        );
-        assert!(
-            !output.contains("io.parquet."),
-            "Should NOT use io.parquet.* namespace for Arrow files"
-        );
-        assert!(
-            !output.contains("io.json."),
-            "Should NOT use io.json.* namespace for Arrow files"
-        );
-    } else {
-        eprintln!(
-            "Note: No I/O metrics reported (expected for small datasets or registered tables)"
-        );
-    }
+    // Verify Arrow-specific I/O metrics are present with the right namespace
+    assert!(
+        output.contains("io.arrow."),
+        "Should contain io.arrow.* metrics for an Arrow scan"
+    );
+    // Verify no other format namespaces are used
+    assert!(
+        !output.contains("io.csv."),
+        "Should NOT use io.csv.* namespace for Arrow files"
+    );
+    assert!(
+        !output.contains("io.parquet."),
+        "Should NOT use io.parquet.* namespace for Arrow files"
+    );
+    assert!(
+        !output.contains("io.json."),
+        "Should NOT use io.json.* namespace for Arrow files"
+    );
 
     // Verify compute metrics are always present
     assert!(
