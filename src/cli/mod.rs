@@ -257,15 +257,11 @@ impl CliApp {
 
             // Analyze cases
             (false, true, _, false, true) => {
-                if self.args.files.len() > 1 {
-                    return Err(eyre!("Analyze requires exactly one file"));
-                }
+                self.validate_analyze_target()?;
                 self.analyze_files(&self.args.files).await
             }
             (true, false, _, false, true) => {
-                if self.args.commands.len() > 1 {
-                    return Err(eyre!("Analyze requires exactly one command"));
-                }
+                self.validate_analyze_target()?;
                 self.analyze_commands(&self.args.commands).await
             }
         }
@@ -316,30 +312,33 @@ impl CliApp {
 
             // Analyze cases
             (true, false, false, false, true) => {
-                if self.args.commands.len() > 1 {
-                    return Err(eyre!("Analyze requires exactly one command"));
-                }
+                self.validate_analyze_target()?;
                 self.analyze_commands(&self.args.commands).await
             }
             (false, true, false, false, true) => {
-                if self.args.files.len() > 1 {
-                    return Err(eyre!("Analyze requires exactly one file"));
-                }
+                self.validate_analyze_target()?;
                 self.analyze_files(&self.args.files).await
             }
             (true, false, true, false, true) => {
-                if self.args.commands.len() > 1 {
-                    return Err(eyre!("Analyze requires exactly one command"));
-                }
+                self.validate_analyze_target()?;
                 self.flightsql_analyze_commands(&self.args.commands).await
             }
             (false, true, true, false, true) => {
-                if self.args.files.len() > 1 {
-                    return Err(eyre!("Analyze requires exactly one file"));
-                }
+                self.validate_analyze_target()?;
                 self.flightsql_analyze_files(&self.args.files).await
             }
         }
+    }
+
+    /// Analyze accepts exactly one file or exactly one command
+    fn validate_analyze_target(&self) -> Result<()> {
+        if self.args.files.len() > 1 {
+            return Err(eyre!("Analyze requires exactly one file"));
+        }
+        if self.args.commands.len() > 1 {
+            return Err(eyre!("Analyze requires exactly one command"));
+        }
+        Ok(())
     }
 
     async fn execute_files(&self, files: &[PathBuf]) -> Result<()> {
@@ -368,6 +367,12 @@ impl CliApp {
     }
 
     async fn analyze_files(&self, files: &[PathBuf]) -> Result<()> {
+        if let Some(run_before_query) = &self.args.run_before {
+            self.app_execution
+                .execution_ctx()
+                .execute_sql_and_discard_results(run_before_query)
+                .await?;
+        }
         info!("Analyzing files: {:?}", files);
         for file in files {
             let query = std::fs::read_to_string(file)?;
@@ -510,6 +515,12 @@ impl CliApp {
     }
 
     async fn analyze_commands(&self, commands: &[String]) -> color_eyre::Result<()> {
+        if let Some(run_before_query) = &self.args.run_before {
+            self.app_execution
+                .execution_ctx()
+                .execute_sql_and_discard_results(run_before_query)
+                .await?;
+        }
         info!("Analyzing commands: {:?}", commands);
         for command in commands {
             self.analyze_from_string(command).await?;
@@ -619,7 +630,6 @@ impl CliApp {
         Ok(())
     }
 
-    #[cfg(feature = "flightsql")]
     fn print_batch(&self, batch: &datafusion::arrow::array::RecordBatch) -> Result<()> {
         use datafusion::arrow::util::pretty::print_batches;
         print_batches(std::slice::from_ref(batch))?;
@@ -702,7 +712,23 @@ impl CliApp {
             .analyze_query(sql)
             .await?;
         stats.collect_stats();
-        println!("{}", stats);
+        if self.args.analyze_raw {
+            // Raw mode: print or write the metrics table directly
+            let metrics_batch = stats.to_metrics_table()?;
+            if let Some(output_path) = &self.args.output {
+                let schema = metrics_batch.schema();
+                let mut writer = path_to_writer(output_path, schema)?;
+                writer.write(&metrics_batch)?;
+                writer.close().await?;
+            } else {
+                println!("==================== Query ====================");
+                println!("{}", sql);
+                println!("\n==================== Metrics ====================");
+                self.print_batch(&metrics_batch)?;
+            }
+        } else {
+            println!("{}", stats);
+        }
         Ok(())
     }
 
