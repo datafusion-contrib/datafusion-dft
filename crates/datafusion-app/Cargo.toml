@@ -37,7 +37,7 @@ opendal = { features = [
 parking_lot = "0.12.3"
 prost = { optional = true, version = "0.14" }
 serde = { features = ["derive"], version = "1.0.197" }
-serde_json = "1.0"
+serde_json = { optional = true, version = "1.0" }
 tokio = { features = ["macros", "rt-multi-thread"], version = "1.36.0" }
 tokio-metrics = { features = [
   "metrics-rs-integration",
@@ -49,11 +49,18 @@ vortex-datafusion = { optional = true, version = "0.58" }
 
 [dev-dependencies]
 criterion = { features = ["async_tokio"], version = "0.5.1" }
+tempfile = "3"
 
 [features]
 default = ["functions-parquet"]
 deltalake = ["dep:deltalake"]
-flightsql = ["dep:arrow-flight", "dep:base64", "dep:prost", "dep:tonic"]
+flightsql = [
+  "dep:arrow-flight",
+  "dep:base64",
+  "dep:prost",
+  "dep:serde_json",
+  "dep:tonic",
+]
 functions-json = ["dep:datafusion-functions-json"]
 functions-parquet = ["dep:datafusion-functions-parquet"]
 huggingface = ["object_store_opendal", "opendal", "url"]
