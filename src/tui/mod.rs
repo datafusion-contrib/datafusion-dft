@@ -17,12 +17,14 @@
 
 pub mod execution;
 pub mod handlers;
+mod pagination;
 pub mod state;
 pub mod ui;
 
+pub use pagination::{extract_page, has_sufficient_rows, page_row_range, PAGE_SIZE};
+
 use color_eyre::eyre::eyre;
 use color_eyre::Result;
-use crossterm::event as ct;
 use datafusion_app::config::merge_configs;
 use datafusion_app::extensions::DftSessionStateBuilder;
 use datafusion_app::local::ExecutionContext;
@@ -70,6 +72,7 @@ pub enum AppEvent {
     // Query Execution
     NewExecution,
     ExecutionResultsNextBatch(ExecutionResultsBatch),
+    ExecutionResultsNextPage,
     ExecutionResultsPreviousPage,
     ExecutionResultsError(ExecutionError),
     // FlightSQL
@@ -237,7 +240,7 @@ impl<'app> App<'app> {
         let _event_tx = self.event_tx();
 
         self.task = tokio::spawn(async move {
-            let mut reader = ct::EventStream::new();
+            let mut reader = crossterm::event::EventStream::new();
             let mut render_interval = tokio::time::interval(render_delay);
             debug!("Render interval: {:?}", render_interval);
             _event_tx.send(AppEvent::Init).unwrap();
@@ -386,14 +389,38 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
 
     #[cfg(feature = "flightsql")]
     {
+        use crate::args::parse_headers_file;
         use datafusion_app::config::FlightSQLConfig;
         use datafusion_app::flightsql::FlightSQLContext;
+
+        // Merge headers: config < file (CLI headers are merged later in the handler)
+        let mut all_headers = config.flightsql_client.headers.clone();
+
+        // Load headers from file if specified in config or CLI args
+        let headers_file = cli
+            .headers_file
+            .as_ref()
+            .or(config.flightsql_client.headers_file.as_ref());
+
+        if let Some(file_path) = headers_file {
+            match parse_headers_file(file_path) {
+                Ok(file_headers) => {
+                    all_headers.extend(file_headers);
+                }
+                Err(e) => {
+                    // TUI silently logs file errors to avoid disrupting UI
+                    error!("Error reading headers file: {}", e);
+                }
+            }
+        }
 
         let flightsql_config = FlightSQLConfig::new(
             config.flightsql_client.connection_url.clone(),
             config.flightsql_client.benchmark_iterations,
             config.flightsql_client.auth.clone(),
-            config.flightsql_client.headers.clone(),
+            all_headers,
+            config.flightsql_client.max_decoding_message_size,
+            config.flightsql_client.max_encoding_message_size,
         );
         app_execution.with_flightsql_ctx(FlightSQLContext::new(flightsql_config));
     }

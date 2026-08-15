@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::{any::Any, collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use async_trait::async_trait;
 use datafusion::{
@@ -137,10 +137,6 @@ impl MapTable {
 
 #[async_trait]
 impl TableProvider for MapTable {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
     fn schema(&self) -> SchemaRef {
         Arc::clone(&self.schema)
     }
@@ -180,7 +176,7 @@ struct MapExec {
     projected_schema: SchemaRef,
     // Sort information: one or more equivalent orderings
     _sort_information: Vec<LexOrdering>,
-    cache: PlanProperties,
+    cache: Arc<PlanProperties>,
 }
 
 impl MapExec {
@@ -210,14 +206,14 @@ impl MapExec {
         orderings: &[LexOrdering],
         constraints: Constraints,
         partitions: &[Vec<RecordBatch>],
-    ) -> PlanProperties {
-        PlanProperties::new(
+    ) -> Arc<PlanProperties> {
+        Arc::new(PlanProperties::new(
             EquivalenceProperties::new_with_orderings(schema, orderings.iter().cloned())
                 .with_constraints(constraints),
             Partitioning::UnknownPartitioning(partitions.len()),
             EmissionType::Incremental,
             Boundedness::Bounded,
-        )
+        ))
     }
 }
 
@@ -249,11 +245,7 @@ impl ExecutionPlan for MapExec {
         "MapExec"
     }
 
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn properties(&self) -> &PlanProperties {
+    fn properties(&self) -> &Arc<PlanProperties> {
         &self.cache
     }
 
@@ -531,18 +523,16 @@ mod test {
             .unwrap();
 
         let expected = [
-             "+---------------+--------------------------------------------------------------------------+",
-    "| plan_type     | plan                                                                     |",
-    "+---------------+--------------------------------------------------------------------------+",
-    "| logical_plan  | Filter: test.id = Int32(2)                                               |",
-    "|               |   TableScan: test projection=[id, val]                                   |",
-    "| physical_plan | CoalesceBatchesExec: target_batch_size=8192                              |",
-    "|               |   FilterExec: id@0 = 2                                                   |",
-    "|               |     RepartitionExec: partitioning=RoundRobinBatch(4), input_partitions=1 |",
-    "|               |       CooperativeExec                                                    |",
-    "|               |         MapExec: partitions=1, projection=Some([0, 1])                   |",
-    "|               |                                                                          |",
-    "+---------------+--------------------------------------------------------------------------+",
+            "+---------------+------------------------------------------------------------------------+",
+            "| plan_type     | plan                                                                   |",
+            "+---------------+------------------------------------------------------------------------+",
+            "| logical_plan  | Filter: test.id = Int32(2)                                             |",
+            "|               |   TableScan: test projection=[id, val]                                 |",
+            "| physical_plan | FilterExec: id@0 = 2                                                   |",
+            "|               |   RepartitionExec: partitioning=RoundRobinBatch(4), input_partitions=1 |",
+            "|               |     MapExec: partitions=1, projection=Some([0, 1])                     |",
+            "|               |                                                                        |",
+            "+---------------+------------------------------------------------------------------------+",
         ];
 
         assert_batches_eq!(expected, &batches);

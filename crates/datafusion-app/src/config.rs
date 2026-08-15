@@ -67,13 +67,45 @@ pub fn merge_configs(shared: ExecutionConfig, priority: ExecutionConfig) -> Exec
         merged.wasm_udf = priority.wasm_udf
     }
 
+    #[cfg(feature = "clickhouse")]
+    if let Some(clickhouse) = priority.clickhouse {
+        merged.clickhouse = Some(clickhouse)
+    }
+
+    #[cfg(feature = "mongodb")]
+    if let Some(mongodb) = priority.mongodb {
+        merged.mongodb = Some(mongodb)
+    }
+
+    #[cfg(feature = "net")]
+    if let Some(geoip_db_path) = priority.net.geoip_db_path {
+        merged.net.geoip_db_path = Some(geoip_db_path)
+    }
+
     merged
+}
+
+/// Configuration for the `net` feature
+#[cfg(feature = "net")]
+#[derive(Clone, Debug, Default, Deserialize)]
+pub struct NetConfig {
+    /// Path to a MaxMind-format (`.mmdb`) database, such as GeoLite2-City,
+    /// used by the single-argument form of the `geoip` UDF. The `GEOIP_DB`
+    /// environment variable takes precedence over this value.
+    #[serde(default)]
+    pub geoip_db_path: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ExecutionConfig {
     #[serde(default)]
     pub object_store: Option<ObjectStoreConfig>,
+    #[cfg(feature = "clickhouse")]
+    #[serde(default)]
+    pub clickhouse: Option<Vec<ClickHouseConfig>>,
+    #[cfg(feature = "mongodb")]
+    #[serde(default)]
+    pub mongodb: Option<Vec<MongoDbConfig>>,
     #[serde(default = "default_ddl_path")]
     pub ddl_path: Option<PathBuf>,
     #[serde(default = "default_benchmark_iterations")]
@@ -89,6 +121,9 @@ pub struct ExecutionConfig {
     #[cfg(feature = "udfs-wasm")]
     #[serde(default = "default_wasm_udf")]
     pub wasm_udf: WasmUdfConfig,
+    #[cfg(feature = "net")]
+    #[serde(default)]
+    pub net: NetConfig,
     #[serde(default = "default_catalog")]
     pub catalog: CatalogConfig,
     #[cfg(feature = "observability")]
@@ -100,6 +135,10 @@ impl Default for ExecutionConfig {
     fn default() -> Self {
         Self {
             object_store: None,
+            #[cfg(feature = "clickhouse")]
+            clickhouse: None,
+            #[cfg(feature = "mongodb")]
+            mongodb: None,
             ddl_path: default_ddl_path(),
             benchmark_iterations: default_benchmark_iterations(),
             datafusion: None,
@@ -108,6 +147,8 @@ impl Default for ExecutionConfig {
             // iceberg: default_iceberg_config(),
             #[cfg(feature = "udfs-wasm")]
             wasm_udf: default_wasm_udf(),
+            #[cfg(feature = "net")]
+            net: NetConfig::default(),
             catalog: default_catalog(),
             #[cfg(feature = "observability")]
             observability: default_observability(),
@@ -224,6 +265,137 @@ impl S3Config {
     }
 }
 
+#[cfg(feature = "clickhouse")]
+fn default_clickhouse_catalog_name() -> String {
+    "clickhouse".to_string()
+}
+
+#[cfg(any(feature = "clickhouse", feature = "mongodb"))]
+fn default_connect_timeout_secs() -> u64 {
+    5
+}
+
+/// Connection details for a ClickHouse instance that is registered as a catalog. All of the
+/// tables from the instance (excluding system tables) are available under the registered catalog
+/// name.
+#[cfg(feature = "clickhouse")]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct ClickHouseConfig {
+    /// Name of the DataFusion catalog the ClickHouse databases and tables are registered under
+    #[serde(default = "default_clickhouse_catalog_name")]
+    pub name: String,
+    /// HTTP(S) url of the ClickHouse instance, for example "http://localhost:8123"
+    pub url: String,
+    pub user: Option<String>,
+    pub password: Option<String>,
+    /// Limit the catalog to a single ClickHouse database. When unset all non-system databases
+    /// are registered as schemas.
+    pub database: Option<String>,
+    /// Compression to use for transport ("lz4" or "none")
+    pub compression: Option<String>,
+    /// Maximum number of seconds to wait for a connection (and initial schema discovery) to
+    /// the ClickHouse instance before failing. Set to 0 to disable the timeout.
+    #[serde(default = "default_connect_timeout_secs")]
+    pub connect_timeout: u64,
+    /// Additional ClickHouse client settings applied to queries. For example
+    /// `output_format_arrow_string_as_string = "1"` returns ClickHouse `String` columns as
+    /// Arrow `Utf8` instead of `Binary`.
+    #[serde(default)]
+    pub options: HashMap<String, String>,
+}
+
+#[cfg(feature = "clickhouse")]
+impl ClickHouseConfig {
+    /// Convert to the parameter map expected by
+    /// [`datafusion_table_providers::sql::db_connection_pool::clickhousepool::ClickHouseConnectionPool`]
+    pub fn to_params(&self) -> HashMap<String, String> {
+        let mut params = HashMap::from([("url".to_string(), self.url.clone())]);
+        if let Some(user) = &self.user {
+            params.insert("user".to_string(), user.clone());
+        }
+        if let Some(password) = &self.password {
+            params.insert("password".to_string(), password.clone());
+        }
+        if let Some(database) = &self.database {
+            params.insert("database".to_string(), database.clone());
+        }
+        if let Some(compression) = &self.compression {
+            params.insert("compression".to_string(), compression.clone());
+        }
+        for (key, value) in &self.options {
+            params.insert(format!("option_{key}"), value.clone());
+        }
+        params
+    }
+}
+
+#[cfg(feature = "mongodb")]
+fn default_mongodb_catalog_name() -> String {
+    "mongodb".to_string()
+}
+
+/// Connection details for a MongoDB instance that is registered as a catalog. Databases are
+/// exposed as schemas and collections as tables, with Arrow schemas inferred by sampling
+/// documents.
+#[cfg(feature = "mongodb")]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+pub struct MongoDbConfig {
+    /// Name of the DataFusion catalog the MongoDB databases and collections are registered under
+    #[serde(default = "default_mongodb_catalog_name")]
+    pub name: String,
+    /// Full MongoDB connection string, for example
+    /// "mongodb://user:pass@localhost:27017/mydb?authSource=admin". When set it takes precedence
+    /// over the individual connection fields and the catalog is limited to the database in the
+    /// connection string.
+    pub connection_string: Option<String>,
+    pub host: Option<String>,
+    pub port: Option<u16>,
+    pub user: Option<String>,
+    pub password: Option<String>,
+    /// Limit the catalog to a single MongoDB database. When unset (and no `connection_string` is
+    /// provided) all non-system databases are registered as schemas.
+    pub database: Option<String>,
+    /// Maximum number of seconds to wait for a connection (and initial schema discovery) to
+    /// the MongoDB instance before failing. Set to 0 to disable the timeout.
+    #[serde(default = "default_connect_timeout_secs")]
+    pub connect_timeout: u64,
+    /// Additional connection parameters passed through to the underlying pool, such as
+    /// `auth_source`, `srv`, `sslmode`, `unnest_depth` or `schema_infer_max_records`.
+    #[serde(default)]
+    pub options: HashMap<String, String>,
+}
+
+#[cfg(feature = "mongodb")]
+impl MongoDbConfig {
+    /// Convert to the parameter map expected by
+    /// [`datafusion_table_providers::mongodb::connection_pool::MongoDBConnectionPool`]
+    pub fn to_params(&self) -> HashMap<String, String> {
+        let mut params = HashMap::new();
+        if let Some(connection_string) = &self.connection_string {
+            params.insert("connection_string".to_string(), connection_string.clone());
+        }
+        if let Some(host) = &self.host {
+            params.insert("host".to_string(), host.clone());
+        }
+        if let Some(port) = &self.port {
+            params.insert("port".to_string(), port.to_string());
+        }
+        if let Some(user) = &self.user {
+            params.insert("user".to_string(), user.clone());
+        }
+        if let Some(password) = &self.password {
+            params.insert("pass".to_string(), password.clone());
+        }
+        if let Some(database) = &self.database {
+            params.insert("db".to_string(), database.clone());
+        }
+        for (key, value) in &self.options {
+            params.insert(key.clone(), value.clone());
+        }
+        params
+    }
+}
+
 #[cfg(feature = "huggingface")]
 #[derive(Clone, Debug, Deserialize)]
 pub struct HuggingFaceConfig {
@@ -275,6 +447,10 @@ pub struct FlightSQLConfig {
     pub benchmark_iterations: usize,
     pub auth: AuthConfig,
     pub headers: HashMap<String, String>,
+    /// Maximum size (in bytes) of a decoded gRPC message. `None` uses tonic's default (4MB).
+    pub max_decoding_message_size: Option<usize>,
+    /// Maximum size (in bytes) of an encoded gRPC message. `None` uses tonic's default (4MB).
+    pub max_encoding_message_size: Option<usize>,
 }
 
 #[cfg(feature = "flightsql")]
@@ -285,6 +461,8 @@ impl Default for FlightSQLConfig {
             benchmark_iterations: 10,
             auth: AuthConfig::default(),
             headers: HashMap::new(),
+            max_decoding_message_size: None,
+            max_encoding_message_size: None,
         }
     }
 }
@@ -296,12 +474,16 @@ impl FlightSQLConfig {
         benchmark_iterations: usize,
         auth: AuthConfig,
         headers: HashMap<String, String>,
+        max_decoding_message_size: Option<usize>,
+        max_encoding_message_size: Option<usize>,
     ) -> Self {
         Self {
             connection_url,
             benchmark_iterations,
             auth,
             headers,
+            max_decoding_message_size,
+            max_encoding_message_size,
         }
     }
 }

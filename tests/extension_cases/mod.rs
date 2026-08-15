@@ -21,20 +21,30 @@
 mod auth_basic;
 #[cfg(feature = "flightsql")]
 mod auth_bearer;
+#[cfg(feature = "clickhouse")]
+mod clickhouse;
 #[cfg(feature = "deltalake")]
 mod deltalake;
 #[cfg(feature = "flightsql")]
 mod flightsql;
+#[cfg(feature = "functions-arrow")]
+mod functions_arrow;
 #[cfg(feature = "functions-json")]
 mod functions_json;
 #[cfg(feature = "huggingface")]
 mod huggingface;
+#[cfg(feature = "mongodb")]
+mod mongodb;
+#[cfg(feature = "net")]
+mod net;
 #[cfg(feature = "s3")]
 mod s3;
 #[cfg(feature = "udfs-wasm")]
 mod udfs_wasm;
 #[cfg(feature = "vortex")]
 mod vortex;
+#[cfg(feature = "websocket")]
+mod websocket;
 
 use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::util::pretty::pretty_format_batches;
@@ -53,8 +63,11 @@ pub struct TestExecution {
 #[allow(dead_code)]
 impl TestExecution {
     pub async fn new() -> Self {
-        let config = AppConfig::default();
+        Self::new_with_config(AppConfig::default()).await
+    }
 
+    /// Like [`Self::new`] but with a caller-provided config
+    pub async fn new_with_config(config: AppConfig) -> Self {
         let session_state = DftSessionStateBuilder::try_new(Some(config.cli.execution.clone()))
             .unwrap()
             .with_extensions()

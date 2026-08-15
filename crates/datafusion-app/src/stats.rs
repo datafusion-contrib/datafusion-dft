@@ -185,40 +185,39 @@ impl OperatorCategory {
         if io_format(plan).is_some() {
             return OperatorCategory::Io;
         }
-        let any = plan.as_any();
-        if any.downcast_ref::<ProjectionExec>().is_some() {
+        if plan.downcast_ref::<ProjectionExec>().is_some() {
             return OperatorCategory::Projection;
         }
-        if any.downcast_ref::<FilterExec>().is_some() {
+        if plan.downcast_ref::<FilterExec>().is_some() {
             return OperatorCategory::Filter;
         }
-        if any.downcast_ref::<SortExec>().is_some()
-            || any.downcast_ref::<SortPreservingMergeExec>().is_some()
+        if plan.downcast_ref::<SortExec>().is_some()
+            || plan.downcast_ref::<SortPreservingMergeExec>().is_some()
         {
             return OperatorCategory::Sort;
         }
-        if any.downcast_ref::<AggregateExec>().is_some() {
+        if plan.downcast_ref::<AggregateExec>().is_some() {
             return OperatorCategory::Aggregate;
         }
-        if any.downcast_ref::<HashJoinExec>().is_some()
-            || any.downcast_ref::<CrossJoinExec>().is_some()
-            || any.downcast_ref::<SortMergeJoinExec>().is_some()
-            || any.downcast_ref::<NestedLoopJoinExec>().is_some()
-            || any.downcast_ref::<SymmetricHashJoinExec>().is_some()
+        if plan.downcast_ref::<HashJoinExec>().is_some()
+            || plan.downcast_ref::<CrossJoinExec>().is_some()
+            || plan.downcast_ref::<SortMergeJoinExec>().is_some()
+            || plan.downcast_ref::<NestedLoopJoinExec>().is_some()
+            || plan.downcast_ref::<SymmetricHashJoinExec>().is_some()
         {
             return OperatorCategory::Join;
         }
-        if any.downcast_ref::<WindowAggExec>().is_some()
-            || any.downcast_ref::<BoundedWindowAggExec>().is_some()
+        if plan.downcast_ref::<WindowAggExec>().is_some()
+            || plan.downcast_ref::<BoundedWindowAggExec>().is_some()
         {
             return OperatorCategory::Window;
         }
-        if any.downcast_ref::<GlobalLimitExec>().is_some()
-            || any.downcast_ref::<LocalLimitExec>().is_some()
+        if plan.downcast_ref::<GlobalLimitExec>().is_some()
+            || plan.downcast_ref::<LocalLimitExec>().is_some()
         {
             return OperatorCategory::Limit;
         }
-        if any.downcast_ref::<UnionExec>().is_some() {
+        if plan.downcast_ref::<UnionExec>().is_some() {
             return OperatorCategory::Union;
         }
         // Name-based fallback for operators without a public type
@@ -282,19 +281,18 @@ impl IOFormatType {
 /// DataFusion 51 all file scans are `DataSourceExec` nodes wrapping a
 /// `FileScanConfig` that carries the format-specific `FileSource`.
 fn io_format(plan: &dyn ExecutionPlan) -> Option<IOFormatType> {
-    let data_source_exec = plan.as_any().downcast_ref::<DataSourceExec>()?;
+    let data_source_exec = plan.downcast_ref::<DataSourceExec>()?;
     let file_scan_config = data_source_exec
         .data_source()
-        .as_any()
         .downcast_ref::<FileScanConfig>()?;
-    let any = file_scan_config.file_source().as_any();
-    if any.downcast_ref::<ParquetSource>().is_some() {
+    let source = file_scan_config.file_source();
+    if source.downcast_ref::<ParquetSource>().is_some() {
         Some(IOFormatType::Parquet)
-    } else if any.downcast_ref::<CsvSource>().is_some() {
+    } else if source.downcast_ref::<CsvSource>().is_some() {
         Some(IOFormatType::Csv)
-    } else if any.downcast_ref::<JsonSource>().is_some() {
+    } else if source.downcast_ref::<JsonSource>().is_some() {
         Some(IOFormatType::Json)
-    } else if any.downcast_ref::<ArrowSource>().is_some() {
+    } else if source.downcast_ref::<ArrowSource>().is_some() {
         Some(IOFormatType::Arrow)
     } else {
         None

@@ -163,7 +163,7 @@ impl DftSessionStateBuilder {
         extension
             .register(config, self)
             .await
-            .map_err(|_| eyre::eyre!("E"))
+            .map_err(|e| eyre::eyre!("Failed to register extension: {e}"))
     }
 
     pub async fn with_extensions(mut self) -> color_eyre::Result<Self> {

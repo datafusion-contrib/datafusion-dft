@@ -36,6 +36,13 @@ pub fn register_io_runtime(handle: Option<Handle>) {
     IO_RUNTIME.set(handle)
 }
 
+/// Returns the IO runtime `Handle` registered for this thread, if any
+///
+/// See [`spawn_io`]
+pub fn io_runtime_handle() -> Option<Handle> {
+    IO_RUNTIME.with_borrow(|h| h.clone())
+}
+
 /// Runs `fut` on the runtime registered by [`register_io_runtime`] if any,
 /// otherwise awaits on the current thread
 ///

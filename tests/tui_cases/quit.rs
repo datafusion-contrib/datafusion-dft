@@ -107,7 +107,7 @@ impl TestApp<'_> {
     /// Create a new [`TestApp`] instance configured with a temporary directory
     async fn new() -> Self {
         let config_path = tempdir().unwrap();
-        let config = create_config(config_path.path().to_path_buf());
+        let config = create_config(config_path.path().to_path_buf(), &[]);
         let state = AppState::new(config);
 
         let session_state =

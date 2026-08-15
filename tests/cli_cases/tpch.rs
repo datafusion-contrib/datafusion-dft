@@ -57,7 +57,7 @@ async fn test_custom_config_with_s3() {
     let mut config_builder = TestConfigBuilder::default();
     config_builder.with_db_path("s3://tpch-db/db/");
     let bucket = "tpch-db";
-    let endpoint = "http://localhost:4566";
+    let endpoint = "http://localhost:9000";
     let access_key = "LSIAQAAAAAAVNCBMPNSG";
     let secret = "5555555555555555555555555555555555555555";
     let allow_http = true;
@@ -102,7 +102,7 @@ async fn test_custom_config_with_s3() {
     let prefixes: Vec<_> = r
         .common_prefixes
         .iter()
-        .map(|p| p.parts().last().unwrap().as_ref().to_string())
+        .map(|p| p.parts().next_back().unwrap().as_ref().to_string())
         .collect();
     for dir in needed_dirs {
         assert!(prefixes.contains(&dir.to_string()));

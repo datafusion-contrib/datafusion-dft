@@ -62,6 +62,16 @@ pub struct DftArgs {
     pub config: Option<String>,
 
     #[clap(
+        long = "set",
+        short = 's',
+        global = true,
+        help = "Override a config value, e.g. --set flightsql_server.connection_url=http://localhost:50051. Can be repeated.",
+        value_parser(parse_config_override),
+        action = clap::ArgAction::Append
+    )]
+    pub set: Option<Vec<(String, String)>>,
+
+    #[clap(
         long,
         short = 'q',
         help = "Use the FlightSQL client defined in your config"
@@ -73,6 +83,20 @@ pub struct DftArgs {
 
     #[clap(long, short, help = "Only show how long the query took to run")]
     pub time: bool,
+
+    #[clap(
+        long,
+        short = 'j',
+        help = "Output query results as line-delimited JSON"
+    )]
+    pub json: bool,
+
+    #[clap(
+        long,
+        short = 'C',
+        help = "Concatenate all result batches into a single batch before printing"
+    )]
+    pub concat: bool,
 
     #[clap(long, short, help = "Benchmark the provided query")]
     pub bench: bool,
@@ -114,6 +138,12 @@ pub struct DftArgs {
         action = clap::ArgAction::Append
     )]
     pub header: Option<Vec<(String, String)>>,
+
+    #[clap(
+        long,
+        help = "Path to file containing Flight SQL headers. Supports simple format ('Name: Value') and curl config format ('header = Name: Value' or '-H \"Name: Value\"'). Only used for FlightSQL"
+    )]
+    pub headers_file: Option<PathBuf>,
 
     #[clap(
         long,
@@ -260,10 +290,24 @@ fn parse_command(command: &str) -> std::result::Result<String, String> {
     }
 }
 
+fn parse_config_override(pair: &str) -> std::result::Result<(String, String), String> {
+    let (key, value) = pair.split_once('=').ok_or_else(|| {
+        format!(
+            "Invalid config override: '{pair}'\n       Expected format: 'section.key=value', e.g. 'flightsql_server.connection_url=http://localhost:50051'"
+        )
+    })?;
+    if key.trim().is_empty() {
+        return Err(format!(
+            "Invalid config override: '{pair}'\n       Key cannot be empty"
+        ));
+    }
+    Ok((key.trim().to_string(), value.trim().to_string()))
+}
+
 fn parse_header_line(line: &str) -> Result<(String, String), String> {
     let (name, value) = line
         .split_once(':')
-        .ok_or_else(|| format!("Invalid header format: '{}'", line))?;
+        .ok_or_else(|| format!("Invalid header format: '{}'\n       Expected format: 'Header-Name: Header-Value', 'header = Name: Value', or '-H \"Name: Value\"'", line))?;
 
     let name =
         HeaderName::try_from(name.trim()).map_err(|e| format!("Invalid header name: {}", e))?;
@@ -275,4 +319,214 @@ fn parse_header_line(line: &str) -> Result<(String, String), String> {
         .map_err(|e| format!("Header value contains invalid characters: {}", e))?;
 
     Ok((name.to_string(), value_str.to_string()))
+}
+
+/// Parse headers from a file supporting both simple and curl config formats
+///
+/// Supported formats:
+/// - Simple: `Header-Name: Header-Value`
+/// - Curl config: `header = Name: Value` or `-H "Name: Value"`
+/// - Comments: Lines starting with `#`
+/// - Blank lines are ignored
+///
+/// Both formats can be mixed in the same file.
+pub fn parse_headers_file(path: &Path) -> Result<Vec<(String, String)>, String> {
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| format!("Failed to read headers file '{}': {}", path.display(), e))?;
+
+    let mut headers = Vec::new();
+    for (line_num, line) in content.lines().enumerate() {
+        let line = line.trim();
+
+        // Skip comments and blank lines
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        // Detect and parse format
+        let header_value = if let Some(stripped) = line.strip_prefix("header") {
+            // Curl config format: "header = Name: Value" or "header=Name: Value"
+            let stripped = stripped.trim_start();
+            if let Some(value) = stripped.strip_prefix('=') {
+                value.trim()
+            } else {
+                line // Not curl format, try simple format
+            }
+        } else if let Some(stripped) = line.strip_prefix("-H") {
+            // Curl config format: -H "Name: Value" or -H Name: Value
+            let stripped = stripped.trim();
+            // Remove surrounding quotes if present
+            stripped.trim_matches(|c| c == '"' || c == '\'')
+        } else {
+            // Simple format: "Name: Value"
+            line
+        };
+
+        // Parse header line
+        match parse_header_line(header_value) {
+            Ok(header) => headers.push(header),
+            Err(e) => {
+                return Err(format!(
+                    "Invalid header format at line {} in '{}': '{}'\n{}",
+                    line_num + 1,
+                    path.display(),
+                    line,
+                    e
+                ));
+            }
+        }
+    }
+
+    Ok(headers)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    #[test]
+    fn test_parse_headers_file_simple_format() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "x-api-key: secret123").unwrap();
+        writeln!(file, "database: production").unwrap();
+        file.flush().unwrap();
+
+        let headers = parse_headers_file(file.path()).unwrap();
+        assert_eq!(headers.len(), 2);
+        assert_eq!(
+            headers[0],
+            ("x-api-key".to_string(), "secret123".to_string())
+        );
+        assert_eq!(
+            headers[1],
+            ("database".to_string(), "production".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_headers_file_curl_format() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "header = x-api-key: secret123").unwrap();
+        writeln!(file, "-H \"database: production\"").unwrap();
+        file.flush().unwrap();
+
+        let headers = parse_headers_file(file.path()).unwrap();
+        assert_eq!(headers.len(), 2);
+        assert_eq!(
+            headers[0],
+            ("x-api-key".to_string(), "secret123".to_string())
+        );
+        assert_eq!(
+            headers[1],
+            ("database".to_string(), "production".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_headers_file_mixed_format() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "# Simple format").unwrap();
+        writeln!(file, "x-test: value1").unwrap();
+        writeln!(file).unwrap();
+        writeln!(file, "# Curl config format").unwrap();
+        writeln!(file, "header = x-api-key: secret123").unwrap();
+        writeln!(file, "-H \"database: production\"").unwrap();
+        file.flush().unwrap();
+
+        let headers = parse_headers_file(file.path()).unwrap();
+        assert_eq!(headers.len(), 3);
+        assert_eq!(headers[0], ("x-test".to_string(), "value1".to_string()));
+        assert_eq!(
+            headers[1],
+            ("x-api-key".to_string(), "secret123".to_string())
+        );
+        assert_eq!(
+            headers[2],
+            ("database".to_string(), "production".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_headers_file_with_comments() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "# This is a comment").unwrap();
+        writeln!(file, "x-api-key: secret123").unwrap();
+        writeln!(file, "# Another comment").unwrap();
+        writeln!(file, "database: production").unwrap();
+        file.flush().unwrap();
+
+        let headers = parse_headers_file(file.path()).unwrap();
+        assert_eq!(headers.len(), 2);
+        assert_eq!(
+            headers[0],
+            ("x-api-key".to_string(), "secret123".to_string())
+        );
+        assert_eq!(
+            headers[1],
+            ("database".to_string(), "production".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_headers_file_blank_lines() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "x-api-key: secret123").unwrap();
+        writeln!(file).unwrap();
+        writeln!(file, "   ").unwrap();
+        writeln!(file, "database: production").unwrap();
+        file.flush().unwrap();
+
+        let headers = parse_headers_file(file.path()).unwrap();
+        assert_eq!(headers.len(), 2);
+        assert_eq!(
+            headers[0],
+            ("x-api-key".to_string(), "secret123".to_string())
+        );
+        assert_eq!(
+            headers[1],
+            ("database".to_string(), "production".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_headers_file_curl_with_quotes() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "-H \"x-api-key: secret123\"").unwrap();
+        writeln!(file, "-H 'database: production'").unwrap();
+        file.flush().unwrap();
+
+        let headers = parse_headers_file(file.path()).unwrap();
+        assert_eq!(headers.len(), 2);
+        assert_eq!(
+            headers[0],
+            ("x-api-key".to_string(), "secret123".to_string())
+        );
+        assert_eq!(
+            headers[1],
+            ("database".to_string(), "production".to_string())
+        );
+    }
+
+    #[test]
+    fn test_parse_headers_file_invalid_format() {
+        let mut file = NamedTempFile::new().unwrap();
+        writeln!(file, "x-api-key: secret123").unwrap();
+        writeln!(file, "invalid-line-without-colon").unwrap();
+        file.flush().unwrap();
+
+        let result = parse_headers_file(file.path());
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .contains("Invalid header format at line 2"));
+    }
+
+    #[test]
+    fn test_parse_headers_file_not_found() {
+        let result = parse_headers_file(Path::new("/nonexistent/file.txt"));
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Failed to read headers file"));
+    }
 }

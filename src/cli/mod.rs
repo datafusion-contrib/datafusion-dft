@@ -42,7 +42,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 #[cfg(feature = "flightsql")]
 use {
-    crate::args::{Command, FlightSqlCommand},
+    crate::args::{parse_headers_file, Command, FlightSqlCommand},
     datafusion_app::{
         config::{AuthConfig, FlightSQLConfig},
         flightsql::FlightSQLContext,
@@ -110,7 +110,7 @@ impl CliApp {
                     .do_get(flight_info)
                     .await?;
                 let flight_batch_stream = stream::select_all(streams);
-                self.print_any_stream(flight_batch_stream).await;
+                self.print_stream(flight_batch_stream).await;
                 Ok(())
             }
             FlightSqlCommand::GetDbSchemas {
@@ -128,7 +128,7 @@ impl CliApp {
                     .do_get(flight_info)
                     .await?;
                 let flight_batch_stream = stream::select_all(streams);
-                self.print_any_stream(flight_batch_stream).await;
+                self.print_stream(flight_batch_stream).await;
                 Ok(())
             }
 
@@ -155,7 +155,7 @@ impl CliApp {
                     .do_get(flight_info)
                     .await?;
                 let flight_batch_stream = stream::select_all(streams);
-                self.print_any_stream(flight_batch_stream).await;
+                self.print_stream(flight_batch_stream).await;
                 Ok(())
             }
             FlightSqlCommand::GetTableTypes => {
@@ -170,7 +170,7 @@ impl CliApp {
                     .do_get(flight_info)
                     .await?;
                 let flight_batch_stream = stream::select_all(streams);
-                self.print_any_stream(flight_batch_stream).await;
+                self.print_stream(flight_batch_stream).await;
                 Ok(())
             }
             FlightSqlCommand::GetSqlInfo { info } => {
@@ -185,7 +185,7 @@ impl CliApp {
                     .do_get(flight_info)
                     .await?;
                 let flight_batch_stream = stream::select_all(streams);
-                self.print_any_stream(flight_batch_stream).await;
+                self.print_stream(flight_batch_stream).await;
                 Ok(())
             }
             FlightSqlCommand::GetXdbcTypeInfo { data_type } => {
@@ -200,7 +200,7 @@ impl CliApp {
                     .do_get(flight_info)
                     .await?;
                 let flight_batch_stream = stream::select_all(streams);
-                self.print_any_stream(flight_batch_stream).await;
+                self.print_stream(flight_batch_stream).await;
                 Ok(())
             }
         }
@@ -444,6 +444,8 @@ impl CliApp {
                     let stream = client.do_get(ticket.into_request()).await?;
                     if let Some(output_path) = &self.args.output {
                         self.output_stream(stream, output_path).await?
+                    } else if self.args.json {
+                        self.print_json_stream(stream).await;
                     } else if let Some(start) = start {
                         self.exec_stream(stream).await;
                         let elapsed = start.elapsed();
@@ -652,6 +654,8 @@ impl CliApp {
                 .await?;
             if let Some(output_path) = &self.args.output {
                 self.output_stream(stream, output_path).await?;
+            } else if self.args.json {
+                self.print_json_stream(stream).await;
             } else if let Some(start) = start {
                 self.exec_stream(stream).await;
                 let elapsed = start.elapsed();
@@ -804,18 +808,114 @@ impl CliApp {
         }
     }
 
-    async fn print_any_stream<S, E>(&self, mut stream: S)
+    #[cfg(feature = "flightsql")]
+    async fn print_stream<S, E>(&self, stream: S)
     where
         S: Stream<Item = Result<RecordBatch, E>> + Unpin,
         E: Error,
     {
+        if self.args.json {
+            self.print_json_stream(stream).await;
+        } else {
+            self.print_any_stream(stream).await;
+        }
+    }
+
+    async fn collect_stream<S, E>(&self, mut stream: S) -> Option<Vec<RecordBatch>>
+    where
+        S: Stream<Item = Result<RecordBatch, E>> + Unpin,
+        E: Error,
+    {
+        let mut batches = Vec::new();
         while let Some(maybe_batch) = stream.next().await {
             match maybe_batch {
-                Ok(batch) => match pretty_format_batches(&[batch]) {
-                    Ok(d) => println!("{}", d),
-                    Err(e) => println!("Error formatting batch: {e}"),
-                },
-                Err(e) => println!("Error executing SQL: {e}"),
+                Ok(batch) => batches.push(batch),
+                Err(e) => {
+                    println!("Error executing SQL: {e}");
+                    return None;
+                }
+            }
+        }
+        Some(batches)
+    }
+
+    async fn print_any_stream<S, E>(&self, stream: S)
+    where
+        S: Stream<Item = Result<RecordBatch, E>> + Unpin,
+        E: Error,
+    {
+        if self.args.concat {
+            let Some(batches) = self.collect_stream(stream).await else {
+                return;
+            };
+            if !batches.is_empty() {
+                let schema = batches[0].schema();
+                match datafusion::arrow::compute::concat_batches(&schema, &batches) {
+                    Ok(batch) => match pretty_format_batches(&[batch]) {
+                        Ok(d) => println!("{}", d),
+                        Err(e) => println!("Error formatting batch: {e}"),
+                    },
+                    Err(e) => println!("Error concatenating batches: {e}"),
+                }
+            }
+        } else {
+            let mut stream = stream;
+            while let Some(maybe_batch) = stream.next().await {
+                match maybe_batch {
+                    Ok(batch) => match pretty_format_batches(&[batch]) {
+                        Ok(d) => println!("{}", d),
+                        Err(e) => println!("Error formatting batch: {e}"),
+                    },
+                    Err(e) => println!("Error executing SQL: {e}"),
+                }
+            }
+        }
+    }
+
+    async fn print_json_stream<S, E>(&self, stream: S)
+    where
+        S: Stream<Item = Result<RecordBatch, E>> + Unpin,
+        E: Error,
+    {
+        if self.args.concat {
+            let Some(batches) = self.collect_stream(stream).await else {
+                return;
+            };
+            if !batches.is_empty() {
+                let schema = batches[0].schema();
+                match datafusion::arrow::compute::concat_batches(&schema, &batches) {
+                    Ok(batch) => {
+                        let mut writer = json::writer::LineDelimitedWriter::new(std::io::stdout());
+                        if let Err(e) = writer.write(&batch) {
+                            println!("Error formatting batch as JSON: {e}");
+                            return;
+                        }
+                        if let Err(e) = writer.finish() {
+                            println!("Error finishing JSON output: {e}");
+                        }
+                    }
+                    Err(e) => println!("Error concatenating batches: {e}"),
+                }
+            }
+        } else {
+            let mut stream = stream;
+            let mut writer = json::writer::LineDelimitedWriter::new(std::io::stdout());
+            while let Some(maybe_batch) = stream.next().await {
+                match maybe_batch {
+                    Ok(batch) => {
+                        if let Err(e) = writer.write(&batch) {
+                            println!("Error formatting batch as JSON: {e}");
+                            return;
+                        }
+                    }
+                    Err(e) => {
+                        println!("Error executing SQL: {e}");
+                        return;
+                    }
+                }
+            }
+            if let Err(e) = writer.finish() {
+                println!("Error finishing JSON output: {e}");
             }
         }
     }
@@ -881,7 +981,7 @@ impl VortexFileWriter {
         let concatenated = datafusion::arrow::compute::concat_batches(&schema, &self.batches)?;
 
         // Convert to Vortex array
-        let vortex_array = ArrayRef::from_arrow(concatenated, false);
+        let vortex_array = ArrayRef::from_arrow(concatenated, false).map_err(|e| eyre!("{}", e))?;
 
         // Convert to array stream
         let stream = vortex_array.to_array_stream();
@@ -1005,10 +1105,43 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
                 config.flightsql_client.connection_url,
                 config.flightsql_client.benchmark_iterations,
                 auth,
-                config.flightsql_client.headers,
+                config.flightsql_client.headers.clone(),
+                config.flightsql_client.max_decoding_message_size,
+                config.flightsql_client.max_encoding_message_size,
             );
             let flightsql_ctx = FlightSQLContext::new(flightsql_cfg);
-            let headers = cli.header.clone().map(|vec| vec.into_iter().collect());
+
+            // Three-way header merge: config < file < CLI
+            let mut all_headers = config.flightsql_client.headers.clone();
+
+            // Merge headers from file (if specified in config or CLI)
+            let headers_file = cli
+                .headers_file
+                .as_ref()
+                .or(config.flightsql_client.headers_file.as_ref());
+
+            if let Some(file_path) = headers_file {
+                match parse_headers_file(file_path) {
+                    Ok(file_headers) => {
+                        all_headers.extend(file_headers);
+                    }
+                    Err(e) => {
+                        return Err(eyre!("Error reading headers file: {}", e));
+                    }
+                }
+            }
+
+            // Merge CLI headers (highest precedence)
+            if let Some(cli_headers) = &cli.header {
+                all_headers.extend(cli_headers.iter().cloned());
+            }
+
+            let headers = if all_headers.is_empty() {
+                None
+            } else {
+                Some(all_headers)
+            };
+
             flightsql_ctx
                 .create_client(cli.host.clone(), headers)
                 .await?;

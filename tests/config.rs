@@ -148,6 +148,80 @@ impl TestConfigBuilder {
         self
     }
 
+    #[cfg(feature = "clickhouse")]
+    pub fn with_clickhouse(
+        &mut self,
+        app: &str,
+        name: &str,
+        url: &str,
+        user: Option<&str>,
+        password: Option<&str>,
+        options: &[(&str, &str)],
+    ) -> &mut Self {
+        self.config_text
+            .push_str(&format!("[[{app}.execution.clickhouse]]\n"));
+        self.config_text.push_str(&format!("name = '{}'\n", name));
+        self.config_text.push_str(&format!("url = '{}'\n", url));
+        if let Some(user) = user {
+            self.config_text.push_str(&format!("user = '{}'\n", user));
+        }
+        if let Some(password) = password {
+            self.config_text
+                .push_str(&format!("password = '{}'\n", password));
+        }
+        if !options.is_empty() {
+            self.config_text.push_str("options = { ");
+            let opts: Vec<String> = options
+                .iter()
+                .map(|(k, v)| format!("{} = \"{}\"", k, v))
+                .collect();
+            self.config_text.push_str(&opts.join(", "));
+            self.config_text.push_str(" }\n");
+        }
+        self
+    }
+
+    #[cfg(feature = "mongodb")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn with_mongodb(
+        &mut self,
+        app: &str,
+        name: &str,
+        host: &str,
+        port: u16,
+        user: Option<&str>,
+        password: Option<&str>,
+        database: Option<&str>,
+        options: &[(&str, &str)],
+    ) -> &mut Self {
+        self.config_text
+            .push_str(&format!("[[{app}.execution.mongodb]]\n"));
+        self.config_text.push_str(&format!("name = '{}'\n", name));
+        self.config_text.push_str(&format!("host = '{}'\n", host));
+        self.config_text.push_str(&format!("port = {}\n", port));
+        if let Some(user) = user {
+            self.config_text.push_str(&format!("user = '{}'\n", user));
+        }
+        if let Some(password) = password {
+            self.config_text
+                .push_str(&format!("password = '{}'\n", password));
+        }
+        if let Some(database) = database {
+            self.config_text
+                .push_str(&format!("database = '{}'\n", database));
+        }
+        if !options.is_empty() {
+            self.config_text.push_str("options = { ");
+            let opts: Vec<String> = options
+                .iter()
+                .map(|(k, v)| format!("{} = \"{}\"", k, v))
+                .collect();
+            self.config_text.push_str(&opts.join(", "));
+            self.config_text.push_str(" }\n");
+        }
+        self
+    }
+
     pub fn with_benchmark_iterations(&mut self, app: &str, iterations: u64) -> &mut Self {
         self.config_text.push_str(&format!(
             "[{app}.execution]\nbenchmark_iterations = {}\n",

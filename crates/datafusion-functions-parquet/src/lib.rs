@@ -37,6 +37,27 @@ use parquet::file::statistics::Statistics;
 use std::fs::File;
 use std::sync::Arc;
 
+mod arrow_schema;
+mod bloom_filter;
+mod compression;
+mod dictionary;
+mod file_metadata;
+mod kv_metadata;
+mod page_index;
+mod pages;
+mod row_groups;
+mod schema;
+pub use arrow_schema::ParquetArrowSchemaFunc;
+pub use bloom_filter::{ParquetBloomFilterCheckFunc, ParquetBloomFilterFunc};
+pub use compression::ParquetCompressionFunc;
+pub use dictionary::ParquetDictionaryFunc;
+pub use file_metadata::ParquetFileMetadataFunc;
+pub use kv_metadata::ParquetKvMetadataFunc;
+pub use page_index::ParquetPageIndexFunc;
+pub use pages::ParquetPagesFunc;
+pub use row_groups::ParquetRowGroupsFunc;
+pub use schema::ParquetSchemaFunc;
+
 // Copied from https://github.com/apache/datafusion/blob/main/datafusion-cli/src/functions.rs
 /// PARQUET_META table function
 #[derive(Debug)]
@@ -47,10 +68,6 @@ struct ParquetMetadataTable {
 
 #[async_trait]
 impl TableProvider for ParquetMetadataTable {
-    fn as_any(&self) -> &dyn std::any::Any {
-        self
-    }
-
     fn schema(&self) -> arrow::datatypes::SchemaRef {
         self.schema.clone()
     }
@@ -119,6 +136,16 @@ fn convert_parquet_statistics(
             val.min_opt().map(|v| v.to_string()),
             val.max_opt().map(|v| v.to_string()),
         ),
+    }
+}
+
+/// Extract a string argument from a table function expression, accepting
+/// either a single-quoted literal or a double-quoted (column) identifier
+fn expr_to_string(expr: Option<&Expr>, func: &str, arg: &str) -> Result<String> {
+    match expr {
+        Some(Expr::Literal(ScalarValue::Utf8(Some(s)), _)) => Ok(s.clone()),
+        Some(Expr::Column(Column { name, .. })) => Ok(name.clone()),
+        _ => plan_err!("{func} requires a string {arg} argument"),
     }
 }
 
@@ -219,7 +246,7 @@ impl TableFunctionImpl for ParquetMetadataFunc {
                 column_id_arr.push(col_idx as i64);
                 file_offset_arr.push(column.file_offset());
                 num_values_arr.push(column.num_values());
-                path_in_schema_arr.push(column.column_path().to_string());
+                path_in_schema_arr.push(column.column_path().string());
                 type_arr.push(column.column_type().to_string());
                 logical_type_arr.push(
                     column

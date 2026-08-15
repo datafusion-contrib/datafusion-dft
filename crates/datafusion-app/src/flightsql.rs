@@ -19,6 +19,7 @@ use std::sync::Arc;
 
 use arrow_flight::{
     decode::FlightRecordBatchStream,
+    flight_service_client::FlightServiceClient,
     sql::{
         client::FlightSqlServiceClient, CommandGetDbSchemas, CommandGetTables,
         CommandGetXdbcTypeInfo,
@@ -82,7 +83,14 @@ impl FlightSQLContext {
         let channel = Channel::from_static(url).connect().await;
         match channel {
             Ok(c) => {
-                let mut client = FlightSqlServiceClient::new(c);
+                let mut inner = FlightServiceClient::new(c);
+                if let Some(size) = self.config.max_decoding_message_size {
+                    inner = inner.max_decoding_message_size(size);
+                }
+                if let Some(size) = self.config.max_encoding_message_size {
+                    inner = inner.max_encoding_message_size(size);
+                }
+                let mut client = FlightSqlServiceClient::new_from_inner(inner);
                 // TODO: Look into setting both bearer and basic, which requires comma separating
                 // them in the same `Authorization` header key (https://www.rfc-editor.org/rfc/rfc7230#section-3.2.2)
                 //
@@ -295,7 +303,10 @@ impl FlightSQLContext {
         _opts: ExecOptions,
     ) -> DFResult<ExecResult> {
         if let Some(ref mut client) = *self.client.lock().await {
-            let flight_info = client.execute(sql.to_string(), None).await?;
+            let flight_info = client
+                .execute(sql.to_string(), None)
+                .await
+                .map_err(|e| DataFusionError::External(Box::new(e)))?;
             if flight_info.endpoint.len() != 1 {
                 return Err(DataFusionError::External("More than one endpoint".into()));
             }
@@ -333,7 +344,7 @@ impl FlightSQLContext {
             client
                 .get_catalogs()
                 .await
-                .map_err(|e| DataFusionError::ArrowError(Box::new(e), None))
+                .map_err(|e| DataFusionError::External(Box::new(e)))
         } else {
             Err(DataFusionError::External(
                 "No FlightSQL client configured.  Add one in `~/.config/dft/config.toml`".into(),
@@ -356,7 +367,7 @@ impl FlightSQLContext {
             client
                 .get_db_schemas(cmd)
                 .await
-                .map_err(|e| DataFusionError::ArrowError(Box::new(e), None))
+                .map_err(|e| DataFusionError::External(Box::new(e)))
         } else {
             Err(DataFusionError::External(
                 "No FlightSQL client configured.  Add one in `~/.config/dft/config.toml`".into(),
@@ -385,7 +396,7 @@ impl FlightSQLContext {
             client
                 .get_tables(cmd)
                 .await
-                .map_err(|e| DataFusionError::ArrowError(Box::new(e), None))
+                .map_err(|e| DataFusionError::External(Box::new(e)))
         } else {
             Err(DataFusionError::External(
                 "No FlightSQL client configured.  Add one in `~/.config/dft/config.toml`".into(),
@@ -400,7 +411,7 @@ impl FlightSQLContext {
             client
                 .get_table_types()
                 .await
-                .map_err(|e| DataFusionError::ArrowError(Box::new(e), None))
+                .map_err(|e| DataFusionError::External(Box::new(e)))
         } else {
             Err(DataFusionError::External(
                 "No FlightSQL client configured.  Add one in `~/.config/dft/config.toml`".into(),
@@ -422,7 +433,7 @@ impl FlightSQLContext {
             client
                 .get_sql_info(sql_info_list)
                 .await
-                .map_err(|e| DataFusionError::ArrowError(Box::new(e), None))
+                .map_err(|e| DataFusionError::External(Box::new(e)))
         } else {
             Err(DataFusionError::External(
                 "No FlightSQL client configured.  Add one in `~/.config/dft/config.toml`".into(),
@@ -441,7 +452,7 @@ impl FlightSQLContext {
             client
                 .get_xdbc_type_info(cmd)
                 .await
-                .map_err(|e| DataFusionError::ArrowError(Box::new(e), None))
+                .map_err(|e| DataFusionError::External(Box::new(e)))
         } else {
             Err(DataFusionError::External(
                 "No FlightSQL client configured.  Add one in `~/.config/dft/config.toml`".into(),
@@ -459,7 +470,7 @@ impl FlightSQLContext {
                     let stream = client
                         .do_get(ticket.into_request())
                         .await
-                        .map_err(|e| DataFusionError::ArrowError(Box::new(e), None))?;
+                        .map_err(|e| DataFusionError::External(Box::new(e)))?;
                     streams.push(stream);
                 } else {
                     debug!("No ticket for endpoint: {endpoint}");

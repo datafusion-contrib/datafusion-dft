@@ -54,7 +54,12 @@ async fn test_deltalake_s3() {
     let tempdir = tempfile::tempdir().unwrap();
     let ddl_path = tempdir.path().join("my_ddl.sql");
     let mut file = std::fs::File::create(ddl_path.clone()).unwrap();
-    let ddl = "CREATE EXTERNAL TABLE delta_tbl STORED AS DELTATABLE LOCATION 's3://test/deltalake/simple_table';";
+    let ddl = "CREATE EXTERNAL TABLE delta_tbl STORED AS DELTATABLE LOCATION 's3://test/deltalake/simple_table' \
+        OPTIONS ('aws_endpoint' 'http://localhost:9000', \
+                 'aws_access_key_id' 'LSIAQAAAAAAVNCBMPNSG', \
+                 'aws_secret_access_key' '5555555555555555555555555555555555555555', \
+                 'aws_allow_http' 'true', \
+                 'aws_region' 'us-east-1');";
     file.write_all(ddl.as_bytes()).unwrap();
     file.flush().unwrap();
 
@@ -70,7 +75,7 @@ async fn test_deltalake_s3() {
         "s3",
         "test",
         "s3://test",
-        "http://localhost:4566",
+        "http://localhost:9000",
         "LSIAQAAAAAAVNCBMPNSG",
         "5555555555555555555555555555555555555555",
         true,

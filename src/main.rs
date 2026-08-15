@@ -64,7 +64,7 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
     if should_init_env_logger(&cli) {
         env_logger::init();
     }
-    let cfg = create_config(cli.config_path());
+    let cfg = create_config(cli.config_path(), cli.set.as_deref().unwrap_or_default());
 
     // Start tokio metrics collection for IO runtime when running servers
     #[cfg(any(feature = "flightsql", feature = "http"))]

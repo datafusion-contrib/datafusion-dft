@@ -1,15 +1,12 @@
 # dft - Batteries included DataFusion
 
-## 🚧 DOCS UNDER CONSTRUCTION
-Documentation is undergoing a significant revamp - the new documentation will be finalized as part of the v0.3 release in the late Spring or early Summer of 2025.
-
 ## Overview
 
 `dft` is a batteries-included suite of [DataFusion](https://github.com/apache/arrow-datafusion) applications that provides:
 
 - **Data Source Integration**: Query files from S3, local filesystems, or HuggingFace datasets
-- **Table Format Support**: Native support for Delta Lake
-- **Extensibility**: UDFs defined in WASM (and soon Python)
+- **Table Format Support**: Native support for Delta Lake and Vortex
+- **Extensibility**: UDFs defined in WASM
 - **Helper Functions**: Built-in functions for JSON and Parquet data processing
 
 The project offers four complementary interfaces:
@@ -58,6 +55,24 @@ cargo install datafusion-dft --features=deltalake
 
 # With JSON and Parquet functions
 cargo install datafusion-dft --features=functions-json,functions-parquet
+
+# With Arrow IPC file inspection functions
+cargo install datafusion-dft --features=functions-arrow
+
+# With the websocket table function for streaming WebSocket messages
+cargo install datafusion-dft --features=websocket
+
+# With the pcap / capture table functions for querying network packet captures
+cargo install datafusion-dft --features=net
+
+# With Vortex file format support
+cargo install datafusion-dft --features=vortex
+
+# With HuggingFace dataset integration
+cargo install datafusion-dft --features=huggingface
+
+# With WASM UDF support
+cargo install datafusion-dft --features=udfs-wasm
 ```
 
 See the [Features documentation](docs/features.md) for all available features.

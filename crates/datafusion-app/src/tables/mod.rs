@@ -16,3 +16,5 @@
 // under the License.
 
 pub mod map_table;
+#[cfg(feature = "websocket")]
+pub mod websocket;

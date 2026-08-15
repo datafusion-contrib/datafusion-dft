@@ -143,6 +143,8 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
             config.flightsql_client.benchmark_iterations,
             auth,
             config.flightsql_client.headers.clone(),
+            config.flightsql_client.max_decoding_message_size,
+            config.flightsql_client.max_encoding_message_size,
         );
 
         let flightsql_context = FlightSQLContext::new(flightsql_cfg.clone());

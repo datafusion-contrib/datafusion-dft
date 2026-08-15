@@ -21,8 +21,6 @@ use crate::execution::AppExecution;
 use crate::tui::AppEvent;
 use color_eyre::eyre::Result;
 use datafusion::arrow::array::RecordBatch;
-#[allow(unused_imports)] // No idea why this is being picked up as unused when I use it twice.
-use datafusion::arrow::error::ArrowError;
 use datafusion::execution::context::SessionContext;
 use datafusion::execution::SendableRecordBatchStream;
 use datafusion::physical_plan::execute_stream;
@@ -315,19 +313,17 @@ impl TuiExecution {
                                         }
                                         Err(e) => {
                                             error!("Error creating result stream: {:?}", e);
-                                            if let ArrowError::IpcError(ipc_err) = &e {
-                                                if ipc_err.contains("error trying to connect") {
-                                                    let e = ExecutionError {
-                                                        query: sql.to_string(),
-                                                        error: "Error connecting to Flight server"
-                                                            .to_string(),
-                                                        duration: std::time::Duration::from_secs(0),
-                                                    };
-                                                    sender.send(
-                                                        AppEvent::FlightSQLExecutionResultsError(e),
-                                                    )?;
-                                                    return Ok(());
-                                                }
+                                            if e.to_string().contains("error trying to connect") {
+                                                let e = ExecutionError {
+                                                    query: sql.to_string(),
+                                                    error: "Error connecting to Flight server"
+                                                        .to_string(),
+                                                    duration: std::time::Duration::from_secs(0),
+                                                };
+                                                sender.send(
+                                                    AppEvent::FlightSQLExecutionResultsError(e),
+                                                )?;
+                                                return Ok(());
                                             }
 
                                             let elapsed = start.elapsed();
@@ -346,16 +342,14 @@ impl TuiExecution {
                         }
                         Err(e) => {
                             error!("Error getting flight info: {:?}", e);
-                            if let ArrowError::IpcError(ipc_err) = &e {
-                                if ipc_err.contains("error trying to connect") {
-                                    let e = ExecutionError {
-                                        query: sql.to_string(),
-                                        error: "Error connecting to Flight server".to_string(),
-                                        duration: std::time::Duration::from_secs(0),
-                                    };
-                                    sender.send(AppEvent::FlightSQLExecutionResultsError(e))?;
-                                    return Ok(());
-                                }
+                            if e.to_string().contains("error trying to connect") {
+                                let e = ExecutionError {
+                                    query: sql.to_string(),
+                                    error: "Error connecting to Flight server".to_string(),
+                                    duration: std::time::Duration::from_secs(0),
+                                };
+                                sender.send(AppEvent::FlightSQLExecutionResultsError(e))?;
+                                return Ok(());
                             }
                             let elapsed = start.elapsed();
                             let e = ExecutionError {
@@ -397,6 +391,35 @@ impl TuiExecution {
                     }
                     Err(e) => {
                         error!("Error getting RecordBatch: {:?}", e);
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "flightsql")]
+    pub async fn next_flightsql_batch(&self, sql: String, sender: UnboundedSender<AppEvent>) {
+        let mut streams = self.flightsql_result_stream.lock().await;
+        if let Some(s) = streams.as_mut() {
+            let start = std::time::Instant::now();
+            if let Some((ticket, batch_result)) = s.next().await {
+                match batch_result {
+                    Ok(batch) => {
+                        info!(
+                            "Fetched next FlightSQL batch from {}: {} rows",
+                            ticket,
+                            batch.num_rows()
+                        );
+                        let duration = start.elapsed();
+                        let results = ExecutionResultsBatch {
+                            query: sql,
+                            batch,
+                            duration,
+                        };
+                        let _ = sender.send(AppEvent::FlightSQLExecutionResultsNextBatch(results));
+                    }
+                    Err(e) => {
+                        error!("Error getting next FlightSQL batch: {:?}", e);
                     }
                 }
             }

@@ -25,7 +25,7 @@ use datafusion_app::{
     config::merge_configs, extensions::DftSessionStateBuilder, local::ExecutionContext,
 };
 use log::info;
-use object_store::ObjectStore;
+use object_store::{ObjectStore, ObjectStoreExt};
 use parquet::arrow::ArrowWriter;
 use tpchgen::generators::{
     CustomerGenerator, LineItemGenerator, NationGenerator, OrderGenerator, PartGenerator,
@@ -159,7 +159,8 @@ where
     let concatenated = concat_batches(&schema, &batches_vec)?;
 
     // Convert to Vortex array
-    let vortex_array = ArrayRef::from_arrow(concatenated, false);
+    let vortex_array =
+        ArrayRef::from_arrow(concatenated, false).map_err(|e| eyre::Error::msg(format!("{e}")))?;
 
     // Convert to array stream
     let stream = vortex_array.to_array_stream();

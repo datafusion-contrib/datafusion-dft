@@ -36,7 +36,7 @@ async fn test_s3_basic() {
         "s3",
         "test",
         "s3://test",
-        "http://localhost:4566",
+        "http://localhost:9000",
         "LSIAQAAAAAAVNCBMPNSG",
         "5555555555555555555555555555555555555555",
         true,
@@ -72,7 +72,7 @@ async fn test_s3_credential_chain_env_vars() {
         "AWS_SECRET_ACCESS_KEY",
         "5555555555555555555555555555555555555555",
     );
-    std::env::set_var("AWS_ENDPOINT_URL_S3", "http://localhost:4566");
+    std::env::set_var("AWS_ENDPOINT_URL_S3", "http://localhost:9000");
 
     let tempdir = tempfile::tempdir().unwrap();
     let ddl_path = tempdir.path().join("my_ddl.sql");
@@ -88,7 +88,7 @@ async fn test_s3_credential_chain_env_vars() {
         "s3",
         "test",
         "s3://test",
-        Some("http://localhost:4566"),
+        Some("http://localhost:9000"),
         true,
     );
     let config = config_builder.build("my_config.toml");
@@ -124,7 +124,7 @@ async fn test_s3_credential_chain_with_static_override() {
     // Set wrong credentials in environment
     std::env::set_var("AWS_ACCESS_KEY_ID", "WRONG_KEY");
     std::env::set_var("AWS_SECRET_ACCESS_KEY", "WRONG_SECRET");
-    std::env::set_var("AWS_ENDPOINT_URL_S3", "http://localhost:4566");
+    std::env::set_var("AWS_ENDPOINT_URL_S3", "http://localhost:9000");
 
     let tempdir = tempfile::tempdir().unwrap();
     let ddl_path = tempdir.path().join("my_ddl.sql");
@@ -143,7 +143,7 @@ async fn test_s3_credential_chain_with_static_override() {
         "s3",
         "test",
         "s3://test",
-        "http://localhost:4566",
+        "http://localhost:9000",
         "LSIAQAAAAAAVNCBMPNSG",
         "5555555555555555555555555555555555555555",
         true,

@@ -1,0 +1,32 @@
+[package]
+authors = ["Matthew Turner <matthew.m.turner@outlook.com>"]
+description = "DataFusion table functions for querying network packet captures (pcap)"
+edition = "2021"
+homepage = "https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-net"
+keywords = ["datafusion", "network", "pcap", "query", "sql"]
+license = "Apache-2.0"
+name = "datafusion-net"
+readme = "README.md"
+repository = "https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-net"
+version = "0.1.0"
+
+[dependencies]
+async-trait = "0.1.80"
+datafusion = { version = "54" }
+dns-lookup = "3"
+etherparse = "0.20"
+maxminddb = "0.29"
+pcap = { optional = true, version = "2.4" }
+pcap-parser = "0.17"
+tokio = { features = ["sync"], version = "1" }
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { features = ["macros", "rt-multi-thread"], version = "1" }
+
+[features]
+default = []
+live = ["dep:pcap"]
+
+[lints.clippy]
+clone_on_ref_ptr = "deny"

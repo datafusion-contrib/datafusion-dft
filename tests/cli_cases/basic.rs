@@ -493,6 +493,71 @@ fn test_output_parquet() {
 }
 
 #[test]
+fn test_json_output() {
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT 1 AS id, 'hello' AS name")
+        .arg("-j")
+        .assert()
+        .success();
+
+    assert.stdout(contains_str(r#"{"id":1,"name":"hello"}"#));
+}
+
+#[test]
+fn test_json_output_multiple_rows() {
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT * FROM (VALUES (1, 'a'), (2, 'b')) AS t(id, val)")
+        .arg("-j")
+        .assert()
+        .success();
+
+    assert
+        .stdout(contains_str(r#"{"id":1,"val":"a"}"#))
+        .stdout(contains_str(r#"{"id":2,"val":"b"}"#));
+}
+
+#[test]
+fn test_concat_output() {
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT * FROM (VALUES (1, 'a'), (2, 'b')) AS t(id, val)")
+        .arg("-C")
+        .assert()
+        .success();
+
+    // With concat the result is a single table with all rows
+    let expected = r#"
++----+-----+
+| id | val |
++----+-----+
+| 1  | a   |
+| 2  | b   |
++----+-----+"#;
+    assert.stdout(contains_str(expected));
+}
+
+#[test]
+fn test_json_and_concat_output() {
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT * FROM (VALUES (1, 'a'), (2, 'b')) AS t(id, val)")
+        .arg("-j")
+        .arg("-C")
+        .assert()
+        .success();
+
+    assert
+        .stdout(contains_str(r#"{"id":1,"val":"a"}"#))
+        .stdout(contains_str(r#"{"id":2,"val":"b"}"#));
+}
+
+#[test]
 #[cfg(feature = "vortex")]
 fn test_output_vortex() {
     let dir = tempfile::tempdir().unwrap();

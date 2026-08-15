@@ -115,6 +115,121 @@ impl ExecutionContext {
             "parquet_metadata",
             Arc::new(datafusion_functions_parquet::ParquetMetadataFunc {}),
         );
+        session_ctx.register_udtf(
+            "parquet_page_index",
+            Arc::new(datafusion_functions_parquet::ParquetPageIndexFunc {}),
+        );
+        session_ctx.register_udtf(
+            "parquet_kv_metadata",
+            Arc::new(datafusion_functions_parquet::ParquetKvMetadataFunc {}),
+        );
+        session_ctx.register_udtf(
+            "parquet_arrow_schema",
+            Arc::new(datafusion_functions_parquet::ParquetArrowSchemaFunc {}),
+        );
+        session_ctx.register_udtf(
+            "parquet_row_groups",
+            Arc::new(datafusion_functions_parquet::ParquetRowGroupsFunc {}),
+        );
+        session_ctx.register_udtf(
+            "parquet_bloom_filter",
+            Arc::new(datafusion_functions_parquet::ParquetBloomFilterFunc {}),
+        );
+        session_ctx.register_udtf(
+            "parquet_bloom_filter_check",
+            Arc::new(datafusion_functions_parquet::ParquetBloomFilterCheckFunc {}),
+        );
+        session_ctx.register_udtf(
+            "parquet_dictionary",
+            Arc::new(datafusion_functions_parquet::ParquetDictionaryFunc {}),
+        );
+        session_ctx.register_udtf(
+            "parquet_compression",
+            Arc::new(datafusion_functions_parquet::ParquetCompressionFunc {}),
+        );
+        session_ctx.register_udtf(
+            "parquet_pages",
+            Arc::new(datafusion_functions_parquet::ParquetPagesFunc {}),
+        );
+        session_ctx.register_udtf(
+            "parquet_schema",
+            Arc::new(datafusion_functions_parquet::ParquetSchemaFunc {}),
+        );
+        session_ctx.register_udtf(
+            "parquet_file_metadata",
+            Arc::new(datafusion_functions_parquet::ParquetFileMetadataFunc {}),
+        );
+
+        #[cfg(feature = "functions-arrow")]
+        {
+            session_ctx.register_udtf(
+                "arrow_schema",
+                Arc::new(datafusion_functions_arrow::ArrowSchemaFunc {}),
+            );
+            session_ctx.register_udtf(
+                "arrow_metadata",
+                Arc::new(datafusion_functions_arrow::ArrowMetadataFunc {}),
+            );
+            session_ctx.register_udtf(
+                "arrow_batches",
+                Arc::new(datafusion_functions_arrow::ArrowBatchesFunc {}),
+            );
+            session_ctx.register_udtf(
+                "arrow_dictionaries",
+                Arc::new(datafusion_functions_arrow::ArrowDictionariesFunc {}),
+            );
+            session_ctx.register_udtf(
+                "arrow_file_metadata",
+                Arc::new(datafusion_functions_arrow::ArrowFileMetadataFunc {}),
+            );
+            session_ctx.register_udtf(
+                "arrow_batch",
+                Arc::new(datafusion_functions_arrow::ArrowBatchFunc {}),
+            );
+        }
+
+        #[cfg(feature = "websocket")]
+        session_ctx.register_udtf(
+            "websocket",
+            Arc::new(crate::tables::websocket::WebSocketFunc::default()),
+        );
+
+        #[cfg(feature = "net")]
+        {
+            use datafusion::logical_expr::ScalarUDF;
+
+            session_ctx.register_udtf("pcap", Arc::new(datafusion_net::PcapFunc::default()));
+            session_ctx.register_udtf("capture", Arc::new(datafusion_net::CaptureFunc::default()));
+            session_ctx.register_udtf(
+                "interfaces",
+                Arc::new(datafusion_net::InterfacesFunc::default()),
+            );
+            session_ctx.register_udtf(
+                "tcp_conversations",
+                Arc::new(datafusion_net::TcpConversationsFunc::default()),
+            );
+            session_ctx.register_udf(ScalarUDF::from(datafusion_net::ReverseDnsUdf::default()));
+            session_ctx.register_udf(ScalarUDF::from(datafusion_net::DnsQueryUdf::default()));
+            session_ctx.register_udf(ScalarUDF::from(datafusion_net::TlsSniUdf::default()));
+            // The GEOIP_DB environment variable takes precedence over the
+            // configured database path
+            let geoip_db_path = std::env::var_os(datafusion_net::GEOIP_DB_ENV_VAR)
+                .map(std::path::PathBuf::from)
+                .or_else(|| config.net.geoip_db_path.clone());
+            let geoip = match &geoip_db_path {
+                Some(path) => datafusion_net::GeoIpUdf::with_db_path(path),
+                None => datafusion_net::GeoIpUdf::default(),
+            };
+            session_ctx.register_udf(ScalarUDF::from(geoip));
+            session_ctx.register_udtf(
+                "pcap_wide",
+                Arc::new(datafusion_net::PcapWideFunc::new(geoip_db_path.clone())),
+            );
+            session_ctx.register_udtf(
+                "capture_wide",
+                Arc::new(datafusion_net::CaptureWideFunc::new(geoip_db_path)),
+            );
+        }
 
         let catalog = create_app_catalog(config, app_name, app_version)?;
         session_ctx.register_catalog(&config.catalog.name, catalog);

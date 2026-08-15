@@ -70,11 +70,9 @@ impl Extension for HuggingFaceExtension {
             if let Some(repo_id) = &huggingface_config.repo_id {
                 hf_builder = hf_builder.repo_id(repo_id);
 
-                let operator = Operator::new(hf_builder)
-                    .map_err(|e| {
-                        datafusion::common::error::DataFusionError::External(e.to_string().into())
-                    })?
-                    .finish();
+                let operator = Operator::new(hf_builder).map_err(|e| {
+                    datafusion::common::error::DataFusionError::External(e.to_string().into())
+                })?;
 
                 let store = object_store_opendal::OpendalStore::new(operator);
 

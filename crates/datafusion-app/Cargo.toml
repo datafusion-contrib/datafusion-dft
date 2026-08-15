@@ -8,20 +8,26 @@ version = "0.1.0"
 [dependencies]
 arrow-flight = { features = [
   "flight-sql-experimental",
-], optional = true, version = "57" }
+], optional = true, version = "58" }
 async-trait = "0.1.80"
 base64 = { optional = true, version = "0.22.1" }
 color-eyre = "0.6.3"
-datafusion = "51"
-datafusion-functions-json = { optional = true, version = "0.51" }
+datafusion = "54"
+datafusion-functions-arrow = { optional = true, path = "../datafusion-functions-arrow", version = "0.1.0" }
+datafusion-functions-json = { optional = true, version = "0.54" }
 datafusion-functions-parquet = { optional = true, path = "../datafusion-functions-parquet", version = "0.1.0" }
+datafusion-net = { optional = true, path = "../datafusion-net", version = "0.1.0" }
+datafusion-table-providers = { optional = true, version = "0.12.0" }
 datafusion-udfs-wasm = { features = [
   "serde",
 ], optional = true, path = "../datafusion-udfs-wasm", version = "0.1.0" }
+# TODO: revert to crates.io once deltalake releases with DataFusion 54 support.
+# Pinned to the head of https://github.com/delta-io/delta-rs/pull/4582 because earlier
+# revs map the `s3`/`rustls` features to kernel features removed in buoyant_kernel 0.24.
 deltalake = { features = [
   "datafusion",
   "s3",
-], optional = true, version = "0.30" }
+], git = "https://github.com/delta-io/delta-rs", optional = true, rev = "b1a18b5aa6d1" }
 directories = "5.0.1"
 futures = "0.3.30"
 indexmap = { features = ["serde"], version = "2.8.0" }
@@ -29,13 +35,19 @@ itertools = "0.13.0"
 log = "0.4.22"
 metrics = { optional = true, version = "0.24.0" }
 num_cpus = "1.16.0"
-object_store = { features = ["aws"], optional = true, version = "0.12" }
-object_store_opendal = { optional = true, version = "0.54" }
+object_store = { features = ["aws"], optional = true, version = "0.13" }
+# TODO: revert to crates.io once object_store_opendal releases with DataFusion 54 support.
+# Both crates must come from the same rev because an opendal `Operator` is passed to
+# `OpendalStore::new` in the huggingface extension.
+object_store_opendal = { git = "https://github.com/apache/opendal", optional = true, rev = "24aaff9c62b1" }
 opendal = { features = [
   "services-huggingface",
-], optional = true, version = "0.54.1" }
+], git = "https://github.com/apache/opendal", optional = true, rev = "24aaff9c62b1" }
 parking_lot = "0.12.3"
 prost = { optional = true, version = "0.14" }
+rustls = { default-features = false, features = [
+  "aws-lc-rs",
+], optional = true, version = "0.23" }
 serde = { features = ["derive"], version = "1.0.197" }
 serde_json = { optional = true, version = "1.0" }
 tokio = { features = ["macros", "rt-multi-thread"], version = "1.36.0" }
@@ -43,15 +55,22 @@ tokio-metrics = { features = [
   "metrics-rs-integration",
 ], optional = true, version = "0.4" }
 tokio-stream = { features = ["net"], version = "0.1.15" }
+tokio-tungstenite = { features = [
+  "rustls-tls-native-roots",
+], optional = true, version = "0.29" }
 tonic = { optional = true, version = "0.14" }
 url = { optional = true, version = "2.5.2" }
-vortex-datafusion = { optional = true, version = "0.58" }
+vortex-datafusion = { optional = true, version = "0.78" }
 
 [dev-dependencies]
 criterion = { features = ["async_tokio"], version = "0.5.1" }
 tempfile = "3"
 
 [features]
+clickhouse = [
+  "datafusion-table-providers/clickhouse",
+  "dep:datafusion-table-providers",
+]
 default = ["functions-parquet"]
 deltalake = ["dep:deltalake"]
 flightsql = [
@@ -61,13 +80,20 @@ flightsql = [
   "dep:serde_json",
   "dep:tonic",
 ]
+functions-arrow = ["dep:datafusion-functions-arrow"]
 functions-json = ["dep:datafusion-functions-json"]
 functions-parquet = ["dep:datafusion-functions-parquet"]
 huggingface = ["object_store_opendal", "opendal", "url"]
+mongodb = [
+  "datafusion-table-providers/mongodb",
+  "dep:datafusion-table-providers",
+]
+net = ["datafusion-net/live", "dep:datafusion-net"]
 observability = ["dep:metrics", "dep:tokio-metrics"]
 s3 = ["object_store/aws", "url"]
 udfs-wasm = ["dep:datafusion-udfs-wasm"]
 vortex = ["dep:vortex-datafusion"]
+websocket = ["dep:rustls", "dep:tokio-tungstenite"]
 
 [lints.clippy]
 clone_on_ref_ptr = "deny"

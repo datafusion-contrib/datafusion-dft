@@ -26,6 +26,7 @@ mod keyboard_modifiers;
 mod pagination;
 mod quit;
 mod sql_execution;
+mod sql_pagination;
 
 use datafusion::arrow::array::RecordBatch;
 use datafusion::common::Result;
@@ -56,7 +57,7 @@ impl TestApp<'_> {
     /// Create a new [`TestApp`] instance configured with a temporary directory
     async fn new() -> Self {
         let config_path = tempdir().unwrap();
-        let config = create_config(config_path.path().to_path_buf());
+        let config = create_config(config_path.path().to_path_buf(), &[]);
         let state = AppState::new(config);
         let session_state =
             DftSessionStateBuilder::try_new(Some(state.config.tui.execution.clone()))

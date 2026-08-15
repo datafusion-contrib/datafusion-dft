@@ -16,7 +16,14 @@
 # under the License.
 
 name: Tests
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -85,6 +92,14 @@ jobs:
   test-cli:
     name: App / CLI
     runs-on: ubuntu-latest
+    services:
+      rustfs:
+        image: rustfs/rustfs:latest
+        ports:
+          - 9000:9000
+        env:
+          RUSTFS_ACCESS_KEY: LSIAQAAAAAAVNCBMPNSG
+          RUSTFS_SECRET_KEY: "5555555555555555555555555555555555555555"
     strategy:
       matrix:
         arch: [amd64]
@@ -107,17 +122,17 @@ jobs:
             target-${{ runner.os }}-
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
-      - name: Start LocalStack
-        uses: LocalStack/setup-localstack@v0.2.3
-        with:
-          image-tag: 'latest'
-          install-awslocal: 'true'
-          configuration: DEBUG=1
-      - name: Run Tests against LocalStack
+      - name: Wait for RustFS
+        run: timeout 60 bash -c 'until nc -z localhost 9000; do sleep 2; done'
+      - name: Setup S3 buckets
+        env:
+          AWS_ACCESS_KEY_ID: LSIAQAAAAAAVNCBMPNSG
+          AWS_SECRET_ACCESS_KEY: "5555555555555555555555555555555555555555"
+          AWS_DEFAULT_REGION: us-east-1
         run: |
-          awslocal s3 mb s3://test
-          awslocal s3 mv data/aggregate_test_100.csv s3://test/
-          awslocal s3 mb s3://tpch-db
+          aws --endpoint-url http://localhost:9000 s3 mb s3://test
+          aws --endpoint-url http://localhost:9000 s3 cp data/aggregate_test_100.csv s3://test/
+          aws --endpoint-url http://localhost:9000 s3 mb s3://tpch-db
           echo "Test Execution complete!"
       - name: Run CLI tests
         run: |
@@ -125,6 +140,14 @@ jobs:
   test-tui:
     name: App / TUI
     runs-on: ubuntu-latest
+    services:
+      rustfs:
+        image: rustfs/rustfs:latest
+        ports:
+          - 9000:9000
+        env:
+          RUSTFS_ACCESS_KEY: LSIAQAAAAAAVNCBMPNSG
+          RUSTFS_SECRET_KEY: "5555555555555555555555555555555555555555"
     strategy:
       matrix:
         arch: [amd64]
@@ -147,17 +170,17 @@ jobs:
             target-${{ runner.os }}-
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
-      - name: Start LocalStack
-        uses: LocalStack/setup-localstack@v0.2.3
-        with:
-          image-tag: 'latest'
-          install-awslocal: 'true'
-          configuration: DEBUG=1
-      - name: Run Tests against LocalStack
+      - name: Wait for RustFS
+        run: timeout 60 bash -c 'until nc -z localhost 9000; do sleep 2; done'
+      - name: Setup S3 buckets
+        env:
+          AWS_ACCESS_KEY_ID: LSIAQAAAAAAVNCBMPNSG
+          AWS_SECRET_ACCESS_KEY: "5555555555555555555555555555555555555555"
+          AWS_DEFAULT_REGION: us-east-1
         run: |
-          awslocal s3 mb s3://test
-          awslocal s3 mv data/aggregate_test_100.csv s3://test/
-          awslocal s3 mb s3://tpch-db
+          aws --endpoint-url http://localhost:9000 s3 mb s3://test
+          aws --endpoint-url http://localhost:9000 s3 cp data/aggregate_test_100.csv s3://test/
+          aws --endpoint-url http://localhost:9000 s3 mb s3://tpch-db
           echo "Test Execution complete!"
       - name: Run TUI tests
         run: |
@@ -166,6 +189,14 @@ jobs:
   test-s3:
     name: Extension / S3
     runs-on: ubuntu-latest
+    services:
+      rustfs:
+        image: rustfs/rustfs:latest
+        ports:
+          - 9000:9000
+        env:
+          RUSTFS_ACCESS_KEY: LSIAQAAAAAAVNCBMPNSG
+          RUSTFS_SECRET_KEY: "5555555555555555555555555555555555555555"
     strategy:
       matrix:
         arch: [amd64]
@@ -188,20 +219,20 @@ jobs:
             target-${{ runner.os }}-
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
-      - name: Start LocalStack
-        uses: LocalStack/setup-localstack@v0.2.3
-        with:
-          image-tag: 'latest'
-          install-awslocal: 'true'
-          configuration: DEBUG=1
-      - name: Run Tests against LocalStack
+      - name: Wait for RustFS
+        run: timeout 60 bash -c 'until nc -z localhost 9000; do sleep 2; done'
+      - name: Setup S3 buckets
+        env:
+          AWS_ACCESS_KEY_ID: LSIAQAAAAAAVNCBMPNSG
+          AWS_SECRET_ACCESS_KEY: "5555555555555555555555555555555555555555"
+          AWS_DEFAULT_REGION: us-east-1
         run: |
-          awslocal s3 mb s3://test
-          awslocal s3 mv data/aggregate_test_100.csv s3://test/
+          aws --endpoint-url http://localhost:9000 s3 mb s3://test
+          aws --endpoint-url http://localhost:9000 s3 cp data/aggregate_test_100.csv s3://test/
           echo "Test Execution complete!"
       - name: Run S3 tests
         run: |
-          cargo test --features=s3 extension_cases::s3
+          cargo test --features=s3 extension_cases::s3 -- --test-threads=1
   test-functions-json:
     name: Extension / Functions-JSON
     runs-on: ubuntu-latest
@@ -232,8 +263,140 @@ jobs:
       - name: Run Functions-JSON tests
         run: |
           cargo test --features=functions-json extension_cases::functions_json
-  test-deltalake:
-    name: Extension / Deltalake
+  test-functions-arrow:
+    name: Extension / Functions-Arrow
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Cache Cargo registry and git
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cargo
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+      - name: Cache Rust target directory
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
+          restore-keys: |
+            target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-
+            target-${{ runner.os }}-
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
+      - name: Run Functions-Arrow tests
+        run: |
+          cargo test --manifest-path crates/datafusion-functions-arrow/Cargo.toml
+          cargo test --features=functions-arrow extension_cases::functions_arrow
+  test-websocket:
+    name: Extension / WebSocket
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Cache Cargo registry and git
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cargo
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+      - name: Cache Rust target directory
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
+          restore-keys: |
+            target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-
+            target-${{ runner.os }}-
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
+      - name: Run WebSocket tests
+        run: |
+          cargo test --features=websocket extension_cases::websocket
+  test-net:
+    name: Extension / Net
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Cache Cargo registry and git
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cargo
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+      - name: Cache Rust target directory
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
+          restore-keys: |
+            target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-
+            target-${{ runner.os }}-
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
+      - name: Install libpcap
+        run: sudo apt-get update && sudo apt-get install -y libpcap-dev
+      - name: Run Net tests
+        run: |
+          cargo test --manifest-path crates/datafusion-net/Cargo.toml --all-features
+          cargo test --features=net extension_cases::net
+  test-clickhouse:
+    name: Extension / ClickHouse
+    runs-on: ubuntu-latest
+    services:
+      clickhouse:
+        image: clickhouse/clickhouse-server:latest
+        ports:
+          - 8123:8123
+        env:
+          CLICKHOUSE_USER: admin
+          CLICKHOUSE_PASSWORD: secret
+    strategy:
+      matrix:
+        arch: [amd64]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Cache Cargo registry and git
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cargo
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+      - name: Cache Rust target directory
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
+          restore-keys: |
+            target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-
+            target-${{ runner.os }}-
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
+      - name: Wait for ClickHouse
+        run: timeout 60 bash -c 'until curl -sf http://localhost:8123/ping; do sleep 2; done'
+      - name: Run ClickHouse tests
+        run: |
+          cargo test --features=clickhouse extension_cases::clickhouse
+  test-mongodb:
+    name: Extension / MongoDB
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -257,26 +420,66 @@ jobs:
             target-${{ runner.os }}-
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
-      - name: Start LocalStack
-        uses: LocalStack/setup-localstack@v0.2.3
-        with:
-          image-tag: 'latest'
-          install-awslocal: 'true'
-          configuration: DEBUG=1
-      - name: Upload Delta Lake data to LocalStack
+      # The tests seed data with `docker exec mongodb mongosh`, which requires a container
+      # named `mongodb`, so a service container (with a generated name) is not used here
+      - name: Start MongoDB
         run: |
-          awslocal s3 mb s3://test
-          awslocal s3 sync data/deltalake/simple_table s3://test/deltalake/simple_table
-          echo "Delta Lake data uploaded to LocalStack"
+          docker run -d --name mongodb -p 27017:27017 \
+            -e MONGO_INITDB_ROOT_USERNAME=admin -e MONGO_INITDB_ROOT_PASSWORD=secret \
+            mongo:7.0
+      - name: Wait for MongoDB
+        run: |
+          timeout 60 bash -c 'until docker exec mongodb mongosh -u admin -p secret --authenticationDatabase admin --quiet --eval "db.adminCommand({ ping: 1 })"; do sleep 2; done'
+      - name: Run MongoDB tests
+        run: |
+          cargo test --features=mongodb extension_cases::mongodb
+  test-deltalake:
+    name: Extension / Deltalake
+    runs-on: ubuntu-latest
+    services:
+      rustfs:
+        image: rustfs/rustfs:latest
+        ports:
+          - 9000:9000
+        env:
+          RUSTFS_ACCESS_KEY: LSIAQAAAAAAVNCBMPNSG
+          RUSTFS_SECRET_KEY: "5555555555555555555555555555555555555555"
+    strategy:
+      matrix:
+        arch: [amd64]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Cache Cargo registry and git
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cargo
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+      - name: Cache Rust target directory
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
+          restore-keys: |
+            target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-
+            target-${{ runner.os }}-
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
+      - name: Wait for RustFS
+        run: timeout 60 bash -c 'until nc -z localhost 9000; do sleep 2; done'
+      - name: Upload Delta Lake data to RustFS
+        env:
+          AWS_ACCESS_KEY_ID: LSIAQAAAAAAVNCBMPNSG
+          AWS_SECRET_ACCESS_KEY: "5555555555555555555555555555555555555555"
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          aws --endpoint-url http://localhost:9000 s3 mb s3://test
+          aws --endpoint-url http://localhost:9000 s3 sync data/deltalake/simple_table s3://test/deltalake/simple_table
+          echo "Delta Lake data uploaded to RustFS"
       - name: Run Deltalake tests
         run: |
           cargo test --features="deltalake s3" extension_cases::deltalake
-        env:
-          AWS_ACCESS_KEY_ID: LSIAQAAAAAAVNCBMPNSG
-          AWS_SECRET_ACCESS_KEY: 5555555555555555555555555555555555555555
-          AWS_ENDPOINT_URL: http://localhost:4566
-          AWS_REGION: us-east-1
-          AWS_ALLOW_HTTP: true
   test-udfs-wasm:
     name: Extension / UDFs-WASM
     runs-on: ubuntu-latest
@@ -394,6 +597,8 @@ jobs:
             target-${{ runner.os }}-
       - name: Setup Rust Toolchain
         uses: ./.github/actions/setup-rust
+      - name: Install libpcap
+        run: sudo apt-get update && sudo apt-get install -y libpcap-dev
       - name: Run UDFs WASM tests
         run: |
           cargo test --all-features --manifest-path crates/datafusion-app/Cargo.toml

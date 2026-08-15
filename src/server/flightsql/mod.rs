@@ -54,6 +54,14 @@ pub fn create_server_handle(
         rx.await.ok();
     };
 
+    let mut flight_service = flightsql.service();
+    if let Some(size) = config.flightsql_server.max_decoding_message_size {
+        flight_service = flight_service.max_decoding_message_size(size);
+    }
+    if let Some(size) = config.flightsql_server.max_encoding_message_size {
+        flight_service = flight_service.max_encoding_message_size(size);
+    }
+
     // TODO: onlu include TrailersLayer for testing
     if cfg!(feature = "flightsql") {
         match (
@@ -66,7 +74,7 @@ pub fn create_server_handle(
                     ValidateRequestHeaderLayer::basic(&basic.username, &basic.password);
                 let f = server_builder
                     .layer(basic_auth_layer)
-                    .add_service(flightsql.service())
+                    .add_service(flight_service)
                     .serve_with_incoming_shutdown(
                         tokio_stream::wrappers::TcpListenerStream::new(listener),
                         shutdown_future,
@@ -77,7 +85,7 @@ pub fn create_server_handle(
                 let bearer_auth_layer = ValidateRequestHeaderLayer::bearer(token);
                 let f = server_builder
                     .layer(bearer_auth_layer)
-                    .add_service(flightsql.service())
+                    .add_service(flight_service)
                     .serve_with_incoming_shutdown(
                         tokio_stream::wrappers::TcpListenerStream::new(listener),
                         shutdown_future,
@@ -86,7 +94,7 @@ pub fn create_server_handle(
             }
             (None, None) => {
                 let f = server_builder
-                    .add_service(flightsql.service())
+                    .add_service(flight_service)
                     .serve_with_incoming_shutdown(
                         tokio_stream::wrappers::TcpListenerStream::new(listener),
                         shutdown_future,
@@ -96,7 +104,7 @@ pub fn create_server_handle(
         }
     } else {
         let f = server_builder
-            .add_service(flightsql.service())
+            .add_service(flight_service)
             .serve_with_incoming_shutdown(
                 tokio_stream::wrappers::TcpListenerStream::new(listener),
                 shutdown_future,

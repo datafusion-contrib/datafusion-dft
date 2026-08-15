@@ -51,6 +51,59 @@ dft flightsql get-xdbc-type-info
 dft flightsql get-xdbc-type-info --data-type 4  # Filter by specific SQL data type
 ```
 
+## Headers
+
+Additional HTTP headers can be attached to FlightSQL connections using `--header` or `--headers-file`. These are useful for passing authentication tokens, tenant identifiers, or any other metadata required by the server.
+
+### Single headers (`--header`)
+
+Pass one or more `Name: Value` pairs directly on the command line. The flag can be repeated:
+
+```sh
+dft -c "SELECT 1" --flightsql --header "x-api-key: secret"
+dft -c "SELECT 1" --flightsql --header "x-tenant: acme" --header "x-api-key: secret"
+```
+
+### Headers file (`--headers-file`)
+
+For many headers, or to avoid exposing secrets in shell history, store them in a file and point `--headers-file` at it:
+
+```sh
+dft -c "SELECT 1" --flightsql --headers-file ~/.config/dft/headers.txt
+```
+
+The file supports three formats (which can be mixed in the same file):
+
+```
+# Simple format
+x-api-key: secret123
+x-tenant: acme
+
+# Curl config format
+header = x-request-id: abc-123
+
+# Curl -H flag format
+-H "authorization: Bearer mytoken"
+-H 'database: production'
+```
+
+Lines beginning with `#` and blank lines are ignored.
+
+The headers file path can also be set in the config so it is always picked up without needing the flag each time:
+
+```toml
+[flightsql_client]
+headers_file = "/home/user/.config/dft/headers.txt"
+```
+
+### Precedence
+
+When headers are specified in multiple places they are merged in this order (later sources win):
+
+1. Config file (`flightsql_client.headers`)
+2. Headers file (config `headers_file` or `--headers-file`)
+3. `--header` flags on the command line
+
 ## Auth
 
 Basic Auth or Bearer Token can be set in your config, which is used by the client:

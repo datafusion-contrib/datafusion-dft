@@ -109,7 +109,7 @@ pub fn render_query_history(area: Rect, buf: &mut Buffer, app: &App) {
             let table = Table::new(rows, widths).header(header).block(block.clone());
 
             let table = table
-                .highlight_style(Style::default().bg(tailwind::WHITE).fg(tailwind::BLACK))
+                .row_highlight_style(Style::default().bg(tailwind::WHITE).fg(tailwind::BLACK))
                 .block(block);
 
             let mut table_state = table_state.borrow_mut();
