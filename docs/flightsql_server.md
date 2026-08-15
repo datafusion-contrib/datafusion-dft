@@ -129,26 +129,29 @@ dft -c "SELECT ..." --analyze-raw --flightsql
 The server collects and returns:
 
 - **Execution timing**: Parsing, planning, execution, and total time
-- **I/O statistics**: Bytes scanned, file operations, format-specific metrics
+- **I/O statistics**: Bytes scanned, file operations, format-specific metrics (per scan node)
 - **Parquet metrics**: Row group pruning, bloom filters, page index effectiveness
-- **Compute breakdown**: Per-operator, per-partition CPU time by category (filter, sort, projection, join, aggregate)
+- **Compute breakdown**: Per-operator, per-partition CPU time by category (projection, filter, sort, aggregate, join, window, distinct, limit, union, other)
+- **Plan hierarchy**: Stable `node_id`/`parent_node_id` for every operator so the plan tree can be reconstructed
+
+**Note**: `analyze_query` executes the query to completion server-side and discards the results, so an analyze call costs a full query execution.
 
 ### Implementation Details
 
 The `dft` server implementation:
 
-1. Handles the `"analyze_query"` action in `do_action_fallback()`
-2. Executes queries using `ExecutionContext::analyze_query()`
-3. Collects metrics from DataFusion execution plan `MetricSet`s
-4. Serializes to two Arrow batches (queries + metrics) following the protocol spec
-5. Returns FlightData stream with metrics encoded as rows
+1. Handles the `"analyze_query"` and `"analyze_query_capabilities"` actions in `do_action_fallback()`
+2. Validates the client's `protocol_version` if provided
+3. Executes queries using `ExecutionContext::analyze_query()` and collects metrics from DataFusion execution plan `MetricSet`s
+4. Serializes to a single flat Arrow metrics batch following the protocol spec, with `analyze.protocol_version` and a per-request `analyze.query_id` in the schema metadata
+5. Returns a FlightData stream with metrics encoded as rows
 
 ### For Other Implementers
 
 If you're implementing an Arrow Flight service and want to support the analyze protocol, see the complete [Arrow Flight Analyze Protocol Specification](arrow_flight_analyze_protocol.md).
 
 The protocol is designed to be:
-- Implementation-agnostic (works with any query engine)
+- Modeled on DataFusion, intended to generalize to other engines
 - Format-agnostic (supports Parquet, CSV, JSON, ORC, custom formats)
 - Extensible (servers can add custom metrics)
 - Language-agnostic (simple flat table format)
