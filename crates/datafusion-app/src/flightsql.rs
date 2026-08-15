@@ -496,6 +496,9 @@ impl FlightSQLContext {
         &self,
         query: &str,
     ) -> Result<(String, datafusion::arrow::array::RecordBatch)> {
+        use crate::stats::{
+            is_compatible_protocol_version, PROTOCOL_VERSION_METADATA_KEY, QUERY_ID_METADATA_KEY,
+        };
         use arrow_flight::utils::flight_data_to_batches;
         use arrow_flight::{Action, FlightData};
 
@@ -527,36 +530,18 @@ impl FlightSQLContext {
             .await
             .map_err(|e| eyre::eyre!("do_action failed: {}", e))?;
 
-        // 3. Collect all Result messages from stream
-        let mut result_messages = Vec::new();
+        // 3. Collect all Result messages, decoding each body as FlightData
+        let mut all_flight_data = Vec::new();
         while let Some(result) = stream.next().await {
             let result = result.map_err(|e| eyre::eyre!("Stream error: {}", e))?;
-            result_messages.push(result);
-        }
-
-        // 4. Decode each Result message to FlightData
-        let mut all_flight_data = Vec::new();
-
-        for result in result_messages {
-            // Deserialize the FlightData from the Result.body bytes using prost
             let flight_data = <FlightData as prost::Message>::decode(result.body.as_ref())
                 .map_err(|e| eyre::eyre!("Failed to decode FlightData: {}", e))?;
-
             all_flight_data.push(flight_data);
         }
 
-        // 5. Use the original query (client retains it, server doesn't send it back)
-        let query_str = query.to_string();
-
-        // 6. Decode metrics batch
-        // batches_to_flight_data creates [schema, data] for the batch
-        if all_flight_data.len() < 2 {
-            return Err(eyre::eyre!(
-                "Invalid analyze response: expected at least 2 FlightData messages (schema + data), got {}",
-                all_flight_data.len()
-            ));
-        }
-
+        // 4. Decode the metrics batches. The framing is a schema message
+        // followed by any number of data (and dictionary) messages; a server
+        // may legitimately split a large metrics table into several batches.
         let metrics_batches = flight_data_to_batches(&all_flight_data)
             .map_err(|e| eyre::eyre!("Failed to decode metrics batch: {}", e))?;
 
@@ -564,6 +549,25 @@ impl FlightSQLContext {
             return Err(eyre::eyre!("No metrics batch found in response"));
         }
 
-        Ok((query_str, metrics_batches[0].clone()))
+        let schema = metrics_batches[0].schema();
+        if let Some(version) = schema.metadata().get(PROTOCOL_VERSION_METADATA_KEY) {
+            if !is_compatible_protocol_version(version) {
+                return Err(eyre::eyre!(
+                    "Server analyze protocol version {} is not compatible with client version {}",
+                    version,
+                    crate::stats::ANALYZE_PROTOCOL_VERSION
+                ));
+            }
+        }
+        if let Some(query_id) = schema.metadata().get(QUERY_ID_METADATA_KEY) {
+            debug!("Analyze response query_id: {query_id}");
+        }
+
+        let metrics_batch =
+            datafusion::arrow::compute::concat_batches(&schema, &metrics_batches)
+                .map_err(|e| eyre::eyre!("Failed to concatenate metrics batches: {}", e))?;
+
+        // Use the original query (client retains it, server doesn't send it back)
+        Ok((query.to_string(), metrics_batch))
     }
 }
