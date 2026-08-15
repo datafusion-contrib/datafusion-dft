@@ -104,3 +104,7 @@ bench/url_files/*
 
 # Tags
 tags
+
+# Local scratch / per-machine files
+notes
+.claude/settings.local.json
