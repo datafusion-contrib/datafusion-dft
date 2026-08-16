@@ -110,12 +110,13 @@ pub enum OperatorCategory {
     Distinct,
     Limit,
     Union,
+    Exchange,
     Other,
 }
 
 impl OperatorCategory {
     /// Compute categories in display order (everything except `Io`)
-    pub const COMPUTE: [OperatorCategory; 10] = [
+    pub const COMPUTE: [OperatorCategory; 11] = [
         OperatorCategory::Projection,
         OperatorCategory::Filter,
         OperatorCategory::Sort,
@@ -125,6 +126,7 @@ impl OperatorCategory {
         OperatorCategory::Distinct,
         OperatorCategory::Limit,
         OperatorCategory::Union,
+        OperatorCategory::Exchange,
         OperatorCategory::Other,
     ];
 
@@ -140,6 +142,7 @@ impl OperatorCategory {
             OperatorCategory::Distinct => "distinct",
             OperatorCategory::Limit => "limit",
             OperatorCategory::Union => "union",
+            OperatorCategory::Exchange => "exchange",
             OperatorCategory::Other => "other",
         }
     }
@@ -157,6 +160,7 @@ impl OperatorCategory {
             OperatorCategory::Distinct => "Distinct",
             OperatorCategory::Limit => "Limit",
             OperatorCategory::Union => "Union",
+            OperatorCategory::Exchange => "Exchange",
             OperatorCategory::Other => "Other",
         }
     }
@@ -173,6 +177,7 @@ impl OperatorCategory {
             "distinct" => Some(OperatorCategory::Distinct),
             "limit" => Some(OperatorCategory::Limit),
             "union" => Some(OperatorCategory::Union),
+            "exchange" => Some(OperatorCategory::Exchange),
             "other" => Some(OperatorCategory::Other),
             _ => None,
         }
@@ -227,6 +232,18 @@ impl OperatorCategory {
         }
         if name.contains("Distinct") || name.contains("Deduplicate") {
             return OperatorCategory::Distinct;
+        }
+        // Network-boundary operators from distributed engines (e.g.
+        // datafusion-distributed's NetworkShuffleExec/NetworkCoalesceExec,
+        // Ballista's ShuffleWriterExec/ShuffleReaderExec/ExchangeExec, or a
+        // RemoteExec-style fragment shipper). Local RepartitionExec is NOT an
+        // exchange: the category is reserved for network boundaries.
+        if name.contains("Network")
+            || name.contains("Exchange")
+            || name.contains("Shuffle")
+            || name.contains("RemoteExec")
+        {
+            return OperatorCategory::Exchange;
         }
         OperatorCategory::Other
     }

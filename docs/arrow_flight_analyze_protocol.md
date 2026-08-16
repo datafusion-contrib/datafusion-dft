@@ -31,6 +31,7 @@ The protocol composes ideas from existing systems rather than inventing new ones
 - **ClickHouse `system.query_log`**: flat metric rows queryable as a table — the same "metrics are data" shape this protocol uses, but post-hoc rather than in-band.
 - **OpenMetrics/Prometheus**: the namespaced metric-name convention (`io.parquet.bytes_scanned`) follows their naming discipline. The `value_type` field is a deliberately minimal unit model; adopters needing richer semantics (temporality, exemplars) should look at the OpenTelemetry metrics data model, which this protocol does not attempt to replicate.
 - **Substrait**: a future request/response field may carry Substrait plans; Substrait plan-relation ids would then be the natural cross-engine operator identity, complementing the per-execution `node_id` used here.
+- **Distributed DataFusion engines** ([DataFusion Distributed](https://datafusion-contrib.github.io/datafusion-distributed/), [Apache DataFusion Ballista](https://github.com/apache/datafusion-ballista), and production Arrow Flight remote-execution systems): a distributed plan is still one plan tree, with network-boundary operators between stages; after execution each worker's per-node metrics are folded back into the coordinator's copy of the plan before display. The [`distributed.*` namespace](#distributed-execution-metrics) and the unified-tree rule follow that model. Notably, systems that ship per-node metrics back today correlate them with the coordinator's tree *positionally* (DFS pre-order) — Ballista's executors report each task's metric sets to the scheduler keyed by pre-order node position within a stage, and its `GetJobMetrics` RPC (per-job metrics retained on the scheduler after completion) is a working precedent for the two-phase analyze in [Future Work](#future-work). The `node_id`/`parent_node_id` columns make exactly that correlation explicit on the wire.
 
 ### Relationship to DataFusion
 
@@ -96,7 +97,7 @@ The response is a stream of `arrow_flight::Result` messages. Each `Result.body` 
 | value_type | Utf8 | false | Unit of value: "duration_ns", "bytes", or "count" |
 | operator_name | Utf8 | true | Execution plan node display name (e.g., "FilterExec", "DataSourceExec"). A label, NOT an identifier — plans routinely contain multiple nodes with the same name. |
 | partition_id | Int32 | true | Partition rank for per-partition metrics (see Compute Metrics) |
-| operator_category | Utf8 | true | Category: "filter", "sort", "projection", "join", "aggregate", "window", "distinct", "limit", "union", "io", "other" |
+| operator_category | Utf8 | true | Category: "filter", "sort", "projection", "join", "aggregate", "window", "distinct", "limit", "union", "exchange", "io", "other" — see [Operator Categories](#operator-categories) |
 | node_id | Int32 | true | Stable id of the plan node this metric belongs to (NULL for query/stage-level metrics) |
 | parent_node_id | Int32 | true | `node_id` of the node's parent (NULL for the root node and for query/stage-level metrics) |
 
@@ -120,6 +121,30 @@ NULL rules:
 - FilterExec: `node_id = 1`, `parent_node_id = 0`
 - DataSourceExec: `node_id = 2`, `parent_node_id = 1`
 
+## Operator Categories
+
+The `operator_category` column groups plan nodes by their function so clients can organize metrics without recognizing every engine-specific operator name. Categories describe what the **physical operator** does, not the logical intent of the query — e.g. an engine that plans `SELECT DISTINCT` as a grouped aggregation reports those nodes as `aggregate`, not `distinct`.
+
+| Category | Meaning | Representative operators (DataFusion) |
+|----------|---------|----------------------------------------|
+| `io` | Scan/data-source nodes reading external data. Report format-specific metrics under `io.{format}.*` and are excluded from the compute breakdown (see [Format-Specific I/O Metrics](#format-specific-io-metrics)) | `DataSourceExec` |
+| `projection` | Column selection and expression evaluation | `ProjectionExec` |
+| `filter` | Row-level predicate evaluation | `FilterExec` |
+| `sort` | Ordering, including order-preserving merges and top-N variants | `SortExec` (incl. TopK), `SortPreservingMergeExec` |
+| `aggregate` | Grouped or scalar aggregation, at any phase (partial/final) | `AggregateExec` |
+| `join` | All join algorithms, including cross joins | `HashJoinExec`, `SortMergeJoinExec`, `NestedLoopJoinExec`, `CrossJoinExec`, `SymmetricHashJoinExec` |
+| `window` | Window-function evaluation | `WindowAggExec`, `BoundedWindowAggExec` |
+| `distinct` | Dedicated deduplication operators (engines without one report deduplication under the operator that implements it, typically `aggregate`) | — |
+| `limit` | Row-count truncation | `GlobalLimitExec`, `LocalLimitExec` |
+| `union` | Concatenating/interleaving multiple inputs without join semantics | `UnionExec`, `InterleaveExec` |
+| `exchange` | Network-boundary data movement between workers in a distributed plan (see [Distributed Execution Metrics](#distributed-execution-metrics)). **Not** for process-local repartitioning | `NetworkShuffleExec`, `ShuffleWriterExec`/`ShuffleReaderExec`, `RemoteExec`-style nodes |
+| `other` | Everything else: local repartition/coalesce, empty relations, unnest, table functions, custom nodes | `RepartitionExec`, `CoalesceBatchesExec`, `UnnestExec` |
+
+**Classification rules**:
+- Classify by the operator's **dominant function** — the work its metrics measure. A hybrid operator goes to the category of its dominant cost (e.g. a fused sort-with-limit is `sort`).
+- Category assignment for ambiguous operators is implementation-defined; `other` is always valid, and clients MUST handle it (and unknown categories) gracefully per [Client Metric Handling](#client-metric-handling).
+- The category is a denormalized presentation hint carried on each of the node's metric rows; all rows for one `node_id` MUST carry the same category.
+
 ## Metric Namespaces
 
 Metric names use a hierarchical namespace structure to prevent collisions and provide clear semantic grouping:
@@ -135,7 +160,7 @@ Metric names use a hierarchical namespace structure to prevent collisions and pr
 - `io.arrow.*` - Arrow IPC-specific I/O metrics
 - `compute.*` - Compute metrics (elapsed_compute with operator breakdown)
 - `index.*` - Reserved for index-related metrics (future: index_hits, index_scans)
-- `distributed.*` - Reserved for distributed execution metrics (future: bytes_sent, rpc_calls)
+- `distributed.*` - Distributed execution metrics (see [Distributed Execution Metrics](#distributed-execution-metrics))
 
 **Important**: There is no generic `io.*` namespace. Each file format reports its own complete set of I/O metrics under its specific namespace (e.g., `io.parquet.*`, `io.csv.*`). This prevents mixing aggregated and raw data. Only namespaced metric names are valid on the wire.
 
@@ -222,10 +247,69 @@ Detailed breakdown by operator and partition:
 - `metric_name = "compute.elapsed_compute"`
 - `operator_name`: Display name of the operator (e.g., "FilterExec")
 - `partition_id`: **Rank** of the value among the node's partitions when sorted ascending (0-based). It preserves the per-partition distribution for skew analysis but is not guaranteed to be the physical partition number.
-- `operator_category`: One of `filter`, `sort`, `projection`, `join`, `aggregate`, `window`, `distinct`, `limit`, `union`, `other`
+- `operator_category`: One of `filter`, `sort`, `projection`, `join`, `aggregate`, `window`, `distinct`, `limit`, `union`, `exchange`, `other` (see [Operator Categories](#operator-categories))
 - `node_id` / `parent_node_id`: identity of the operator node
 
-**Note**: Category assignment for ambiguous operators is implementation-defined. Scan nodes report under `io` and are excluded from the compute breakdown and from the aggregate compute total.
+**Note**: Scan nodes report under `io` and are excluded from the compute breakdown and from the aggregate compute total. Exchange (network boundary) nodes report their local CPU work here under category `exchange`; their network-side metrics are reported separately under `distributed.*`.
+
+### Distributed Execution Metrics
+
+Distributed engines execute parts of the plan on remote workers, connected by network-boundary **exchange operators** — shuffle/coalesce nodes in a stage/task scheduler (e.g. DataFusion Distributed's `NetworkShuffleExec` and `NetworkCoalesceExec`), or a `RemoteExec`-style node in a single-hop plan-fragment shipper. The `distributed.*` namespace carries the network-side metrics of those boundaries. The reference implementation is a single-node engine and does not emit these metrics; the definitions below are derived from surveyed distributed DataFusion systems so that distributed adopters map onto real metric sets. Servers implementing distributed execution SHOULD include `"distributed"` in the `namespaces` list of `analyze_query_capabilities`.
+
+**One table, one tree.** A distributed query still produces a single metrics table over the **unified** plan: servers MUST fold each worker's sub-plan metrics back into the coordinator's plan tree before emitting, and assign `node_id` by pre-order traversal of that unified tree. In stage-based engines (Ballista-style), stages are stitched back together at their exchange boundaries (e.g. a shuffle reader leaf reconnects to the producer stage's shuffle writer root). Remote operators are therefore indistinguishable from local ones in the response, apart from the exchange nodes between them.
+
+**Trees, not DAGs.** Stage graphs can be DAGs: a broadcast stage may feed several consumers (e.g. a broadcast join build side read by N exchange nodes). Servers MUST emit each producer node exactly once — attach the shared subtree under exactly one of its consumer exchange nodes (implementation-defined; e.g. the first in pre-order) so its metrics are not double-counted. The `distributed.consumers` metric on the subtree's root records the fan-out; an explicit plan-edge representation is future work.
+
+**Adaptive execution.** Engines that re-plan stages mid-flight (adaptive query execution: runtime join selection, stage elimination, stage re-execution) MUST emit the plan as it **finally executed**. Node ids are assigned after the query completes, over that final plan; retried stages report the winning attempt's metrics only.
+
+**Aggregation across tasks.** When multiple tasks (workers) execute the same stage in parallel, each plan node's metric values are aggregated across tasks before emission — sums for counts, bytes, and durations — mirroring how I/O metrics are summed across partitions. Per-partition `compute.elapsed_compute` rows rank values over the union of all tasks' partitions. Engines that cannot attribute values to individual partitions exactly (a known hazard for subtrees beneath partition-coalescing operators in task-parallel engines) SHOULD emit an aggregated row (`partition_id = NULL`) rather than approximate or inflated per-partition rows. A per-task or per-worker breakdown requires a task identity the v0.1 schema does not carry; see [Future Work](#future-work).
+
+#### Exchange-Node Metrics
+
+Each exchange operator reports with `operator_category = "exchange"`, `partition_id = NULL`, and its own `node_id`/`parent_node_id`. A boundary may be represented by a single receiving operator (fragment shippers, network shuffle readers) or by a sender/receiver pair (a shuffle writer at a producer stage's root plus a shuffle reader leaf in the consumer); both sides are `exchange` nodes and each reports the metrics for its own side.
+
+**Receiver-side metrics**:
+
+| Metric Name | Value Type | Description |
+|-------------|------------|-------------|
+| `distributed.bytes_transferred` | bytes | Serialized bytes received across the boundary (wire size — NOT the in-memory size used by `query.bytes`) |
+| `distributed.messages` | count | Data messages (e.g. Arrow Flight `FlightData`) received |
+| `distributed.rpc_calls` | count | RPCs issued to serve the boundary |
+| `distributed.rpc_retries` | count | Failed attempts that were retried (connection acquisition, endpoint failover, fetch retries) |
+| `distributed.tasks` | count | Remote tasks feeding this boundary |
+| `distributed.time_to_first_batch` | duration_ns | Time from issuing the request to receiving the first record batch |
+| `distributed.time_transferring` | duration_ns | Time spent receiving data across the boundary |
+| `distributed.network_latency_sum` | duration_ns | Sum of per-message network latencies (clients derive the average using `_count`) |
+| `distributed.network_latency_count` | count | Number of latency observations contributing to `_sum` |
+
+**Sender-side metrics** (on writer-style exchange nodes, where they exist):
+
+| Metric Name | Value Type | Description |
+|-------------|------------|-------------|
+| `distributed.bytes_written` | bytes | Serialized bytes written for downstream consumers (e.g. shuffle files) |
+| `distributed.time_writing` | duration_ns | Time spent serializing and writing exchange output |
+| `distributed.consumers` | count | Downstream consumers of this node's output (> 1 when a broadcast stage feeds several exchanges; see "Trees, not DAGs") |
+
+Byte accounting is deliberately split: engines often source the two sides differently (received bytes from the reader's metrics, written bytes from shuffle file statistics), and with broadcast or partial fetches they are not equal, so there is no single "transferred" number spanning both sides.
+
+`distributed.network_latency_min`, `_max`, `_p50`, `_p95`, and `_p99` are **reserved** for pre-aggregated latency distribution values (each a `duration_ns` computed server-side, e.g. from a quantile sketch); v0.1 does not define or emit them, consistent with the no-server-computed-ratios rule (`_sum`/`_count` are the required pair). `distributed.time_queued` is likewise **reserved** for time spent waiting on admission control or backpressure permits before fetching — engines with such governors MUST NOT fold that wait into `distributed.network_latency_sum`.
+
+Exchange operators MAY additionally report `compute.elapsed_compute` (category `exchange`) for their local CPU work, like any other operator.
+
+#### Query-Level Distributed Metrics
+
+These rows have all identity columns NULL (like other query-level metrics):
+
+| Metric Name | Value Type | Description |
+|-------------|------------|-------------|
+| `distributed.stages` | count | Number of distributed stages in the plan |
+| `distributed.tasks` | count | Total tasks scheduled across all stages |
+| `distributed.plan_bytes_sent` | bytes | Serialized plan fragments/tasks shipped to workers |
+| `distributed.time_distributing_plan` | duration_ns | Time spent serializing and shipping plan fragments to workers |
+
+`distributed.tasks` follows the `compute.elapsed_compute` precedent: the query-level row is the total, exchange-node rows are per-boundary.
+
+**Timing semantics.** All `distributed.*` durations are wall-clock observations at a boundary that overlap the execution of upstream stages and each other (`time_to_first_batch` overlaps `time_transferring`); like the `compute.*` and `io.*` timers, they MUST NOT be treated as additive with the `stage.*` timers or with each other.
 
 ## Example Response
 
@@ -290,6 +374,7 @@ To implement this protocol in an Arrow Flight service:
    - Run the query to completion with execution plan metrics collection enabled
 
 4. **Collect Metrics**
+   - In a distributed engine, first gather each worker's per-node metrics and fold them into the coordinator's plan tree (see [Distributed Execution Metrics](#distributed-execution-metrics)); all subsequent steps operate on the unified tree
    - Assign each plan node a `node_id` by pre-order traversal (root = 0)
    - Traverse the plan extracting metrics from each operator; emit one row per metric value with the node's `node_id`/`parent_node_id`
 
@@ -333,6 +418,8 @@ Any error during request parsing, query execution, metrics collection, or respon
 
 **Payload size.** The metrics table is `O(operators × partitions × metrics)` rows. A scan with thousands of partitions produces a correspondingly large batch. Servers MAY split the table across multiple record batches (clients must handle this); future versions may add sampling or aggregation options.
 
+**Distributed collection.** In a distributed engine the response cannot be built until every worker's metrics have arrived at the coordinator, adding a synchronization step after the result stream completes (surveyed systems use a dedicated metrics channel, piggyback metrics on the final data message, or retain per-job metrics on the scheduler for post-hoc retrieval). Per [Error Handling](#error-handling), if any worker's metrics cannot be retrieved the action fails — no partial metrics are returned. This also applies to *silent* loss inside the engine's own metric transport: surveyed systems have failure modes where a single non-serializable metric value drops an entire task's metric set, or where only successfully completed stages report at all — an `analyze_query` implementation MUST surface such gaps as `internal` errors rather than emit a silently incomplete table. Engines should also note that result caches must be bypassed for `analyze_query`: a cached response carries no live metrics.
+
 **Authorization and audit.** The SQL travels inside an `Action` body. Proxies or middleware that authorize/audit only `DoGet`/`GetFlightInfo` tickets will not see it — route `do_action` through the same authorization and audit path as query execution. Also note that analyze output discloses plan internals (operator structure, partition counts, pruning effectiveness); deployments may want to gate the action separately from query execution.
 
 ## Extensibility
@@ -360,7 +447,7 @@ node_id / parent_node_id: (scan node identity)
 ```
 
 **Custom Compute Operators**:
-- Choose the closest standard `operator_category` (filter, sort, projection, join, aggregate, window, distinct, limit, union, other)
+- Choose the closest standard `operator_category` per the classification rules in [Operator Categories](#operator-categories)
 - Use the `compute.elapsed_compute` metric name with operator name, partition rank, and node identity
 
 **Custom Query-Level Metrics**:
@@ -402,7 +489,11 @@ Tracked candidates for later protocol versions, roughly in priority order:
 - A fractional value column (e.g., Float64) if server-computed ratios prove necessary
 - Substrait request support, with Substrait plan-relation ids as cross-engine operator identity
 - Response served via `Ticket` + standard `DoGet` instead of `Result`-wrapped FlightData, gaining standard streaming/dictionary handling
-- `index.*` and `distributed.*` namespace definitions
+- `index.*` namespace definitions
+- Per-task/per-worker breakdown of distributed metrics (DataFusion Distributed's "PerTask" format). Note that in surveyed systems worker identity is a set of strings (service, cluster, host/URL) rather than an integer, so this likely needs a nullable Utf8 identity column rather than reusing `partition_id`
+- A text value column for non-numeric per-node diagnostics (e.g. a remote worker's end-of-execution dynamic-filter snapshot, which surveyed systems transport alongside numeric metrics)
+- An explicit plan-edge representation for DAG-shaped distributed plans (broadcast stages feeding multiple consumers), replacing the emit-once/`distributed.consumers` convention
+- A `memory.*` namespace for spill and memory metrics (`spilled_bytes`, `spilled_rows`, `spill_count`, peak memory) — first-class in DataFusion's metric model and in Ballista's metric transport, but not yet mapped by this protocol
 - Config/resource context (memory limits, target partitions) in response metadata
 - A UDTF form (`SELECT * FROM analyze('...')`) so metrics can be queried directly
 
@@ -411,6 +502,8 @@ Tracked candidates for later protocol versions, roughly in priority order:
 - [Apache Arrow Flight SQL Protocol](https://arrow.apache.org/docs/format/FlightSql.html)
 - [Apache Arrow IPC Format](https://arrow.apache.org/docs/format/Columnar.html#ipc-streaming-format)
 - [DataFusion Execution Plans](https://docs.rs/datafusion/latest/datafusion/physical_plan/trait.ExecutionPlan.html)
+- [DataFusion Distributed](https://datafusion-contrib.github.io/datafusion-distributed/)
+- [Apache DataFusion Ballista](https://github.com/apache/datafusion-ballista)
 - [OpenTelemetry Metrics Data Model](https://opentelemetry.io/docs/specs/otel/metrics/data-model/)
 - [Substrait](https://substrait.io/)
 
