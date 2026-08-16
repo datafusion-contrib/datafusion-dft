@@ -665,7 +665,7 @@ impl ExecutionContext {
                 physical_plan,
             )
         } else {
-            Err(eyre::eyre!("Only a single statement can be benchmarked"))
+            Err(eyre::eyre!("Only a single statement can be analyzed"))
         }
     }
 

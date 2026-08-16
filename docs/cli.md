@@ -186,11 +186,85 @@ The output from `EXPLAIN ANALYZE` provides a wealth of information on a queries 
 
 To help with this the `--analyze` flag can used to generate a summary of the underlying `ExecutionPlan` `MetricSet`s.  The summary presents the information in a way that is hopefully easier to understand and easier to draw conclusions on a query's performance.
 
-This feature is still in it's early stages and is expected to evolve.  Once it has gone through enough real world testing and it has been confirmed the metrics make sense documentation will be added on the exact calculations - until then the source will need to be inspected to see the calculations.
+**Important**: The analyze feature only supports a single SQL statement. If you provide multiple statements (e.g., separated by semicolons) or multiple files/commands, an error will be returned.
+
+**Note**: Analyze executes the query to completion and discards the results, so analyzing an expensive query costs a full extra execution.
+
+**Derived ratios** shown in the formatted output:
+- *Output Rows (%)*: `query.rows / sum of scan output_rows` (row selectivity)
+- *Output Bytes (%)*: `query.bytes / sum of bytes_scanned`
+- *Parquet Efficiency*: row-group matched ratio (`rg_matched / (rg_pruned + rg_matched)`) divided by row selectivity
+- Ratios display as `N/A` when the underlying metrics are unavailable
+
+### Local Analyze
 
 ```sh
-dft -c "SELECT ..." --analyze
+# Analyze a query locally
+dft -c "SELECT * FROM table WHERE id > 100" --analyze
+
+# Analyze from a file
+dft -f query.sql --analyze
+
+# Warm up caches or create tables before analyzing (same as --bench)
+dft -c "SELECT * FROM t WHERE id > 100" --analyze --run-before "CREATE EXTERNAL TABLE t STORED AS PARQUET LOCATION 'data/t.parquet'"
 ```
+
+### FlightSQL Analyze
+
+The `--analyze` flag also works with FlightSQL execution, providing identical output to local analyze:
+
+```sh
+# Analyze query on FlightSQL server
+dft -c "SELECT * FROM table WHERE id > 100" --analyze --flightsql
+
+# Analyze from a file via FlightSQL
+dft -f query.sql --analyze --flightsql
+```
+
+**Requirements:**
+- The Arrow Flight service must support the `"analyze_query"` custom action
+- See the [Arrow Flight Analyze Protocol Specification](arrow_flight_analyze_protocol.md) for implementation details
+- Servers without analyze support will return an "unimplemented" error
+
+**How it works:**
+1. Client sends a `do_action("analyze_query")` request with the SQL query
+2. Server executes the query with metrics collection enabled
+3. Server serializes execution statistics to a single flat Arrow metrics table (one row per metric, with `node_id`/`parent_node_id` identifying plan nodes)
+4. Client deserializes and reconstructs the full execution statistics
+5. Output is formatted identically to local analyze
+
+### Analyze Output
+
+Both local and FlightSQL analyze produce identical output including:
+
+- **Execution Summary**: Output rows/bytes, batch counts, selectivity ratios
+- **Timing Breakdown**: Parsing, logical planning, physical planning, execution, total time
+- **I/O Statistics**: Bytes scanned, file opening/scanning times
+- **Parquet Metrics** (when applicable):
+  - Row group pruning effectiveness (statistics, bloom filters, page index)
+  - Per-row-group timing
+- **Compute Statistics**: Per-operator elapsed compute time by partition
+  - Breakdown by operator category (projection, filter, sort, aggregate, join, window, distinct, limit, union, other)
+  - Min/median/mean/max timing per operator
+
+### Raw Metrics Mode
+
+For debugging or custom analysis, use `--analyze-raw` to print the raw metrics table without formatting:
+
+```sh
+# Local raw metrics
+dft -c "SELECT ..." --analyze-raw
+
+# FlightSQL raw metrics
+dft -c "SELECT ..." --analyze-raw --flightsql
+
+# Write the raw metrics table to a file (Arrow/CSV/JSON/Parquet, by extension)
+dft -c "SELECT ..." --analyze-raw --output metrics.parquet
+```
+
+This outputs a single flat Arrow metrics table with columns `(metric_name, value, value_type, operator_name, partition_id, operator_category, node_id, parent_node_id)`. The query text is not included; retain it client-side. See the [Arrow Flight Analyze Protocol Specification](arrow_flight_analyze_protocol.md) for the full schema and semantics.
+
+Writing raw metrics to a file makes a simple pipeline for tracking query performance over time: append metrics batches to a file on a schedule and query them with `dft` itself.
 
 ## Generate TPC-H Data
 

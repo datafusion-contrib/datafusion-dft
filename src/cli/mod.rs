@@ -25,6 +25,7 @@ use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use datafusion::arrow::array::{RecordBatch, RecordBatchWriter};
 use datafusion::arrow::datatypes::SchemaRef;
+use datafusion::arrow::ipc::writer::FileWriter as ArrowIpcWriter;
 use datafusion::arrow::util::pretty::pretty_format_batches;
 use datafusion::arrow::{csv, json};
 use datafusion::sql::parser::DFParser;
@@ -226,7 +227,7 @@ impl CliApp {
             self.args.commands.is_empty(),
             self.args.flightsql,
             self.args.bench,
-            self.args.analyze,
+            self.args.analyze || self.args.analyze_raw,
         ) {
             // Error cases
             (_, _, true, _, _) => Err(eyre!(
@@ -236,12 +237,15 @@ impl CliApp {
                 Err(eyre!("Cannot benchmark without a command or file"))
             }
             (true, true, _, _, _) => Err(eyre!("No files or commands provided to execute")),
-            (false, false, _, false, _) => Err(eyre!(
+            (false, false, _, false, false) => Err(eyre!(
                 "Cannot execute both files and commands at the same time"
             )),
             (_, _, false, true, true) => Err(eyre!(
                 "The `benchmark` and `analyze` flags are mutually exclusive"
             )),
+            (false, false, _, _, true) => {
+                Err(eyre!("Analyze requires exactly one command or file"))
+            }
 
             // Execution cases
             (false, true, _, false, false) => self.execute_files(&self.args.files).await,
@@ -252,8 +256,14 @@ impl CliApp {
             (true, false, _, true, false) => self.benchmark_commands(&self.args.commands).await,
 
             // Analyze cases
-            (false, true, _, false, true) => self.analyze_files(&self.args.files).await,
-            (true, false, _, false, true) => self.analyze_commands(&self.args.commands).await,
+            (false, true, _, false, true) => {
+                self.validate_analyze_target()?;
+                self.analyze_files(&self.args.files).await
+            }
+            (true, false, _, false, true) => {
+                self.validate_analyze_target()?;
+                self.analyze_commands(&self.args.commands).await
+            }
         }
         #[cfg(feature = "flightsql")]
         match (
@@ -261,22 +271,22 @@ impl CliApp {
             self.args.commands.is_empty(),
             self.args.flightsql,
             self.args.bench,
-            self.args.analyze,
+            self.args.analyze || self.args.analyze_raw,
         ) {
             // Error cases
             (true, true, _, _, _) => Err(eyre!("No files or commands provided to execute")),
             (false, false, false, true, _) => {
                 Err(eyre!("Cannot benchmark without a command or file"))
             }
-            (false, false, _, _, _) => Err(eyre!(
+            (false, false, _, _, false) => Err(eyre!(
                 "Cannot execute both files and commands at the same time"
             )),
             (_, _, _, true, true) => Err(eyre!(
                 "The `benchmark` and `analyze` flags are mutually exclusive"
             )),
-            (_, _, true, false, true) => Err(eyre!(
-                "The `analyze` flag is not currently supported with FlightSQL"
-            )),
+            (false, false, _, _, true) => {
+                Err(eyre!("Analyze requires exactly one command or file"))
+            }
 
             // Execution cases
             (true, false, false, false, false) => self.execute_commands(&self.args.commands).await,
@@ -301,9 +311,34 @@ impl CliApp {
             (true, false, false, true, false) => self.benchmark_commands(&self.args.commands).await,
 
             // Analyze cases
-            (true, false, false, false, true) => self.analyze_commands(&self.args.commands).await,
-            (false, true, false, false, true) => self.analyze_files(&self.args.files).await,
+            (true, false, false, false, true) => {
+                self.validate_analyze_target()?;
+                self.analyze_commands(&self.args.commands).await
+            }
+            (false, true, false, false, true) => {
+                self.validate_analyze_target()?;
+                self.analyze_files(&self.args.files).await
+            }
+            (true, false, true, false, true) => {
+                self.validate_analyze_target()?;
+                self.flightsql_analyze_commands(&self.args.commands).await
+            }
+            (false, true, true, false, true) => {
+                self.validate_analyze_target()?;
+                self.flightsql_analyze_files(&self.args.files).await
+            }
         }
+    }
+
+    /// Analyze accepts exactly one file or exactly one command
+    fn validate_analyze_target(&self) -> Result<()> {
+        if self.args.files.len() > 1 {
+            return Err(eyre!("Analyze requires exactly one file"));
+        }
+        if self.args.commands.len() > 1 {
+            return Err(eyre!("Analyze requires exactly one command"));
+        }
+        Ok(())
     }
 
     async fn execute_files(&self, files: &[PathBuf]) -> Result<()> {
@@ -332,6 +367,12 @@ impl CliApp {
     }
 
     async fn analyze_files(&self, files: &[PathBuf]) -> Result<()> {
+        if let Some(run_before_query) = &self.args.run_before {
+            self.app_execution
+                .execution_ctx()
+                .execute_sql_and_discard_results(run_before_query)
+                .await?;
+        }
         info!("Analyzing files: {:?}", files);
         for file in files {
             let query = std::fs::read_to_string(file)?;
@@ -476,6 +517,12 @@ impl CliApp {
     }
 
     async fn analyze_commands(&self, commands: &[String]) -> color_eyre::Result<()> {
+        if let Some(run_before_query) = &self.args.run_before {
+            self.app_execution
+                .execution_ctx()
+                .execute_sql_and_discard_results(run_before_query)
+                .await?;
+        }
         info!("Analyzing commands: {:?}", commands);
         for command in commands {
             self.analyze_from_string(command).await?;
@@ -526,6 +573,68 @@ impl CliApp {
             }
         }
 
+        Ok(())
+    }
+
+    #[cfg(feature = "flightsql")]
+    async fn flightsql_analyze_commands(&self, commands: &[String]) -> Result<()> {
+        info!("Analyzing FlightSQL commands: {:?}", commands);
+        for command in commands {
+            self.flightsql_analyze_from_string(command).await?;
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "flightsql")]
+    async fn flightsql_analyze_files(&self, files: &[PathBuf]) -> Result<()> {
+        info!("Analyzing FlightSQL files: {:?}", files);
+        for file in files {
+            let sql = std::fs::read_to_string(file)?;
+            self.flightsql_analyze_from_string(&sql).await?;
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "flightsql")]
+    async fn flightsql_analyze_from_string(&self, sql: &str) -> Result<()> {
+        if self.args.analyze_raw {
+            // Raw mode: print metrics table directly
+            let (query_str, metrics_batch) = self
+                .app_execution
+                .flightsql_ctx()
+                .analyze_query_raw(sql)
+                .await?;
+
+            if let Some(output_path) = &self.args.output {
+                // Write metrics batch to file
+                let schema = metrics_batch.schema();
+                let mut writer = path_to_writer(output_path, schema)?;
+                writer.write(&metrics_batch)?;
+                writer.close().await?;
+            } else {
+                // Print to stdout
+                println!("==================== Query ====================");
+                println!("{}", query_str);
+                println!("\n==================== Metrics ====================");
+                self.print_batch(&metrics_batch)?;
+            }
+        } else {
+            // Normal mode: reconstruct and display ExecutionStats
+            let stats = self
+                .app_execution
+                .flightsql_ctx()
+                .analyze_query(sql)
+                .await?;
+
+            // Display using existing ExecutionStats::Display implementation
+            println!("{}", stats);
+        }
+        Ok(())
+    }
+
+    fn print_batch(&self, batch: &datafusion::arrow::array::RecordBatch) -> Result<()> {
+        use datafusion::arrow::util::pretty::print_batches;
+        print_batches(std::slice::from_ref(batch))?;
         Ok(())
     }
 
@@ -607,7 +716,23 @@ impl CliApp {
             .analyze_query(sql)
             .await?;
         stats.collect_stats();
-        println!("{}", stats);
+        if self.args.analyze_raw {
+            // Raw mode: print or write the metrics table directly
+            let metrics_batch = stats.to_metrics_table()?;
+            if let Some(output_path) = &self.args.output {
+                let schema = metrics_batch.schema();
+                let mut writer = path_to_writer(output_path, schema)?;
+                writer.write(&metrics_batch)?;
+                writer.close().await?;
+            } else {
+                println!("==================== Query ====================");
+                println!("{}", sql);
+                println!("\n==================== Metrics ====================");
+                self.print_batch(&metrics_batch)?;
+            }
+        } else {
+            println!("{}", stats);
+        }
         Ok(())
     }
 
@@ -880,6 +1005,7 @@ enum AnyWriter {
     Csv(csv::writer::Writer<File>),
     Json(json::writer::LineDelimitedWriter<File>),
     Parquet(ArrowWriter<File>),
+    Arrow(ArrowIpcWriter<File>),
     #[cfg(feature = "vortex")]
     Vortex(VortexFileWriter),
 }
@@ -890,17 +1016,22 @@ impl AnyWriter {
             AnyWriter::Csv(w) => Ok(w.write(batch)?),
             AnyWriter::Json(w) => Ok(w.write(batch)?),
             AnyWriter::Parquet(w) => Ok(w.write(batch)?),
+            AnyWriter::Arrow(w) => Ok(w.write(batch)?),
             #[cfg(feature = "vortex")]
             AnyWriter::Vortex(w) => Ok(w.write(batch)?),
         }
     }
 
-    async fn close(self) -> Result<()> {
+    async fn close(mut self) -> Result<()> {
         match self {
             AnyWriter::Csv(w) => Ok(w.close()?),
             AnyWriter::Json(w) => Ok(w.close()?),
             AnyWriter::Parquet(w) => {
                 w.close()?;
+                Ok(())
+            }
+            AnyWriter::Arrow(ref mut w) => {
+                w.finish()?;
                 Ok(())
             }
             #[cfg(feature = "vortex")]
@@ -923,6 +1054,10 @@ fn path_to_writer(path: &Path, schema: SchemaRef) -> Result<AnyWriter> {
                     let writer = ArrowWriter::try_new(file, schema, Some(props))?;
                     Ok(AnyWriter::Parquet(writer))
                 }
+                "arrow" | "ipc" => {
+                    let writer = ArrowIpcWriter::try_new(file, &schema)?;
+                    Ok(AnyWriter::Arrow(writer))
+                }
                 #[cfg(feature = "vortex")]
                 "vortex" => Ok(AnyWriter::Vortex(VortexFileWriter::new(
                     file, schema, path,
@@ -930,11 +1065,11 @@ fn path_to_writer(path: &Path, schema: SchemaRef) -> Result<AnyWriter> {
                 _ => {
                     #[cfg(feature = "vortex")]
                     return Err(eyre!(
-                        "Only 'csv', 'parquet', 'json', and 'vortex' file types can be output"
+                        "Only 'csv', 'parquet', 'json', 'arrow', and 'vortex' file types can be output"
                     ));
                     #[cfg(not(feature = "vortex"))]
                     return Err(eyre!(
-                        "Only 'csv', 'parquet', and 'json' file types can be output"
+                        "Only 'csv', 'parquet', 'json', and 'arrow' file types can be output"
                     ));
                 }
             };

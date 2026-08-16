@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+mod analyze;
 mod basic;
 mod bench;
 mod config;
