@@ -23,6 +23,9 @@ color-eyre = "0.6.3"
 crossterm = { features = ["event-stream"], optional = true, version = "0.29" }
 datafusion = { version = "54" }
 datafusion-app = { path = "crates/datafusion-app", version = "0.1.0" }
+# Optional (not a dev-dependency) so that plain `cargo test` does not compile
+# librocksdb; used from feature-gated test code to generate fixture databases.
+datafusion-rocksdb = { optional = true, path = "crates/datafusion-rocksdb", version = "0.1.0" }
 directories = "5.0.1"
 env_logger = "0.11.5"
 futures = "0.3.30"
@@ -122,6 +125,7 @@ http = [
 huggingface = ["datafusion-app/huggingface"]
 mongodb = ["datafusion-app/mongodb"]
 net = ["datafusion-app/net"]
+rocksdb = ["datafusion-app/rocksdb", "dep:datafusion-rocksdb"]
 s3 = ["datafusion-app/s3"]
 tui = ["dep:crossterm", "dep:ratatui", "dep:ratatui-textarea", "dep:tui-logger"]
 udfs-wasm = ["datafusion-app/udfs-wasm"]

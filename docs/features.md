@@ -237,6 +237,35 @@ SELECT tls_sni(payload) AS host, count(*) AS hellos
 FROM pcap('capture.pcap') WHERE tls_sni(payload) IS NOT NULL GROUP BY host ORDER BY hellos DESC
 ```
 
+### RocksDB (`--features=rocksdb`)
+
+Adds table functions from [datafusion-rocksdb](https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-rocksdb) for inspecting RocksDB databases with SQL.  Databases are opened read-only and the LOCK file is never taken, so a database another process has open read-write can be inspected safely.  Data still in the WAL is not visible to a read-only handle: memtable-related metrics read 0 and key estimates exclude unflushed writes.
+
+`rocksdb_metadata` returns a single database-level summary row: column families, latest sequence number, live SST file count and total size, estimated key count, snapshot count, and MANIFEST / WAL file details:
+
+```sql
+SELECT * FROM rocksdb_metadata('/path/to/db')
+```
+
+`rocksdb_sstables` returns one row per live SST file — column family, file name, LSM level, size, entry and deletion counts, and the key range (keys are arbitrary bytes, so the range is exposed both as lossless hex and as lossy UTF-8).  An optional second argument filters to a single column family:
+
+```sql
+SELECT column_family, file_name, level, size_bytes, num_entries
+FROM rocksdb_sstables('/path/to/db') ORDER BY size_bytes DESC;
+
+SELECT * FROM rocksdb_sstables('/path/to/db', 'my_cf');
+```
+
+`rocksdb_cf_metrics` returns one row per column family and RocksDB property (long format: `column_family`, `property`, `value`), covering key counts, SST and memtable sizes, compaction state, block cache usage, and per-level file counts (`rocksdb.num-files-at-level0` and up).  An optional second argument filters to a single column family:
+
+```sql
+SELECT column_family, property, value
+FROM rocksdb_cf_metrics('/path/to/db')
+WHERE property IN ('rocksdb.estimate-num-keys', 'rocksdb.total-sst-files-size');
+```
+
+Per-SST table properties (compression, block counts) and SST sequence number ranges are not exposed by the Rust `rocksdb` binding and are therefore not included.
+
 ## External Features
 
 `dft` also has several external optional (conditionally compiled features) integrations which are controlled by [Rust Crate Features]
