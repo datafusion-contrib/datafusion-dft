@@ -51,7 +51,7 @@ use {
 };
 #[cfg(feature = "vortex")]
 use {
-    vortex::array::{arrow::FromArrowArray, ArrayRef},
+    vortex::{array::ArrayRef, arrow::FromArrowArray, VortexSessionDefault},
     vortex_file::VortexWriteOptions,
     vortex_session::VortexSession,
 };
@@ -862,7 +862,7 @@ impl VortexFileWriter {
         let stream = vortex_array.to_array_stream();
 
         // Write using async API
-        let session = VortexSession::empty();
+        let session = VortexSession::default();
         VortexWriteOptions::new(session)
             .write(file, stream)
             .await

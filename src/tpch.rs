@@ -40,7 +40,7 @@ use url::Url;
 #[cfg(feature = "vortex")]
 use {
     datafusion::arrow::compute::concat_batches,
-    vortex::array::{arrow::FromArrowArray, ArrayRef},
+    vortex::{array::ArrayRef, arrow::FromArrowArray, VortexSessionDefault},
     vortex_file::VortexWriteOptions,
     vortex_session::VortexSession,
 };
@@ -168,7 +168,7 @@ where
     // Write to a buffer
     let mut buf: Vec<u8> = Vec::new();
     info!("...writing {table_type} batches to vortex format");
-    let session = VortexSession::empty();
+    let session = VortexSession::default();
     VortexWriteOptions::new(session)
         .write(&mut buf, stream)
         .await

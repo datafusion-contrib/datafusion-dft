@@ -25,6 +25,7 @@ use datafusion::common::{DataFusionError, Result};
 use datafusion::sql::TableReference;
 use datafusion_table_providers::clickhouse::ClickHouseTableFactory;
 use datafusion_table_providers::sql::db_connection_pool::clickhousepool::ClickHouseConnectionPool;
+use datafusion_table_providers::sql::db_connection_pool::dbconnection::clickhouseconn::ClickHouseConnection;
 use datafusion_table_providers::sql::db_connection_pool::dbconnection::AsyncDbConnection;
 use log::warn;
 
@@ -64,10 +65,12 @@ impl ClickHouseCatalogProvider {
         pool: Arc<ClickHouseConnectionPool>,
         database: Option<String>,
     ) -> Result<Self> {
-        let client = pool.client();
         let schema_names = match database {
             Some(database) => vec![database],
-            None => client.schemas().await.map_err(to_external_err)?,
+            None => ClickHouseConnection::new(pool.client())
+                .schemas()
+                .await
+                .map_err(to_external_err)?,
         };
 
         let mut schemas = HashMap::with_capacity(schema_names.len());
