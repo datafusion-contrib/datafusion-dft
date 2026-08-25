@@ -324,6 +324,37 @@ jobs:
       - name: Run WebSocket tests
         run: |
           cargo test --features=websocket extension_cases::websocket
+  test-rocksdb:
+    name: Extension / RocksDB
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        arch: [amd64]
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: true
+      - name: Cache Cargo registry and git
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cargo
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
+      - name: Cache Rust target directory
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
+          restore-keys: |
+            target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-
+            target-${{ runner.os }}-
+      - name: Setup Rust Toolchain
+        uses: ./.github/actions/setup-rust
+      - name: Run RocksDB tests
+        run: |
+          cargo test --manifest-path crates/datafusion-rocksdb/Cargo.toml
+          cargo test --features=rocksdb extension_cases::rocksdb
   test-net:
     name: Extension / Net
     runs-on: ubuntu-latest

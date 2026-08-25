@@ -37,6 +37,8 @@ mod huggingface;
 mod mongodb;
 #[cfg(feature = "net")]
 mod net;
+#[cfg(feature = "rocksdb")]
+mod rocksdb;
 #[cfg(feature = "s3")]
 mod s3;
 #[cfg(feature = "udfs-wasm")]

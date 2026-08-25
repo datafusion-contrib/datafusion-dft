@@ -65,6 +65,9 @@ cargo install datafusion-dft --features=websocket
 # With the pcap / capture table functions for querying network packet captures
 cargo install datafusion-dft --features=net
 
+# With the rocksdb_* table functions for inspecting RocksDB databases
+cargo install datafusion-dft --features=rocksdb
+
 # With Vortex file format support
 cargo install datafusion-dft --features=vortex
 

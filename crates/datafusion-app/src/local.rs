@@ -231,6 +231,22 @@ impl ExecutionContext {
             );
         }
 
+        #[cfg(feature = "rocksdb")]
+        {
+            session_ctx.register_udtf(
+                "rocksdb_metadata",
+                Arc::new(datafusion_rocksdb::RocksDbMetadataFunc {}),
+            );
+            session_ctx.register_udtf(
+                "rocksdb_sstables",
+                Arc::new(datafusion_rocksdb::RocksDbSstablesFunc {}),
+            );
+            session_ctx.register_udtf(
+                "rocksdb_cf_metrics",
+                Arc::new(datafusion_rocksdb::RocksDbCfMetricsFunc {}),
+            );
+        }
+
         let catalog = create_app_catalog(config, app_name, app_version)?;
         session_ctx.register_catalog(&config.catalog.name, catalog);
 
