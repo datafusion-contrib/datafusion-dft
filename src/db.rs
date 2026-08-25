@@ -29,7 +29,9 @@ use datafusion::{
 use log::{debug, info};
 use std::path::Path;
 #[cfg(feature = "vortex")]
-use {vortex_datafusion::VortexFormat, vortex_session::VortexSession};
+use {
+    vortex::VortexSessionDefault, vortex_datafusion::VortexFormat, vortex_session::VortexSession,
+};
 
 use crate::config::DbConfig;
 
@@ -41,7 +43,7 @@ fn detect_format(extension: &str) -> Result<(Arc<dyn FileFormat>, &'static str)>
         "json" => Ok((Arc::new(JsonFormat::default()), ".json")),
         #[cfg(feature = "vortex")]
         "vortex" => Ok((
-            Arc::new(VortexFormat::new(VortexSession::empty())),
+            Arc::new(VortexFormat::new(VortexSession::default())),
             ".vortex",
         )),
         _ => Err(Report::msg(format!(
