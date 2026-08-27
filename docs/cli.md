@@ -104,6 +104,47 @@ When headers are specified in multiple places they are merged in this order (lat
 2. Headers file (config `headers_file` or `--headers-file`)
 3. `--header` flags on the command line
 
+### Response headers (`--print-headers`)
+
+To inspect the metadata returned by the FlightSQL server on each `DoGet` response, pass `--print-headers`. The response headers are printed before the query results and the response trailers (if the server sends any) after them:
+
+```sh
+dft -c "SELECT 1" --flightsql --print-headers
+dft --print-headers flightsql statement-query --sql "SELECT 1"
+```
+
+```text
+Response headers:
+  content-type: application/grpc
+  date: ...
++----------+
+| Int64(1) |
++----------+
+| 1        |
++----------+
+Response trailers:
+  grpc-status: 0
+```
+
+### Headers only (`--headers-only`)
+
+For large results, `--headers-only` skips printing the results entirely and instead prints the headers, a summary of the response schema and total record count, and the trailers. It implies `--print-headers` and cannot be combined with `--output`, `--json`, or `--bench`:
+
+```sh
+dft -c "SELECT * FROM huge_table" --flightsql --headers-only
+```
+
+```text
+Response headers:
+  content-type: application/grpc
+Schema:
+  x: Int64
+  y: Utf8
+Records: 1234567
+Response trailers:
+  grpc-status: 0
+```
+
 ## Auth
 
 Basic Auth or Bearer Token can be set in your config, which is used by the client:

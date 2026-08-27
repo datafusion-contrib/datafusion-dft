@@ -92,9 +92,103 @@ impl CliApp {
     }
 
     #[cfg(feature = "flightsql")]
-    async fn handle_flightsql_command(&self, command: FlightSqlCommand) -> color_eyre::Result<()> {
-        use futures::stream;
+    fn print_response_headers(&self, headers: &tonic::metadata::MetadataMap) {
+        if !self.print_headers_enabled() {
+            return;
+        }
+        Self::print_metadata_map("Response headers", headers);
+    }
 
+    /// Print the trailing metadata of a consumed stream, if `--print-headers` is set
+    ///
+    /// Trailers are only available after the stream has been fully consumed.
+    #[cfg(feature = "flightsql")]
+    fn print_response_trailers(&self, trailers: Option<tonic::metadata::MetadataMap>) {
+        if !self.print_headers_enabled() {
+            return;
+        }
+        if let Some(trailers) = trailers {
+            Self::print_metadata_map("Response trailers", &trailers);
+        }
+    }
+
+    #[cfg(feature = "flightsql")]
+    fn print_metadata_map(label: &str, metadata: &tonic::metadata::MetadataMap) {
+        println!("{label}:");
+        if metadata.is_empty() {
+            println!("  <none>");
+        }
+        for kv in metadata.iter() {
+            match kv {
+                tonic::metadata::KeyAndValueRef::Ascii(key, value) => {
+                    let value = value.to_str().unwrap_or("<invalid utf-8>");
+                    println!("  {key}: {value}");
+                }
+                tonic::metadata::KeyAndValueRef::Binary(key, value) => {
+                    println!("  {key}: {value:?}");
+                }
+            }
+        }
+    }
+
+    /// Whether response metadata (headers/trailers) should be printed
+    #[cfg(feature = "flightsql")]
+    fn print_headers_enabled(&self) -> bool {
+        self.args.print_headers || self.args.headers_only
+    }
+
+    /// Drain a Flight stream without printing the results, then print a summary
+    /// of the schema and total record count
+    #[cfg(feature = "flightsql")]
+    async fn summarize_stream(&self, stream: &mut arrow_flight::decode::FlightRecordBatchStream) {
+        let mut records = 0usize;
+        while let Some(maybe_batch) = stream.next().await {
+            match maybe_batch {
+                Ok(batch) => records += batch.num_rows(),
+                Err(e) => {
+                    println!("Error executing SQL: {e}");
+                    break;
+                }
+            }
+        }
+        match stream.schema() {
+            Some(schema) => {
+                println!("Schema:");
+                for field in schema.fields() {
+                    println!("  {}: {}", field.name(), field.data_type());
+                }
+            }
+            None => println!("Schema: <not received>"),
+        }
+        println!("Records: {records}");
+    }
+
+    #[cfg(feature = "flightsql")]
+    async fn do_get_and_print(
+        &self,
+        flight_info: arrow_flight::FlightInfo,
+    ) -> color_eyre::Result<()> {
+        let streams = self
+            .app_execution
+            .flightsql_ctx()
+            .do_get(flight_info)
+            .await?;
+        // Streams are processed sequentially (rather than merged with `select_all`)
+        // so that each stream's trailers remain accessible after it is consumed
+        for mut stream in streams {
+            self.print_response_headers(stream.headers());
+            if self.args.headers_only {
+                self.summarize_stream(&mut stream).await;
+            } else {
+                self.print_stream(&mut stream).await;
+            }
+            self.print_response_trailers(stream.trailers());
+        }
+        Ok(())
+    }
+
+    #[cfg(feature = "flightsql")]
+    async fn handle_flightsql_command(&self, command: FlightSqlCommand) -> color_eyre::Result<()> {
         match command {
             FlightSqlCommand::StatementQuery { sql } => self.exec_from_flightsql(sql, 0).await,
             FlightSqlCommand::GetCatalogs => {
@@ -103,14 +197,7 @@ impl CliApp {
                     .flightsql_ctx()
                     .get_catalogs_flight_info()
                     .await?;
-                let streams = self
-                    .app_execution
-                    .flightsql_ctx()
-                    .do_get(flight_info)
-                    .await?;
-                let flight_batch_stream = stream::select_all(streams);
-                self.print_stream(flight_batch_stream).await;
-                Ok(())
+                self.do_get_and_print(flight_info).await
             }
             FlightSqlCommand::GetDbSchemas {
                 catalog,
@@ -121,14 +208,7 @@ impl CliApp {
                     .flightsql_ctx()
                     .get_db_schemas_flight_info(catalog, db_schema_filter_pattern)
                     .await?;
-                let streams = self
-                    .app_execution
-                    .flightsql_ctx()
-                    .do_get(flight_info)
-                    .await?;
-                let flight_batch_stream = stream::select_all(streams);
-                self.print_stream(flight_batch_stream).await;
-                Ok(())
+                self.do_get_and_print(flight_info).await
             }
 
             FlightSqlCommand::GetTables {
@@ -148,14 +228,7 @@ impl CliApp {
                         false,
                     )
                     .await?;
-                let streams = self
-                    .app_execution
-                    .flightsql_ctx()
-                    .do_get(flight_info)
-                    .await?;
-                let flight_batch_stream = stream::select_all(streams);
-                self.print_stream(flight_batch_stream).await;
-                Ok(())
+                self.do_get_and_print(flight_info).await
             }
             FlightSqlCommand::GetTableTypes => {
                 let flight_info = self
@@ -163,14 +236,7 @@ impl CliApp {
                     .flightsql_ctx()
                     .get_table_types_flight_info()
                     .await?;
-                let streams = self
-                    .app_execution
-                    .flightsql_ctx()
-                    .do_get(flight_info)
-                    .await?;
-                let flight_batch_stream = stream::select_all(streams);
-                self.print_stream(flight_batch_stream).await;
-                Ok(())
+                self.do_get_and_print(flight_info).await
             }
             FlightSqlCommand::GetSqlInfo { info } => {
                 let flight_info = self
@@ -178,14 +244,7 @@ impl CliApp {
                     .flightsql_ctx()
                     .get_sql_info_flight_info(info)
                     .await?;
-                let streams = self
-                    .app_execution
-                    .flightsql_ctx()
-                    .do_get(flight_info)
-                    .await?;
-                let flight_batch_stream = stream::select_all(streams);
-                self.print_stream(flight_batch_stream).await;
-                Ok(())
+                self.do_get_and_print(flight_info).await
             }
             FlightSqlCommand::GetXdbcTypeInfo { data_type } => {
                 let flight_info = self
@@ -193,14 +252,7 @@ impl CliApp {
                     .flightsql_ctx()
                     .get_xdbc_type_info_flight_info(data_type)
                     .await?;
-                let streams = self
-                    .app_execution
-                    .flightsql_ctx()
-                    .do_get(flight_info)
-                    .await?;
-                let flight_batch_stream = stream::select_all(streams);
-                self.print_stream(flight_batch_stream).await;
-                Ok(())
+                self.do_get_and_print(flight_info).await
             }
         }
     }
@@ -400,18 +452,24 @@ impl CliApp {
             let flight_info = client.execute(sql, None).await?;
             for endpoint in flight_info.endpoint {
                 if let Some(ticket) = endpoint.ticket {
-                    let stream = client.do_get(ticket.into_request()).await?;
-                    if let Some(output_path) = &self.args.output {
-                        self.output_stream(stream, output_path).await?
+                    let mut stream = client.do_get(ticket.into_request()).await?;
+                    self.print_response_headers(stream.headers());
+                    // The print helpers are given `&mut stream` so that the
+                    // trailers remain accessible after the stream is consumed
+                    if self.args.headers_only {
+                        self.summarize_stream(&mut stream).await;
+                    } else if let Some(output_path) = &self.args.output {
+                        self.output_stream(&mut stream, output_path).await?
                     } else if self.args.json {
-                        self.print_json_stream(stream).await;
+                        self.print_json_stream(&mut stream).await;
                     } else if let Some(start) = start {
-                        self.exec_stream(stream).await;
+                        self.exec_stream(&mut stream).await;
                         let elapsed = start.elapsed();
                         println!("Query {i} executed in {:?}", elapsed);
                     } else {
-                        self.print_any_stream(stream).await;
+                        self.print_any_stream(&mut stream).await;
                     }
+                    self.print_response_trailers(stream.trailers());
                 }
             }
         } else {
@@ -683,8 +741,10 @@ impl CliApp {
         }
     }
 
+    /// Print a stream of results, leaving ownership with the caller so that
+    /// stream-level state (e.g. FlightSQL response trailers) remains accessible
     #[cfg(feature = "flightsql")]
-    async fn print_stream<S, E>(&self, stream: S)
+    async fn print_stream<S, E>(&self, stream: &mut S)
     where
         S: Stream<Item = Result<RecordBatch, E>> + Unpin,
         E: Error,
