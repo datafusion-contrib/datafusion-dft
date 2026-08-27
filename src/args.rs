@@ -141,6 +141,19 @@ pub struct DftArgs {
 
     #[clap(
         long,
+        help = "Print the response headers received from the FlightSQL server. Only used for FlightSQL"
+    )]
+    pub print_headers: bool,
+
+    #[clap(
+        long,
+        help = "Only print the FlightSQL response headers, trailers, and a summary of the schema and record count, without printing the results. Implies --print-headers. Only used for FlightSQL",
+        conflicts_with_all = ["output", "json", "bench"]
+    )]
+    pub headers_only: bool,
+
+    #[clap(
+        long,
         short,
         help = "Path to save output to. Type is inferred from file suffix"
     )]

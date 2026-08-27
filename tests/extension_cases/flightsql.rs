@@ -1589,3 +1589,144 @@ async fn test_headers_file_precedence() {
     assert.stdout(contains_str(expected));
     fixture.shutdown_and_wait().await;
 }
+
+#[tokio::test]
+async fn test_print_headers() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1;")
+            .arg("--flightsql")
+            .arg("--print-headers")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    // gRPC responses always include a content-type header and the test
+    // server attaches a `test-trailer` trailer to every response
+    let output = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    assert!(output.contains("Response headers:"));
+    assert!(output.contains("content-type: application/grpc"));
+    assert!(output.contains("Response trailers:"));
+    assert!(output.contains("test-trailer: trailer_val"));
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_print_headers_subcommand() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("--print-headers")
+            .arg("flightsql")
+            .arg("statement-query")
+            .arg("--sql")
+            .arg("SELECT 1")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let output = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    assert!(output.contains("Response headers:"));
+    assert!(output.contains("content-type: application/grpc"));
+    assert!(output.contains("Response trailers:"));
+    assert!(output.contains("test-trailer: trailer_val"));
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_no_print_headers_by_default() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1;")
+            .arg("--flightsql")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let output = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    assert!(!output.contains("Response headers:"));
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_headers_only() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1;")
+            .arg("--flightsql")
+            .arg("--headers-only")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .success()
+    })
+    .await
+    .unwrap();
+
+    let output = String::from_utf8(assert.get_output().stdout.clone()).unwrap();
+    // headers-only implies printing headers and trailers
+    assert!(output.contains("Response headers:"));
+    assert!(output.contains("Response trailers:"));
+    // schema and record count summary instead of the results
+    assert!(output.contains("Schema:"));
+    assert!(output.contains("Int64(1): Int64"));
+    assert!(output.contains("Records: 1"));
+    // results table must not be printed
+    assert!(!output.contains("+----------+"));
+
+    fixture.shutdown_and_wait().await;
+}
+
+#[tokio::test]
+async fn test_headers_only_conflicts_with_json() {
+    let test_server = TestFlightSqlServiceImpl::new();
+    let fixture = TestFixture::new(test_server.service(), "127.0.0.1:50051").await;
+
+    let assert = tokio::task::spawn_blocking(|| {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg("SELECT 1;")
+            .arg("--flightsql")
+            .arg("--headers-only")
+            .arg("--json")
+            .timeout(Duration::from_secs(5))
+            .assert()
+            .failure()
+    })
+    .await
+    .unwrap();
+
+    assert.stderr(contains_str("cannot be used with"));
+
+    fixture.shutdown_and_wait().await;
+}
