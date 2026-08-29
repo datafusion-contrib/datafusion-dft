@@ -37,13 +37,12 @@ log = "0.4.22"
 metrics = { optional = true, version = "0.24.0" }
 num_cpus = "1.16.0"
 object_store = { features = ["aws"], optional = true, version = "0.13" }
-# TODO: revert to crates.io once object_store_opendal releases with DataFusion 54 support.
-# Both crates must come from the same rev because an opendal `Operator` is passed to
-# `OpendalStore::new` in the huggingface extension.
-object_store_opendal = { git = "https://github.com/apache/opendal", optional = true, rev = "24aaff9c62b1" }
+# object_store_opendal 0.59 requires object_store 0.14; DataFusion 54 is on
+# object_store 0.13, so stay on 0.58 until the DataFusion 55 upgrade.
+object_store_opendal = { optional = true, version = "0.58.0" }
 opendal = { features = [
   "services-huggingface",
-], git = "https://github.com/apache/opendal", optional = true, rev = "24aaff9c62b1" }
+], optional = true, version = "0.58.0" }
 parking_lot = "0.12.3"
 rustls = { default-features = false, features = [
   "aws-lc-rs",
@@ -59,7 +58,7 @@ tokio-tungstenite = { features = [
 ], optional = true, version = "0.29" }
 tonic = { optional = true, version = "0.14" }
 url = { optional = true, version = "2.5.2" }
-vortex-datafusion = { optional = true, version = "0.84" }
+vortex-datafusion = { optional = true, version = "0.85" }
 
 [dev-dependencies]
 criterion = { features = ["async_tokio"], version = "0.5.1" }
