@@ -49,12 +49,12 @@ pub fn normal_mode_handler(app: &mut App, key: KeyEvent) {
         }
         (KeyCode::Char('d'), KeyModifiers::NONE) => app.state.sql_tab.set_mode(SQLTabMode::DDL),
         (KeyCode::Char('n'), KeyModifiers::NONE) => app.state.sql_tab.set_mode(SQLTabMode::Normal),
-        (KeyCode::Char('s'), KeyModifiers::NONE) => {
-            if *app.state.sql_tab.mode() == SQLTabMode::DDL {
-                let textarea = app.state.sql_tab.active_editor_cloned();
-                let ddl = textarea.lines().join("\n");
-                app.execution.save_ddl(ddl)
-            }
+        (KeyCode::Char('s'), KeyModifiers::NONE)
+            if *app.state.sql_tab.mode() == SQLTabMode::DDL =>
+        {
+            let textarea = app.state.sql_tab.active_editor_cloned();
+            let ddl = textarea.lines().join("\n");
+            app.execution.save_ddl(ddl)
         }
         (KeyCode::Down, KeyModifiers::NONE) => {
             if let Some(s) = app.state.sql_tab.query_results_state() {

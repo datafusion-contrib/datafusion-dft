@@ -51,7 +51,7 @@ use {
 };
 #[cfg(feature = "vortex")]
 use {
-    vortex::{array::ArrayRef, arrow::FromArrowArray, VortexSessionDefault},
+    vortex::{arrow::ArrowSessionExt, VortexSessionDefault},
     vortex_file::VortexWriteOptions,
     vortex_session::VortexSession,
 };
@@ -916,13 +916,16 @@ impl VortexFileWriter {
         let concatenated = datafusion::arrow::compute::concat_batches(&schema, &self.batches)?;
 
         // Convert to Vortex array
-        let vortex_array = ArrayRef::from_arrow(concatenated, false).map_err(|e| eyre!("{}", e))?;
+        let session = VortexSession::default();
+        let vortex_array = session
+            .arrow()
+            .from_arrow_record_batch(concatenated, &schema)
+            .map_err(|e| eyre!("{}", e))?;
 
         // Convert to array stream
         let stream = vortex_array.to_array_stream();
 
         // Write using async API
-        let session = VortexSession::default();
         VortexWriteOptions::new(session)
             .write(file, stream)
             .await
