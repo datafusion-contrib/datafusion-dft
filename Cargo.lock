@@ -2654,8 +2654,8 @@ dependencies = [
  "datafusion-functions-arrow",
  "datafusion-functions-json",
  "datafusion-functions-parquet",
+ "datafusion-functions-rocksdb",
  "datafusion-net",
- "datafusion-rocksdb",
  "datafusion-table-providers",
  "datafusion-udfs-wasm",
  "deltalake",
@@ -2915,8 +2915,8 @@ dependencies = [
  "crossterm",
  "datafusion",
  "datafusion-app",
+ "datafusion-functions-rocksdb",
  "datafusion-net",
- "datafusion-rocksdb",
  "datafusion-udfs-wasm",
  "directories",
  "env_logger",
@@ -3168,6 +3168,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "datafusion-functions-rocksdb"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "async-trait",
+ "datafusion",
+ "rocksdb",
+]
+
+[[package]]
 name = "datafusion-functions-table"
 version = "54.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3413,16 +3423,6 @@ dependencies = [
  "datafusion-physical-expr-common",
  "datafusion-physical-plan",
  "log",
-]
-
-[[package]]
-name = "datafusion-rocksdb"
-version = "0.1.0"
-dependencies = [
- "arrow",
- "async-trait",
- "datafusion",
- "rocksdb",
 ]
 
 [[package]]

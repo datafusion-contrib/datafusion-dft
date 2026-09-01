@@ -15,9 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-//! Tests for datafusion-rocksdb integration
+//! Tests for datafusion-functions-rocksdb integration
 
-use datafusion_rocksdb::rocksdb::{Options, DB};
+use datafusion_functions_rocksdb::rocksdb::{Options, DB};
 
 use crate::extension_cases::TestExecution;
 

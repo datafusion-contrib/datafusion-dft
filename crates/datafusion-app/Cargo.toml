@@ -16,8 +16,8 @@ datafusion = "54"
 datafusion-functions-arrow = { optional = true, path = "../datafusion-functions-arrow", version = "0.1.0" }
 datafusion-functions-json = { optional = true, version = "0.54" }
 datafusion-functions-parquet = { optional = true, path = "../datafusion-functions-parquet", version = "0.1.0" }
+datafusion-functions-rocksdb = { optional = true, path = "../datafusion-functions-rocksdb", version = "0.1.0" }
 datafusion-net = { optional = true, path = "../datafusion-net", version = "0.1.0" }
-datafusion-rocksdb = { optional = true, path = "../datafusion-rocksdb", version = "0.1.0" }
 datafusion-table-providers = { optional = true, version = "0.13.0" }
 datafusion-udfs-wasm = { features = [
   "serde",
@@ -74,6 +74,7 @@ flightsql = ["dep:arrow-flight", "dep:base64", "dep:tonic"]
 functions-arrow = ["dep:datafusion-functions-arrow"]
 functions-json = ["dep:datafusion-functions-json"]
 functions-parquet = ["dep:datafusion-functions-parquet"]
+functions-rocksdb = ["dep:datafusion-functions-rocksdb"]
 huggingface = ["object_store_opendal", "opendal", "url"]
 mongodb = [
   "datafusion-table-providers/mongodb",
@@ -81,7 +82,6 @@ mongodb = [
 ]
 net = ["datafusion-net/live", "dep:datafusion-net"]
 observability = ["dep:metrics", "dep:tokio-metrics"]
-rocksdb = ["dep:datafusion-rocksdb"]
 s3 = ["object_store/aws", "url"]
 udfs-wasm = ["dep:datafusion-udfs-wasm"]
 vortex = ["dep:vortex-datafusion"]

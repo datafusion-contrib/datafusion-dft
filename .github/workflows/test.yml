@@ -353,8 +353,8 @@ jobs:
         uses: ./.github/actions/setup-rust
       - name: Run RocksDB tests
         run: |
-          cargo test --manifest-path crates/datafusion-rocksdb/Cargo.toml
-          cargo test --features=rocksdb extension_cases::rocksdb
+          cargo test --manifest-path crates/datafusion-functions-rocksdb/Cargo.toml
+          cargo test --features=functions-rocksdb extension_cases::rocksdb
   test-net:
     name: Extension / Net
     runs-on: ubuntu-latest
