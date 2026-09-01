@@ -2,12 +2,12 @@
 authors = ["Matthew Turner <matthew.m.turner@outlook.com>"]
 description = "DataFusion table functions for inspecting RocksDB databases"
 edition = "2021"
-homepage = "https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-rocksdb"
+homepage = "https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-functions-rocksdb"
 keywords = ["datafusion", "query", "rocksdb", "sql"]
 license = "Apache-2.0"
-name = "datafusion-rocksdb"
+name = "datafusion-functions-rocksdb"
 readme = "README.md"
-repository = "https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-rocksdb"
+repository = "https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-functions-rocksdb"
 version = "0.1.0"
 
 [dependencies]

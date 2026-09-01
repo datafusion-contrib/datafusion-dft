@@ -237,9 +237,9 @@ SELECT tls_sni(payload) AS host, count(*) AS hellos
 FROM pcap('capture.pcap') WHERE tls_sni(payload) IS NOT NULL GROUP BY host ORDER BY hellos DESC
 ```
 
-### RocksDB (`--features=rocksdb`)
+### RocksDB (`--features=functions-rocksdb`)
 
-Adds table functions from [datafusion-rocksdb](https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-rocksdb) for inspecting RocksDB databases with SQL.  Databases are opened read-only and the LOCK file is never taken, so a database another process has open read-write can be inspected safely.  Data still in the WAL is not visible to a read-only handle: memtable-related metrics read 0 and key estimates exclude unflushed writes.
+Adds table functions from [datafusion-functions-rocksdb](https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-functions-rocksdb) for inspecting RocksDB databases with SQL.  Databases are opened read-only and the LOCK file is never taken, so a database another process has open read-write can be inspected safely.  Data still in the WAL is not visible to a read-only handle: memtable-related metrics read 0 and key estimates exclude unflushed writes.
 
 `rocksdb_metadata` returns a single database-level summary row: column families, latest sequence number, live SST file count and total size, estimated key count, snapshot count, and MANIFEST / WAL file details:
 

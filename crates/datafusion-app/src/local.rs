@@ -231,19 +231,19 @@ impl ExecutionContext {
             );
         }
 
-        #[cfg(feature = "rocksdb")]
+        #[cfg(feature = "functions-rocksdb")]
         {
             session_ctx.register_udtf(
                 "rocksdb_metadata",
-                Arc::new(datafusion_rocksdb::RocksDbMetadataFunc {}),
+                Arc::new(datafusion_functions_rocksdb::RocksDbMetadataFunc {}),
             );
             session_ctx.register_udtf(
                 "rocksdb_sstables",
-                Arc::new(datafusion_rocksdb::RocksDbSstablesFunc {}),
+                Arc::new(datafusion_functions_rocksdb::RocksDbSstablesFunc {}),
             );
             session_ctx.register_udtf(
                 "rocksdb_cf_metrics",
-                Arc::new(datafusion_rocksdb::RocksDbCfMetricsFunc {}),
+                Arc::new(datafusion_functions_rocksdb::RocksDbCfMetricsFunc {}),
             );
         }
 
