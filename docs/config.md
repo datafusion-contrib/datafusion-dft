@@ -109,6 +109,10 @@ aws_allow_http = false
 
 ### ClickHouse Catalog Configuration
 
+> **Temporarily unavailable.** The `clickhouse` feature is disabled because
+> `datafusion-table-providers` has no DataFusion 55 release yet. The configuration below
+> applies once the feature is restored.
+
 With the `clickhouse` feature enabled, one or more ClickHouse instances can be registered as catalogs.  All non-system databases (or a single one, if `database` is set) are exposed as schemas with their tables queryable, for example `SELECT * FROM clickhouse.my_db.my_table`.
 
 ```toml
@@ -125,6 +129,10 @@ options = { output_format_arrow_string_as_string = "1" }
 See the [Features Guide](features.md) for details.
 
 ### MongoDB Catalog Configuration
+
+> **Temporarily unavailable.** The `mongodb` feature is disabled because
+> `datafusion-table-providers` has no DataFusion 55 release yet. The configuration below
+> applies once the feature is restored.
 
 With the `mongodb` feature enabled, one or more MongoDB instances can be registered as catalogs.  All non-system databases (or a single one, if `database` is set or a `connection_string` is used) are exposed as schemas with their collections queryable as tables, for example `SELECT * FROM mongodb.my_db.my_collection`.
 

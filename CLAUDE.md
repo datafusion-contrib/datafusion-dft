@@ -102,8 +102,9 @@ cargo test --features=tui tui_cases
 # Run feature-specific tests
 cargo test --features=flightsql extension_cases::flightsql -- --test-threads=1
 cargo test --features=s3 extension_cases::s3
-cargo test --features=clickhouse extension_cases::clickhouse  # Requires local ClickHouse (see tests/extension_cases/clickhouse.rs)
-cargo test --features=mongodb extension_cases::mongodb  # Requires local MongoDB (see tests/extension_cases/mongodb.rs)
+# clickhouse and mongodb are temporarily disabled (datafusion-table-providers has no DataFusion 55 release yet)
+# cargo test --features=clickhouse extension_cases::clickhouse  # Requires local ClickHouse
+# cargo test --features=mongodb extension_cases::mongodb  # Requires local MongoDB
 cargo test --features=functions-json extension_cases::functions_json
 cargo test --features=deltalake extension_cases::deltalake
 cargo test --features="deltalake s3" extension_cases::deltalake::test_deltalake_s3  # Requires LocalStack
@@ -218,8 +219,9 @@ The project uses extensive feature flags to keep binary size manageable:
 - `functions-arrow` - Arrow IPC file inspection functions
 - `functions-json` - JSON functions
 - `functions-rocksdb` - Inspect RocksDB databases (metadata, SST files, column family metrics) via SQL
-- `clickhouse` - Register ClickHouse instances as catalogs
-- `mongodb` - Register MongoDB instances as catalogs
+# `clickhouse` and `mongodb` are temporarily disabled until datafusion-table-providers
+# publishes a DataFusion 55 release. The gated code remains in the tree (see
+# crates/datafusion-app/src/{catalog,extensions}/{clickhouse,mongodb}.rs).
 - `deltalake` - Delta Lake table format support
 - `vortex` - Vortex file format support
 - `flightsql` - FlightSQL server and client

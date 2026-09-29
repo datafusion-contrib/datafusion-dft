@@ -39,10 +39,13 @@ use datafusion::{
         datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit},
     },
     catalog::{Session, TableFunctionImpl, TableProvider},
-    common::{internal_err, plan_err, project_schema, Column, DataFusionError, Result},
+    common::{
+        internal_err, plan_err, project_schema, tree_node::TreeNodeRecursion, Column,
+        DataFusionError, Result,
+    },
     datasource::TableType,
     execution::SendableRecordBatchStream,
-    physical_expr::EquivalenceProperties,
+    physical_expr::{EquivalenceProperties, PhysicalExpr},
     physical_plan::{
         execution_plan::{Boundedness, EmissionType},
         stream::RecordBatchReceiverStream,
@@ -278,6 +281,14 @@ impl ExecutionPlan for WebSocketExec {
             None => builder.spawn(task),
         }
         Ok(builder.build())
+    }
+
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
+    ) -> Result<TreeNodeRecursion> {
+        // Leaf node with no expressions.
+        Ok(TreeNodeRecursion::Continue)
     }
 }
 

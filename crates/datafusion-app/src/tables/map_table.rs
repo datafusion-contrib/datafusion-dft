@@ -28,10 +28,13 @@ use datafusion::{
         datatypes::{DataType, Schema, SchemaRef},
     },
     catalog::{Session, TableProvider},
-    common::{internal_err, project_schema, Constraints, DataFusionError, Result},
+    common::{
+        internal_err, project_schema, tree_node::TreeNodeRecursion, Constraints, DataFusionError,
+        Result,
+    },
     datasource::TableType,
     execution::SendableRecordBatchStream,
-    physical_expr::{EquivalenceProperties, LexOrdering},
+    physical_expr::{EquivalenceProperties, LexOrdering, PhysicalExpr},
     physical_plan::{
         execution_plan::{Boundedness, EmissionType},
         memory::MemoryStream,
@@ -276,6 +279,14 @@ impl ExecutionPlan for MapExec {
             Arc::clone(&self.projected_schema),
             self.projection.clone(),
         )?))
+    }
+
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
+    ) -> Result<TreeNodeRecursion> {
+        // Leaf node with no expressions.
+        Ok(TreeNodeRecursion::Continue)
     }
 }
 

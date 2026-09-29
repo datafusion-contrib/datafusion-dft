@@ -59,8 +59,21 @@ impl TableProviderFactory for DeltaTableFactory {
         _ctx: &dyn Session,
         cmd: &CreateExternalTable,
     ) -> datafusion::error::Result<Arc<dyn datafusion::catalog::TableProvider>> {
+        let location = match cmd.locations.as_slice() {
+            [location] => location,
+            [] => {
+                return Err(DataFusionError::Plan(
+                    "DELTATABLE requires a LOCATION".to_string(),
+                ))
+            }
+            _ => {
+                return Err(DataFusionError::Plan(
+                    "DELTATABLE supports a single LOCATION".to_string(),
+                ))
+            }
+        };
         let table_url =
-            ensure_table_uri(&cmd.location).map_err(|e| DataFusionError::External(Box::new(e)))?;
+            ensure_table_uri(location).map_err(|e| DataFusionError::External(Box::new(e)))?;
 
         let provider = if cmd.options.is_empty() {
             deltalake::open_table(table_url)
