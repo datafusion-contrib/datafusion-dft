@@ -11,13 +11,13 @@ repository = "https://github.com/datafusion-contrib/datafusion-dft/tree/main/cra
 version = "0.1.0"
 
 [dependencies]
-arrow = { version = "58" }
+arrow = { version = "59" }
 async-trait = "0.1.41"
 base64 = "0.22"
-datafusion = { version = "54" }
-parquet = { default-features = false, features = ["arrow"], version = "58.3" }
+datafusion = { version = "55" }
+parquet = { default-features = false, features = ["arrow"], version = "59.2" }
 
 [dev-dependencies]
-parquet = { features = ["arrow"], version = "58" }
+parquet = { features = ["arrow"], version = "59" }
 tempfile = "3"
 tokio = { features = ["macros", "rt"], version = "1" }

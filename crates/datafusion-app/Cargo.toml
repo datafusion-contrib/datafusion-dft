@@ -3,39 +3,28 @@ edition = "2021"
 name = "datafusion-app"
 version = "0.1.0"
 
-[package.metadata.cargo-machete]
-# This dependency intentionally constrains a transitive version.
-ignored = ["datafusion-federation"]
-
 # Leaving Hudi and Iceberg around in case traction on those picks up.  It would be better if I just remove them from main and create PRs with the diff - maybe ill get around to that.
 
 [dependencies]
 arrow-flight = { features = [
   "flight-sql-experimental",
-], optional = true, version = "58" }
+], optional = true, version = "59" }
 async-trait = "0.1.80"
 base64 = { optional = true, version = "0.22.1" }
 color-eyre = "0.6.3"
-datafusion = "54"
+datafusion = "55"
 datafusion-functions-arrow = { optional = true, path = "../datafusion-functions-arrow", version = "0.1.0" }
-datafusion-functions-json = { optional = true, version = "0.54" }
+datafusion-functions-json = { optional = true, version = "0.55" }
 datafusion-functions-parquet = { optional = true, path = "../datafusion-functions-parquet", version = "0.1.0" }
 datafusion-functions-rocksdb = { optional = true, path = "../datafusion-functions-rocksdb", version = "0.1.0" }
 datafusion-net = { optional = true, path = "../datafusion-net", version = "0.1.0" }
-# Keep datafusion-table-providers 0.13 on its DataFusion 54-compatible
-# federation release. Federation 0.5.6 moved to DataFusion 55.
-datafusion-federation = { optional = true, version = "=0.5.5" }
-datafusion-table-providers = { optional = true, version = "0.13.0" }
 datafusion-udfs-wasm = { features = [
   "serde",
 ], optional = true, path = "../datafusion-udfs-wasm", version = "0.1.0" }
-# TODO: revert to crates.io once deltalake releases with DataFusion 54 support.
-# Pinned to the head of https://github.com/delta-io/delta-rs/pull/4582 because earlier
-# revs map the `s3`/`rustls` features to kernel features removed in buoyant_kernel 0.24.
 deltalake = { features = [
   "datafusion",
   "s3",
-], git = "https://github.com/delta-io/delta-rs", optional = true, rev = "b1a18b5aa6d1" }
+], optional = true, version = "1.1" }
 directories = "5.0.1"
 futures = "0.3.30"
 indexmap = { features = ["serde"], version = "2.8.0" }
@@ -44,8 +33,8 @@ log = "0.4.22"
 metrics = { optional = true, version = "0.24.0" }
 num_cpus = "1.16.0"
 object_store = { features = ["aws"], optional = true, version = "0.13" }
-# object_store_opendal 0.59 requires object_store 0.14; DataFusion 54 is on
-# object_store 0.13, so stay on 0.58 until the DataFusion 55 upgrade.
+# object_store_opendal 0.59 requires object_store 0.14; DataFusion 55 is still on
+# object_store 0.13, so stay on 0.58 until DataFusion moves to object_store 0.14.
 object_store_opendal = { optional = true, version = "0.58.0" }
 opendal = { features = [
   "services-huggingface",
@@ -65,17 +54,12 @@ tokio-tungstenite = { features = [
 ], optional = true, version = "0.29" }
 tonic = { optional = true, version = "0.14" }
 url = { optional = true, version = "2.5.2" }
-vortex-datafusion = { optional = true, version = "0.85" }
+vortex-datafusion = { optional = true, version = "0.86" }
 
 [dev-dependencies]
 criterion = { features = ["async_tokio"], version = "0.5.1" }
 
 [features]
-clickhouse = [
-  "datafusion-table-providers/clickhouse",
-  "dep:datafusion-federation",
-  "dep:datafusion-table-providers",
-]
 default = ["functions-parquet"]
 deltalake = ["dep:deltalake"]
 flightsql = ["dep:arrow-flight", "dep:base64", "dep:tonic"]
@@ -84,17 +68,22 @@ functions-json = ["dep:datafusion-functions-json"]
 functions-parquet = ["dep:datafusion-functions-parquet"]
 functions-rocksdb = ["dep:datafusion-functions-rocksdb"]
 huggingface = ["object_store_opendal", "opendal", "url"]
-mongodb = [
-  "datafusion-table-providers/mongodb",
-  "dep:datafusion-federation",
-  "dep:datafusion-table-providers",
-]
 net = ["datafusion-net/live", "dep:datafusion-net"]
 observability = ["dep:metrics", "dep:tokio-metrics"]
 s3 = ["object_store/aws", "url"]
 udfs-wasm = ["dep:datafusion-udfs-wasm"]
 vortex = ["dep:vortex-datafusion"]
 websocket = ["dep:rustls", "dep:tokio-tungstenite"]
+
+# The `clickhouse` and `mongodb` integrations are temporarily disabled because
+# `datafusion-table-providers` has no DataFusion 55 release yet. The code is kept but
+# gated out; these cfg values are declared so the unused feature gates do not warn.
+# TODO: remove this once datafusion-table-providers supports DataFusion 55 and the
+# `clickhouse`/`mongodb` features (and their dependencies) are restored.
+[lints.rust]
+unexpected_cfgs = { check-cfg = [
+  'cfg(feature, values("clickhouse", "mongodb"))',
+], level = "allow" }
 
 [lints.clippy]
 clone_on_ref_ptr = "deny"

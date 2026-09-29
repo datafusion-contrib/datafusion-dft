@@ -11,9 +11,9 @@ repository = "https://github.com/datafusion-contrib/datafusion-dft/tree/main/cra
 version = "0.1.0"
 
 [dependencies]
-arrow = { version = "58" }
+arrow = { version = "59" }
 async-trait = "0.1.41"
-datafusion = { version = "54" }
+datafusion = { version = "55" }
 rocksdb = { version = "0.25" }
 
 [dev-dependencies]

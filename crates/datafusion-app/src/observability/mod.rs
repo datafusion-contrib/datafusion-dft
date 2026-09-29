@@ -20,13 +20,12 @@ use std::{collections::HashMap, sync::Arc};
 use datafusion::{
     arrow::datatypes::{DataType, Field, Schema, TimeUnit},
     catalog::{MemorySchemaProvider, SchemaProvider},
-    common::{DFSchema, Result},
+    common::{DFSchema, Result, TableReference},
     datasource::MemTable,
     logical_expr::{logical_plan::dml::InsertOp, LogicalPlan, Values},
     physical_plan::execute_stream,
     prelude::{cast, lit, SessionContext},
     scalar::ScalarValue,
-    sql::TableReference,
 };
 use log::error;
 use tokio_stream::StreamExt;

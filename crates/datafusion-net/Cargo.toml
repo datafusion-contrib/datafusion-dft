@@ -12,7 +12,7 @@ version = "0.1.0"
 
 [dependencies]
 async-trait = "0.1.80"
-datafusion = { version = "54" }
+datafusion = { version = "55" }
 dns-lookup = "3"
 etherparse = "0.20"
 maxminddb = "0.29"

@@ -335,6 +335,10 @@ CREATE EXTERNAL TABLE table_name STORED AS DELTATABLE LOCATION 's3://bucket/tabl
 
 ### ClickHouse (`--features=clickhouse`)
 
+> **Temporarily unavailable.** The `clickhouse` feature is disabled because
+> [datafusion-table-providers] has no DataFusion 55 release yet. The configuration below
+> applies once the feature is restored.
+
 Register an entire ClickHouse instance as a catalog (backed by [datafusion-table-providers]).  Each non-system database in the instance becomes a schema in the catalog and all of its tables are queryable.  For example use the following config:
 
 ```toml
@@ -360,6 +364,10 @@ SELECT * FROM clickhouse.my_db.my_table
 Multiple `[[execution.clickhouse]]` entries can be defined, each registered as its own catalog.  Databases and table names are discovered once at startup; the data itself is queried from ClickHouse on demand.
 
 ### MongoDB (`--features=mongodb`)
+
+> **Temporarily unavailable.** The `mongodb` feature is disabled because
+> [datafusion-table-providers] has no DataFusion 55 release yet. The configuration below
+> applies once the feature is restored.
 
 Register an entire MongoDB instance as a catalog (backed by [datafusion-table-providers]).  Each non-system database in the instance becomes a schema in the catalog and its collections are queryable as tables.  For example use the following config:
 

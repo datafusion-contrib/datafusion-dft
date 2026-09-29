@@ -388,82 +388,10 @@ jobs:
         run: |
           cargo test --manifest-path crates/datafusion-net/Cargo.toml --all-features
           cargo test --features=net extension_cases::net
-  test-clickhouse:
-    name: Extension / ClickHouse
-    runs-on: ubuntu-latest
-    services:
-      clickhouse:
-        image: clickhouse/clickhouse-server:latest
-        ports:
-          - 8123:8123
-        env:
-          CLICKHOUSE_USER: admin
-          CLICKHOUSE_PASSWORD: secret
-    strategy:
-      matrix:
-        arch: [amd64]
-    steps:
-      - uses: actions/checkout@v3
-      - name: Cache Cargo registry and git
-        uses: actions/cache@v4
-        with:
-          path: /home/runner/.cargo
-          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            cargo-${{ runner.os }}-
-      - name: Cache Rust target directory
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
-          restore-keys: |
-            target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-
-            target-${{ runner.os }}-
-      - name: Setup Rust Toolchain
-        uses: ./.github/actions/setup-rust
-      - name: Wait for ClickHouse
-        run: timeout 60 bash -c 'until curl -sf http://localhost:8123/ping; do sleep 2; done'
-      - name: Run ClickHouse tests
-        run: |
-          cargo test --features=clickhouse extension_cases::clickhouse
-  test-mongodb:
-    name: Extension / MongoDB
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [amd64]
-    steps:
-      - uses: actions/checkout@v3
-      - name: Cache Cargo registry and git
-        uses: actions/cache@v4
-        with:
-          path: /home/runner/.cargo
-          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            cargo-${{ runner.os }}-
-      - name: Cache Rust target directory
-        uses: actions/cache@v4
-        with:
-          path: target
-          key: target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
-          restore-keys: |
-            target-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}-
-            target-${{ runner.os }}-
-      - name: Setup Rust Toolchain
-        uses: ./.github/actions/setup-rust
-      # The tests seed data with `docker exec mongodb mongosh`, which requires a container
-      # named `mongodb`, so a service container (with a generated name) is not used here
-      - name: Start MongoDB
-        run: |
-          docker run -d --name mongodb -p 27017:27017 \
-            -e MONGO_INITDB_ROOT_USERNAME=admin -e MONGO_INITDB_ROOT_PASSWORD=secret \
-            mongo:7.0
-      - name: Wait for MongoDB
-        run: |
-          timeout 60 bash -c 'until docker exec mongodb mongosh -u admin -p secret --authenticationDatabase admin --quiet --eval "db.adminCommand({ ping: 1 })"; do sleep 2; done'
-      - name: Run MongoDB tests
-        run: |
-          cargo test --features=mongodb extension_cases::mongodb
+  # The ClickHouse and MongoDB test jobs are temporarily disabled because
+  # `datafusion-table-providers` has no DataFusion 55 release yet, so the
+  # `clickhouse` and `mongodb` features (and their dependencies) are disabled.
+  # TODO: restore these jobs once datafusion-table-providers supports DataFusion 55.
   test-deltalake:
     name: Extension / Deltalake
     runs-on: ubuntu-latest

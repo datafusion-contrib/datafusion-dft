@@ -47,10 +47,10 @@ use datafusion::{
         datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit},
     },
     catalog::{Session, TableFunctionImpl, TableProvider},
-    common::{internal_err, project_schema, Result},
+    common::{internal_err, project_schema, tree_node::TreeNodeRecursion, Result},
     datasource::TableType,
     execution::SendableRecordBatchStream,
-    physical_expr::EquivalenceProperties,
+    physical_expr::{EquivalenceProperties, PhysicalExpr},
     physical_plan::{
         execution_plan::{Boundedness, EmissionType},
         stream::RecordBatchReceiverStream,
@@ -237,6 +237,14 @@ impl ExecutionPlan for TcpConversationsExec {
         let limit = self.limit;
         builder.spawn_blocking(move || read_conversations(path, projection, limit, tx));
         Ok(builder.build())
+    }
+
+    fn apply_expressions(
+        &self,
+        _f: &mut dyn FnMut(&Arc<dyn PhysicalExpr>) -> Result<TreeNodeRecursion>,
+    ) -> Result<TreeNodeRecursion> {
+        // Leaf node with no expressions.
+        Ok(TreeNodeRecursion::Continue)
     }
 }
 

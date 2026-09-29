@@ -11,12 +11,12 @@ repository = "https://github.com/datafusion-contrib/datafusion-dft/tree/main/cra
 version = "0.1.0"
 
 [dependencies]
-arrow = { version = "58" }
+arrow = { version = "59" }
 async-trait = "0.1.41"
-datafusion = { version = "54" }
+datafusion = { version = "55" }
 flatbuffers = { default-features = false, version = "25.2.10" }
 
 [dev-dependencies]
-arrow = { features = ["ipc_compression"], version = "58" }
+arrow = { features = ["ipc_compression"], version = "59" }
 tempfile = "3"
 tokio = { features = ["macros", "rt"], version = "1" }
