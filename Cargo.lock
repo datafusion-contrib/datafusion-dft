@@ -2485,7 +2485,7 @@ dependencies = [
 
 [[package]]
 name = "datafusion-app"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "arrow-flight",
  "async-trait",
@@ -2753,7 +2753,7 @@ dependencies = [
 
 [[package]]
 name = "datafusion-dft"
-version = "0.2.2"
+version = "0.4.0"
 dependencies = [
  "arrow-flight",
  "assert_cmd",
@@ -2999,7 +2999,7 @@ dependencies = [
 
 [[package]]
 name = "datafusion-functions-parquet"
-version = "0.1.0"
+version = "0.2.1"
 dependencies = [
  "arrow",
  "async-trait",
@@ -3322,7 +3322,7 @@ dependencies = [
 
 [[package]]
 name = "datafusion-udfs-wasm"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "datafusion",
  "log",

@@ -8,7 +8,7 @@ license = "Apache-2.0"
 name = "datafusion-functions-parquet"
 readme = "README.md"
 repository = "https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-functions-parquet"
-version = "0.1.0"
+version = "0.2.1"
 
 [dependencies]
 arrow = { version = "59" }
