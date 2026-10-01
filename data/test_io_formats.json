@@ -1,0 +1,10 @@
+{"id":1,"name":"apple","value":100,"category":"fruit"}
+{"id":2,"name":"banana","value":150,"category":"fruit"}
+{"id":3,"name":"carrot","value":75,"category":"vegetable"}
+{"id":4,"name":"date","value":200,"category":"fruit"}
+{"id":5,"name":"eggplant","value":120,"category":"vegetable"}
+{"id":6,"name":"fig","value":90,"category":"fruit"}
+{"id":7,"name":"garlic","value":45,"category":"vegetable"}
+{"id":8,"name":"honeydew","value":180,"category":"fruit"}
+{"id":9,"name":"iceberg","value":60,"category":"vegetable"}
+{"id":10,"name":"jalapeño","value":30,"category":"vegetable"}
