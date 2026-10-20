@@ -68,6 +68,7 @@ pub struct VortexWriteConfig {
     row_block_size: usize,
     data_block_target_bytes: Option<u64>,
     compact: bool,
+    statistics: bool,
     columns: Vec<ColumnOverride>,
 }
 
@@ -76,6 +77,7 @@ struct ColumnOverride {
     name: String,
     encoding: Option<String>,
     dictionary: Option<bool>,
+    statistics: Option<bool>,
 }
 
 impl Default for VortexWriteConfig {
@@ -84,6 +86,7 @@ impl Default for VortexWriteConfig {
             row_block_size: DEFAULT_ROW_BLOCK_SIZE,
             data_block_target_bytes: Some(DEFAULT_DATA_BLOCK_TARGET_BYTES),
             compact: false,
+            statistics: true,
             columns: Vec::new(),
         }
     }
@@ -128,6 +131,9 @@ impl VortexWriteConfig {
                         }
                     };
                 }
+                "statistics_enabled" => {
+                    config.statistics = parse_bool(value)?;
+                }
                 _ => {
                     if let Some(column) = key.strip_prefix("encoding::") {
                         if column.is_empty() {
@@ -144,6 +150,14 @@ impl VortexWriteConfig {
                         }
                         let enabled = parse_bool(value)?;
                         config.column(column).dictionary = Some(enabled);
+                    } else if let Some(column) = key.strip_prefix("statistics_enabled::") {
+                        if column.is_empty() {
+                            return Err(eyre!(
+                                "statistics_enabled requires a column name, for example statistics_enabled::id=false"
+                            ));
+                        }
+                        let enabled = parse_bool(value)?;
+                        config.column(column).statistics = Some(enabled);
                     } else {
                         return Err(eyre!("Unknown vortex output format option '{key}'"));
                     }
@@ -161,12 +175,13 @@ impl VortexWriteConfig {
             name: name.to_string(),
             encoding: None,
             dictionary: None,
+            statistics: None,
         });
         self.columns.last_mut().expect("a column was just pushed")
     }
 
-    /// Build the layout strategy. Every column uses the same pipeline; only the compressor
-    /// differs, so zone maps are preserved for overridden columns.
+    /// Build the layout strategy. Every column uses the same pipeline; only the compressor and
+    /// the zone-map layer differ per column, so overrides keep zone maps unless disabled.
     pub fn build_strategy(&self, schema: &Schema) -> Result<Arc<dyn LayoutStrategy>> {
         let base = if self.compact {
             BtrBlocksCompressorBuilder::default().with_compact()
@@ -183,13 +198,14 @@ impl VortexWriteConfig {
         let row_block_size = NonZeroUsize::new(self.row_block_size)
             .ok_or_else(|| eyre!("row_block_size must be greater than zero"))?;
 
-        let default_leaf: Arc<dyn LayoutStrategy> = Arc::new(build_leaf(
+        let default_leaf = build_leaf(
             Arc::clone(&default_data_compressor),
             Arc::clone(&stats_compressor),
             row_block_size,
             self.data_block_target_bytes,
             true,
-        ));
+            self.statistics,
+        );
 
         let mut field_writers: HashMap<FieldPath, Arc<dyn LayoutStrategy>> = HashMap::new();
         for column in &self.columns {
@@ -214,13 +230,14 @@ impl VortexWriteConfig {
                 }
                 None => Arc::clone(&default_data_compressor),
             };
-            let leaf: Arc<dyn LayoutStrategy> = Arc::new(build_leaf(
+            let leaf = build_leaf(
                 data_compressor,
                 Arc::clone(&stats_compressor),
                 row_block_size,
                 self.data_block_target_bytes,
                 column.dictionary.unwrap_or(true),
-            ));
+                column.statistics.unwrap_or(self.statistics),
+            );
             field_writers.insert(FieldPath::from_name(column.name.clone()), leaf);
         }
 
@@ -267,14 +284,17 @@ fn flat_strategy() -> Arc<dyn LayoutStrategy> {
 /// Compose the leaf pipeline used for a single column.
 ///
 /// This mirrors the leaf of `vortex_file::WriteStrategyBuilder::build`, including the
-/// [`ZonedStrategy`] that writes zone maps.
+/// [`ZonedStrategy`] that writes zone maps. When `zone_maps` is false, the zone-map layer is
+/// skipped. The outer repartition exists only to give the zone-map layer fixed-size row blocks,
+/// so it is skipped too.
 fn build_leaf(
     data_compressor: Arc<dyn CompressorPlugin>,
     stats_compressor: Arc<dyn CompressorPlugin>,
     row_block_size: NonZeroUsize,
     data_block_target_bytes: Option<u64>,
     dictionary: bool,
-) -> RepartitionStrategy {
+    zone_maps: bool,
+) -> Arc<dyn LayoutStrategy> {
     let flat = flat_strategy();
     let chunked = ChunkedLayoutStrategy::new(Arc::clone(&flat));
     let buffered = BufferedStrategy::new(chunked, BUFFER_SIZE);
@@ -291,7 +311,7 @@ fn build_leaf(
     let compress_then_flat =
         CompressingStrategy::new(Arc::clone(&flat), Arc::clone(&stats_compressor));
 
-    let zoned_child: Arc<dyn LayoutStrategy> = if dictionary {
+    let data: Arc<dyn LayoutStrategy> = if dictionary {
         Arc::new(DictStrategy::new(
             coalescing.clone(),
             compress_then_flat.clone(),
@@ -303,8 +323,12 @@ fn build_leaf(
         Arc::new(coalescing)
     };
 
+    if !zone_maps {
+        return data;
+    }
+
     let stats = ZonedStrategy::new(
-        zoned_child,
+        data,
         compress_then_flat,
         ZonedLayoutOptions {
             block_size: row_block_size,
@@ -312,7 +336,7 @@ fn build_leaf(
         },
     );
 
-    RepartitionStrategy::new(
+    Arc::new(RepartitionStrategy::new(
         stats,
         RepartitionWriterOptions {
             block_size_minimum: 0,
@@ -320,7 +344,7 @@ fn build_leaf(
             block_size_target: None,
             canonicalize: false,
         },
-    )
+    ))
 }
 
 struct SchemeEntry {
@@ -472,6 +496,14 @@ pub fn print_options() {
     println!(
         "{:<44} {:<18} Enable dictionary encoding for a top-level column",
         "dictionary_enabled::COLUMN", "true"
+    );
+    println!(
+        "{:<44} {:<18} Write zone maps (statistics) for pruning",
+        "statistics_enabled", "true"
+    );
+    println!(
+        "{:<44} {:<18} Write zone maps for a top-level column",
+        "statistics_enabled::COLUMN", "true"
     );
 
     println!("\nPass an option with: --format-option KEY=VALUE");

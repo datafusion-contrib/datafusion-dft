@@ -45,6 +45,7 @@ dft -c "SELECT id, name FROM users" -o users.vortex \
   --format-option encoding::id=bitpacking \
   --format-option encoding::name=vortex.string.fsst \
   --format-option dictionary_enabled::name=false \
+  --format-option statistics_enabled::id=false \
   --format-option row_block_size=4096 \
   --format-option data_block_target_bytes=none \
   --format-option compressor=compact
@@ -52,10 +53,16 @@ dft -c "SELECT id, name FROM users" -o users.vortex \
 
 An encoding name can be a full scheme name (`vortex.string.fsst`), a
 kind-qualified name (`string.fsst`), or a short name (`fsst`) when the column
-type disambiguates it. Zone maps are always written, including for columns with
-an encoding override. Vortex selects encodings adaptively; `encoding` restricts
-the candidate schemes for that column. Use `dictionary_enabled::COLUMN=false` to
-skip dictionary encoding when you want a single encoding.
+type disambiguates it. Zone maps are written by default, including for columns
+with an encoding override. Vortex selects encodings adaptively; `encoding`
+restricts the candidate schemes for that column. Use
+`dictionary_enabled::COLUMN=false` to skip dictionary encoding when you want a
+single encoding.
+
+`statistics_enabled=false` disables zone maps. It accepts a global value or a
+`statistics_enabled::COLUMN` override. Zone maps are what DataFusion uses to
+prune files and row blocks, so disabling them makes files smaller and writes
+faster, and queries scan more rows.
 
 Invalid options fail with a configuration error. Compressed CSV and JSON output
 is not currently supported.

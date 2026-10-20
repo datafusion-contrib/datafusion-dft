@@ -852,23 +852,38 @@ fn test_output_vortex_unknown_column() {
         .stderr(contains_str("Unknown column 'missing'"));
 }
 
-/// Guard against a regression where a per-column override drops the zone-map layout.
-#[test]
+/// Count layout nodes with the given encoding id in a written Vortex file.
 #[cfg(feature = "vortex")]
-fn test_output_vortex_preserves_zone_maps() {
+fn count_vortex_layouts(path: &std::path::Path, id: &str) -> usize {
     use vortex::file::OpenOptionsSessionExt;
     use vortex::layout::LayoutRef;
     use vortex::session::VortexSession;
     use vortex::VortexSessionDefault;
 
-    fn count_layouts(layout: &LayoutRef, id: &str) -> usize {
-        let mut count = usize::from(layout.encoding_id().to_string() == id);
+    fn count(layout: &LayoutRef, id: &str) -> usize {
+        let mut total = usize::from(layout.encoding_id().to_string() == id);
         for child in layout.children().unwrap() {
-            count += count_layouts(&child, id);
+            total += count(&child, id);
         }
-        count
+        total
     }
 
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    runtime.block_on(async {
+        let session = VortexSession::default();
+        let file = session.open_options().open_path(path).await.unwrap();
+        count(file.footer().layout(), id)
+    })
+}
+
+/// Guard against a regression where a per-column override drops the zone-map layout.
+#[test]
+#[cfg(feature = "vortex")]
+fn test_output_vortex_preserves_zone_maps() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("zoned.vortex");
 
@@ -883,19 +898,62 @@ fn test_output_vortex_preserves_zone_maps() {
         .assert()
         .success();
 
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-
-    let zoned = runtime.block_on(async {
-        let session = VortexSession::default();
-        let file = session.open_options().open_path(&path).await.unwrap();
-        count_layouts(file.footer().layout(), "vortex.zoned")
-    });
-
+    let zoned = count_vortex_layouts(&path, "vortex.zoned");
     assert!(
         zoned >= 2,
         "expected a zone-map layout for each column, found {zoned}"
     );
+}
+
+#[test]
+#[cfg(feature = "vortex")]
+fn test_output_vortex_zone_maps_disabled() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("no_zoned.vortex");
+
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT * FROM (VALUES (1, 'alpha'), (2, 'beta')) AS t(id, name)")
+        .arg("-o")
+        .arg(&path)
+        .arg("--format-option")
+        .arg("encoding::id=bitpacking")
+        .arg("--format-option")
+        .arg("statistics_enabled=false")
+        .assert()
+        .success();
+
+    assert_eq!(count_vortex_layouts(&path, "vortex.zoned"), 0);
+
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(format!("SELECT * FROM '{}'", path.to_str().unwrap()))
+        .assert()
+        .success();
+
+    let expected = r#"
++----+-------+
+| id | name  |
++----+-------+
+| 1  | alpha |
+| 2  | beta  |
++----+-------+"#;
+    assert.stdout(contains_str(expected));
+
+    // Per-column disable: only the other column keeps zone maps.
+    let column_path = dir.path().join("column_no_zoned.vortex");
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT * FROM (VALUES (1, 'alpha'), (2, 'beta')) AS t(id, name)")
+        .arg("-o")
+        .arg(&column_path)
+        .arg("--format-option")
+        .arg("statistics_enabled::id=false")
+        .assert()
+        .success();
+
+    assert_eq!(count_vortex_layouts(&column_path, "vortex.zoned"), 1);
 }
