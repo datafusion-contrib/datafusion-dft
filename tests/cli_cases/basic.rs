@@ -659,6 +659,60 @@ fn test_concat_output() {
 }
 
 #[test]
+fn test_duration_format_options() {
+    // DataFusion's default duration format is `pretty`, not Arrow's ISO 8601
+    let cases = [
+        (
+            "SELECT arrow_cast(7262, 'Duration(Second)') AS d",
+            r#"
++------------------------------+
+| d                            |
++------------------------------+
+| 0 days 2 hours 1 mins 2 secs |
++------------------------------+"#,
+        ),
+        (
+            "SELECT arrow_cast(1500, 'Duration(Millisecond)') AS d",
+            r#"
++----------------------------------+
+| d                                |
++----------------------------------+
+| 0 days 0 hours 0 mins 1.500 secs |
++----------------------------------+"#,
+        ),
+        (
+            "SELECT arrow_cast(7262962529104, 'Duration(Nanosecond)') AS d",
+            r#"
++----------------------------------------+
+| d                                      |
++----------------------------------------+
+| 0 days 2 hours 1 mins 2.962529104 secs |
++----------------------------------------+"#,
+        ),
+        (
+            "SET datafusion.format.duration_format = 'iso8601'; \
+             SELECT arrow_cast(7262962529104, 'Duration(Nanosecond)') AS d",
+            r#"
++-------------------+
+| d                 |
++-------------------+
+| PT7262.962529104S |
++-------------------+"#,
+        ),
+    ];
+
+    for (sql, expected) in cases {
+        Command::cargo_bin("dft")
+            .unwrap()
+            .arg("-c")
+            .arg(sql)
+            .assert()
+            .success()
+            .stdout(contains_str(expected));
+    }
+}
+
+#[test]
 fn test_json_and_concat_output() {
     let assert = Command::cargo_bin("dft")
         .unwrap()
