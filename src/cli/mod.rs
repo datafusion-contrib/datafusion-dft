@@ -17,6 +17,8 @@
 //! [`CliApp`]: Command Line User Interface
 
 mod progress;
+#[cfg(feature = "vortex")]
+mod vortex_write_options;
 
 use crate::config::AppConfig;
 use crate::db::register_db;
@@ -59,7 +61,8 @@ use {
 };
 #[cfg(feature = "vortex")]
 use {
-    vortex::{arrow::ArrowSessionExt, VortexSessionDefault},
+    std::sync::Arc,
+    vortex::{arrow::ArrowSessionExt, layout::LayoutStrategy, VortexSessionDefault},
     vortex_file::VortexWriteOptions,
     vortex_session::VortexSession,
 };
@@ -892,16 +895,23 @@ impl CliApp {
 struct VortexFileWriter {
     path: PathBuf,
     batches: Vec<RecordBatch>,
+    strategy: Arc<dyn LayoutStrategy>,
 }
 
 #[cfg(feature = "vortex")]
 impl VortexFileWriter {
-    fn new(file: File, _schema: SchemaRef, path: &Path) -> Result<Self> {
+    fn new(
+        file: File,
+        _schema: SchemaRef,
+        path: &Path,
+        strategy: Arc<dyn LayoutStrategy>,
+    ) -> Result<Self> {
         // We need to drop the std::fs::File and use tokio::fs::File later
         drop(file);
         Ok(Self {
             path: path.to_path_buf(),
             batches: Vec::new(),
+            strategy,
         })
     }
 
@@ -935,6 +945,7 @@ impl VortexFileWriter {
 
         // Write using async API
         VortexWriteOptions::new(session)
+            .with_strategy(self.strategy)
             .write(file, stream)
             .await
             .map_err(|e| eyre!("Failed to write Vortex file: {}", e))?;
@@ -1019,12 +1030,11 @@ fn path_to_writer(
                 }
                 #[cfg(feature = "vortex")]
                 "vortex" => {
-                    if !format_options.is_empty() {
-                        return Err(eyre!("Vortex output does not support format options"));
-                    }
+                    let config = vortex_write_options::VortexWriteConfig::parse(format_options)?;
+                    let strategy = config.build_strategy(schema.as_ref())?;
                     let file = std::fs::File::create(path)?;
                     Ok(AnyWriter::Vortex(VortexFileWriter::new(
-                        file, schema, path,
+                        file, schema, path, strategy,
                     )?))
                 }
                 _ => {
@@ -1078,7 +1088,7 @@ pub fn print_format_options(format: Format) {
         Format::Parquet => ConfigFileType::PARQUET,
         #[cfg(feature = "vortex")]
         Format::Vortex => {
-            println!("Vortex output does not currently expose configurable format options.");
+            vortex_write_options::print_options();
             return;
         }
     };

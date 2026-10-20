@@ -2810,6 +2810,7 @@ dependencies = [
  "url",
  "uuid",
  "vortex",
+ "vortex-btrblocks",
  "vortex-datafusion",
  "vortex-file",
  "vortex-session",
