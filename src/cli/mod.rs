@@ -30,13 +30,16 @@ use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use datafusion::arrow::array::{RecordBatch, RecordBatchWriter};
 use datafusion::arrow::datatypes::SchemaRef;
-use datafusion::arrow::util::pretty::pretty_format_batches;
+use datafusion::arrow::util::display::FormatOptions;
+use datafusion::arrow::util::pretty::pretty_format_batches_with_options;
 use datafusion::arrow::{csv, json};
+use datafusion::catalog::Session;
 use datafusion::common::{
     config::{ConfigFileType, TableOptions},
     file_options::{csv_writer::CsvWriterOptions, parquet_writer::ParquetWriterOptions},
     parsers::CompressionTypeVariant,
 };
+use datafusion::logical_expr::extension_types::DFArrayFormatterFactory;
 use datafusion::sql::parser::DFParser;
 use datafusion_app::config::merge_configs;
 use datafusion_app::extensions::DftSessionStateBuilder;
@@ -49,6 +52,7 @@ use std::error::Error;
 use std::fs::File;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 #[cfg(feature = "flightsql")]
 use {
     crate::args::{parse_headers_file, Command, FlightSqlCommand},
@@ -790,6 +794,20 @@ impl CliApp {
         S: Stream<Item = Result<RecordBatch, E>> + Unpin,
         E: Error,
     {
+        // Format values using the local session's `datafusion.format.*` settings (as
+        // `DataFrame::to_string` does) rather than Arrow's defaults. In FlightSQL mode the
+        // server's settings aren't visible to the client, so the local settings are used.
+        let state = self.app_execution.session_ctx().state();
+        let format_config = state.config().options().format.clone();
+        let formatter_factory =
+            DFArrayFormatterFactory::new(Arc::clone(state.extension_type_registry()));
+        let format_options = match FormatOptions::try_from(&format_config) {
+            Ok(options) => options.with_formatter_factory(Some(&formatter_factory)),
+            Err(e) => {
+                println!("Error building format options: {e}");
+                return;
+            }
+        };
         if self.args.concat {
             let Some(batches) = self.collect_stream(stream).await else {
                 return;
@@ -797,10 +815,12 @@ impl CliApp {
             if !batches.is_empty() {
                 let schema = batches[0].schema();
                 match datafusion::arrow::compute::concat_batches(&schema, &batches) {
-                    Ok(batch) => match pretty_format_batches(&[batch]) {
-                        Ok(d) => println!("{}", d),
-                        Err(e) => println!("Error formatting batch: {e}"),
-                    },
+                    Ok(batch) => {
+                        match pretty_format_batches_with_options(&[batch], &format_options) {
+                            Ok(d) => println!("{}", d),
+                            Err(e) => println!("Error formatting batch: {e}"),
+                        }
+                    }
                     Err(e) => println!("Error concatenating batches: {e}"),
                 }
             }
@@ -808,10 +828,12 @@ impl CliApp {
             let mut stream = stream;
             while let Some(maybe_batch) = stream.next().await {
                 match maybe_batch {
-                    Ok(batch) => match pretty_format_batches(&[batch]) {
-                        Ok(d) => println!("{}", d),
-                        Err(e) => println!("Error formatting batch: {e}"),
-                    },
+                    Ok(batch) => {
+                        match pretty_format_batches_with_options(&[batch], &format_options) {
+                            Ok(d) => println!("{}", d),
+                            Err(e) => println!("Error formatting batch: {e}"),
+                        }
+                    }
                     Err(e) => println!("Error executing SQL: {e}"),
                 }
             }
