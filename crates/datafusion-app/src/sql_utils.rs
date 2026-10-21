@@ -19,6 +19,21 @@
 pub fn clean_sql(sql: String) -> String {
     sql.lines()
         .filter(|l| !l.starts_with("--") && !l.trim().is_empty())
-        .map(|l| l.to_string())
-        .collect()
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::clean_sql;
+
+    #[test]
+    fn clean_sql_preserves_line_boundaries() {
+        let sql = "CREATE EXTERNAL TABLE hits\nSTORED AS PARQUET\n-- location follows\n\nLOCATION (\n 'hits.parquet'\n);";
+
+        assert_eq!(
+            clean_sql(sql.to_string()),
+            "CREATE EXTERNAL TABLE hits\nSTORED AS PARQUET\nLOCATION (\n 'hits.parquet'\n);"
+        );
+    }
 }
