@@ -72,6 +72,10 @@ tui-logger = { features = [
 url = { features = ["serde"], version = "2.5.2" }
 uuid = { optional = true, version = "1.10.0" }
 vortex = { optional = true, version = "0.86" }
+vortex-btrblocks = { features = [
+  "pco",
+  "zstd",
+], optional = true, version = "0.86" }
 vortex-datafusion = { optional = true, version = "0.86" }
 vortex-file = { optional = true, version = "0.86" }
 vortex-session = { optional = true, version = "0.86" }
@@ -133,6 +137,7 @@ udfs-wasm = ["datafusion-app/udfs-wasm"]
 vortex = [
   "datafusion-app/vortex",
   "dep:vortex",
+  "dep:vortex-btrblocks",
   "dep:vortex-datafusion",
   "dep:vortex-file",
   "dep:vortex-session",

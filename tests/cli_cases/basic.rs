@@ -708,3 +708,252 @@ fn test_output_vortex() {
 
     assert.stdout(contains_str(expected));
 }
+
+#[test]
+#[cfg(feature = "vortex")]
+fn test_print_vortex_format_options() {
+    Command::cargo_bin("dft")
+        .unwrap()
+        .args(["--print-format-options", "vortex"])
+        .assert()
+        .success()
+        .stdout(contains_str("Available vortex output format options:"))
+        .stdout(contains_str("encoding::COLUMN"))
+        .stdout(contains_str("bitpacking"));
+}
+
+#[test]
+#[cfg(feature = "vortex")]
+fn test_output_vortex_column_encoding() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("encoded.vortex");
+
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT * FROM (VALUES (1, 'alpha'), (2, 'beta')) AS t(id, name)")
+        .arg("-o")
+        .arg(&path)
+        .arg("--format-option")
+        .arg("encoding::id=bitpacking")
+        .arg("--format-option")
+        .arg("encoding::name=vortex.string.fsst")
+        .arg("--format-option")
+        .arg("dictionary_enabled::name=false")
+        .assert()
+        .success();
+
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(format!("SELECT * FROM '{}'", path.to_str().unwrap()))
+        .assert()
+        .success();
+
+    let expected = r#"
++----+-------+
+| id | name  |
++----+-------+
+| 1  | alpha |
+| 2  | beta  |
++----+-------+"#;
+    assert.stdout(contains_str(expected));
+}
+
+#[test]
+#[cfg(feature = "vortex")]
+fn test_output_vortex_write_options() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("options.vortex");
+
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT * FROM (VALUES (1, 'alpha'), (2, 'beta')) AS t(id, name)")
+        .arg("-o")
+        .arg(&path)
+        .arg("--format-option")
+        .arg("row_block_size=4096")
+        .arg("--format-option")
+        .arg("data_block_target_bytes=none")
+        .arg("--format-option")
+        .arg("compressor=compact")
+        .assert()
+        .success();
+
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(format!("SELECT count(*) FROM '{}'", path.to_str().unwrap()))
+        .assert()
+        .success();
+
+    assert.stdout(contains_str("2"));
+}
+
+#[test]
+#[cfg(feature = "vortex")]
+fn test_output_vortex_unknown_encoding() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("bad.vortex");
+
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT 1 AS id")
+        .arg("-o")
+        .arg(&path)
+        .arg("--format-option")
+        .arg("encoding::id=not_a_scheme")
+        .assert()
+        .failure()
+        .stderr(contains_str("Unknown vortex encoding 'not_a_scheme'"));
+
+    assert!(!path.exists());
+}
+
+#[test]
+#[cfg(feature = "vortex")]
+fn test_output_vortex_encoding_type_mismatch() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("bad.vortex");
+
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT 1 AS id")
+        .arg("-o")
+        .arg(&path)
+        .arg("--format-option")
+        .arg("encoding::id=fsst")
+        .assert()
+        .failure()
+        .stderr(contains_str(
+            "Unknown vortex encoding 'fsst' for int column 'id'",
+        ));
+}
+
+#[test]
+#[cfg(feature = "vortex")]
+fn test_output_vortex_unknown_column() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("bad.vortex");
+
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT 1 AS id")
+        .arg("-o")
+        .arg(&path)
+        .arg("--format-option")
+        .arg("encoding::missing=bitpacking")
+        .assert()
+        .failure()
+        .stderr(contains_str("Unknown column 'missing'"));
+}
+
+/// Count layout nodes with the given encoding id in a written Vortex file.
+#[cfg(feature = "vortex")]
+fn count_vortex_layouts(path: &std::path::Path, id: &str) -> usize {
+    use vortex::file::OpenOptionsSessionExt;
+    use vortex::layout::LayoutRef;
+    use vortex::session::VortexSession;
+    use vortex::VortexSessionDefault;
+
+    fn count(layout: &LayoutRef, id: &str) -> usize {
+        let mut total = usize::from(layout.encoding_id().to_string() == id);
+        for child in layout.children().unwrap() {
+            total += count(&child, id);
+        }
+        total
+    }
+
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    runtime.block_on(async {
+        let session = VortexSession::default();
+        let file = session.open_options().open_path(path).await.unwrap();
+        count(file.footer().layout(), id)
+    })
+}
+
+/// Guard against a regression where a per-column override drops the zone-map layout.
+#[test]
+#[cfg(feature = "vortex")]
+fn test_output_vortex_preserves_zone_maps() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("zoned.vortex");
+
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT * FROM (VALUES (1, 'alpha'), (2, 'beta')) AS t(id, name)")
+        .arg("-o")
+        .arg(&path)
+        .arg("--format-option")
+        .arg("encoding::id=bitpacking")
+        .assert()
+        .success();
+
+    let zoned = count_vortex_layouts(&path, "vortex.zoned");
+    assert!(
+        zoned >= 2,
+        "expected a zone-map layout for each column, found {zoned}"
+    );
+}
+
+#[test]
+#[cfg(feature = "vortex")]
+fn test_output_vortex_zone_maps_disabled() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("no_zoned.vortex");
+
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT * FROM (VALUES (1, 'alpha'), (2, 'beta')) AS t(id, name)")
+        .arg("-o")
+        .arg(&path)
+        .arg("--format-option")
+        .arg("encoding::id=bitpacking")
+        .arg("--format-option")
+        .arg("statistics_enabled=false")
+        .assert()
+        .success();
+
+    assert_eq!(count_vortex_layouts(&path, "vortex.zoned"), 0);
+
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(format!("SELECT * FROM '{}'", path.to_str().unwrap()))
+        .assert()
+        .success();
+
+    let expected = r#"
++----+-------+
+| id | name  |
++----+-------+
+| 1  | alpha |
+| 2  | beta  |
++----+-------+"#;
+    assert.stdout(contains_str(expected));
+
+    // Per-column disable: only the other column keeps zone maps.
+    let column_path = dir.path().join("column_no_zoned.vortex");
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg("SELECT * FROM (VALUES (1, 'alpha'), (2, 'beta')) AS t(id, name)")
+        .arg("-o")
+        .arg(&column_path)
+        .arg("--format-option")
+        .arg("statistics_enabled::id=false")
+        .assert()
+        .success();
+
+    assert_eq!(count_vortex_layouts(&column_path, "vortex.zoned"), 1);
+}
