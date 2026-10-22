@@ -839,6 +839,151 @@ impl FlightSqlService for FlightSqlServiceImpl {
         res
     }
 
+    async fn do_action_fallback(
+        &self,
+        request: Request<Action>,
+    ) -> Result<Response<<Self as FlightService>::DoActionStream>, Status> {
+        use arrow_flight::utils::batches_to_flight_data;
+        let action = request.into_inner();
+        counter!("requests", "endpoint" => "do_action_fallback").increment(1);
+        let start = Timestamp::now();
+
+        match action.r#type.as_str() {
+            "analyze_query" => {
+                // 1. Parse JSON request body
+                let request: datafusion_app::stats::AnalyzeQueryRequest =
+                    serde_json::from_slice(&action.body).map_err(|e| {
+                        Status::invalid_argument(format!("Invalid JSON request: {}", e))
+                    })?;
+
+                // 2. Validate protocol version if the client sent one
+                if let Some(version) = &request.protocol_version {
+                    if !datafusion_app::stats::is_compatible_protocol_version(version) {
+                        return Err(Status::invalid_argument(format!(
+                            "Unsupported analyze protocol version: {} (server implements {})",
+                            version,
+                            datafusion_app::stats::ANALYZE_PROTOCOL_VERSION
+                        )));
+                    }
+                }
+
+                // 3. Extract SQL query (only supported format for now)
+                let sql = request
+                    .sql()
+                    .map_err(|e| Status::invalid_argument(e.to_string()))?;
+
+                info!("Analyzing query via do_action: {}", sql);
+
+                // 4. Execute analyze_query on ExecutionContext
+                let mut stats = self
+                    .execution
+                    .analyze_query(sql)
+                    .await
+                    .map_err(|e| Status::internal(format!("Analyze failed: {}", e)))?;
+
+                stats.collect_stats(); // Collect IO and compute metrics from plan
+
+                // 5. Convert ExecutionStats to metrics table format
+                let metrics_batch = stats.to_metrics_table().map_err(|e| {
+                    Status::internal(format!("Metrics serialization failed: {}", e))
+                })?;
+
+                // 6. Attach a correlation id so clients can match concurrent
+                // responses to requests. The protocol version is already in
+                // the schema metadata from `analyze_metrics_schema`.
+                let query_id = uuid::Uuid::new_v4();
+                let mut metadata = metrics_batch.schema().metadata().clone();
+                metadata.insert(
+                    datafusion_app::stats::QUERY_ID_METADATA_KEY.to_string(),
+                    query_id.to_string(),
+                );
+                let schema_with_meta = Arc::new(
+                    metrics_batch
+                        .schema()
+                        .as_ref()
+                        .clone()
+                        .with_metadata(metadata),
+                );
+                let metrics_batch = datafusion::arrow::array::RecordBatch::try_new(
+                    Arc::clone(&schema_with_meta),
+                    metrics_batch.columns().to_vec(),
+                )
+                .map_err(|e| Status::internal(format!("Failed to attach metadata: {}", e)))?;
+
+                // 7. Encode metrics batch as FlightData
+                let flight_data = batches_to_flight_data(&schema_with_meta, vec![metrics_batch])
+                    .map_err(|e| {
+                        Status::internal(format!("Failed to encode metrics batch: {}", e))
+                    })?;
+
+                // 8. Convert FlightData to arrow_flight::Result messages
+                // Note: Query is NOT included in response; clients must retain the original request
+                let results: Vec<arrow_flight::Result> = flight_data
+                    .into_iter()
+                    .map(|fd| {
+                        // Serialize FlightData to bytes
+                        let bytes = fd.encode_to_vec();
+                        arrow_flight::Result { body: bytes.into() }
+                    })
+                    .collect();
+
+                // 9. Create stream of Result messages
+                let stream = futures::stream::iter(results.into_iter().map(Ok)).boxed();
+
+                // Record metrics
+                let duration = Timestamp::now() - start;
+                histogram!("do_action_analyze_query_latency_ms")
+                    .record(duration.get_milliseconds() as f64);
+
+                let ctx = self.execution.session_ctx();
+                let req = ObservabilityRequestDetails {
+                    request_id: None,
+                    path: "/do_action/analyze_query".to_string(),
+                    sql: Some(sql.to_string()),
+                    start_ms: start.as_millisecond(),
+                    duration_ms: duration.get_milliseconds(),
+                    rows: None,
+                    status: 0,
+                };
+                if let Err(e) = self
+                    .execution
+                    .observability()
+                    .try_record_request(ctx, req)
+                    .await
+                {
+                    error!("Error recording request: {}", e);
+                }
+
+                Ok(Response::new(stream))
+            }
+            "analyze_query_capabilities" => {
+                let capabilities = serde_json::json!({
+                    "protocol_version": datafusion_app::stats::ANALYZE_PROTOCOL_VERSION,
+                    "request_formats": ["sql"],
+                    "namespaces": [
+                        "query",
+                        "stage",
+                        "compute",
+                        "io.parquet",
+                        "io.csv",
+                        "io.arrow",
+                        "io.json",
+                    ],
+                });
+                let body = serde_json::to_vec(&capabilities).map_err(|e| {
+                    Status::internal(format!("Failed to serialize capabilities: {}", e))
+                })?;
+                let result = arrow_flight::Result { body: body.into() };
+                let stream = futures::stream::iter([Ok(result)]).boxed();
+                Ok(Response::new(stream))
+            }
+            _ => Err(Status::unimplemented(format!(
+                "Unknown action: {}",
+                action.r#type
+            ))),
+        }
+    }
+
     async fn register_sql_info(&self, _id: i32, _result: &SqlInfo) {}
 }
 

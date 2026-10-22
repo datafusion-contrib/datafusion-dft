@@ -483,4 +483,102 @@ impl FlightSQLContext {
             ))
         }
     }
+
+    /// Get raw metrics batch without reconstruction (for --analyze-raw)
+    pub async fn analyze_query_raw(
+        &self,
+        query: &str,
+    ) -> Result<(String, datafusion::arrow::array::RecordBatch)> {
+        self.fetch_analyze_batches(query).await
+    }
+
+    /// Reconstruct ExecutionStats from metrics (for --analyze)
+    pub async fn analyze_query(&self, query: &str) -> Result<crate::stats::ExecutionStats> {
+        let (query_str, metrics_batch) = self.fetch_analyze_batches(query).await?;
+
+        // Reconstruct ExecutionStats from metrics table
+        let stats = crate::stats::ExecutionStats::from_metrics_table(metrics_batch, query_str)?;
+
+        Ok(stats)
+    }
+
+    /// Shared logic to fetch analyze batch and query from server
+    async fn fetch_analyze_batches(
+        &self,
+        query: &str,
+    ) -> Result<(String, datafusion::arrow::array::RecordBatch)> {
+        use crate::stats::{
+            is_compatible_protocol_version, PROTOCOL_VERSION_METADATA_KEY, QUERY_ID_METADATA_KEY,
+        };
+        use arrow_flight::utils::flight_data_to_batches;
+        use arrow_flight::{Action, FlightData};
+
+        // Validate that query contains only a single statement
+        let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
+        let statements = DFParser::parse_sql_with_dialect(query, &dialect)?;
+        if statements.len() != 1 {
+            return Err(eyre::eyre!("Only a single SQL statement can be analyzed"));
+        }
+
+        // 1. Create JSON request and encode as Action body
+        let request = crate::stats::AnalyzeQueryRequest::with_sql(query);
+        let request_body = serde_json::to_vec(&request)
+            .map_err(|e| eyre::eyre!("Failed to serialize request: {}", e))?;
+
+        let action = Action {
+            r#type: "analyze_query".to_string(),
+            body: request_body.into(),
+        };
+
+        // 2. Call do_action on the FlightSQL service
+        let mut client = self.client.lock().await;
+        let client = client
+            .as_mut()
+            .ok_or_else(|| eyre::eyre!("No FlightSQL client configured"))?;
+
+        let mut stream = client
+            .do_action(action.into_request())
+            .await
+            .map_err(|e| eyre::eyre!("do_action failed: {}", e))?;
+
+        // 3. Collect all Result messages, decoding each body as FlightData
+        let mut all_flight_data = Vec::new();
+        while let Some(result) = stream.next().await {
+            let result = result.map_err(|e| eyre::eyre!("Stream error: {}", e))?;
+            let flight_data = <FlightData as prost::Message>::decode(result.body.as_ref())
+                .map_err(|e| eyre::eyre!("Failed to decode FlightData: {}", e))?;
+            all_flight_data.push(flight_data);
+        }
+
+        // 4. Decode the metrics batches. The framing is a schema message
+        // followed by any number of data (and dictionary) messages; a server
+        // may legitimately split a large metrics table into several batches.
+        let metrics_batches = flight_data_to_batches(&all_flight_data)
+            .map_err(|e| eyre::eyre!("Failed to decode metrics batch: {}", e))?;
+
+        if metrics_batches.is_empty() {
+            return Err(eyre::eyre!("No metrics batch found in response"));
+        }
+
+        let schema = metrics_batches[0].schema();
+        if let Some(version) = schema.metadata().get(PROTOCOL_VERSION_METADATA_KEY) {
+            if !is_compatible_protocol_version(version) {
+                return Err(eyre::eyre!(
+                    "Server analyze protocol version {} is not compatible with client version {}",
+                    version,
+                    crate::stats::ANALYZE_PROTOCOL_VERSION
+                ));
+            }
+        }
+        if let Some(query_id) = schema.metadata().get(QUERY_ID_METADATA_KEY) {
+            debug!("Analyze response query_id: {query_id}");
+        }
+
+        let metrics_batch =
+            datafusion::arrow::compute::concat_batches(&schema, &metrics_batches)
+                .map_err(|e| eyre::eyre!("Failed to concatenate metrics batches: {}", e))?;
+
+        // Use the original query (client retains it, server doesn't send it back)
+        Ok((query.to_string(), metrics_batch))
+    }
 }
