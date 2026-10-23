@@ -79,7 +79,6 @@ cpp/Brewfile.lock.json
 
 # Rust
 target
-Cargo.lock
 
 rusty-tags.vi
 .history
@@ -90,8 +89,6 @@ venv/*
 
 # apache release artifacts
 dev/dist
-
-Cargo.lock
 
 # For local development of benchmarking
 benchmark_results/

@@ -1,7 +1,7 @@
 [package]
 authors = ["Matthew Turner <matthew.m.turner@outlook.com>"]
 description = "DataFusion table functions for querying network packet captures (pcap)"
-edition = "2021"
+edition.workspace = true
 homepage = "https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-net"
 keywords = ["datafusion", "network", "pcap", "query", "sql"]
 license = "Apache-2.0"

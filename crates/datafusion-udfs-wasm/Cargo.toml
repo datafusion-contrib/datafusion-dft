@@ -1,5 +1,5 @@
 [package]
-edition = "2021"
+edition.workspace = true
 name = "datafusion-udfs-wasm"
 version = "0.1.2"
 
