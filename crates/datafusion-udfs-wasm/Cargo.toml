@@ -17,8 +17,8 @@ tokio = { features = ["macros", "rt-multi-thread"], version = "1.36.0" }
 [features]
 serde = ["dep:serde"]
 
-[profile.bench]
-debug = true
+[lints]
+workspace = true
 
 [[bench]]
 harness = false

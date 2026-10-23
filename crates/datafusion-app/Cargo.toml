@@ -75,18 +75,8 @@ udfs-wasm = ["dep:datafusion-udfs-wasm"]
 vortex = ["dep:vortex-datafusion"]
 websocket = ["dep:rustls", "dep:tokio-tungstenite"]
 
-# The `clickhouse` and `mongodb` integrations are temporarily disabled because
-# `datafusion-table-providers` has no DataFusion 55 release yet. The code is kept but
-# gated out; these cfg values are declared so the unused feature gates do not warn.
-# TODO: remove this once datafusion-table-providers supports DataFusion 55 and the
-# `clickhouse`/`mongodb` features (and their dependencies) are restored.
-[lints.rust]
-unexpected_cfgs = { check-cfg = [
-  'cfg(feature, values("clickhouse", "mongodb"))',
-], level = "allow" }
-
-[lints.clippy]
-clone_on_ref_ptr = "deny"
+[lints]
+workspace = true
 
 [[bench]]
 harness = false

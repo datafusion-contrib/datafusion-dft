@@ -14,3 +14,19 @@ datafusion-functions-parquet = { path = "crates/datafusion-functions-parquet" }
 datafusion-functions-rocksdb = { path = "crates/datafusion-functions-rocksdb" }
 datafusion-net = { path = "crates/datafusion-net" }
 datafusion-udfs-wasm = { path = "crates/datafusion-udfs-wasm" }
+
+[profile.bench]
+debug = true
+
+# The `clickhouse` and `mongodb` features are temporarily disabled because
+# `datafusion-table-providers` has no DataFusion 55 release yet. The gated test helpers
+# remain in the tree; these cfg values are declared so they do not warn.
+# TODO: remove this once datafusion-table-providers supports DataFusion 55 and the
+# `clickhouse`/`mongodb` features are restored.
+[workspace.lints.rust]
+unexpected_cfgs = { check-cfg = [
+  'cfg(feature, values("clickhouse", "mongodb"))',
+], level = "allow" }
+
+[workspace.lints.clippy]
+clone_on_ref_ptr = "deny"

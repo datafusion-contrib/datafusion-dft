@@ -21,3 +21,6 @@ parquet = { default-features = false, features = ["arrow"], version = "59.2" }
 parquet = { features = ["arrow"], version = "59" }
 tempfile = "3"
 tokio = { features = ["macros", "rt"], version = "1" }
+
+[lints]
+workspace = true

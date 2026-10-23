@@ -20,3 +20,6 @@ flatbuffers = { default-features = false, version = "25.2.10" }
 arrow = { features = ["ipc_compression"], version = "59" }
 tempfile = "3"
 tokio = { features = ["macros", "rt"], version = "1" }
+
+[lints]
+workspace = true

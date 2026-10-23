@@ -28,5 +28,6 @@ tokio = { features = ["macros", "rt-multi-thread"], version = "1" }
 default = []
 live = ["dep:pcap"]
 
-[lints.clippy]
-clone_on_ref_ptr = "deny"
+[lints]
+workspace = true
+

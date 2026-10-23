@@ -142,19 +142,9 @@ vortex = [
 ]
 websocket = ["datafusion-app/websocket"]
 
+[lints]
+workspace = true
+
 [[bin]]
 name = "dft"
 path = "src/main.rs"
-
-# The `clickhouse` and `mongodb` features are temporarily disabled because
-# `datafusion-table-providers` has no DataFusion 55 release yet. The gated test helpers
-# remain in the tree; these cfg values are declared so they do not warn.
-# TODO: remove this once datafusion-table-providers supports DataFusion 55 and the
-# `clickhouse`/`mongodb` features are restored.
-[lints.rust]
-unexpected_cfgs = { check-cfg = [
-  'cfg(feature, values("clickhouse", "mongodb"))',
-], level = "allow" }
-
-[lints.clippy]
-clone_on_ref_ptr = "deny"
