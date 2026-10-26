@@ -78,7 +78,7 @@ impl TableFunctionImpl for ArrowBatchesFunc {
         }
 
         let batch = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![
                 Arc::new(StringArray::from(filename_arr)),
                 Arc::new(Int64Array::from(batch_index_arr)),
@@ -119,7 +119,7 @@ mod tests {
             arrow::ipc::writer::FileWriter::try_new_with_options(file, &schema, options).unwrap();
         for i in 0..3 {
             let batch = RecordBatch::try_new(
-                schema.clone(),
+                Arc::clone(&schema),
                 vec![Arc::new(Int32Array::from(vec![i * 2, i * 2 + 1]))],
             )
             .unwrap();

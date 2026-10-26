@@ -44,7 +44,7 @@ struct ParquetArrowSchemaTable {
 #[async_trait]
 impl TableProvider for ParquetArrowSchemaTable {
     fn schema(&self) -> arrow::datatypes::SchemaRef {
-        self.schema.clone()
+        Arc::clone(&self.schema)
     }
 
     fn table_type(&self) -> datafusion::logical_expr::TableType {
@@ -139,7 +139,7 @@ impl TableFunctionImpl for ParquetArrowSchemaFunc {
         }
 
         let rb = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![
                 Arc::new(StringArray::from(filename_arr)),
                 Arc::new(StringArray::from(field_name_arr)),
@@ -184,7 +184,7 @@ mod tests {
             ),
         ]));
         let batch = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![
                 Arc::new(Int32Array::from(vec![1i32])),
                 Arc::new(TimestampNanosecondArray::from(vec![1_000_000_000i64]).with_timezone(tz)),
@@ -249,9 +249,11 @@ mod tests {
         let path = dir.path().join("t.parquet");
 
         let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int32, false)]));
-        let batch =
-            RecordBatch::try_new(schema.clone(), vec![Arc::new(Int32Array::from(vec![1i32]))])
-                .unwrap();
+        let batch = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![Arc::new(Int32Array::from(vec![1i32]))],
+        )
+        .unwrap();
         let options = ArrowWriterOptions::new().with_skip_arrow_metadata(true);
         let file = std::fs::File::create(&path).unwrap();
         let mut writer = ArrowWriter::try_new_with_options(file, schema, options).unwrap();

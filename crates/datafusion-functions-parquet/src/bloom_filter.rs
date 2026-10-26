@@ -47,7 +47,7 @@ struct ParquetBloomFilterTable {
 #[async_trait]
 impl TableProvider for ParquetBloomFilterTable {
     fn schema(&self) -> arrow::datatypes::SchemaRef {
-        self.schema.clone()
+        Arc::clone(&self.schema)
     }
 
     fn table_type(&self) -> datafusion::logical_expr::TableType {
@@ -129,7 +129,7 @@ impl TableFunctionImpl for ParquetBloomFilterFunc {
         }
 
         let rb = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![
                 Arc::new(StringArray::from(filename_arr)),
                 Arc::new(Int64Array::from(row_group_id_arr)),
@@ -274,7 +274,7 @@ impl TableFunctionImpl for ParquetBloomFilterCheckFunc {
         }
 
         let rb = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![
                 Arc::new(StringArray::from(filename_arr)),
                 Arc::new(Int64Array::from(row_group_id_arr)),
@@ -460,7 +460,7 @@ mod tests {
         .unwrap();
         let props = WriterProperties::builder()
             .set_bloom_filter_enabled(true)
-            .set_max_row_group_size(2)
+            .set_max_row_group_row_count(Some(2))
             .build();
         write_parquet(&path, &[batch], Some(props));
 
@@ -601,7 +601,7 @@ mod tests {
         // 2 rows per group: "apple"/"banana" in group 0, "cherry"/"durian" in group 1
         let props = WriterProperties::builder()
             .set_bloom_filter_enabled(true)
-            .set_max_row_group_size(2)
+            .set_max_row_group_row_count(Some(2))
             .build();
         write_parquet(
             &path,

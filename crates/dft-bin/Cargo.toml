@@ -1,0 +1,151 @@
+[package]
+authors = ["Matthew Turner <matthew.m.turner@outlook.com>"]
+default-run = "dft"
+description = "An opinionated and batteries included DataFusion implementation"
+edition.workspace = true
+homepage = "https://github.com/datafusion-contrib/datafusion-dft"
+keywords = ["arrow", "datafusion", "query", "sql"]
+license = "Apache-2.0"
+name = "datafusion-dft"
+readme = "README.md"
+repository = "https://github.com/datafusion-contrib/datafusion-dft"
+version = "0.4.0"
+
+[dependencies]
+### Local
+datafusion-app.workspace = true
+# Optional (not a dev-dependency) so that plain `cargo test` does not compile
+# librocksdb; used from feature-gated test code to generate fixture databases.
+datafusion-functions-rocksdb = { optional = true, workspace = true }
+###
+
+arrow-flight = { features = [
+  "flight-sql-experimental",
+], optional = true, workspace = true }
+axum = { features = ["macros"], optional = true, workspace = true }
+clap.workspace = true
+color-eyre.workspace = true
+crossterm = { features = ["event-stream"], optional = true, workspace = true }
+datafusion.workspace = true
+directories.workspace = true
+env_logger.workspace = true
+futures.workspace = true
+http.workspace = true
+http-body.workspace = true
+indicatif.workspace = true
+itertools.workspace = true
+jiff = { optional = true, workspace = true }
+lazy_static.workspace = true
+log.workspace = true
+metrics = { optional = true, workspace = true }
+metrics-exporter-prometheus = { optional = true, workspace = true }
+object_store.workspace = true
+parquet.workspace = true
+pin-project-lite.workspace = true
+prost.workspace = true
+ratatui = { optional = true, workspace = true }
+ratatui-textarea = { features = ["search"], optional = true, workspace = true }
+serde.workspace = true
+strum.workspace = true
+tokio = { features = [
+  "process",
+  "rt-multi-thread",
+  "signal",
+], workspace = true }
+tokio-stream = { features = ["net"], workspace = true }
+tokio-util.workspace = true
+toml.workspace = true
+tonic = { optional = true, workspace = true }
+tower.workspace = true
+tower-http = { features = [
+  "timeout",
+  "trace",
+], optional = true, workspace = true }
+tpchgen.workspace = true
+tpchgen-arrow.workspace = true
+tracing = { features = ["log"], workspace = true }
+tracing-subscriber = { features = ["env-filter"], workspace = true }
+tui-logger = { features = [
+  "tracing-support",
+], optional = true, workspace = true }
+url.workspace = true
+uuid = { optional = true, workspace = true }
+vortex = { optional = true, workspace = true }
+vortex-btrblocks = { features = [
+  "pco",
+  "zstd",
+], optional = true, workspace = true }
+vortex-datafusion = { optional = true, workspace = true }
+vortex-file = { optional = true, workspace = true }
+vortex-session = { optional = true, workspace = true }
+
+[dev-dependencies]
+### Local
+# Used (without the libpcap-backed `live` feature) to generate pcap fixtures
+datafusion-net.workspace = true
+datafusion-udfs-wasm = { features = ["serde"], workspace = true }
+###
+
+assert_cmd.workspace = true
+etherparse.workspace = true
+http-body-util.workspace = true
+insta = { features = ["yaml"], workspace = true }
+predicates.workspace = true
+reqwest = { features = ["json"], workspace = true }
+serde_json.workspace = true
+socket2.workspace = true
+tempfile.workspace = true
+tokio-tungstenite.workspace = true
+
+# When adding a new feature, also add it to the features tested list in CI (`.github/workflows/test.yml`)
+[features]
+default = ["functions-parquet", "s3"]
+deltalake = ["datafusion-app/deltalake"]
+flightsql = [
+  "datafusion-app/flightsql",
+  "datafusion-app/observability",
+  "dep:arrow-flight",
+  "dep:jiff",
+  "dep:metrics",
+  "dep:metrics-exporter-prometheus",
+  "dep:tonic",
+  "dep:tower-http",
+  "dep:uuid",
+]
+functions-arrow = ["datafusion-app/functions-arrow"]
+functions-json = ["datafusion-app/functions-json"]
+functions-parquet = ["datafusion-app/functions-parquet"]
+functions-rocksdb = [
+  "datafusion-app/functions-rocksdb",
+  "dep:datafusion-functions-rocksdb",
+]
+http = [
+  "axum",
+  "datafusion-app/observability",
+  "dep:jiff",
+  "dep:metrics",
+  "dep:metrics-exporter-prometheus",
+  "dep:tower-http",
+  "dep:uuid",
+]
+huggingface = ["datafusion-app/huggingface"]
+net = ["datafusion-app/net"]
+s3 = ["datafusion-app/s3"]
+tui = ["dep:crossterm", "dep:ratatui", "dep:ratatui-textarea", "dep:tui-logger"]
+udfs-wasm = ["datafusion-app/udfs-wasm"]
+vortex = [
+  "datafusion-app/vortex",
+  "dep:vortex",
+  "dep:vortex-btrblocks",
+  "dep:vortex-datafusion",
+  "dep:vortex-file",
+  "dep:vortex-session",
+]
+websocket = ["datafusion-app/websocket"]
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "dft"
+path = "src/main.rs"

@@ -24,17 +24,22 @@ pub fn alloc(len: usize) -> *mut u8 {
 }
 
 #[no_mangle]
-pub fn dealloc(ptr: usize, offset: usize) {}
+pub fn dealloc(ptr: usize, offset: usize) {
+    _ = ptr;
+    _ = offset;
+}
 
 #[no_mangle]
 pub fn wasm_add(left: i64, right: i64) -> i64 {
     left + right
 }
 
+/// # Safety
+/// `ptr` and `len` must adhere to [`std::slice::from_raw_parts`].
 #[no_mangle]
 pub unsafe fn arrow_func(ptr: *mut u8, len: i32) -> u64 {
     // 1. Read the input (Arrow IPC bytes) from WASM memory
-    let input_data = unsafe { Vec::from_raw_parts(ptr, len as usize, len as usize) };
+    let input_data = unsafe { std::slice::from_raw_parts(ptr, len as usize) };
 
     // 2. Parse the Arrow IPC data into RecordBatches
     let c = Cursor::new(input_data);

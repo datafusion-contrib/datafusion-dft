@@ -69,7 +69,7 @@ impl TableFunctionImpl for ArrowSchemaFunc {
         }
 
         let batch = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![
                 Arc::new(StringArray::from(filename_arr)),
                 Arc::new(StringArray::from(field_name_arr)),
@@ -106,7 +106,7 @@ mod tests {
             Field::new("s", DataType::Utf8, true).with_metadata(field_metadata),
         ]));
         let batch = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![
                 Arc::new(Int32Array::from(vec![1i32])),
                 Arc::new(StringArrayType::from(vec![Some("a")])),

@@ -420,43 +420,56 @@ fn open_error(interface: &str, err: &pcap::Error) -> DataFusionError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use datafusion::{catalog::TableFunctionArgs, execution::SessionStateBuilder};
 
     #[test]
     fn test_call_requires_interface() {
+        let session = SessionStateBuilder::new().build();
         let func = CaptureFunc::default();
-        let err = func.call(&[]).unwrap_err();
+        let err = func
+            .call_with_args(TableFunctionArgs::new(&[], &session))
+            .unwrap_err();
         assert!(err.to_string().contains("1 to 3 arguments"));
     }
 
     #[test]
     fn test_call_rejects_too_many_arguments() {
+        let session = SessionStateBuilder::new().build();
         let func = CaptureFunc::default();
         let args = vec![Expr::Literal(ScalarValue::Utf8(Some("en0".to_string())), None); 4];
-        let err = func.call(&args).unwrap_err();
+        let err = func
+            .call_with_args(TableFunctionArgs::new(&args, &session))
+            .unwrap_err();
         assert!(err.to_string().contains("1 to 3 arguments"));
     }
 
     #[test]
     fn test_call_rejects_non_integer_duration() {
+        let session = SessionStateBuilder::new().build();
         let func = CaptureFunc::default();
         let args = vec![
             Expr::Literal(ScalarValue::Utf8(Some("en0".to_string())), None),
             Expr::Literal(ScalarValue::Utf8(Some("tcp".to_string())), None),
             Expr::Literal(ScalarValue::Utf8(Some("ten".to_string())), None),
         ];
-        let err = func.call(&args).unwrap_err();
+        let err = func
+            .call_with_args(TableFunctionArgs::new(&args, &session))
+            .unwrap_err();
         assert!(err.to_string().contains("positive integer"));
     }
 
     #[test]
     fn test_call_parses_all_arguments() {
+        let session = SessionStateBuilder::new().build();
         let func = CaptureFunc::default();
         let args = vec![
             Expr::Literal(ScalarValue::Utf8(Some("en0".to_string())), None),
             Expr::Literal(ScalarValue::Utf8(Some("tcp port 443".to_string())), None),
             Expr::Literal(ScalarValue::Int64(Some(10)), None),
         ];
-        let provider = func.call(&args).unwrap();
+        let provider = func
+            .call_with_args(TableFunctionArgs::new(&args, &session))
+            .unwrap();
         assert_eq!(provider.schema(), packet_schema());
     }
 

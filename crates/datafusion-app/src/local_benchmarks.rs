@@ -52,8 +52,9 @@ impl std::fmt::Display for DurationsSummary {
 }
 
 /// Benchmark execution mode
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub enum BenchmarkMode {
+    #[default]
     Serial,
     Concurrent(usize), // number of concurrent tasks
 }
@@ -64,12 +65,6 @@ impl std::fmt::Display for BenchmarkMode {
             BenchmarkMode::Serial => write!(f, "serial"),
             BenchmarkMode::Concurrent(n) => write!(f, "concurrent({})", n),
         }
-    }
-}
-
-impl Default for BenchmarkMode {
-    fn default() -> Self {
-        BenchmarkMode::Serial
     }
 }
 

@@ -166,7 +166,7 @@ pub fn columnar_values_to_ipc(
                 let arr_len = arr.len();
                 if arr_len == max_length {
                     fields.push(Field::new(&field_name, arr.data_type().clone(), true));
-                    arrays.push(arr.clone());
+                    arrays.push(Arc::clone(arr));
                 } else if arr_len == 1 {
                     // Convert this single row into a scalar and then broadcast
                     let scalar = ScalarValue::try_from_array(arr.as_ref(), 0)?;
@@ -252,12 +252,12 @@ pub fn try_record_batches_to_columnar_values(
     for col_idx in 0..num_cols {
         let column_arrays: Vec<ArrayRef> = batches
             .iter()
-            .map(|batch| batch.column(col_idx).clone())
+            .map(|batch| Arc::clone(batch.column(col_idx)))
             .collect();
 
         let concatenated = if column_arrays.len() == 1 {
             // Only one batch => no need to concatenate
-            column_arrays[0].clone()
+            Arc::clone(&column_arrays[0])
         } else {
             let array_refs: Vec<&dyn Array> = column_arrays.iter().map(|a| a.as_ref()).collect();
             // Concatenate arrays across all batches for this column

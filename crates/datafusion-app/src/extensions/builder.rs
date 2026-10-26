@@ -122,14 +122,9 @@ impl DftSessionStateBuilder {
 
     /// Add a table factory to the list of factories on this builder
     pub fn add_table_factory(&mut self, name: &str, factory: Arc<dyn TableProviderFactory>) {
-        if self.table_factories.is_none() {
-            self.table_factories = Some(HashMap::from([(name.to_string(), factory)]));
-        } else {
-            self.table_factories
-                .as_mut()
-                .unwrap()
-                .insert(name.to_string(), factory);
-        }
+        self.table_factories
+            .get_or_insert_default()
+            .insert(name.to_string(), factory);
     }
 
     /// Add a file format factory to the list of file format factories on this builder
@@ -139,14 +134,9 @@ impl DftSessionStateBuilder {
 
     /// Add a catalog provider to the list of providers on this builder
     pub fn add_catalog_provider(&mut self, name: &str, factory: Arc<dyn CatalogProvider>) {
-        if self.catalog_providers.is_none() {
-            self.catalog_providers = Some(HashMap::from([(name.to_string(), factory)]));
-        } else {
-            self.catalog_providers
-                .as_mut()
-                .unwrap()
-                .insert(name.to_string(), factory);
-        }
+        self.catalog_providers
+            .get_or_insert_default()
+            .insert(name.to_string(), factory);
     }
 
     /// Return the current [`RuntimeEnv`], creating a default if it doesn't exist

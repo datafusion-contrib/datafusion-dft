@@ -59,7 +59,7 @@ impl TableFunctionImpl for ArrowMetadataFunc {
         }
 
         let batch = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![
                 Arc::new(StringArray::from(filename_arr)),
                 Arc::new(StringArray::from(key_arr)),
@@ -90,9 +90,11 @@ mod tests {
     fn write_ipc(path: &Path, metadata: HashMap<String, String>) {
         let schema: SchemaRef =
             Arc::new(Schema::new(vec![Field::new("v", DataType::Int32, false)]));
-        let batch =
-            RecordBatch::try_new(schema.clone(), vec![Arc::new(Int32Array::from(vec![1i32]))])
-                .unwrap();
+        let batch = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![Arc::new(Int32Array::from(vec![1i32]))],
+        )
+        .unwrap();
         let file = std::fs::File::create(path).unwrap();
         let mut writer = arrow::ipc::writer::FileWriter::try_new(file, &schema).unwrap();
         for (key, value) in metadata {

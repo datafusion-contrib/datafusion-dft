@@ -220,6 +220,7 @@ fn interfaces_batch(schema: &SchemaRef) -> Result<RecordBatch> {
 mod tests {
     use super::*;
     use datafusion::prelude::SessionContext;
+    use datafusion::{catalog::TableFunctionArgs, execution::SessionStateBuilder};
 
     #[test]
     fn test_static_description_linux_predictable_names() {
@@ -271,12 +272,15 @@ mod tests {
 
     #[test]
     fn test_call_rejects_arguments() {
+        let session = SessionStateBuilder::new().build();
         let func = InterfacesFunc::default();
         let args = vec![Expr::Literal(
             datafusion::scalar::ScalarValue::Utf8(Some("en0".to_string())),
             None,
         )];
-        let err = func.call(&args).unwrap_err();
+        let err = func
+            .call_with_args(TableFunctionArgs::new(&args, &session))
+            .unwrap_err();
         assert!(err.to_string().contains("takes no arguments"));
     }
 

@@ -1,7 +1,7 @@
 [package]
 authors = ["Matthew Turner <matthew.m.turner@outlook.com>"]
 description = "DataFusion helper functions for working with Parquet files"
-edition = "2021"
+edition.workspace = true
 homepage = "https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-functions-parquet"
 keywords = ["datafusion", "parquet", "query", "sql"]
 license = "Apache-2.0"
@@ -11,13 +11,15 @@ repository = "https://github.com/datafusion-contrib/datafusion-dft/tree/main/cra
 version = "0.2.1"
 
 [dependencies]
-arrow = { version = "59" }
-async-trait = "0.1.41"
-base64 = "0.22"
-datafusion = { version = "55" }
-parquet = { default-features = false, features = ["arrow"], version = "59.2" }
+arrow.workspace = true
+async-trait.workspace = true
+base64.workspace = true
+datafusion.workspace = true
+parquet.workspace = true
 
 [dev-dependencies]
-parquet = { features = ["arrow"], version = "59" }
-tempfile = "3"
-tokio = { features = ["macros", "rt"], version = "1" }
+tempfile.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

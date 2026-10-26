@@ -191,13 +191,18 @@ impl TableFunctionImpl for CaptureWideFunc {
 mod tests {
     use super::*;
     use datafusion::arrow::datatypes::DataType;
+    use datafusion::{catalog::TableFunctionArgs, execution::SessionStateBuilder};
 
     fn wide_provider(geoip_db_path: Option<PathBuf>) -> Arc<dyn TableProvider> {
+        let session = SessionStateBuilder::new().build();
         let func = PcapWideFunc::new(geoip_db_path);
-        func.call(&[Expr::Literal(
-            ScalarValue::Utf8(Some("test.pcap".to_string())),
-            None,
-        )])
+        func.call_with_args(TableFunctionArgs::new(
+            &[Expr::Literal(
+                ScalarValue::Utf8(Some("test.pcap".to_string())),
+                None,
+            )],
+            &session,
+        ))
         .unwrap()
     }
 
@@ -257,8 +262,11 @@ mod tests {
 
     #[test]
     fn test_wide_rejects_bad_arguments() {
+        let session = SessionStateBuilder::new().build();
         let func = PcapWideFunc::new(None);
-        let err = func.call(&[]).unwrap_err();
+        let err = func
+            .call_with_args(TableFunctionArgs::new(&[], &session))
+            .unwrap_err();
         assert!(err.to_string().contains("pcap_wide"), "got: {err}");
     }
 }

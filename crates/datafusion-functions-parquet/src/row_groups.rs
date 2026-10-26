@@ -40,7 +40,7 @@ struct ParquetRowGroupsTable {
 #[async_trait]
 impl TableProvider for ParquetRowGroupsTable {
     fn schema(&self) -> SchemaRef {
-        self.schema.clone()
+        Arc::clone(&self.schema)
     }
 
     fn table_type(&self) -> datafusion::logical_expr::TableType {
@@ -120,7 +120,7 @@ impl TableFunctionImpl for ParquetRowGroupsFunc {
             );
         }
 
-        let schema = builder.schema().clone();
+        let schema = Arc::clone(builder.schema());
         let reader = builder.with_row_groups((start..=end).collect()).build()?;
         let batches = reader.collect::<std::result::Result<Vec<_>, _>>()?;
 
@@ -149,7 +149,7 @@ mod tests {
     fn write_parquet(path: &Path) {
         let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int64, false)]));
         let batch = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![Arc::new(Int64Array::from((0..6).collect::<Vec<i64>>()))],
         )
         .unwrap();
