@@ -2490,6 +2490,7 @@ dependencies = [
  "arrow-flight",
  "async-trait",
  "base64 0.22.1",
+ "bytes",
  "color-eyre",
  "datafusion",
  "datafusion-functions-arrow",

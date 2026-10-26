@@ -11,6 +11,7 @@ arrow-flight = { features = [
 ], optional = true, version = "59" }
 async-trait = "0.1.80"
 base64 = { optional = true, version = "0.22.1" }
+bytes = "1"
 color-eyre = "0.6.3"
 datafusion = "55"
 datafusion-functions-arrow = { optional = true, path = "../datafusion-functions-arrow", version = "0.1.0" }

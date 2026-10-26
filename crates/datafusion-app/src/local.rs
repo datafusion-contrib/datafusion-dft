@@ -188,6 +188,11 @@ impl ExecutionContext {
             );
         }
 
+        session_ctx.register_udtf(
+            "stdin",
+            Arc::new(crate::tables::stdin::StdinFunc::default()),
+        );
+
         #[cfg(feature = "websocket")]
         session_ctx.register_udtf(
             "websocket",

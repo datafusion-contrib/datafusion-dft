@@ -18,6 +18,7 @@
 mod basic;
 mod bench;
 mod config;
+mod stdin;
 mod tpch;
 
 use assert_cmd::Command;
