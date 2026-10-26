@@ -10125,6 +10125,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "wasm-examples"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+]
+
+[[package]]
 name = "wasm-streams"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

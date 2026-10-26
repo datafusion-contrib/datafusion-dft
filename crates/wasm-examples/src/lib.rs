@@ -24,7 +24,10 @@ pub fn alloc(len: usize) -> *mut u8 {
 }
 
 #[no_mangle]
-pub fn dealloc(ptr: usize, offset: usize) {}
+pub fn dealloc(ptr: usize, offset: usize) {
+    _ = ptr;
+    _ = offset;
+}
 
 #[no_mangle]
 pub fn wasm_add(left: i64, right: i64) -> i64 {
