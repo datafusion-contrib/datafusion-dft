@@ -11,7 +11,7 @@ curl -s 'https://api.example.com/data' | dft -c "SELECT * FROM stdin('json')"
 cat data.parquet | dft -c "SELECT count(*) FROM stdin('parquet')"
 ```
 
-The input is streamed: at plan time only the bytes needed for schema inference are read (a bounded 1MB prefix for `csv` and `json`, the schema message for the arrow IPC stream format) and the rest is decoded incrementally at execution time, so memory use stays bounded for large inputs and a `LIMIT` terminates early on an unbounded pipe.  `parquet` and the arrow IPC file format store their metadata in a footer, so those inputs are fully buffered (but still decoded lazily at execution time).
+The input is streamed: at plan time only the bytes needed for schema inference are read (a bounded 1MB prefix for `csv` and `json`, the leading schema message for both arrow IPC variants) and the rest is decoded incrementally at execution time, so memory use stays bounded for large inputs and a `LIMIT` terminates early on an unbounded pipe.  Only `parquet` stores its metadata exclusively in a footer, so that input is fully buffered (but still decoded lazily at execution time).
 
 Stdin is consumable once: if the input is larger than the inference prefix it can only be scanned once per process, and a second scan (for example a self join) returns an error.  Inputs that fit entirely in the inference prefix are replayable and can be scanned multiple times.
 

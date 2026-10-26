@@ -25,12 +25,13 @@
 //! (newline-delimited), `parquet`, or `arrow` (IPC file or stream).
 //!
 //! At plan time only the bytes needed for schema inference are read: a
-//! bounded prefix for `csv` and `json`, and the schema message for the arrow
-//! IPC stream format. The remaining data is decoded incrementally at
-//! execution time on a blocking task, with the already-consumed prefix
-//! replayed ahead of the live stdin stream. `parquet` and the arrow IPC file
-//! format store their metadata in a footer, so those are fully buffered at
-//! plan time (but still decoded lazily at execution time).
+//! bounded prefix for `csv` and `json`, and the schema message for `arrow`
+//! (both IPC variants put it first; for the file format the magic header is
+//! skipped and the trailing footer ignored). The remaining data is decoded
+//! incrementally at execution time on a blocking task, with the
+//! already-consumed prefix replayed ahead of the live stdin stream. Only
+//! `parquet` requires its metadata footer before decoding, so that format is
+//! fully buffered at plan time (but still decoded lazily at execution time).
 //!
 //! Stdin is consumable once: when execution has started reading past the
 //! inference prefix, a second scan returns an error.
@@ -75,8 +76,7 @@ enum StdinFormat {
     Csv,
     Json,
     Parquet,
-    ArrowFile,
-    ArrowStream,
+    Arrow,
 }
 
 impl StdinFormat {
@@ -86,7 +86,7 @@ impl StdinFormat {
             Self::Csv => "csv",
             Self::Json => "json",
             Self::Parquet => "parquet",
-            Self::ArrowFile | Self::ArrowStream => "arrow",
+            Self::Arrow => "arrow",
         }
     }
 }
@@ -204,49 +204,60 @@ fn capture_stdin(format_name: &str) -> std::result::Result<Arc<StdinCapture>, St
             }
         }
         "arrow" | "ipc" => {
-            // The IPC file format starts with magic bytes and keeps its
-            // metadata in a footer (fully buffered); the IPC stream format
-            // starts with the schema message (streamed)
-            let (magic, magic_eof) =
+            // The IPC file format is the stream format wrapped with a magic
+            // header (plus padding) and a trailing footer. Both variants are
+            // streamed with `StreamReader`: for a file the magic and padding
+            // are skipped so the schema message is next, and the trailing
+            // footer is never read because the reader stops at the
+            // end-of-stream marker.
+            let (magic, _) =
                 read_prefix(&mut lock, ARROW_FILE_MAGIC.len()).map_err(|e| e.to_string())?;
             if magic.is_empty() {
                 return Err("no data received on stdin".to_string());
             }
-            if magic == ARROW_FILE_MAGIC {
-                let mut buf = magic;
-                lock.read_to_end(&mut buf).map_err(|e| e.to_string())?;
-                let reader = ipc::reader::FileReader::try_new(Cursor::new(&buf), None)
-                    .map_err(|e| e.to_string())?;
-                let schema = reader.schema();
-                drop(reader);
-                StdinCapture {
-                    format: StdinFormat::ArrowFile,
-                    schema,
-                    prefix: Bytes::from(buf),
-                    eof: true,
+            let head = if magic == ARROW_FILE_MAGIC {
+                // Discard the 2 bytes padding the magic to 8 bytes, then any
+                // zero words aligning the first message (e.g. arrow-rs pads
+                // the body start to 64 bytes). A message never starts with a
+                // zero word: that is the end-of-stream marker.
+                read_prefix(&mut lock, 2).map_err(|e| e.to_string())?;
+                loop {
+                    let (word, _) = read_prefix(&mut lock, 4).map_err(|e| e.to_string())?;
+                    if word.len() < 4 {
+                        return Err(
+                            "arrow IPC file from stdin ended before the schema message".to_string()
+                        );
+                    }
+                    if word != [0u8; 4] {
+                        break word;
+                    }
                 }
             } else {
-                let captured = Arc::new(Mutex::new(Vec::new()));
-                let tracking = TrackingReader {
-                    inner: Cursor::new(magic).chain(lock),
-                    captured: Arc::clone(&captured),
-                };
-                let reader = ipc::reader::StreamReader::try_new(tracking, None)
-                    .map_err(|e| e.to_string())?;
-                let schema = reader.schema();
-                drop(reader);
-                let prefix = std::mem::take(&mut *captured.lock());
-                StdinCapture {
-                    format: StdinFormat::ArrowStream,
-                    schema,
-                    prefix: Bytes::from(prefix),
-                    eof: magic_eof,
-                }
+                // Not a file: the bytes are the start of the stream format
+                magic
+            };
+            let captured = Arc::new(Mutex::new(Vec::new()));
+            let tracking = TrackingReader {
+                inner: Cursor::new(head).chain(lock),
+                captured: Arc::clone(&captured),
+            };
+            let reader =
+                ipc::reader::StreamReader::try_new(tracking, None).map_err(|e| e.to_string())?;
+            let schema = reader.schema();
+            drop(reader);
+            let prefix = std::mem::take(&mut *captured.lock());
+            StdinCapture {
+                format: StdinFormat::Arrow,
+                schema,
+                prefix: Bytes::from(prefix),
+                eof: false,
             }
         }
-        other => return Err(format!(
+        other => {
+            return Err(format!(
             "unsupported stdin() format '{other}'; expected 'csv', 'json', 'parquet', or 'arrow'"
-        )),
+        ))
+        }
     };
     Ok(Arc::new(capture))
 }
@@ -446,12 +457,10 @@ fn read_stdin_batches(
                 ParquetRecordBatchReaderBuilder::try_new(capture.prefix.clone())?.build()?;
             Box::new(reader.map(|r| r.map_err(Into::into)))
         }
-        StdinFormat::ArrowFile => {
-            let reader =
-                ipc::reader::FileReader::try_new(Cursor::new(capture.prefix.clone()), None)?;
-            Box::new(reader.map(|r| r.map_err(Into::into)))
-        }
-        StdinFormat::ArrowStream => {
+        StdinFormat::Arrow => {
+            // For the file format the magic and padding were stripped at
+            // capture time, so the prefix starts at the schema message for
+            // both IPC variants
             let reader = ipc::reader::StreamReader::try_new(chained, None)?;
             Box::new(reader.map(|r| r.map_err(Into::into)))
         }
