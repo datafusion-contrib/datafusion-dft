@@ -507,7 +507,7 @@ mod tests {
         let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int32, false)]));
         // Force a new row group after every row
         let props = WriterProperties::builder()
-            .set_max_row_group_size(2)
+            .set_max_row_group_row_count(Some(2))
             .build();
         let batch = RecordBatch::try_new(
             schema,
@@ -536,7 +536,7 @@ mod tests {
 
         let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int32, false)]));
         let props = WriterProperties::builder()
-            .set_max_row_group_size(3)
+            .set_max_row_group_row_count(Some(3))
             .build();
         let batch = RecordBatch::try_new(
             schema,

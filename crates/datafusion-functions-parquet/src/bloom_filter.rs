@@ -460,7 +460,7 @@ mod tests {
         .unwrap();
         let props = WriterProperties::builder()
             .set_bloom_filter_enabled(true)
-            .set_max_row_group_size(2)
+            .set_max_row_group_row_count(Some(2))
             .build();
         write_parquet(&path, &[batch], Some(props));
 
@@ -601,7 +601,7 @@ mod tests {
         // 2 rows per group: "apple"/"banana" in group 0, "cherry"/"durian" in group 1
         let props = WriterProperties::builder()
             .set_bloom_filter_enabled(true)
-            .set_max_row_group_size(2)
+            .set_max_row_group_row_count(Some(2))
             .build();
         write_parquet(
             &path,

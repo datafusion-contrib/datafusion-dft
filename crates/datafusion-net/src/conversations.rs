@@ -550,6 +550,8 @@ impl FlowTracker {
 mod tests {
     use super::*;
 
+    use datafusion::{catalog::TableFunctionArgs, execution::SessionStateBuilder};
+
     fn tcp_packet(
         src: (&str, u16),
         dst: (&str, u16),
@@ -654,8 +656,11 @@ mod tests {
 
     #[test]
     fn test_call_rejects_bad_arguments() {
+        let session = SessionStateBuilder::new().build();
         let func = TcpConversationsFunc::default();
-        let err = func.call(&[]).unwrap_err();
+        let err = func
+            .call_with_args(TableFunctionArgs::new(&[], &session))
+            .unwrap_err();
         assert!(err.to_string().contains("tcp_conversations"), "got: {err}");
     }
 }

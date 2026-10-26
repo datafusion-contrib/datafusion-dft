@@ -405,20 +405,28 @@ fn read_pcap_file(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use datafusion::scalar::ScalarValue;
+    use datafusion::{
+        catalog::TableFunctionArgs, execution::SessionStateBuilder, scalar::ScalarValue,
+    };
 
     #[test]
     fn test_call_requires_single_path() {
+        let session = SessionStateBuilder::new().build();
         let func = PcapFunc::default();
-        let err = func.call(&[]).unwrap_err();
+        let err = func
+            .call_with_args(TableFunctionArgs::new(&[], &session))
+            .unwrap_err();
         assert!(err.to_string().contains("single argument"));
     }
 
     #[test]
     fn test_call_rejects_non_string_path() {
+        let session = SessionStateBuilder::new().build();
         let func = PcapFunc::default();
         let args = vec![Expr::Literal(ScalarValue::Int64(Some(1)), None)];
-        let err = func.call(&args).unwrap_err();
+        let err = func
+            .call_with_args(TableFunctionArgs::new(&args, &session))
+            .unwrap_err();
         assert!(err.to_string().contains("must be a string literal"));
     }
 
