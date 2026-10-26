@@ -23,6 +23,7 @@ arrow-flight = { features = [
 ], optional = true, workspace = true }
 async-trait.workspace = true
 base64 = { optional = true, workspace = true }
+bytes.workspace = true
 color-eyre.workspace = true
 datafusion.workspace = true
 datafusion-functions-json = { optional = true, workspace = true }

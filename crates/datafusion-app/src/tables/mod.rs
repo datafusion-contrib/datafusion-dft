@@ -16,5 +16,6 @@
 // under the License.
 
 pub mod map_table;
+pub mod stdin;
 #[cfg(feature = "websocket")]
 pub mod websocket;
