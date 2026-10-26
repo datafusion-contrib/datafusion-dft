@@ -381,27 +381,35 @@ fn message_to_batch(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use datafusion::{catalog::TableFunctionArgs, execution::SessionStateBuilder};
 
     #[test]
     fn test_call_requires_url() {
+        let session = SessionStateBuilder::new().build();
         let func = WebSocketFunc::default();
-        let err = func.call(&[]).unwrap_err();
+        let err = func
+            .call_with_args(TableFunctionArgs::new(&[], &session))
+            .unwrap_err();
         assert!(err.to_string().contains("at least one argument"));
     }
 
     #[test]
     fn test_call_rejects_invalid_scheme() {
+        let session = SessionStateBuilder::new().build();
         let func = WebSocketFunc::default();
         let args = vec![Expr::Literal(
             ScalarValue::Utf8(Some("http://example.com".to_string())),
             None,
         )];
-        let err = func.call(&args).unwrap_err();
+        let err = func
+            .call_with_args(TableFunctionArgs::new(&args, &session))
+            .unwrap_err();
         assert!(err.to_string().contains("'ws://' or 'wss://'"));
     }
 
     #[test]
     fn test_call_rejects_non_string_message() {
+        let session = SessionStateBuilder::new().build();
         let func = WebSocketFunc::default();
         let args = vec![
             Expr::Literal(
@@ -410,12 +418,15 @@ mod tests {
             ),
             Expr::Literal(ScalarValue::Int64(Some(1)), None),
         ];
-        let err = func.call(&args).unwrap_err();
+        let err = func
+            .call_with_args(TableFunctionArgs::new(&args, &session))
+            .unwrap_err();
         assert!(err.to_string().contains("must be a string literal"));
     }
 
     #[test]
     fn test_call_parses_url_and_messages() {
+        let session = SessionStateBuilder::new().build();
         let func = WebSocketFunc::default();
         let args = vec![
             Expr::Literal(
@@ -424,7 +435,9 @@ mod tests {
             ),
             Expr::Literal(ScalarValue::Utf8(Some("subscribe".to_string())), None),
         ];
-        let provider = func.call(&args).unwrap();
+        let provider = func
+            .call_with_args(TableFunctionArgs::new(&args, &session))
+            .unwrap();
         assert_eq!(provider.schema(), websocket_schema());
     }
 
