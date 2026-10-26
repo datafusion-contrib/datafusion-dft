@@ -44,7 +44,7 @@ struct ParquetPagesTable {
 #[async_trait]
 impl TableProvider for ParquetPagesTable {
     fn schema(&self) -> SchemaRef {
-        self.schema.clone()
+        Arc::clone(&self.schema)
     }
 
     fn table_type(&self) -> datafusion::logical_expr::TableType {
@@ -276,7 +276,7 @@ impl TableFunctionImpl for ParquetPagesFunc {
         }
 
         let rb = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![
                 Arc::new(StringArray::from(vec![Some(filename); rows.len()])),
                 Arc::new(Int64Array::from(
@@ -369,7 +369,7 @@ mod tests {
             Field::new("s", DataType::Utf8, false),
         ]));
         let batch = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![
                 Arc::new(Int64Array::from((0..6).collect::<Vec<i64>>())),
                 Arc::new(StringArray::from(vec!["a", "b", "a", "b", "a", "b"])),

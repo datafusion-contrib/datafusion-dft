@@ -42,7 +42,7 @@ struct ArrowBatchTable {
 #[async_trait]
 impl TableProvider for ArrowBatchTable {
     fn schema(&self) -> SchemaRef {
-        self.schema.clone()
+        Arc::clone(&self.schema)
     }
 
     fn table_type(&self) -> datafusion::logical_expr::TableType {
@@ -151,7 +151,7 @@ mod tests {
         let mut writer = FileWriter::try_new(file, &schema).unwrap();
         for chunk in (0..6).collect::<Vec<i64>>().chunks(2) {
             let batch = RecordBatch::try_new(
-                schema.clone(),
+                Arc::clone(&schema),
                 vec![Arc::new(Int64Array::from(chunk.to_vec()))],
             )
             .unwrap();

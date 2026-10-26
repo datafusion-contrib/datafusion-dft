@@ -41,7 +41,7 @@ struct ParquetCompressionTable {
 #[async_trait]
 impl TableProvider for ParquetCompressionTable {
     fn schema(&self) -> SchemaRef {
-        self.schema.clone()
+        Arc::clone(&self.schema)
     }
 
     fn table_type(&self) -> datafusion::logical_expr::TableType {
@@ -134,7 +134,7 @@ impl TableFunctionImpl for ParquetCompressionFunc {
         }
 
         let rb = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![
                 Arc::new(StringArray::from(filename_arr)),
                 Arc::new(Int64Array::from(row_group_id_arr)),
@@ -172,8 +172,11 @@ mod tests {
     /// Write a single-column string parquet file at `path` using `props`.
     fn write_parquet(path: &Path, values: Vec<&str>, props: Option<WriterProperties>) {
         let schema = Arc::new(Schema::new(vec![Field::new("name", DataType::Utf8, false)]));
-        let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(StringArray::from(values))])
-            .unwrap();
+        let batch = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![Arc::new(StringArray::from(values))],
+        )
+        .unwrap();
         let file = std::fs::File::create(path).unwrap();
         let mut writer = ArrowWriter::try_new(file, schema, props).unwrap();
         writer.write(&batch).unwrap();

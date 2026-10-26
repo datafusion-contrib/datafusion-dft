@@ -114,7 +114,7 @@ impl TableFunctionImpl for RocksDbSstablesFunc {
         }
 
         let batch = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![
                 Arc::new(StringArray::from(path_arr)),
                 Arc::new(StringArray::from(cf_arr)),

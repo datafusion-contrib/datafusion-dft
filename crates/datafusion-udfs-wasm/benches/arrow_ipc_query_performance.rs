@@ -51,7 +51,7 @@ async fn create_test_table(
 
     // Create RecordBatch
     let batch = RecordBatch::try_new(
-        schema.clone(),
+        Arc::clone(&schema),
         vec![Arc::new(col1_array), Arc::new(col2_array)],
     )?;
 

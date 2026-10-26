@@ -47,7 +47,7 @@ struct ParquetBloomFilterTable {
 #[async_trait]
 impl TableProvider for ParquetBloomFilterTable {
     fn schema(&self) -> arrow::datatypes::SchemaRef {
-        self.schema.clone()
+        Arc::clone(&self.schema)
     }
 
     fn table_type(&self) -> datafusion::logical_expr::TableType {
@@ -129,7 +129,7 @@ impl TableFunctionImpl for ParquetBloomFilterFunc {
         }
 
         let rb = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![
                 Arc::new(StringArray::from(filename_arr)),
                 Arc::new(Int64Array::from(row_group_id_arr)),
@@ -274,7 +274,7 @@ impl TableFunctionImpl for ParquetBloomFilterCheckFunc {
         }
 
         let rb = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![
                 Arc::new(StringArray::from(filename_arr)),
                 Arc::new(Int64Array::from(row_group_id_arr)),

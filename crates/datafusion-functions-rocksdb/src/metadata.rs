@@ -106,7 +106,7 @@ impl TableFunctionImpl for RocksDbMetadataFunc {
         ]));
 
         let batch = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![
                 Arc::new(StringArray::from(vec![Some(path.to_string())])),
                 Arc::new(StringArray::from(vec![Some(cfs.join(", "))])),

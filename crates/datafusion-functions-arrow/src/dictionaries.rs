@@ -78,7 +78,7 @@ impl TableFunctionImpl for ArrowDictionariesFunc {
         }
 
         let batch = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![
                 Arc::new(StringArray::from(filename_arr)),
                 Arc::new(Int64Array::from(index_arr)),
@@ -116,7 +116,7 @@ mod tests {
             values.data_type().clone(),
             false,
         )]));
-        let batch = RecordBatch::try_new(schema.clone(), vec![Arc::new(values)]).unwrap();
+        let batch = RecordBatch::try_new(Arc::clone(&schema), vec![Arc::new(values)]).unwrap();
         let file = std::fs::File::create(path).unwrap();
         let mut writer = arrow::ipc::writer::FileWriter::try_new(file, &schema).unwrap();
         writer.write(&batch).unwrap();
@@ -168,9 +168,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("t.arrow");
         let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int32, false)]));
-        let batch =
-            RecordBatch::try_new(schema.clone(), vec![Arc::new(Int32Array::from(vec![1i32]))])
-                .unwrap();
+        let batch = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![Arc::new(Int32Array::from(vec![1i32]))],
+        )
+        .unwrap();
         let file = std::fs::File::create(&path).unwrap();
         let mut writer = arrow::ipc::writer::FileWriter::try_new(file, &schema).unwrap();
         writer.write(&batch).unwrap();

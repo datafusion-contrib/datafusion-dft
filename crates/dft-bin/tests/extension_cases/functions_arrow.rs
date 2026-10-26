@@ -35,7 +35,7 @@ fn write_ipc(path: &std::path::Path) {
     writer.write_metadata("writer", "dft");
     for i in 0..2 {
         let batch = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![
                 Arc::new(Int32Array::from(vec![i * 2, i * 2 + 1])),
                 Arc::new(StringArray::from(vec![Some("a"), Some("b")])),

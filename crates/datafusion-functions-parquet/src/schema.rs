@@ -44,7 +44,7 @@ struct ParquetSchemaTable {
 #[async_trait]
 impl TableProvider for ParquetSchemaTable {
     fn schema(&self) -> SchemaRef {
-        self.schema.clone()
+        Arc::clone(&self.schema)
     }
 
     fn table_type(&self) -> datafusion::logical_expr::TableType {
@@ -200,7 +200,7 @@ impl TableFunctionImpl for ParquetSchemaFunc {
         ]));
 
         let rb = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![
                 Arc::new(StringArray::from(vec![Some(filename); rows.len()])),
                 Arc::new(StringArray::from(

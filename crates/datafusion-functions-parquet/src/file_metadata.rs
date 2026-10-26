@@ -43,7 +43,7 @@ struct ParquetFileMetadataTable {
 #[async_trait]
 impl TableProvider for ParquetFileMetadataTable {
     fn schema(&self) -> SchemaRef {
-        self.schema.clone()
+        Arc::clone(&self.schema)
     }
 
     fn table_type(&self) -> datafusion::logical_expr::TableType {
@@ -144,7 +144,7 @@ impl TableFunctionImpl for ParquetFileMetadataFunc {
         ]));
 
         let rb = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![
                 Arc::new(StringArray::from(vec![Some(filename)])),
                 Arc::new(Int32Array::from(vec![file_metadata.version()])),
@@ -194,7 +194,7 @@ mod tests {
     fn write_parquet(path: &Path) {
         let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int64, false)]));
         let batch = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![Arc::new(ArrowInt64Array::from(
                 (0..6).collect::<Vec<i64>>(),
             ))],
@@ -268,7 +268,7 @@ mod tests {
         let path = dir.path().join("t.parquet");
         let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int64, false)]));
         let batch = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![Arc::new(ArrowInt64Array::from(vec![1i64, 2, 3]))],
         )
         .unwrap();

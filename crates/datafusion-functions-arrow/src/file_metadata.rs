@@ -66,7 +66,7 @@ impl TableFunctionImpl for ArrowFileMetadataFunc {
         ]));
 
         let batch = RecordBatch::try_new(
-            schema.clone(),
+            Arc::clone(&schema),
             vec![
                 Arc::new(StringArray::from(vec![Some(filename.to_string())])),
                 Arc::new(StringArray::from(vec![Some(footer.version)])),
@@ -109,7 +109,7 @@ mod tests {
             arrow::ipc::writer::FileWriter::try_new_with_options(file, &schema, options).unwrap();
         for i in 0..2 {
             let batch = RecordBatch::try_new(
-                schema.clone(),
+                Arc::clone(&schema),
                 vec![Arc::new(Int32Array::from(vec![i, i + 1, i + 2]))],
             )
             .unwrap();
@@ -189,9 +189,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("t.arrows");
         let schema = Arc::new(Schema::new(vec![Field::new("v", DataType::Int32, false)]));
-        let batch =
-            RecordBatch::try_new(schema.clone(), vec![Arc::new(Int32Array::from(vec![1i32]))])
-                .unwrap();
+        let batch = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![Arc::new(Int32Array::from(vec![1i32]))],
+        )
+        .unwrap();
         let file = std::fs::File::create(&path).unwrap();
         let mut writer = arrow::ipc::writer::StreamWriter::try_new(file, &schema).unwrap();
         writer.write(&batch).unwrap();

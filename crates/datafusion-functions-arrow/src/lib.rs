@@ -60,7 +60,7 @@ impl BatchTable {
 #[async_trait]
 impl TableProvider for BatchTable {
     fn schema(&self) -> SchemaRef {
-        self.schema.clone()
+        Arc::clone(&self.schema)
     }
 
     fn table_type(&self) -> datafusion::logical_expr::TableType {
