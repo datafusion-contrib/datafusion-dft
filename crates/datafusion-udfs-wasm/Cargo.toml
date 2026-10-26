@@ -4,15 +4,15 @@ name = "datafusion-udfs-wasm"
 version = "0.1.2"
 
 [dependencies]
-datafusion = { version = "55" }
-log = "0.4.25"
-serde = { optional = true, version = "1.0.217" }
-wasi-common = "29.0.1"
-wasmtime = "29.0.1"
+datafusion.workspace = true
+log.workspace = true
+serde = { optional = true, workspace = true }
+wasi-common.workspace = true
+wasmtime.workspace = true
 
 [dev-dependencies]
-criterion = { features = ["html_reports"], version = "0.5" }
-tokio = { features = ["macros", "rt-multi-thread"], version = "1.36.0" }
+criterion = { features = ["html_reports"], workspace = true }
+tokio = { features = ["rt-multi-thread"], workspace = true }
 
 [features]
 serde = ["dep:serde"]

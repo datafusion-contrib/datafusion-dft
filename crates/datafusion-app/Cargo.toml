@@ -3,61 +3,62 @@ edition.workspace = true
 name = "datafusion-app"
 version = "0.1.1"
 
-# Leaving Hudi and Iceberg around in case traction on those picks up.  It would be better if I just remove them from main and create PRs with the diff - maybe ill get around to that.
+# Leaving Hudi and Iceberg around in case traction on those picks up.  
+# It would be better if I just remove them from main and create PRs with the diff - 
+# maybe ill get around to that.
 
 [dependencies]
-arrow-flight = { features = [
-  "flight-sql-experimental",
-], optional = true, version = "59" }
-async-trait = "0.1.80"
-base64 = { optional = true, version = "0.22.1" }
-color-eyre = "0.6.3"
-datafusion = "55"
-datafusion-functions-arrow = { optional = true, path = "../datafusion-functions-arrow", version = "0.1.0" }
-datafusion-functions-json = { optional = true, version = "0.55" }
-datafusion-functions-parquet = { optional = true, path = "../datafusion-functions-parquet", version = "0.2.1" }
-datafusion-functions-rocksdb = { optional = true, path = "../datafusion-functions-rocksdb", version = "0.1.0" }
-datafusion-net = { optional = true, path = "../datafusion-net", version = "0.1.0" }
+### Local
+datafusion-functions-arrow = { optional = true, workspace = true }
+datafusion-functions-parquet = { optional = true, workspace = true }
+datafusion-functions-rocksdb = { optional = true, workspace = true }
+datafusion-net = { optional = true, workspace = true }
 datafusion-udfs-wasm = { features = [
   "serde",
-], optional = true, path = "../datafusion-udfs-wasm", version = "0.1.2" }
+], optional = true, workspace = true }
+###
+
+arrow-flight = { features = [
+  "flight-sql-experimental",
+], optional = true, workspace = true }
+async-trait.workspace = true
+base64 = { optional = true, workspace = true }
+color-eyre.workspace = true
+datafusion.workspace = true
+datafusion-functions-json = { optional = true, workspace = true }
 deltalake = { features = [
   "datafusion",
   "s3",
-], optional = true, version = "1.1" }
-directories = "5.0.1"
-futures = "0.3.30"
-indexmap = { features = ["serde"], version = "2.8.0" }
-itertools = "0.13.0"
-log = "0.4.22"
-metrics = { optional = true, version = "0.24.0" }
-num_cpus = "1.16.0"
-object_store = { features = ["aws"], optional = true, version = "0.13" }
-# object_store_opendal 0.59 requires object_store 0.14; DataFusion 55 is still on
-# object_store 0.13, so stay on 0.58 until DataFusion moves to object_store 0.14.
-object_store_opendal = { optional = true, version = "0.58.0" }
+], optional = true, workspace = true }
+directories.workspace = true
+futures.workspace = true
+indexmap = { features = ["serde"], workspace = true }
+itertools.workspace = true
+log.workspace = true
+metrics = { optional = true, workspace = true }
+num_cpus.workspace = true
+object_store = { features = ["aws"], optional = true, workspace = true }
+object_store_opendal = { optional = true, workspace = true }
 opendal = { features = [
   "services-huggingface",
-], optional = true, version = "0.58.0" }
-parking_lot = "0.12.3"
-rustls = { default-features = false, features = [
-  "aws-lc-rs",
-], optional = true, version = "0.23" }
-serde = { features = ["derive"], version = "1.0.197" }
-tokio = { features = ["macros", "rt-multi-thread"], version = "1.36.0" }
+], optional = true, workspace = true }
+parking_lot.workspace = true
+rustls = { optional = true, workspace = true }
+serde.workspace = true
+tokio = { features = ["rt-multi-thread"], workspace = true }
 tokio-metrics = { features = [
   "metrics-rs-integration",
-], optional = true, version = "0.4" }
-tokio-stream = { features = ["net"], version = "0.1.15" }
+], optional = true, workspace = true }
+tokio-stream = { features = ["net"], workspace = true }
 tokio-tungstenite = { features = [
   "rustls-tls-native-roots",
-], optional = true, version = "0.29" }
-tonic = { optional = true, version = "0.14" }
-url = { optional = true, version = "2.5.2" }
-vortex-datafusion = { optional = true, version = "0.86" }
+], optional = true, workspace = true }
+tonic = { optional = true, workspace = true }
+url = { optional = true, workspace = true }
+vortex-datafusion = { optional = true, workspace = true }
 
 [dev-dependencies]
-criterion = { features = ["async_tokio"], version = "0.5.1" }
+criterion = { features = ["async_tokio"], workspace = true }
 
 [features]
 default = ["functions-parquet"]

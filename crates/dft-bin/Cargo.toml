@@ -11,92 +11,93 @@ readme = "README.md"
 repository = "https://github.com/datafusion-contrib/datafusion-dft"
 version = "0.4.0"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
-arrow-flight = { features = [
-  "flight-sql-experimental",
-], optional = true, version = "59" }
-axum = { features = ["macros"], optional = true, version = "0.7.9" }
-clap = { features = ["derive"], version = "4.5.27" }
-color-eyre = "0.6.3"
-crossterm = { features = ["event-stream"], optional = true, version = "0.29" }
-datafusion = { version = "55" }
+### Local
 datafusion-app.workspace = true
 # Optional (not a dev-dependency) so that plain `cargo test` does not compile
 # librocksdb; used from feature-gated test code to generate fixture databases.
-datafusion-functions-rocksdb = { workspace = true, optional = true }
-directories = "5.0.1"
-env_logger = "0.11.5"
-futures = "0.3.30"
-http = "1"
-http-body = "1"
-indicatif = "0.17"
-itertools = "0.13.0"
-jiff = { optional = true, version = "0.2.5" }
-lazy_static = "1.4.0"
-log = "0.4.22"
-metrics = { optional = true, version = "0.24.0" }
-metrics-exporter-prometheus = { optional = true, version = "0.16.0" }
-object_store = "0.13"
-parquet = "59"
-pin-project-lite = { version = "0.2.14" }
-prost = "0.14"
-ratatui = { optional = true, version = "0.30" }
-ratatui-textarea = { features = ["search"], optional = true, version = "0.8" }
-serde = { features = ["derive"], version = "1.0.197" }
-strum = { features = ["derive"], version = "0.26.2" }
+datafusion-functions-rocksdb = { optional = true, workspace = true }
+###
+
+arrow-flight = { features = [
+  "flight-sql-experimental",
+], optional = true, workspace = true }
+axum = { features = ["macros"], optional = true, workspace = true }
+clap.workspace = true
+color-eyre.workspace = true
+crossterm = { features = ["event-stream"], optional = true, workspace = true }
+datafusion.workspace = true
+directories.workspace = true
+env_logger.workspace = true
+futures.workspace = true
+http.workspace = true
+http-body.workspace = true
+indicatif.workspace = true
+itertools.workspace = true
+jiff = { optional = true, workspace = true }
+lazy_static.workspace = true
+log.workspace = true
+metrics = { optional = true, workspace = true }
+metrics-exporter-prometheus = { optional = true, workspace = true }
+object_store.workspace = true
+parquet.workspace = true
+pin-project-lite.workspace = true
+prost.workspace = true
+ratatui = { optional = true, workspace = true }
+ratatui-textarea = { features = ["search"], optional = true, workspace = true }
+serde.workspace = true
+strum.workspace = true
 tokio = { features = [
-  "macros",
   "process",
   "rt-multi-thread",
   "signal",
-], version = "1.36.0" }
-tokio-stream = { features = ["net"], version = "0.1.15" }
-tokio-util = "0.7.10"
-toml = "0.8.12"
-tonic = { optional = true, version = "0.14" }
-tower = { version = "0.5.0" }
+], workspace = true }
+tokio-stream = { features = ["net"], workspace = true }
+tokio-util.workspace = true
+toml.workspace = true
+tonic = { optional = true, workspace = true }
+tower.workspace = true
 tower-http = { features = [
-  "auth",
   "timeout",
   "trace",
-], optional = true, version = "0.6.2" }
-tpchgen = "3.0"
-tpchgen-arrow = "3.0"
-tracing = { features = ["log"], version = "0.1.41" }
-tracing-subscriber = { features = ["env-filter"], version = "0.3.19" }
+], optional = true, workspace = true }
+tpchgen.workspace = true
+tpchgen-arrow.workspace = true
+tracing = { features = ["log"], workspace = true }
+tracing-subscriber = { features = ["env-filter"], workspace = true }
 tui-logger = { features = [
   "tracing-support",
-], optional = true, version = "0.18" }
-url = { features = ["serde"], version = "2.5.2" }
-uuid = { optional = true, version = "1.10.0" }
-vortex = { optional = true, version = "0.86" }
+], optional = true, workspace = true }
+url.workspace = true
+uuid = { optional = true, workspace = true }
+vortex = { optional = true, workspace = true }
 vortex-btrblocks = { features = [
   "pco",
   "zstd",
-], optional = true, version = "0.86" }
-vortex-datafusion = { optional = true, version = "0.86" }
-vortex-file = { optional = true, version = "0.86" }
-vortex-session = { optional = true, version = "0.86" }
+], optional = true, workspace = true }
+vortex-datafusion = { optional = true, workspace = true }
+vortex-file = { optional = true, workspace = true }
+vortex-session = { optional = true, workspace = true }
 
 [dev-dependencies]
-assert_cmd = "2.0.16"
+### Local
 # Used (without the libpcap-backed `live` feature) to generate pcap fixtures
 datafusion-net.workspace = true
-datafusion-udfs-wasm = { workspace = true, features = ["serde"] }
-etherparse = "0.20"
-http-body-util = "0.1.3"
-insta = { features = ["yaml"], version = "1.40.0" }
-predicates = "3.1.2"
-reqwest = { features = ["json"], version = "0.12.23" }
-serde_json = "1.0.140"
-socket2 = "0.5"
-tempfile = "3.2.0"
-tokio-tungstenite = "0.29"
-url = "2.5.2"
+datafusion-udfs-wasm = { features = ["serde"], workspace = true }
+###
 
-# When addding a new feature, also add it to the features tested list in CI (`.github/workflows/test.yml`)
+assert_cmd.workspace = true
+etherparse.workspace = true
+http-body-util.workspace = true
+insta = { features = ["yaml"], workspace = true }
+predicates.workspace = true
+reqwest = { features = ["json"], workspace = true }
+serde_json.workspace = true
+socket2.workspace = true
+tempfile.workspace = true
+tokio-tungstenite.workspace = true
+
+# When adding a new feature, also add it to the features tested list in CI (`.github/workflows/test.yml`)
 [features]
 default = ["functions-parquet", "s3"]
 deltalake = ["datafusion-app/deltalake"]
