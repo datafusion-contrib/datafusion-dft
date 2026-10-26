@@ -675,6 +675,41 @@ fn test_json_and_concat_output() {
 }
 
 #[test]
+fn test_query_arrow_ipc_file() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("test.arrow");
+
+    let copy_sql = format!(
+        "COPY (SELECT 1 as num, 'hello' as text) TO '{}'",
+        path.to_str().unwrap()
+    );
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(copy_sql)
+        .assert()
+        .success();
+
+    let read_sql = format!("SELECT * FROM '{}'", path.to_str().unwrap());
+
+    let assert = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("-c")
+        .arg(read_sql)
+        .assert()
+        .success();
+
+    let expected = r#"
++-----+-------+
+| num | text  |
++-----+-------+
+| 1   | hello |
++-----+-------+"#;
+
+    assert.stdout(contains_str(expected));
+}
+
+#[test]
 #[cfg(feature = "vortex")]
 fn test_output_vortex() {
     let dir = tempfile::tempdir().unwrap();
