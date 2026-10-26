@@ -21,8 +21,8 @@ use color_eyre::{eyre, Result};
 use datafusion::catalog::MemoryCatalogProviderList;
 use datafusion::catalog::{CatalogProvider, CatalogProviderList, TableProviderFactory};
 use datafusion::datasource::file_format::{
-    csv::CsvFormatFactory, json::JsonFormatFactory, parquet::ParquetFormatFactory,
-    FileFormatFactory,
+    arrow::ArrowFormatFactory, csv::CsvFormatFactory, json::JsonFormatFactory,
+    parquet::ParquetFormatFactory, FileFormatFactory,
 };
 use datafusion::execution::context::SessionState;
 use datafusion::execution::runtime_env::RuntimeEnv;
@@ -86,6 +86,7 @@ impl Default for DftSessionStateBuilder {
                 Arc::new(ParquetFormatFactory::new()),
                 Arc::new(CsvFormatFactory::new()),
                 Arc::new(JsonFormatFactory::new()),
+                Arc::new(ArrowFormatFactory::new()),
             ],
             catalog_providers: None,
             runtime_env: None,
@@ -110,6 +111,7 @@ impl DftSessionStateBuilder {
                 Arc::new(ParquetFormatFactory::new()),
                 Arc::new(CsvFormatFactory::new()),
                 Arc::new(JsonFormatFactory::new()),
+                Arc::new(ArrowFormatFactory::new()),
             ],
 
             catalog_providers: None,
