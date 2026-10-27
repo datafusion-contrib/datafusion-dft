@@ -66,6 +66,11 @@ impl FlightSQLContext {
         }
     }
 
+    /// A fresh client slot with the same endpoint, authentication and headers.
+    pub fn disconnected(&self) -> Self {
+        Self::new(self.config.clone())
+    }
+
     pub fn client(&self) -> &FlightSQLClient {
         &self.client
     }
@@ -78,9 +83,8 @@ impl FlightSQLContext {
         cli_headers: Option<HashMap<String, String>>,
     ) -> Result<()> {
         let final_url = cli_host.unwrap_or(self.config.connection_url.clone());
-        let url = Box::leak(final_url.into_boxed_str());
-        info!("Connecting to FlightSQL host: {}", url);
-        let channel = Channel::from_static(url).connect().await;
+        info!("Connecting to FlightSQL host: {}", final_url);
+        let channel = Channel::from_shared(final_url)?.connect().await;
         match channel {
             Ok(c) => {
                 let mut inner = FlightServiceClient::new(c);
@@ -302,39 +306,115 @@ impl FlightSQLContext {
         sql: &str,
         _opts: ExecOptions,
     ) -> DFResult<ExecResult> {
-        if let Some(ref mut client) = *self.client.lock().await {
-            let flight_info = client
-                .execute(sql.to_string(), None)
+        let (_, stream) = self.execute_query(sql).await?;
+        Ok(ExecResult::RecordBatchStream(stream))
+    }
+
+    /// Execute a query and retain its FlightInfo for optional server cancellation.
+    pub async fn execute_query(
+        &self,
+        sql: &str,
+    ) -> DFResult<(FlightInfo, datafusion::execution::SendableRecordBatchStream)> {
+        use datafusion::arrow::datatypes::Schema;
+        let info = {
+            let mut guard = self.client.lock().await;
+            let client = guard
+                .as_mut()
+                .ok_or_else(|| DataFusionError::External("Missing client".into()))?;
+            client
+                .execute(sql.to_owned(), None)
                 .await
-                .map_err(|e| DataFusionError::External(Box::new(e)))?;
-            if flight_info.endpoint.len() != 1 {
-                return Err(DataFusionError::External("More than one endpoint".into()));
-            }
-            let endpoint = &flight_info.endpoint[0];
-            if let Some(ticket) = &endpoint.ticket {
-                match client.do_get(ticket.clone().into_request()).await {
-                    Ok(stream) => {
-                        let mut peekable = stream.peekable();
-                        if let Some(Ok(first)) = peekable.peek().await {
-                            let schema = first.schema();
-                            let mapped = peekable
-                                .map(|r| r.map_err(|e| DataFusionError::External(e.into())));
-                            let adapter = RecordBatchStreamAdapter::new(schema, mapped);
-                            Ok(ExecResult::RecordBatchStream(Box::pin(adapter)))
-                        } else {
-                            Err(DataFusionError::External("No first result".into()))
-                        }
-                    }
-                    Err(e) => Err(DataFusionError::External(
-                        format!("Call to do_get failed: {}", e).into(),
-                    )),
-                }
-            } else {
-                Err(DataFusionError::External("Missing ticket".into()))
-            }
+                .map_err(|e| DataFusionError::External(e.into()))?
+        };
+        let schema = if info.schema.is_empty() {
+            Arc::new(Schema::empty())
         } else {
-            Err(DataFusionError::External("Missing client".into()))
+            Arc::new(info.clone().try_decode_schema()?)
+        };
+        // Open endpoints lazily and consume each stream before opening the next.
+        // This preserves endpoint order and bounds buffering to the active stream.
+        let state = (
+            self.client.clone(),
+            info.clone().endpoint.into_iter(),
+            None::<FlightRecordBatchStream>,
+        );
+        let stream =
+            futures::stream::try_unfold(state, |(client, mut endpoints, mut stream)| async move {
+                loop {
+                    if let Some(active) = &mut stream {
+                        match active.next().await {
+                            Some(Ok(batch)) => {
+                                return Ok(Some((batch, (client, endpoints, stream))))
+                            }
+                            Some(Err(e)) => return Err(DataFusionError::External(e.into())),
+                            None => stream = None,
+                        }
+                    } else if let Some(endpoint) = endpoints.next() {
+                        let ticket = endpoint.ticket.ok_or_else(|| {
+                            DataFusionError::External("Missing FlightSQL endpoint ticket".into())
+                        })?;
+                        let mut guard = client.lock().await;
+                        let service = guard
+                            .as_mut()
+                            .ok_or_else(|| DataFusionError::External("Missing client".into()))?;
+                        stream = Some(
+                            service
+                                .do_get(ticket.into_request())
+                                .await
+                                .map_err(|e| DataFusionError::External(e.into()))?,
+                        );
+                    } else {
+                        return Ok(None);
+                    }
+                }
+            });
+        Ok((
+            info,
+            Box::pin(RecordBatchStreamAdapter::new(schema, stream)),
+        ))
+    }
+
+    /// Request cancellation, preferring Flight's current action and falling back
+    /// to the older FlightSQL action only when the server does not support it.
+    /// A successful request does not guarantee that the server cancelled work.
+    pub async fn cancel_query(&self, info: FlightInfo) -> Result<()> {
+        use arrow_flight::sql::{ActionCancelQueryRequest, ProstMessageExt};
+        use arrow_flight::{Action, CancelFlightInfoRequest};
+        use prost::Message;
+        let mut guard = self.client.lock().await;
+        let client = guard
+            .as_mut()
+            .ok_or_else(|| eyre::eyre!("Missing client"))?;
+        let modern = Action {
+            r#type: "CancelFlightInfo".into(),
+            body: CancelFlightInfoRequest::new(info.clone())
+                .encode_to_vec()
+                .into(),
+        };
+        let mut response = match client.do_action(modern).await {
+            Ok(response) => response,
+            Err(arrow_flight::error::FlightError::Tonic(status))
+                if matches!(
+                    status.code(),
+                    tonic::Code::Unimplemented | tonic::Code::InvalidArgument
+                ) =>
+            {
+                let request = ActionCancelQueryRequest {
+                    info: info.encode_to_vec().into(),
+                };
+                client
+                    .do_action(Action {
+                        r#type: "CancelQuery".into(),
+                        body: request.as_any().encode_to_vec().into(),
+                    })
+                    .await?
+            }
+            Err(error) => return Err(error.into()),
+        };
+        while let Some(result) = response.next().await {
+            result?;
         }
+        Ok(())
     }
 
     pub async fn get_catalogs_flight_info(&self) -> DFResult<FlightInfo> {

@@ -25,7 +25,7 @@ arrow-flight = { features = [
 axum = { features = ["macros"], optional = true, workspace = true }
 clap.workspace = true
 color-eyre.workspace = true
-crossterm = { features = ["event-stream"], optional = true, workspace = true }
+crossterm = { features = ["event-stream"], workspace = true }
 datafusion.workspace = true
 directories.workspace = true
 env_logger.workspace = true
@@ -43,8 +43,8 @@ object_store.workspace = true
 parquet.workspace = true
 pin-project-lite.workspace = true
 prost.workspace = true
-ratatui = { optional = true, workspace = true }
-ratatui-textarea = { features = ["search"], optional = true, workspace = true }
+ratatui = { features = ["scrolling-regions"], workspace = true }
+ratatui-textarea = { features = ["search"], workspace = true }
 serde.workspace = true
 strum.workspace = true
 tokio = { features = [
@@ -60,6 +60,7 @@ tower.workspace = true
 tower-http = { features = [
   "timeout",
   "trace",
+  "auth",
 ], optional = true, workspace = true }
 tpchgen.workspace = true
 tpchgen-arrow.workspace = true
@@ -131,7 +132,7 @@ http = [
 huggingface = ["datafusion-app/huggingface"]
 net = ["datafusion-app/net"]
 s3 = ["datafusion-app/s3"]
-tui = ["dep:crossterm", "dep:ratatui", "dep:ratatui-textarea", "dep:tui-logger"]
+tui = ["dep:tui-logger"]
 udfs-wasm = ["datafusion-app/udfs-wasm"]
 vortex = [
   "datafusion-app/vortex",
