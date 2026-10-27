@@ -12,6 +12,99 @@ dft -f query.sql
 dft -c "SELECT 1+2"
 ```
 
+## Persistent SQL prompt
+
+Run `dft --repl` to start the inline SQL prompt.
+Without the `tui` feature, `dft` starts this prompt automatically.
+With the `tui` feature, `dft` continues to start the full TUI.
+
+```sh
+# Local DataFusion session
+dft --repl
+
+# FlightSQL session (requires the flightsql feature)
+dft --repl -q --host http://localhost:50051
+```
+
+End each statement with `;` and press Enter to execute it.
+Enter continues incomplete statements on a new line.
+Alt+Enter inserts a new line without execution.
+Pasted SQL remains editable until Enter.
+Multiple complete statements execute in order.
+An error stops the current submission and returns control to the prompt.
+Any unfinished suffix remains in the editor.
+
+Results appear above the editor in terminal scrollback.
+Local tables, views, and session settings remain available between statements.
+The prompt uses the CLI execution configuration, extensions, and database registrations.
+`--run-ddl` executes the configured local initialization DDL once at startup.
+`--json` selects line-delimited JSON results.
+`--time` suppresses result rows and shows execution time and row counts.
+
+| Control | Action |
+| --- | --- |
+| `\?` | Show help |
+| `\q` | Exit |
+| Ctrl+D with empty input | Exit |
+| Ctrl+C | Clear input or stop execution |
+| Up at the first editor line | Previous SQL submission |
+| Down at the last editor line | Next submission or the original draft |
+| Ctrl+R | Search previous submissions |
+| Ctrl+R during search | Select the next older match |
+| Enter during search | Copy the match into the editor |
+| Escape during search | Close search |
+
+History stores up to 1,000 submissions in `repl-history.toml` under the dft data directory.
+The default directory is `~/.config/dft`.
+`DATAFUSION_DFT_DATA` overrides this directory.
+History contains SQL text, including literals.
+History read or write errors produce a message and do not stop the session.
+Concurrent sessions keep independent histories; the last save replaces the file.
+
+The prompt requires terminal input and output.
+Use `-c` or `-f` for scripts and redirected output.
+The prompt does not accept batch export, concatenation, benchmarking, or analysis options.
+
+### FlightSQL connections
+
+The prompt reuses one FlightSQL client and channel by default.
+Configure a new client and channel for each SQL statement when required:
+
+```toml
+[flightsql_client]
+connection_mode = "per_statement" # Default: "persistent"
+```
+
+The existing configuration override also works:
+
+```sh
+dft --repl -q --set flightsql_client.connection_mode=per_statement
+```
+
+This setting applies to the inline prompt.
+Both modes use the configured authentication, headers, and message limits.
+Header precedence remains configuration, headers file, then command-line headers.
+Each statement retains its connection until all result endpoints finish.
+A persistent channel can reconnect its transport.
+Server session state depends on the server implementation.
+Failed statements are never automatically repeated.
+
+SQL uses FlightSQL statement-query requests by default.
+For servers that require statement-update requests for writes, use `\update`:
+
+```sql
+\update INSERT INTO events VALUES (1);
+```
+
+This command reports the affected row count.
+It also supports DDL when the server accepts DDL through statement-update requests.
+Ordinary SQL continues to support servers that execute DDL through statement-query requests.
+Ctrl+C stops result consumption and drops the active execution future.
+When query metadata is available, it also requests server cancellation.
+The client tries `CancelFlightInfo`, then the older `CancelQuery` action when necessary.
+Cancellation requests have a one-second timeout.
+Server cancellation support determines whether remote work stops.
+
 ## Saving Results and Format Options
 
 Use `--output` (or `-o`) to save the result of one command or SQL file. The

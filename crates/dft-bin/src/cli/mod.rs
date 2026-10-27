@@ -53,8 +53,7 @@ use std::path::{Path, PathBuf};
 use {
     crate::args::{parse_headers_file, Command, FlightSqlCommand},
     datafusion_app::{
-        config::{AuthConfig, FlightSQLConfig},
-        flightsql::FlightSQLContext,
+        config::FlightSQLConfig, flightsql::FlightSQLContext,
         flightsql_benchmarks::FlightSQLBenchmarkStats,
     },
     tonic::IntoRequest,
@@ -1179,78 +1178,61 @@ fn is_output_format_option(format: Format, key: &str) -> bool {
     }
 }
 
-pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
-    let merged_exec_config = merge_configs(config.shared.clone(), config.cli.execution.clone());
-    let session_state_builder = DftSessionStateBuilder::try_new(Some(merged_exec_config.clone()))?
-        .with_extensions()
-        .await?;
-
-    // CLI mode: executing commands from files or CLI arguments
-    let session_state = session_state_builder.build()?;
-    let execution_ctx = ExecutionContext::try_new(
-        &merged_exec_config,
-        session_state,
-        crate::APP_NAME,
-        env!("CARGO_PKG_VERSION"),
-    )?;
-    #[allow(unused_mut)]
-    let mut app_execution = AppExecution::new(execution_ctx);
-    #[cfg(feature = "flightsql")]
+/// Build the execution state shared by batch CLI and inline REPL modes.
+/// REPL connections are opened lazily so the connection policy applies to every statement.
+pub(crate) async fn create_execution(
+    cli: &DftArgs,
+    config: &AppConfig,
+    connect: bool,
+) -> Result<AppExecution> {
+    #[cfg(not(feature = "flightsql"))]
     {
-        if cli.flightsql || matches!(cli.command, Some(Command::FlightSql { .. })) {
-            let auth = AuthConfig {
-                basic_auth: config.flightsql_client.auth.basic_auth,
-                bearer_token: config.flightsql_client.auth.bearer_token,
-            };
-            let flightsql_cfg = FlightSQLConfig::new(
-                config.flightsql_client.connection_url,
-                config.flightsql_client.benchmark_iterations,
-                auth,
-                config.flightsql_client.headers.clone(),
-                config.flightsql_client.max_decoding_message_size,
-                config.flightsql_client.max_encoding_message_size,
-            );
-            let flightsql_ctx = FlightSQLContext::new(flightsql_cfg);
-
-            // Three-way header merge: config < file < CLI
-            let mut all_headers = config.flightsql_client.headers.clone();
-
-            // Merge headers from file (if specified in config or CLI)
-            let headers_file = cli
-                .headers_file
-                .as_ref()
-                .or(config.flightsql_client.headers_file.as_ref());
-
-            if let Some(file_path) = headers_file {
-                match parse_headers_file(file_path) {
-                    Ok(file_headers) => {
-                        all_headers.extend(file_headers);
-                    }
-                    Err(e) => {
-                        return Err(eyre!("Error reading headers file: {}", e));
-                    }
-                }
-            }
-
-            // Merge CLI headers (highest precedence)
-            if let Some(cli_headers) = &cli.header {
-                all_headers.extend(cli_headers.iter().cloned());
-            }
-
-            let headers = if all_headers.is_empty() {
-                None
-            } else {
-                Some(all_headers)
-            };
-
-            flightsql_ctx
-                .create_client(cli.host.clone(), headers)
-                .await?;
-            app_execution.with_flightsql_ctx(flightsql_ctx);
+        let _ = connect;
+        if cli.flightsql {
+            return Err(eyre!("FlightSQL is not enabled in this build"));
         }
     }
-    register_db(app_execution.session_ctx(), &config.db).await?;
-    let app = CliApp::new(app_execution, cli.clone());
-    app.execute_files_or_commands().await?;
-    Ok(())
+    let merged = merge_configs(config.shared.clone(), config.cli.execution.clone());
+    let state = DftSessionStateBuilder::try_new(Some(merged.clone()))?
+        .with_extensions()
+        .await?
+        .build()?;
+    let ctx =
+        ExecutionContext::try_new(&merged, state, crate::APP_NAME, env!("CARGO_PKG_VERSION"))?;
+    #[allow(unused_mut)]
+    let mut execution = AppExecution::new(ctx);
+    #[cfg(feature = "flightsql")]
+    if cli.flightsql || matches!(cli.command, Some(Command::FlightSql { .. })) {
+        let cfg = &config.flightsql_client;
+        let mut headers = cfg.headers.clone();
+        if let Some(path) = cli.headers_file.as_ref().or(cfg.headers_file.as_ref()) {
+            headers.extend(parse_headers_file(path).map_err(|e| eyre!(e))?);
+        }
+        if let Some(overrides) = &cli.header {
+            headers.extend(overrides.iter().cloned());
+        }
+        let ctx = FlightSQLContext::new(FlightSQLConfig::new(
+            cli.host
+                .clone()
+                .unwrap_or_else(|| cfg.connection_url.clone()),
+            cfg.benchmark_iterations,
+            cfg.auth.clone(),
+            headers,
+            cfg.max_decoding_message_size,
+            cfg.max_encoding_message_size,
+        ));
+        if connect {
+            ctx.create_client(None, None).await?;
+        }
+        execution.with_flightsql_ctx(ctx);
+    }
+    register_db(execution.session_ctx(), &config.db).await?;
+    Ok(execution)
+}
+
+pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
+    let execution = create_execution(&cli, &config, true).await?;
+    CliApp::new(execution, cli)
+        .execute_files_or_commands()
+        .await
 }
