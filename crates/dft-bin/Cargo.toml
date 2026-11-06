@@ -58,6 +58,7 @@ toml.workspace = true
 tonic = { optional = true, workspace = true }
 tower.workspace = true
 tower-http = { features = [
+  "auth",
   "timeout",
   "trace",
 ], optional = true, workspace = true }
