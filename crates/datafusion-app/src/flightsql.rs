@@ -135,6 +135,11 @@ impl FlightSQLContext {
         progress_reporter: Option<Arc<dyn BenchmarkProgressReporter>>,
     ) -> Result<FlightSQLBenchmarkStats> {
         let iterations = cli_iterations.unwrap_or(self.config.benchmark_iterations);
+        if iterations == 0 {
+            return Err(eyre::eyre!(
+                "Benchmark iterations must be greater than zero"
+            ));
+        }
         let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
         let statements = DFParser::parse_sql_with_dialect(query, &dialect)?;
 

@@ -101,6 +101,9 @@ pub struct DftArgs {
     #[clap(long, short, help = "Benchmark the provided query")]
     pub bench: bool,
 
+    #[clap(long, help = "Compare benchmark timings for multiple queries", conflicts_with_all = ["bench", "analyze", "save", "append", "output", "json", "time", "headers_only", "print_headers"])]
+    pub bench_compare: bool,
+
     #[clap(
         long,
         help = "Print a summary of the query's execution plan and statistics"
