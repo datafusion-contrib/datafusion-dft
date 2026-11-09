@@ -20,7 +20,7 @@ use std::time::Duration;
 use crate::local_benchmarks::is_all_same;
 
 use crate::local_benchmarks::BenchmarkMode;
-use crate::local_benchmarks::DurationsSummary;
+use crate::local_benchmarks::{ComparisonDuration, ComparisonStats, DurationsSummary};
 
 pub struct FlightSQLBenchmarkStats {
     query: String,
@@ -86,6 +86,23 @@ impl FlightSQLBenchmarkStats {
             mean,
             median,
             percent_of_total,
+        }
+    }
+
+    pub fn comparison_stats(&self) -> ComparisonStats {
+        ComparisonStats {
+            runs: self.runs,
+            mode: self.mode,
+            components: [
+                &self.get_flight_info_durations,
+                &self.ttfb_durations,
+                &self.do_get_durations,
+                &self.total_durations,
+            ]
+            .iter()
+            .map(|samples| ComparisonDuration::from_samples(samples))
+            .collect(),
+            rows_match: is_all_same(&self.rows),
         }
     }
 

@@ -277,6 +277,10 @@ impl CliApp {
 
         self.validate_args()?;
 
+        if self.args.bench_compare {
+            return self.benchmark_compare().await;
+        }
+
         #[cfg(feature = "flightsql")]
         if let Some(Command::FlightSql { command }) = &self.args.command {
             return self.handle_flightsql_command(command.clone()).await;
@@ -374,6 +378,162 @@ impl CliApp {
             self.exec_from_file(file).await?
         }
 
+        Ok(())
+    }
+
+    async fn benchmark_compare(&self) -> Result<()> {
+        use datafusion_app::local_benchmarks::ComparisonStats;
+
+        if !self.args.files.is_empty() && !self.args.commands.is_empty() {
+            return Err(eyre!("Cannot compare files and commands together"));
+        }
+        let queries: Vec<(String, String)> = if self.args.files.is_empty() {
+            self.args
+                .commands
+                .iter()
+                .enumerate()
+                .map(|(index, query)| ((index + 1).to_string(), query.clone()))
+                .collect()
+        } else {
+            self.args
+                .files
+                .iter()
+                .map(|path| Ok((path.display().to_string(), std::fs::read_to_string(path)?)))
+                .collect::<Result<_>>()?
+        };
+        if queries.len() < 2 {
+            return Err(eyre!("Benchmark comparison requires at least two queries"));
+        }
+        if self.args.benchmark_iterations == Some(0) {
+            return Err(eyre!("Benchmark iterations must be greater than zero"));
+        }
+        #[cfg(not(feature = "flightsql"))]
+        if self.args.flightsql {
+            return Err(eyre!("FlightSQL feature is not enabled"));
+        }
+        if let Some(sql) = &self.args.run_before {
+            if self.args.flightsql {
+                #[cfg(feature = "flightsql")]
+                {
+                    let client = self.app_execution.flightsql_client();
+                    let mut guard = client.lock().await;
+                    let client = guard
+                        .as_mut()
+                        .ok_or_else(|| eyre!("No FlightSQL client configured"))?;
+                    let info = client.execute(sql.clone(), None).await?;
+                    for endpoint in info.endpoint {
+                        if let Some(ticket) = endpoint.ticket {
+                            let mut stream = client.do_get(ticket.into_request()).await?;
+                            while let Some(batch) = stream.next().await {
+                                batch?;
+                            }
+                        }
+                    }
+                }
+            } else {
+                self.app_execution
+                    .execution_ctx()
+                    .execute_sql_and_discard_results(sql)
+                    .await?;
+            }
+        }
+        let mut results: Vec<(String, String, ComparisonStats)> = Vec::with_capacity(queries.len());
+        for (input, query) in queries {
+            let normalized = query.split_whitespace().collect::<Vec<_>>().join(" ");
+            let label = if normalized.chars().count() > 40 {
+                format!("{}...", normalized.chars().take(37).collect::<String>())
+            } else {
+                normalized
+            };
+            let stats = if self.args.flightsql {
+                #[cfg(feature = "flightsql")]
+                {
+                    self.flightsql_benchmark_from_string(&query)
+                        .await?
+                        .comparison_stats()
+                }
+                #[cfg(not(feature = "flightsql"))]
+                {
+                    unreachable!()
+                }
+            } else {
+                self.benchmark_from_string(&query).await?.comparison_stats()
+            };
+            if stats.runs == 0 {
+                return Err(eyre!("Benchmark iterations must be greater than zero"));
+            }
+            results.push((input, label, stats));
+        }
+        results.sort_by_key(|(_, _, stats)| stats.components[3].median);
+        let title = if self.args.flightsql {
+            "FlightSQL benchmark comparison"
+        } else {
+            "Benchmark comparison"
+        };
+        println!(
+            "{title} ({} runs per query, {})",
+            results[0].2.runs, results[0].2.mode
+        );
+        let headers = if self.args.flightsql {
+            ["Get Flight Info", "TTFB", "Do Get", "Total"]
+        } else {
+            [
+                "Logical Planning",
+                "Physical Planning",
+                "Execution",
+                "Total",
+            ]
+        };
+        let fastest = results[0].2.components[3].median.as_secs_f64();
+        let mut rows = vec![vec![
+            "Rank".to_string(),
+            "Input".to_string(),
+            "Query".to_string(),
+            headers[0].to_string(),
+            headers[1].to_string(),
+            headers[2].to_string(),
+            headers[3].to_string(),
+            "Relative".to_string(),
+        ]];
+        for (index, (input, label, stats)) in results.iter().enumerate() {
+            let mut row = vec![(index + 1).to_string(), input.clone(), label.clone()];
+            row.extend(stats.components.iter().map(|d| {
+                format!(
+                    "{:.3} ms ({:.3} ms)",
+                    d.median.as_secs_f64() * 1000.0,
+                    d.stddev.as_secs_f64() * 1000.0
+                )
+            }));
+            let total = stats.components[3].median.as_secs_f64();
+            row.push(if fastest == 0.0 {
+                "n/a".to_string()
+            } else {
+                format!("{:.2}x", total / fastest)
+            });
+            rows.push(row);
+            if !stats.rows_match {
+                eprintln!("Row counts differ across runs for input: {input}");
+            }
+        }
+        let widths: Vec<usize> = (0..8)
+            .map(|i| {
+                rows.iter()
+                    .map(|row| row[i].chars().count())
+                    .max()
+                    .unwrap_or(0)
+            })
+            .collect();
+        for row in rows {
+            for (i, value) in row.iter().enumerate() {
+                if i == 7 {
+                    print!("{value}");
+                } else {
+                    print!("{value:<width$}  ", width = widths[i]);
+                }
+            }
+            println!();
+        }
+        println!("Values: median (population standard deviation)");
         Ok(())
     }
 
@@ -1212,7 +1372,7 @@ pub(crate) async fn create_execution(
             headers.extend(overrides.iter().cloned());
         }
         let ctx = FlightSQLContext::new(FlightSQLConfig::new(
-            cli.host
+            cli.url
                 .clone()
                 .unwrap_or_else(|| cfg.connection_url.clone()),
             cfg.benchmark_iterations,

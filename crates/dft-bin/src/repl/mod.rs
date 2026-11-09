@@ -53,7 +53,7 @@ enum Output {
     Finished(Result<()>),
     #[cfg(feature = "flightsql")]
     FlightQuery(
-        datafusion_app::flightsql::FlightSQLContext,
+        Box<datafusion_app::flightsql::FlightSQLContext>,
         arrow_flight::FlightInfo,
     ),
 }
@@ -142,7 +142,9 @@ async fn run_statements(
         let mut stream = if args.flightsql {
             let ctx = execution.flightsql_ctx();
             let (info, stream) = ctx.execute_query(&sql).await?;
-            sender.send(Output::FlightQuery(ctx.clone(), info)).await?;
+            sender
+                .send(Output::FlightQuery(Box::new(ctx.clone()), info))
+                .await?;
             stream
         } else {
             local_stream(&execution, &sql).await?
@@ -295,7 +297,7 @@ pub async fn try_run(args: DftArgs, config: AppConfig) -> Result<()> {
                     }
                     #[cfg(feature = "flightsql")]
                     Some(Output::FlightQuery(ctx, info)) => {
-                        running.as_mut().unwrap().cancellation = Some((ctx, info));
+                        running.as_mut().unwrap().cancellation = Some((*ctx, info));
                     }
                     Some(Output::Finished(result)) => {
                         running = None;

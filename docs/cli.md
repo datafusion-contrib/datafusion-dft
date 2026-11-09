@@ -171,10 +171,10 @@ dft --print-format-options vortex
 
 ## FlightSQL Mode
 
-Use `--flightsql` or `-q` to run commands or files against a FlightSQL server (instead of the default local SessionContext). You can override the default host for that single command with --host
+Use `--flightsql` or `-q` to run commands or files against a FlightSQL server (instead of the default local SessionContext). Use `--url` to override the configured connection URL for one command.
 
 ```sh
-dft -f query.sql --flightsql --host "http://127.0.0.1:50052"
+dft -f query.sql --flightsql --url "http://127.0.0.1:50052"
 ```
 
 ### FlightSQL Commands
@@ -316,6 +316,26 @@ basic_auth.password = "Pass"
 ## Benchmark Queries
 
 You can benchmark queries by adding the `--bench` parameter. This will run the query a configurable number of times and output a breakdown of the query's execution time with summary statistics for each component (logical planning, physical planning, execution time, and total time).
+
+### Compare queries
+
+Use `--bench-compare` to compare two or more commands or SQL files:
+
+```sh
+dft --bench-compare -n 10 -c "SELECT count(*) FROM orders" -c "SELECT sum(total) FROM orders"
+dft --flightsql --bench-compare -f query1.sql query2.sql
+```
+
+The command benchmarks queries sequentially and sorts them by median total time. Ties retain input order.
+The Input column shows each command’s position or the supplied file path.
+Query labels are limited to 40 characters.
+Each timing column shows the median and population standard deviation, in milliseconds.
+Standard deviation measures variation around the mean. Component medians may not add up to the total median.
+Local timings include logical planning, physical planning, execution, and total time.
+FlightSQL timings include Get Flight Info, time to first byte (TTFB), Do Get, and total time.
+Do Get includes TTFB. Relative time compares each total median with the fastest total median.
+Use `--run-before` for setup and `--concurrent` to run each query's iterations concurrently.
+Comparison does not support `--save` or `--append`.
 
 ### Benchmark Modes
 

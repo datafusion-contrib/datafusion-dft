@@ -58,9 +58,9 @@ toml.workspace = true
 tonic = { optional = true, workspace = true }
 tower.workspace = true
 tower-http = { features = [
+  "auth",
   "timeout",
   "trace",
-  "auth",
 ], optional = true, workspace = true }
 tpchgen.workspace = true
 tpchgen-arrow.workspace = true

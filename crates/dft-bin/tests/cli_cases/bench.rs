@@ -289,3 +289,90 @@ fn test_bench_serial_vs_concurrent_csv_compatibility() {
     assert!(lines[1].ends_with("serial"));
     assert!(lines[2].contains("concurrent"));
 }
+
+#[test]
+fn test_bench_compare_commands() {
+    let output = Command::cargo_bin("dft")
+        .unwrap()
+        .args(["--bench-compare", "-n", "2", "-c", "SELECT 1", "SELECT 2"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Benchmark comparison (2 runs per query, serial)"));
+    assert!(stdout.contains("Logical Planning"));
+    assert!(stdout.contains("Input"));
+    assert!(stdout
+        .lines()
+        .any(|line| line.split_whitespace().take(4).collect::<Vec<_>>()
+            == ["1", "1", "SELECT", "1"]
+            || line.split_whitespace().take(4).collect::<Vec<_>>() == ["2", "1", "SELECT", "1"]));
+    assert!(stdout
+        .lines()
+        .any(|line| line.split_whitespace().take(4).collect::<Vec<_>>()
+            == ["2", "2", "SELECT", "2"]
+            || line.split_whitespace().take(4).collect::<Vec<_>>() == ["1", "2", "SELECT", "2"]));
+    assert!(stdout.contains("SELECT 1"));
+    assert!(stdout.contains("SELECT 2"));
+    assert!(stdout.contains("population standard deviation"));
+}
+
+#[test]
+fn test_bench_compare_requires_two_queries() {
+    Command::cargo_bin("dft")
+        .unwrap()
+        .args(["--bench-compare", "-c", "SELECT 1"])
+        .assert()
+        .failure()
+        .stderr(contains_str("requires at least two queries"));
+}
+
+#[test]
+fn test_bench_compare_rejects_zero_iterations() {
+    Command::cargo_bin("dft")
+        .unwrap()
+        .args(["--bench-compare", "-n", "0", "-c", "SELECT 1", "SELECT 2"])
+        .assert()
+        .failure()
+        .stderr(contains_str("greater than zero"));
+}
+
+#[test]
+fn test_bench_compare_files() {
+    let first = sql_in_file("SELECT 1");
+    let second = sql_in_file("SELECT 2");
+    let output = Command::cargo_bin("dft")
+        .unwrap()
+        .arg("--bench-compare")
+        .args(["-n", "1", "-f"])
+        .arg(first.path())
+        .arg(second.path())
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains(first.path().to_str().unwrap()));
+    assert!(stdout.contains(second.path().to_str().unwrap()));
+}
+
+#[test]
+fn test_bench_compare_truncates_long_query() {
+    let query = "SELECT 'abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnop'";
+    let output = Command::cargo_bin("dft")
+        .unwrap()
+        .args(["--bench-compare", "-n", "1", "-c", query, "SELECT 2"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("SELECT 'abcdefghijklmnopqrstuvwxyz012..."));
+    assert!(!stdout.contains(query));
+}

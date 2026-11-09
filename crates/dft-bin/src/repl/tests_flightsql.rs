@@ -209,7 +209,7 @@ async fn connection_lifetime_headers_empty_results_and_multiple_endpoints() {
         std::fs::write(&headers_file, "x-test: file").unwrap();
         let args = DftArgs {
             flightsql: true,
-            host: Some(format!("http://{}", fixture.addr)),
+            url: Some(format!("http://{}", fixture.addr)),
             headers_file: Some(headers_file),
             header: Some(vec![("x-test".into(), "cli".into())]),
             ..Default::default()
@@ -297,7 +297,7 @@ async fn remote_datafusion_ddl_and_dml_share_session() {
     let directory = tempfile::tempdir().unwrap();
     let args = DftArgs {
         flightsql: true,
-        host: Some(format!("http://{}", fixture.addr)),
+        url: Some(format!("http://{}", fixture.addr)),
         ..Default::default()
     };
     let mut config = AppConfig::default();

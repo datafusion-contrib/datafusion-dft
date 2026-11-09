@@ -23,7 +23,7 @@ use tokio::process::Command as TokioCommand;
 use crate::cli_cases::contains_str;
 
 #[tokio::test]
-pub async fn test_flightsql_custom_host() {
+pub async fn test_flightsql_custom_url() {
     let bin = assert_cmd::cargo::cargo_bin("dft");
 
     // Bind to port 0 to have the OS assign an available port.
@@ -56,7 +56,7 @@ pub async fn test_flightsql_custom_host() {
         .arg("-c")
         .arg("SELECT 1")
         .arg("--flightsql")
-        .arg("--host")
+        .arg("--url")
         .arg(format!("http://{addr}"))
         .assert()
         .success();

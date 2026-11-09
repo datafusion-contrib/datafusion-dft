@@ -79,10 +79,10 @@ impl FlightSQLContext {
     /// Create FlightSQL client from users FlightSQL config
     pub async fn create_client(
         &self,
-        cli_host: Option<String>,
+        cli_url: Option<String>,
         cli_headers: Option<HashMap<String, String>>,
     ) -> Result<()> {
-        let final_url = cli_host.unwrap_or(self.config.connection_url.clone());
+        let final_url = cli_url.unwrap_or(self.config.connection_url.clone());
         info!("Connecting to FlightSQL host: {}", final_url);
         let channel = Channel::from_shared(final_url)?.connect().await;
         match channel {
@@ -139,6 +139,11 @@ impl FlightSQLContext {
         progress_reporter: Option<Arc<dyn BenchmarkProgressReporter>>,
     ) -> Result<FlightSQLBenchmarkStats> {
         let iterations = cli_iterations.unwrap_or(self.config.benchmark_iterations);
+        if iterations == 0 {
+            return Err(eyre::eyre!(
+                "Benchmark iterations must be greater than zero"
+            ));
+        }
         let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
         let statements = DFParser::parse_sql_with_dialect(query, &dialect)?;
 
@@ -334,7 +339,7 @@ impl FlightSQLContext {
         // Open endpoints lazily and consume each stream before opening the next.
         // This preserves endpoint order and bounds buffering to the active stream.
         let state = (
-            self.client.clone(),
+            Arc::clone(&self.client),
             info.clone().endpoint.into_iter(),
             None::<FlightRecordBatchStream>,
         );
