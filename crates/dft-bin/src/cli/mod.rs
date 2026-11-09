@@ -1404,7 +1404,7 @@ pub async fn try_run(cli: DftArgs, config: AppConfig) -> Result<()> {
             };
 
             flightsql_ctx
-                .create_client(cli.host.clone(), headers)
+                .create_client(cli.url.clone(), headers)
                 .await?;
             app_execution.with_flightsql_ctx(flightsql_ctx);
         }

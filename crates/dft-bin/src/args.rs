@@ -125,12 +125,12 @@ pub struct DftArgs {
     #[clap(long, help = "Run benchmark iterations concurrently/in parallel")]
     pub concurrent: bool,
 
-    #[clap(long, help = "Host address to query. Only used for FlightSQL")]
-    pub host: Option<String>,
+    #[clap(long, help = "Connection URL to query. Only used for FlightSQL")]
+    pub url: Option<String>,
 
     #[clap(
         long,
-        help = "Header to add to Flight SQL connection. Only used for FlightSQL",
+        help = "Header to add to Flight SQL connection, in 'Name: Value' format. Only used for FlightSQL",
         value_parser(parse_header_line),
         action = clap::ArgAction::Append
     )]

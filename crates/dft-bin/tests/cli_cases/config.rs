@@ -108,3 +108,19 @@ fn test_custom_config_benchmark_iterations() {
 
     assert.stdout(contains_str(expected));
 }
+
+#[test]
+fn test_flightsql_url_option_replaces_host() {
+    Command::cargo_bin("dft")
+        .unwrap()
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(contains_str("--url <URL>"));
+    Command::cargo_bin("dft")
+        .unwrap()
+        .args(["--host", "http://localhost:50051"])
+        .assert()
+        .failure()
+        .stderr(contains_str("unexpected argument '--host'"));
+}

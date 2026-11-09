@@ -78,10 +78,10 @@ dft --print-format-options vortex
 
 ## FlightSQL Mode
 
-Use `--flightsql` or `-q` to run commands or files against a FlightSQL server (instead of the default local SessionContext). You can override the default host for that single command with --host
+Use `--flightsql` or `-q` to run commands or files against a FlightSQL server (instead of the default local SessionContext). Use `--url` to override the configured connection URL for one command.
 
 ```sh
-dft -f query.sql --flightsql --host "http://127.0.0.1:50052"
+dft -f query.sql --flightsql --url "http://127.0.0.1:50052"
 ```
 
 ### FlightSQL Commands

@@ -431,12 +431,12 @@ impl TuiExecution {
     #[cfg(feature = "flightsql")]
     pub async fn create_flightsql_client(
         &self,
-        cli_host: Option<String>,
+        cli_url: Option<String>,
         cli_headers: Option<HashMap<String, String>>,
     ) -> Result<()> {
         self.inner
             .flightsql_ctx()
-            .create_client(cli_host, cli_headers)
+            .create_client(cli_url, cli_headers)
             .await
     }
 
