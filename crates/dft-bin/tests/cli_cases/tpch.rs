@@ -19,6 +19,7 @@
 
 use crate::config::TestConfigBuilder;
 use assert_cmd::Command;
+#[cfg(feature = "s3")]
 use object_store::{aws::AmazonS3Builder, path::Path, ObjectStore};
 
 #[test]
@@ -52,6 +53,7 @@ fn test_custom_config() {
     })
 }
 
+#[cfg(feature = "s3")]
 #[tokio::test]
 async fn test_custom_config_with_s3() {
     let mut config_builder = TestConfigBuilder::default();

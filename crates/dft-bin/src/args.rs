@@ -78,6 +78,13 @@ pub struct DftArgs {
     )]
     pub flightsql: bool,
 
+    #[clap(
+        long,
+        help = "Start an inline SQL prompt (the default when built without TUI)",
+        conflicts_with_all = ["files", "commands", "bench", "analyze", "output", "concat", "save", "run_before", "benchmark_iterations", "concurrent", "append", "print_format_options", "print_headers", "headers_only"]
+    )]
+    pub repl: bool,
+
     #[clap(long, help = "Run DDL prior to executing")]
     pub run_ddl: bool,
 

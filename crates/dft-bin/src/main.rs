@@ -16,20 +16,23 @@
 // under the License.
 
 use clap::Parser;
-#[cfg(not(feature = "tui"))]
-use color_eyre::eyre::eyre;
 use color_eyre::Result;
 use datafusion_dft::args::Command;
 #[cfg(any(feature = "flightsql", feature = "http"))]
 use datafusion_dft::server;
 #[cfg(feature = "tui")]
 use datafusion_dft::tui;
-use datafusion_dft::{args::DftArgs, cli, config::create_config, tpch};
+use datafusion_dft::{args::DftArgs, cli, config::create_config, repl, tpch};
 #[cfg(feature = "http")]
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 fn main() -> Result<()> {
     let cli = DftArgs::parse();
+    if cli.repl && cli.command.is_some() {
+        return Err(color_eyre::eyre::eyre!(
+            "--repl cannot be combined with a subcommand"
+        ));
+    }
 
     if let Some(format) = cli.print_format_options {
         cli::print_format_options(format);
@@ -137,23 +140,11 @@ async fn app_entry_point(cli: DftArgs) -> Result<()> {
 
     if !cli.files.is_empty() || !cli.commands.is_empty() {
         cli::try_run(cli, cfg).await?;
+    } else if cli.repl || !cfg!(feature = "tui") {
+        repl::try_run(cli, cfg).await?;
     } else {
         #[cfg(feature = "tui")]
-        {
-            tui::try_run(cli, cfg).await?;
-        }
-        #[cfg(not(feature = "tui"))]
-        {
-            return Err(eyre!(
-                "TUI is not enabled in this build.\n\n\
-                 To use the TUI interface, rebuild with:\n    \
-                 cargo install datafusion-dft --features=tui\n\n\
-                 Or use the CLI interface:\n    \
-                 dft -c \"SELECT 1 + 2\"\n    \
-                 dft -f query.sql\n\n\
-                 For more information, run: dft --help"
-            ));
-        }
+        tui::try_run(cli, cfg).await?;
     }
 
     Ok(())

@@ -20,6 +20,7 @@ pub mod cli;
 pub mod config;
 pub mod db;
 pub mod execution;
+pub mod repl;
 #[cfg(any(feature = "flightsql", feature = "http"))]
 pub mod server;
 #[cfg(feature = "tui")]

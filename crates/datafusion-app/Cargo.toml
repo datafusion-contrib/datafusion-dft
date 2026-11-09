@@ -44,6 +44,7 @@ opendal = { features = [
   "services-huggingface",
 ], optional = true, workspace = true }
 parking_lot.workspace = true
+prost = { optional = true, workspace = true }
 rustls = { optional = true, workspace = true }
 serde.workspace = true
 tokio = { features = ["rt-multi-thread"], workspace = true }
@@ -64,7 +65,7 @@ criterion = { features = ["async_tokio"], workspace = true }
 [features]
 default = ["functions-parquet"]
 deltalake = ["dep:deltalake"]
-flightsql = ["dep:arrow-flight", "dep:base64", "dep:tonic"]
+flightsql = ["dep:arrow-flight", "dep:base64", "dep:prost", "dep:tonic"]
 functions-arrow = ["dep:datafusion-functions-arrow"]
 functions-json = ["dep:datafusion-functions-json"]
 functions-parquet = ["dep:datafusion-functions-parquet"]

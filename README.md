@@ -9,12 +9,13 @@
 - **Extensibility**: UDFs defined in WASM
 - **Helper Functions**: Built-in functions for JSON and Parquet data processing
 
-The project offers four complementary interfaces:
+The project offers five complementary interfaces:
 
 1. **Text User Interface (TUI)**: An interactive SQL IDE with real-time query analysis, benchmarking, and catalog exploration (requires `tui` feature)
-2. **Command Line Interface (CLI)**: A scriptable engine for executing queries from files or command line
-3. **FlightSQL Server**: A standards-compliant SQL interface for programmatic access (requires `flightsql` feature)
-4. **HTTP Server**: A REST API for SQL queries and catalog exploration (requires `http` feature)
+2. **Inline SQL prompt (REPL)**: A persistent SQL editor with terminal scrollback, local execution, and optional FlightSQL connections
+3. **Command Line Interface (CLI)**: A scriptable engine for executing queries from files or command line
+4. **FlightSQL Server**: A standards-compliant SQL interface for programmatic access (requires `flightsql` feature)
+5. **HTTP Server**: A REST API for SQL queries and catalog exploration (requires `http` feature)
 
 All interfaces share the same execution engine, allowing you to develop locally with the TUI and then seamlessly deploy with the server implementations.
 
@@ -80,13 +81,19 @@ cargo install datafusion-dft --features=udfs-wasm
 
 See the [Features documentation](docs/features.md) for all available features.
 
-**Note**: The TUI (Text User Interface) is optional and requires the `tui` feature flag. The CLI, FlightSQL server, and HTTP server are always available.
+**Note**: The TUI (Text User Interface) is optional and requires the `tui` feature flag. The CLI and inline SQL prompt are always available. Servers require their corresponding feature flags.
 
 ### Running the apps
 
 ```sh
-# Interactive TUI (requires `tui` feature)
+# Interactive prompt, or full TUI when built with the `tui` feature
 dft
+
+# Inline SQL prompt in any build
+dft --repl
+
+# Inline FlightSQL prompt (requires `flightsql` feature)
+dft --repl -q
 
 # CLI with direct query execution
 dft -c "SELECT 1 + 2"

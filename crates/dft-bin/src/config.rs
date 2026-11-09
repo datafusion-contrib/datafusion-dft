@@ -122,6 +122,9 @@ impl Default for FlightSQLServerConfig {
 #[cfg(feature = "flightsql")]
 #[derive(Clone, Debug, Deserialize)]
 pub struct FlightSQLClientConfig {
+    /// Connection lifetime for the inline SQL prompt.
+    #[serde(default)]
+    pub connection_mode: ConnectionMode,
     #[serde(default = "default_connection_url")]
     pub connection_url: String,
     #[serde(default = "default_benchmark_iterations")]
@@ -146,6 +149,7 @@ pub struct FlightSQLClientConfig {
 impl Default for FlightSQLClientConfig {
     fn default() -> Self {
         Self {
+            connection_mode: ConnectionMode::default(),
             connection_url: default_connection_url(),
             benchmark_iterations: default_benchmark_iterations(),
             auth: default_auth_config(),
@@ -155,6 +159,16 @@ impl Default for FlightSQLClientConfig {
             max_encoding_message_size: None,
         }
     }
+}
+
+/// REPL FlightSQL connection policy. Queries are never automatically retried.
+#[cfg(feature = "flightsql")]
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ConnectionMode {
+    #[default]
+    Persistent,
+    PerStatement,
 }
 
 #[cfg(feature = "http")]

@@ -56,3 +56,5 @@ pub fn assert_output_contains(files: Vec<NamedTempFile>, expected_output: &str) 
 
     assert.stdout(contains_str(expected_output));
 }
+
+mod repl;
