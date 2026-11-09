@@ -74,10 +74,10 @@ impl FlightSQLContext {
     /// Create FlightSQL client from users FlightSQL config
     pub async fn create_client(
         &self,
-        cli_host: Option<String>,
+        cli_url: Option<String>,
         cli_headers: Option<HashMap<String, String>>,
     ) -> Result<()> {
-        let final_url = cli_host.unwrap_or(self.config.connection_url.clone());
+        let final_url = cli_url.unwrap_or(self.config.connection_url.clone());
         let url = Box::leak(final_url.into_boxed_str());
         info!("Connecting to FlightSQL host: {}", url);
         let channel = Channel::from_static(url).connect().await;
@@ -135,6 +135,11 @@ impl FlightSQLContext {
         progress_reporter: Option<Arc<dyn BenchmarkProgressReporter>>,
     ) -> Result<FlightSQLBenchmarkStats> {
         let iterations = cli_iterations.unwrap_or(self.config.benchmark_iterations);
+        if iterations == 0 {
+            return Err(eyre::eyre!(
+                "Benchmark iterations must be greater than zero"
+            ));
+        }
         let dialect = datafusion::sql::sqlparser::dialect::GenericDialect {};
         let statements = DFParser::parse_sql_with_dialect(query, &dialect)?;
 

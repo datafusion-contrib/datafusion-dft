@@ -51,6 +51,45 @@ impl std::fmt::Display for DurationsSummary {
     }
 }
 
+/// Median and population standard deviation for benchmark durations.
+#[derive(Debug, Clone, Copy)]
+pub struct ComparisonDuration {
+    pub median: Duration,
+    pub stddev: Duration,
+}
+
+impl ComparisonDuration {
+    pub fn from_samples(samples: &[Duration]) -> Self {
+        if samples.is_empty() {
+            return Self {
+                median: Duration::ZERO,
+                stddev: Duration::ZERO,
+            };
+        }
+        let mut sorted = samples.to_vec();
+        sorted.sort();
+        let mean = samples.iter().map(Duration::as_secs_f64).sum::<f64>() / samples.len() as f64;
+        let variance = samples
+            .iter()
+            .map(|d| (d.as_secs_f64() - mean).powi(2))
+            .sum::<f64>()
+            / samples.len() as f64;
+        Self {
+            median: sorted[sorted.len() / 2],
+            stddev: Duration::from_secs_f64(variance.sqrt()),
+        }
+    }
+}
+
+/// Timing components for one benchmark query.
+#[derive(Debug)]
+pub struct ComparisonStats {
+    pub runs: usize,
+    pub mode: BenchmarkMode,
+    pub components: Vec<ComparisonDuration>,
+    pub rows_match: bool,
+}
+
 /// Benchmark execution mode
 #[derive(Debug, Default, Clone, Copy, PartialEq)]
 pub enum BenchmarkMode {
@@ -137,6 +176,23 @@ impl LocalBenchmarkStats {
         }
     }
 
+    pub fn comparison_stats(&self) -> ComparisonStats {
+        ComparisonStats {
+            runs: self.runs,
+            mode: self.mode,
+            components: [
+                &self.logical_planning_durations,
+                &self.physical_planning_durations,
+                &self.execution_durations,
+                &self.total_durations,
+            ]
+            .iter()
+            .map(|samples| ComparisonDuration::from_samples(samples))
+            .collect(),
+            rows_match: is_all_same(&self.rows),
+        }
+    }
+
     pub fn to_summary_csv_row(&self) -> String {
         let mut csv = String::new();
         let logical_planning_summary = self.summarize(&self.logical_planning_durations);
@@ -206,4 +262,17 @@ pub trait BenchmarkProgressReporter: Send + Sync {
 
     /// Called when benchmark completes
     fn finish(&self);
+}
+
+#[cfg(test)]
+mod comparison_tests {
+    use super::*;
+
+    #[test]
+    fn comparison_duration_uses_population_standard_deviation() {
+        let samples = [1, 2, 3].map(Duration::from_millis);
+        let result = ComparisonDuration::from_samples(&samples);
+        assert_eq!(result.median, Duration::from_millis(2));
+        assert!((result.stddev.as_secs_f64() - 0.0008164966).abs() < 0.00000001);
+    }
 }
