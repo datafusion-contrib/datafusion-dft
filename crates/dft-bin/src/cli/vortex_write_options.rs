@@ -24,6 +24,11 @@
 //!
 //! Keep the pipeline in [`build_leaf`] in sync with `vortex_file::WriteStrategyBuilder::build`
 //! when the pinned Vortex version changes.
+//!
+//! When no options are given, no custom strategy is built and the Vortex writer uses its own
+//! default. A custom strategy bypasses the edition filter that the Vortex writer applies to its
+//! default compressor, so every compressor built here is restricted to the array encodings that
+//! the session's enabled editions permit (see [`allowed_array_encodings`]).
 
 use color_eyre::eyre::{eyre, Result};
 use datafusion::arrow::datatypes::{DataType, Schema};
@@ -31,6 +36,8 @@ use std::collections::HashMap;
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::sync::OnceLock;
+use vortex::array::session::ArraySessionExt;
+use vortex::array::ArrayId;
 use vortex::compressor::{BtrBlocksCompressorBuilder, Scheme};
 use vortex::dtype::FieldPath;
 use vortex::layout::layouts::buffered::BufferedStrategy;
@@ -43,7 +50,11 @@ use vortex::layout::layouts::list::writer::ListLayoutStrategy;
 use vortex::layout::layouts::repartition::{RepartitionStrategy, RepartitionWriterOptions};
 use vortex::layout::layouts::table::{use_experimental_list_layout, TableStrategy};
 use vortex::layout::layouts::zoned::writer::{ZonedLayoutOptions, ZonedStrategy};
+use vortex::editions::{ComponentKind, EditionSessionExt};
 use vortex::layout::LayoutStrategy;
+use vortex::utils::aliases::hash_set::HashSet;
+use vortex::VortexSessionDefault;
+use vortex_session::VortexSession;
 use vortex_btrblocks::schemes::{binary, float, integer, string};
 use vortex_btrblocks::{SchemeExt, ALL_SCHEMES};
 
@@ -65,6 +76,8 @@ const COMPACT_SCHEMES: &[&dyn Scheme] = &[
 /// Parsed `--format-option` values for a `.vortex` output file.
 #[derive(Debug)]
 pub struct VortexWriteConfig {
+    /// True when at least one option was given. When false, the Vortex default strategy is used.
+    customized: bool,
     row_block_size: usize,
     data_block_target_bytes: Option<u64>,
     compact: bool,
@@ -83,6 +96,7 @@ struct ColumnOverride {
 impl Default for VortexWriteConfig {
     fn default() -> Self {
         Self {
+            customized: false,
             row_block_size: DEFAULT_ROW_BLOCK_SIZE,
             data_block_target_bytes: Some(DEFAULT_DATA_BLOCK_TARGET_BYTES),
             compact: false,
@@ -95,7 +109,10 @@ impl Default for VortexWriteConfig {
 impl VortexWriteConfig {
     /// Parse `--format-option KEY=VALUE` pairs. The optional `format.` prefix is accepted.
     pub fn parse(options: &[(String, String)]) -> Result<Self> {
-        let mut config = Self::default();
+        let mut config = Self {
+            customized: !options.is_empty(),
+            ..Self::default()
+        };
         for (key, value) in options {
             let key = key.strip_prefix("format.").unwrap_or(key);
             match key {
@@ -180,14 +197,29 @@ impl VortexWriteConfig {
         self.columns.last_mut().expect("a column was just pushed")
     }
 
-    /// Build the layout strategy. Every column uses the same pipeline; only the compressor and
-    /// the zone-map layer differ per column, so overrides keep zone maps unless disabled.
-    pub fn build_strategy(&self, schema: &Schema) -> Result<Arc<dyn LayoutStrategy>> {
+    /// Build the layout strategy.
+    ///
+    /// Returns `None` when no options were given, so that the Vortex writer uses its own default
+    /// strategy. Otherwise every column uses the same pipeline; only the compressor and the
+    /// zone-map layer differ per column, so overrides keep zone maps unless disabled.
+    ///
+    /// `allowed` is the set of array encodings that the writer will accept. All compressors are
+    /// restricted to it, and a forced encoding outside of it is an error.
+    pub fn build_strategy(
+        &self,
+        schema: &Schema,
+        allowed: &HashSet<ArrayId>,
+    ) -> Result<Option<Arc<dyn LayoutStrategy>>> {
+        if !self.customized {
+            return Ok(None);
+        }
+
         let base = if self.compact {
             BtrBlocksCompressorBuilder::default().with_compact()
         } else {
             BtrBlocksCompressorBuilder::default()
-        };
+        }
+        .retain_allowed_encodings(allowed);
         let stats_compressor: Arc<dyn CompressorPlugin> = Arc::new(base.clone().build());
         let default_data_compressor: Arc<dyn CompressorPlugin> = Arc::new(
             base.clone()
@@ -222,6 +254,13 @@ impl VortexWriteConfig {
             let data_compressor: Arc<dyn CompressorPlugin> = match &column.encoding {
                 Some(raw) => {
                     let scheme = resolve_scheme(raw, kind, &column.name)?;
+                    if !scheme_allowed(scheme, allowed) {
+                        return Err(eyre!(
+                            "Encoding '{}' for column '{}' is not permitted by the enabled Vortex editions",
+                            scheme.scheme_name(),
+                            column.name
+                        ));
+                    }
                     Arc::new(
                         BtrBlocksCompressorBuilder::empty()
                             .with_new_scheme(scheme)
@@ -273,8 +312,29 @@ impl VortexWriteConfig {
             );
         }
 
-        Ok(Arc::new(table))
+        Ok(Some(Arc::new(table)))
     }
+}
+
+/// The array encodings that the session's enabled editions permit a writer to emit.
+///
+/// This mirrors the set that `vortex_file::VortexWriteOptions` passes to
+/// `BtrBlocksCompressorBuilder::retain_allowed_encodings` for its default strategy.
+pub fn allowed_array_encodings(session: &VortexSession) -> HashSet<ArrayId> {
+    let arrays = session.arrays();
+    session
+        .enabled_component_ids(ComponentKind::Array)
+        .iter()
+        .filter_map(|serialized_id| arrays.registry().get(serialized_id))
+        .map(|plugin| plugin.id())
+        .collect()
+}
+
+fn scheme_allowed(scheme: &dyn Scheme, allowed: &HashSet<ArrayId>) -> bool {
+    scheme
+        .produced_encodings()
+        .iter()
+        .all(|id| allowed.contains(id))
 }
 
 fn flat_strategy() -> Arc<dyn LayoutStrategy> {
@@ -512,11 +572,16 @@ pub fn print_options() {
     );
 
     println!("\nAvailable encodings by column type:");
-    let mut kinds: Vec<&str> = scheme_entries().iter().map(|entry| entry.kind).collect();
+    let allowed = allowed_array_encodings(&VortexSession::default());
+    let entries: Vec<&SchemeEntry> = scheme_entries()
+        .iter()
+        .filter(|entry| scheme_allowed(entry.scheme, &allowed))
+        .collect();
+    let mut kinds: Vec<&str> = entries.iter().map(|entry| entry.kind).collect();
     kinds.sort_unstable();
     kinds.dedup();
     for kind in kinds {
-        let mut shorts: Vec<&str> = scheme_entries()
+        let mut shorts: Vec<&str> = entries
             .iter()
             .filter(|entry| entry.kind == kind)
             .map(|entry| entry.short)
