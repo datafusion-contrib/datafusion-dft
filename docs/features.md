@@ -288,6 +288,46 @@ WHERE property IN ('rocksdb.estimate-num-keys', 'rocksdb.total-sst-files-size');
 
 Per-SST table properties (compression, block counts) and SST sequence number ranges are not exposed by the Rust `rocksdb` binding and are therefore not included.
 
+### Vortex (`--features=vortex`)
+
+Adds support for the [Vortex](https://vortex.dev) file format (`STORED AS VORTEX` and `.vortex` output files), and table functions from [datafusion-functions-vortex](https://github.com/datafusion-contrib/datafusion-dft/tree/main/crates/datafusion-functions-vortex) for inspecting Vortex files with SQL.  Each function takes a local file path.  `node_id` is the depth-first index of a layout node and is the same in every function, so their results can be joined.
+
+`vortex_file_metadata` returns one summary row: row count, file, footer, and data sizes, segment and field counts, the root DType, and a count of each layout type.  `vortex_schema` returns one row per node of the DType tree, and `vortex_field_stats` returns the file-level statistics (min, max, sum, null count, NaN count) and the compressed size of each top-level field:
+
+```sql
+SELECT * FROM vortex_file_metadata('data.vortex');
+SELECT path, type_kind, dtype, nullable FROM vortex_schema('data.vortex');
+SELECT field_name, min, max, null_count, compressed_size FROM vortex_field_stats('data.vortex');
+```
+
+`vortex_layout` returns one row per node of the layout tree (struct, chunked, zoned, dict, and flat layouts) with its field path, role (`data`, `zone_map`, `dict_values`, `validity`), absolute row offset, row count, segments, and zone map settings.  `vortex_segments` returns one row per segment with its byte range and owning layout node:
+
+```sql
+SELECT node_id, parent_id, path, encoding, row_offset, row_count, zone_len FROM vortex_layout('data.vortex');
+SELECT role, count(*), sum(length) FROM vortex_segments('data.vortex') GROUP BY role;
+```
+
+`vortex_zone_map` returns the per-zone pruning statistics in long format (one row per zone and aggregate, for example `min`, `max`, and `null_count`).  An optional second argument selects one column:
+
+```sql
+SELECT zone_id, first_row, num_rows, aggregate, value FROM vortex_zone_map('data.vortex', 'id');
+```
+
+`vortex_encodings` decodes each data segment into its array encoding tree, without decompressing it, and returns one row per array node with its encoding (for example `fastlanes.bitpacked` or `vortex.alp`), size, and encoding metadata.  `vortex_compression` returns the compressed and uncompressed size of each top-level field, the compression ratio, and the encodings used.  These two functions read the data segments, so their cost is proportional to the file size:
+
+```sql
+SELECT path, encoding, count(*), sum(buffer_bytes) FROM vortex_encodings('data.vortex') GROUP BY 1, 2;
+SELECT field_name, compressed_size, uncompressed_size, compression_ratio, encodings FROM vortex_compression('data.vortex');
+```
+
+`vortex_kv_metadata` returns the user-defined metadata segments, `vortex_dictionary` returns the values of the dictionary layouts of a column, and `vortex_rows` reads the rows in the half-open range `[start, end)`:
+
+```sql
+SELECT key, value FROM vortex_kv_metadata('data.vortex');
+SELECT dictionary_index, value FROM vortex_dictionary('data.vortex', 'category');
+SELECT * FROM vortex_rows('data.vortex', 100, 200);
+```
+
 ## External Features
 
 `dft` also has several external optional (conditionally compiled features) integrations which are controlled by [Rust Crate Features]

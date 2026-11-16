@@ -1054,7 +1054,9 @@ impl CliApp {
 struct VortexFileWriter {
     path: PathBuf,
     batches: Vec<RecordBatch>,
-    strategy: Arc<dyn LayoutStrategy>,
+    session: VortexSession,
+    /// `None` uses the Vortex default strategy.
+    strategy: Option<Arc<dyn LayoutStrategy>>,
 }
 
 #[cfg(feature = "vortex")]
@@ -1063,13 +1065,15 @@ impl VortexFileWriter {
         file: File,
         _schema: SchemaRef,
         path: &Path,
-        strategy: Arc<dyn LayoutStrategy>,
+        session: VortexSession,
+        strategy: Option<Arc<dyn LayoutStrategy>>,
     ) -> Result<Self> {
         // We need to drop the std::fs::File and use tokio::fs::File later
         drop(file);
         Ok(Self {
             path: path.to_path_buf(),
             batches: Vec::new(),
+            session,
             strategy,
         })
     }
@@ -1093,8 +1097,8 @@ impl VortexFileWriter {
         let concatenated = datafusion::arrow::compute::concat_batches(&schema, &self.batches)?;
 
         // Convert to Vortex array
-        let session = VortexSession::default();
-        let vortex_array = session
+        let vortex_array = self
+            .session
             .arrow()
             .from_arrow_record_batch(concatenated, &schema)
             .map_err(|e| eyre!("{}", e))?;
@@ -1103,8 +1107,11 @@ impl VortexFileWriter {
         let stream = vortex_array.to_array_stream();
 
         // Write using async API
-        VortexWriteOptions::new(session)
-            .with_strategy(self.strategy)
+        let mut options = VortexWriteOptions::new(self.session);
+        if let Some(strategy) = self.strategy {
+            options = options.with_strategy(strategy);
+        }
+        options
             .write(file, stream)
             .await
             .map_err(|e| eyre!("Failed to write Vortex file: {}", e))?;
@@ -1190,10 +1197,12 @@ fn path_to_writer(
                 #[cfg(feature = "vortex")]
                 "vortex" => {
                     let config = vortex_write_options::VortexWriteConfig::parse(format_options)?;
-                    let strategy = config.build_strategy(schema.as_ref())?;
+                    let session = VortexSession::default();
+                    let allowed = vortex_write_options::allowed_array_encodings(&session);
+                    let strategy = config.build_strategy(schema.as_ref(), &allowed)?;
                     let file = std::fs::File::create(path)?;
                     Ok(AnyWriter::Vortex(VortexFileWriter::new(
-                        file, schema, path, strategy,
+                        file, schema, path, session, strategy,
                     )?))
                 }
                 _ => {

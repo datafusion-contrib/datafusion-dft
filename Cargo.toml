@@ -11,6 +11,7 @@ datafusion-app = { path = "crates/datafusion-app" }
 datafusion-functions-arrow = { path = "crates/datafusion-functions-arrow" }
 datafusion-functions-parquet = { path = "crates/datafusion-functions-parquet" }
 datafusion-functions-rocksdb = { path = "crates/datafusion-functions-rocksdb" }
+datafusion-functions-vortex = { path = "crates/datafusion-functions-vortex" }
 datafusion-net = { path = "crates/datafusion-net" }
 datafusion-udfs-wasm = { path = "crates/datafusion-udfs-wasm" }
 ###

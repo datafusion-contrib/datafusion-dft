@@ -12,6 +12,7 @@ version = "0.1.1"
 datafusion-functions-arrow = { optional = true, workspace = true }
 datafusion-functions-parquet = { optional = true, workspace = true }
 datafusion-functions-rocksdb = { optional = true, workspace = true }
+datafusion-functions-vortex = { optional = true, workspace = true }
 datafusion-net = { optional = true, workspace = true }
 datafusion-udfs-wasm = { features = [
   "serde",
@@ -75,7 +76,7 @@ net = ["datafusion-net/live", "dep:datafusion-net"]
 observability = ["dep:metrics", "dep:tokio-metrics"]
 s3 = ["object_store/aws", "url"]
 udfs-wasm = ["dep:datafusion-udfs-wasm"]
-vortex = ["dep:vortex-datafusion"]
+vortex = ["dep:datafusion-functions-vortex", "dep:vortex-datafusion"]
 websocket = ["dep:rustls", "dep:tokio-tungstenite"]
 
 [lints]

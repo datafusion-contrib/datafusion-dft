@@ -498,6 +498,7 @@ jobs:
         uses: ./.github/actions/setup-rust
       - name: Run Vortex tests
         run: |
+          cargo test --manifest-path crates/datafusion-functions-vortex/Cargo.toml
           cargo test --features=vortex extension_cases::vortex
   test-crate-functions-parquet:
     name: Crate / Functions-Parquet
