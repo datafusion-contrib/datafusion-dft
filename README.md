@@ -69,7 +69,7 @@ cargo install datafusion-dft --features=net
 # With the rocksdb_* table functions for inspecting RocksDB databases
 cargo install datafusion-dft --features=functions-rocksdb
 
-# With Vortex file format support
+# With Vortex file format support and the vortex_* inspection table functions
 cargo install datafusion-dft --features=vortex
 
 # With HuggingFace dataset integration

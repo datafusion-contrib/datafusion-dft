@@ -188,6 +188,11 @@ impl ExecutionContext {
             );
         }
 
+        #[cfg(feature = "vortex")]
+        for (name, func) in datafusion_functions_vortex::all_functions() {
+            session_ctx.register_udtf(name, func);
+        }
+
         session_ctx.register_udtf(
             "stdin",
             Arc::new(crate::tables::stdin::StdinFunc::default()),

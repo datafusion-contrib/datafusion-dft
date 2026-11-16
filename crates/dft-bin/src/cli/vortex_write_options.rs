@@ -40,6 +40,7 @@ use vortex::array::session::ArraySessionExt;
 use vortex::array::ArrayId;
 use vortex::compressor::{BtrBlocksCompressorBuilder, Scheme};
 use vortex::dtype::FieldPath;
+use vortex::editions::{ComponentKind, EditionSessionExt};
 use vortex::layout::layouts::buffered::BufferedStrategy;
 use vortex::layout::layouts::chunked::writer::ChunkedLayoutStrategy;
 use vortex::layout::layouts::collect::CollectStrategy;
@@ -50,13 +51,12 @@ use vortex::layout::layouts::list::writer::ListLayoutStrategy;
 use vortex::layout::layouts::repartition::{RepartitionStrategy, RepartitionWriterOptions};
 use vortex::layout::layouts::table::{use_experimental_list_layout, TableStrategy};
 use vortex::layout::layouts::zoned::writer::{ZonedLayoutOptions, ZonedStrategy};
-use vortex::editions::{ComponentKind, EditionSessionExt};
 use vortex::layout::LayoutStrategy;
 use vortex::utils::aliases::hash_set::HashSet;
 use vortex::VortexSessionDefault;
-use vortex_session::VortexSession;
 use vortex_btrblocks::schemes::{binary, float, integer, string};
 use vortex_btrblocks::{SchemeExt, ALL_SCHEMES};
+use vortex_session::VortexSession;
 
 /// Default row block size. Matches `vortex_file::WriteStrategyBuilder`.
 const DEFAULT_ROW_BLOCK_SIZE: usize = 8192;

@@ -2575,6 +2575,7 @@ dependencies = [
  "datafusion-functions-json",
  "datafusion-functions-parquet",
  "datafusion-functions-rocksdb",
+ "datafusion-functions-vortex",
  "datafusion-net",
  "datafusion-udfs-wasm",
  "deltalake",
@@ -3126,6 +3127,18 @@ dependencies = [
  "datafusion-physical-expr",
  "datafusion-physical-plan",
  "parking_lot",
+]
+
+[[package]]
+name = "datafusion-functions-vortex"
+version = "0.1.0"
+dependencies = [
+ "arrow",
+ "datafusion",
+ "futures",
+ "tempfile",
+ "tokio",
+ "vortex",
 ]
 
 [[package]]

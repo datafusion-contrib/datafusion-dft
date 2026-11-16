@@ -121,6 +121,7 @@ cargo test --manifest-path crates/datafusion-functions-arrow/Cargo.toml
 cargo test --manifest-path crates/datafusion-udfs-wasm/Cargo.toml
 cargo test --manifest-path crates/datafusion-net/Cargo.toml --all-features
 cargo test --manifest-path crates/datafusion-functions-rocksdb/Cargo.toml
+cargo test --manifest-path crates/datafusion-functions-vortex/Cargo.toml
 
 # Run a single test
 cargo test <test_name>
@@ -180,6 +181,8 @@ The project is organized as a workspace with multiple crates:
 
 - **`crates/datafusion-functions-rocksdb`**: RocksDB database inspection table functions — `rocksdb_metadata` (DB-level summary), `rocksdb_sstables` (one row per live SST file), `rocksdb_cf_metadata` (column-family size and file count), and `rocksdb_cf_metrics` (per-column-family RocksDB properties in long format); databases are opened read-only so live databases can be inspected
 
+- **`crates/datafusion-functions-vortex`**: Vortex file inspection table functions — `vortex_file_metadata`, `vortex_schema`, `vortex_field_stats` (file-level statistics), `vortex_layout` (layout tree), `vortex_zone_map` (per-zone statistics in long format), `vortex_segments`, `vortex_encodings` (array encoding tree per data segment), `vortex_compression`, `vortex_kv_metadata`, `vortex_dictionary`, and `vortex_rows`; registered by the `vortex` feature. File I/O runs on a Vortex `CurrentThreadRuntime` on the planning thread
+
 - **`crates/datafusion-auth`**: Authentication implementations
 
 - **`crates/datafusion-ffi-table-providers`**: FFI table provider support
@@ -223,7 +226,7 @@ The project uses extensive feature flags to keep binary size manageable:
 # publishes a DataFusion 55 release. The gated code remains in the tree (see
 # crates/datafusion-app/src/{catalog,extensions}/{clickhouse,mongodb}.rs).
 - `deltalake` - Delta Lake table format support
-- `vortex` - Vortex file format support
+- `vortex` - Vortex file format support and the `vortex_*` inspection table functions
 - `flightsql` - FlightSQL server and client
 - `http` - HTTP server
 - `huggingface` - HuggingFace dataset integration
